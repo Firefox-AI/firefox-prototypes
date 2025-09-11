@@ -31,6 +31,7 @@
   Services.scriptloader.loadSubScript("chrome://browser/content/places/places-menupopup.js", this);
   Services.scriptloader.loadSubScript("chrome://browser/content/search/autocomplete-popup.js", this);
   Services.scriptloader.loadSubScript("chrome://browser/content/search/searchbar.js", this);
+  Services.scriptloader.loadSubScript("chrome://browser/content/browser-smart-window.js", this);
 }
 
 window.onload = gBrowserInit.onLoad.bind(gBrowserInit);
