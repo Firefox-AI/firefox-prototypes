@@ -1692,6 +1692,30 @@ function toOpenWindowByType(inType, uri, features) {
 function OpenBrowserWindow(options = {}) {
   let timerId = Glean.browserTimings.newWindow.start();
 
+  // Pass Smart Window state to new window
+  if (window.SmartWindow && window.SmartWindow._smartWindowActive) {
+    // Create a new property bag for extra options
+    const extraOptions = Cc["@mozilla.org/hash-property-bag;1"].createInstance(
+      Ci.nsIWritablePropertyBag2
+    );
+    extraOptions.setPropertyAsBool("smartWindowActive", true);
+
+    // Create the args array with null URI and our extraOptions
+    const argsArray = Cc["@mozilla.org/array;1"].createInstance(
+      Ci.nsIMutableArray
+    );
+
+    // Add null for URI (position 0)
+    argsArray.appendElement(null);
+    // Add extraOptions (position 1)
+    argsArray.appendElement(extraOptions);
+
+    options.args = argsArray;
+    console.log(
+      "[OpenBrowserWindow] Passing Smart Window state to new window via extraOptions"
+    );
+  }
+
   let win = BrowserWindowTracker.openWindow({
     openerWindow: window,
     ...options,
