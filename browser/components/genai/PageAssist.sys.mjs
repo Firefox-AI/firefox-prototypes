@@ -29,7 +29,7 @@ export const PageAssist = {
 
     // TODO: Call AI API here with prompt and page context
     const mockAiResponse = `
-      This is a placeholder response from the AI model
+      This is a placeholder response from the AI model!
       ** User Prompt: ${userPrompt}
       ** Page URL: ${pageData.url}
       ** Page Title: ${pageData.title}
