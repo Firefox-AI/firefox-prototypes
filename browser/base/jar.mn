@@ -10,6 +10,7 @@ browser.jar:
         content/browser/aboutDialog.css               (content/aboutDialog.css)
         content/browser/aboutRestartRequired.js       (content/aboutRestartRequired.js)
         content/browser/aboutRestartRequired.xhtml    (content/aboutRestartRequired.xhtml)
+        content/browser/browser-smart-window.js       (content/browser-smart-window.js)
         content/browser/aboutRobots.xhtml             (content/aboutRobots.xhtml)
         content/browser/aboutRobots.js                (content/aboutRobots.js)
         content/browser/aboutRobots.css               (content/aboutRobots.css)
