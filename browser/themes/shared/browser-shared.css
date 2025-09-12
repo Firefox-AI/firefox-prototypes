@@ -1408,3 +1408,13 @@ popupnotificationcontent {
 #bookmarksToolbarFolderMenu {
   --menuitem-icon: url("chrome://browser/skin/places/bookmarksToolbar.svg");
 }
+
+/* Default opaque background for all browsers */
+browser {
+  background-color: -moz-Dialog;
+}
+
+/* Smart Window mode - allow transparency for blank pages */
+:root[smart-window] browser[transparent][isblankpage] {
+  background-color: transparent;
+}
