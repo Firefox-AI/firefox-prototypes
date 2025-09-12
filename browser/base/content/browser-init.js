@@ -529,6 +529,8 @@ var gBrowserInit = {
       // Enable the Restore Last Session command if needed
       gRestoreLastSessionObserver.init();
 
+      SmartWindow.init();
+
       SidebarController.startDelayedLoad();
 
       PanicButtonNotifier.init();
@@ -1062,6 +1064,8 @@ var gBrowserInit = {
 
     gExtensionsNotifications.uninit();
     gUnifiedExtensions.uninit();
+
+    SmartWindow.shutdown();
 
     try {
       gBrowser.removeProgressListener(window.XULBrowserWindow);

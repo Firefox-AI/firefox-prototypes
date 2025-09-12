@@ -1142,6 +1142,9 @@ pref("browser.bookmarks.defaultLocation", "toolbar");
 
 pref("browser.tabs.allow_transparent_browser", false);
 
+// Smart window feature
+pref("browser.smartwindow.enabled", true);
+
 // Scripts & Windows prefs
 pref("dom.disable_open_during_load",              true);
 
