@@ -36,6 +36,10 @@ ChromeUtils.defineLazyGetter(this, "ReferrerInfo", () =>
 Object.defineProperty(this, "BROWSER_NEW_TAB_URL", {
   enumerable: true,
   get() {
+    if (window.SmartWindow && window.SmartWindow.isSmartWindowActive()) {
+      return "chrome://browser/content/smartwindow/smartwindow.html";
+    }
+
     if (PrivateBrowsingUtils.isWindowPrivate(window)) {
       if (
         !PrivateBrowsingUtils.permanentPrivateBrowsing &&
@@ -79,7 +83,8 @@ function isBlankPageURL(aURL) {
     aURL == "about:blank" ||
     aURL == "about:home" ||
     aURL == BROWSER_NEW_TAB_URL ||
-    aURL == "chrome://browser/content/blanktab.html"
+    aURL == "chrome://browser/content/blanktab.html" ||
+    aURL == "chrome://browser/content/smartwindow/smartwindow.html"
   );
 }
 

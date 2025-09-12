@@ -59,9 +59,6 @@ var SmartWindow = {
       const toggleButton = document.getElementById("smart-window-toggle");
       toggleButton?.setAttribute("checked", "true");
 
-      // Notify observers about Smart Window state
-      Services.obs.notifyObservers(window, "smart-window-state-changed");
-
       console.log("[Smart Window] New window Smart Window activated");
     } else {
       // Otherwise restore Smart Window state from session storage
@@ -166,6 +163,12 @@ var SmartWindow = {
     const root = document.documentElement;
     const toggleButton = document.getElementById("smart-window-toggle");
 
+    // Remove any preloaded new tab page browser when switching modes
+    // This ensures the next new tab will use the correct type
+    if (typeof NewTabPagePreloading !== "undefined") {
+      NewTabPagePreloading.removePreloadedBrowser(window);
+    }
+
     if (!this._smartWindowActive) {
       // Activate Smart Window
       this._smartWindowActive = true;
@@ -174,9 +177,6 @@ var SmartWindow = {
 
       // Hide bookmarks toolbar immediately
       updateBookmarkToolbarVisibility();
-
-      // Notify observers about Smart Window state change
-      Services.obs.notifyObservers(window, "smart-window-state-changed");
 
       console.log("Smart Window activated");
 
@@ -192,9 +192,6 @@ var SmartWindow = {
 
       // Restore bookmarks toolbar visibility based on user preference
       updateBookmarkToolbarVisibility();
-
-      // Notify observers about Smart Window state change
-      Services.obs.notifyObservers(window, "smart-window-state-changed");
 
       console.log("Smart Window deactivated");
 
@@ -212,6 +209,31 @@ var SmartWindow = {
   exitSmartWindow() {
     if (this.isSmartWindowActive()) {
       this.toggleSmartWindow();
+    }
+  },
+
+  updateSidebar() {
+    // Check if smart window sidebar is open
+    if (
+      typeof SidebarController !== "undefined" &&
+      SidebarController?.currentID === "viewSmartWindowSidebar" &&
+      SidebarController.browser
+    ) {
+      const currentTab = gBrowser.selectedTab;
+      const currentBrowser = gBrowser.selectedBrowser;
+
+      // Send tab info to the sidebar
+      const actor =
+        SidebarController.browser.browsingContext?.currentWindowGlobal?.getActor(
+          "SmartWindow"
+        );
+      if (actor) {
+        actor.sendAsyncMessage("SmartWindow:TabUpdate", {
+          url: currentBrowser.currentURI.spec,
+          title: currentTab.label,
+          favicon: currentTab.getAttribute("image") || "",
+        });
+      }
     }
   },
 

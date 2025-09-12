@@ -64,6 +64,7 @@ DIRS += [
     "sessionstore",
     "shell",
     "sidebar",
+    "smartwindow",
     "syncedtabs",
     "tabbrowser",
     "tabunloader",

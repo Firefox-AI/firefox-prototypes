@@ -1,0 +1,136 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  color-scheme: light;
+}
+
+.smart-window-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+.search-box {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto 20px;
+}
+
+#search-input {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  outline: none;
+  transition: all 0.2s;
+}
+
+#search-input:focus {
+  border-color: rgba(0, 122, 255, 0.5);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+}
+
+#results-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.result-item {
+  padding: 10px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.result-item:hover {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+/* Sidebar chat mode styles */
+.sidebar-mode .smart-window-container {
+  padding-top: 0;
+}
+
+.sidebar-mode #results-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 20px;
+}
+
+/* Status bar styles */
+.status-bar {
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.9));
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 12px 20px;
+  margin-bottom: 15px;
+  backdrop-filter: blur(10px);
+}
+
+.status-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-favicon {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.status-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.status-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1a1a1a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-url {
+  font-size: 12px;
+  color: #666;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.message {
+  padding: 10px 14px;
+  border-radius: 12px;
+  max-width: 80%;
+  word-wrap: break-word;
+}
+
+.message-user {
+  align-self: flex-end;
+  background: rgba(0, 122, 255, 0.1);
+  color: #000;
+}
+
+.message-assistant {
+  align-self: flex-start;
+  background: rgba(0, 0, 0, 0.05);
+  color: #000;
+}
