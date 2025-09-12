@@ -739,6 +739,7 @@ var gInitialPages = [
   "about:welcome",
   "about:welcomeback",
   "chrome://browser/content/blanktab.html",
+  "chrome://browser/content/smartwindow/smartwindow.html",
 ];
 
 function isInitialPage(url) {
@@ -765,6 +766,28 @@ function updateBookmarkToolbarVisibility() {
     ? "never"
     : gBookmarksToolbarVisibility;
   setToolbarVisibility(BookmarkingUI.toolbar, visibility, false, false);
+}
+
+function updateNavBarForSmartWindow() {
+  const currentURI = gBrowser.currentURI;
+  const isSmartWindowURL =
+    currentURI &&
+    currentURI.spec === "chrome://browser/content/smartwindow/smartwindow.html";
+
+  const navBar = document.getElementById("nav-bar");
+  if (!navBar) {
+    return;
+  }
+
+  // Set attribute on root element for CSS to use
+  if (isSmartWindowURL) {
+    document.documentElement.setAttribute("smart-window-url", "true");
+  } else {
+    document.documentElement.removeAttribute("smart-window-url");
+  }
+
+  // Update smart window sidebar with current tab info
+  SmartWindow.updateSidebar();
 }
 
 // This is a stringbundle-like interface to gBrowserBundle, formerly a getter for
@@ -2254,6 +2277,7 @@ var XULBrowserWindow = {
     // If we've actually changed document, update the toolbar visibility.
     if (!isSameDocument) {
       updateBookmarkToolbarVisibility();
+      updateNavBarForSmartWindow();
     }
 
     let closeOpenPanels = selector => {
