@@ -172,6 +172,9 @@ var SmartWindow = {
       root.setAttribute("smart-window", "true");
       toggleButton?.setAttribute("checked", "true");
 
+      // Hide bookmarks toolbar immediately
+      updateBookmarkToolbarVisibility();
+
       // Notify observers about Smart Window state change
       Services.obs.notifyObservers(window, "smart-window-state-changed");
 
@@ -187,6 +190,9 @@ var SmartWindow = {
       root.removeAttribute("smart-window");
       toggleButton?.removeAttribute("checked");
 
+      // Restore bookmarks toolbar visibility based on user preference
+      updateBookmarkToolbarVisibility();
+
       // Notify observers about Smart Window state change
       Services.obs.notifyObservers(window, "smart-window-state-changed");
 
@@ -199,8 +205,12 @@ var SmartWindow = {
     }
   },
 
+  isSmartWindowActive() {
+    return this._smartWindowActive;
+  },
+
   exitSmartWindow() {
-    if (this._smartWindowActive) {
+    if (this.isSmartWindowActive()) {
       this.toggleSmartWindow();
     }
   },
