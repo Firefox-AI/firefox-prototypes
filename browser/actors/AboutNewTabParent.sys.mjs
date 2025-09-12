@@ -23,7 +23,7 @@ let gSmartWindowObserver = {
         const { actor } = tabDetails;
         // Read the current state from the window's SmartWindow object
         const smartWindowActive =
-          window.SmartWindow?._smartWindowActive || false;
+          window.SmartWindow?.isSmartWindowActive?.() || false;
         const action = {
           type: "SMART_WINDOW_STATE_UPDATE",
           data: { smartWindowActive },
@@ -95,7 +95,7 @@ export class AboutNewTabParent extends JSWindowActorParent {
           }
           let browser = browsingContext.top.embedderElement;
           const window = browser?.ownerGlobal;
-          if (window?.SmartWindow && window?.SmartWindow._smartWindowActive) {
+          if (window?.SmartWindow?.isSmartWindowActive?.()) {
             const action = {
               type: "SMART_WINDOW_STATE_UPDATE",
               data: { smartWindowActive: true },
@@ -135,7 +135,7 @@ export class AboutNewTabParent extends JSWindowActorParent {
         }
         // Check if this window has Smart Window active and notify the new tab
         const window = browser.ownerGlobal;
-        if (window.SmartWindow && window.SmartWindow._smartWindowActive) {
+        if (window.SmartWindow?.isSmartWindowActive?.()) {
           const action = {
             type: "SMART_WINDOW_STATE_UPDATE",
             data: { smartWindowActive: true },
