@@ -183,6 +183,10 @@ export const INITIAL_STATE = {
       },
     },
   },
+  // Smart Window state
+  SmartWindow: {
+    active: false,
+  },
   TimerWidget: {
     // The timer will have 2 types of states, focus and break.
     // Focus will the default state
@@ -1152,6 +1156,15 @@ function ListsWidget(prevState = INITIAL_STATE.ListsWidget, action) {
   }
 }
 
+function SmartWindow(prevState = INITIAL_STATE.SmartWindow, action) {
+  switch (action.type) {
+    case "SMART_WINDOW_STATE_UPDATE":
+      return { ...prevState, active: action.data.smartWindowActive };
+    default:
+      return prevState;
+  }
+}
+
 export const reducers = {
   TopSites,
   App,
@@ -1171,4 +1184,5 @@ export const reducers = {
   TrendingSearch,
   Wallpapers,
   Weather,
+  SmartWindow,
 };

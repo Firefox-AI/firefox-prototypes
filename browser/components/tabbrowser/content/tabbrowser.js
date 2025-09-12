@@ -156,12 +156,6 @@
       );
       XPCOMUtils.defineLazyPreferenceGetter(
         this,
-        "_smartWindowEnabled",
-        "browser.smartwindow.enabled",
-        false
-      );
-      XPCOMUtils.defineLazyPreferenceGetter(
-        this,
         "_tabGroupsEnabled",
         "browser.tabs.groups.enabled",
         false
@@ -1823,14 +1817,12 @@
       if (!aOptions.isContentTitle && isBlankPageURL(aTitle)) {
         aTitle = this.tabContainer.emptyTabTitle;
         // Set attributes on browser for blank pages
-        if (this._smartWindowEnabled && aTab.linkedBrowser) {
+        if (aTab.linkedBrowser) {
           aTab.linkedBrowser.setAttribute("isblankpage", "true");
-          aTab.linkedBrowser.setAttribute("transparent", "true");
         }
-      } else if (this._smartWindowEnabled && aTab.linkedBrowser) {
+      } else if (aTab.linkedBrowser) {
         // Remove attributes for non-blank pages
         aTab.linkedBrowser.removeAttribute("isblankpage");
-        aTab.linkedBrowser.removeAttribute("transparent");
       }
 
       if (aTitle) {
@@ -3008,10 +3000,8 @@
           triggeringRemoteType,
         }));
 
-        // Set initial browser attributes for blank pages
-        if (this._smartWindowEnabled && isBlankPageURL(uriString)) {
+        if (isBlankPageURL(uriString)) {
           b.setAttribute("isblankpage", "true");
-          b.setAttribute("transparent", "true");
         }
 
         if (focusUrlBar) {
@@ -8683,14 +8673,10 @@
 
         if (!isSameDocument) {
           // Update browser attributes based on whether it's a blank page
-          if (gBrowser._smartWindowEnabled) {
-            if (isBlankPageURL(aLocation.spec)) {
-              this.mBrowser.setAttribute("isblankpage", "true");
-              this.mBrowser.setAttribute("transparent", "true");
-            } else {
-              this.mBrowser.removeAttribute("isblankpage");
-              this.mBrowser.removeAttribute("transparent");
-            }
+          if (isBlankPageURL(aLocation.spec)) {
+            this.mBrowser.setAttribute("isblankpage", "true");
+          } else {
+            this.mBrowser.removeAttribute("isblankpage");
           }
 
           // If the browser was playing audio, we should remove the playing state.
