@@ -575,6 +575,13 @@ XPCOMUtils.defineLazyPreferenceGetter(
 
 XPCOMUtils.defineLazyPreferenceGetter(
   this,
+  "gSmartWindowEnabled",
+  "browser.smartwindow.enabled",
+  false
+);
+
+XPCOMUtils.defineLazyPreferenceGetter(
+  this,
   "gFxaToolbarAccessed",
   "identity.fxaccounts.toolbar.accessed",
   false,
@@ -1692,8 +1699,12 @@ function toOpenWindowByType(inType, uri, features) {
 function OpenBrowserWindow(options = {}) {
   let timerId = Glean.browserTimings.newWindow.start();
 
-  // Pass Smart Window state to new window
-  if (window.SmartWindow && window.SmartWindow._smartWindowActive) {
+  // Pass Smart Window state to new window (only if feature is enabled)
+  if (
+    window.gSmartWindowEnabled &&
+    window.SmartWindow &&
+    window.SmartWindow._smartWindowActive
+  ) {
     // Create a new property bag for extra options
     const extraOptions = Cc["@mozilla.org/hash-property-bag;1"].createInstance(
       Ci.nsIWritablePropertyBag2
