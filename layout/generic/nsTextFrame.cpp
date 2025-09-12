@@ -108,7 +108,7 @@ using namespace mozilla::gfx;
 namespace mozilla {
 
 bool TextAutospace::Enabled(const StyleTextAutospace& aStyleTextAutospace,
-                            const StyleTextOrientation aStyleTextOrientation,
+                            const nsIFrame* aFrame,
                             const CharacterDataBuffer& aBuffer) {
   if (aStyleTextAutospace == StyleTextAutospace::NO_AUTOSPACE) {
     return false;
@@ -121,10 +121,13 @@ bool TextAutospace::Enabled(const StyleTextAutospace& aStyleTextAutospace,
     return false;
   }
 
-  if (aStyleTextOrientation == StyleTextOrientation::Upright) {
-    // If 'text-orientation: upright', a character cannot be a non-ideographic
-    // letter nor a non-ideographic numeral, so ideograph-alpha or
-    // ideograph-numeric boundaries cannot occur.
+  WritingMode wm = aFrame->GetWritingMode();
+  if (wm.IsVertical() && !wm.IsVerticalSideways() &&
+      aFrame->StyleVisibility()->mTextOrientation ==
+          StyleTextOrientation::Upright) {
+    // If writing-mode is vertical-* and 'text-orientation: upright',
+    // a character cannot be a non-ideographic letter or numeral,
+    // so ideograph-alpha or ideograph-numeric boundaries cannot occur.
     //
     // Note: 'text-combine-upright' is checked in
     // PropertyProvider::GetSpacingInternal(), so we do not check it here.
@@ -1907,18 +1910,6 @@ static gfxFont::Metrics GetFirstFontMetrics(gfxFontGroup* aFontGroup,
                                            : nsFontMetrics::eHorizontal);
 }
 
-static nscoord GetSpaceWidthAppUnits(const gfxTextRun* aTextRun) {
-  // Round the space width when converting to appunits the same way textruns
-  // do.
-  gfxFloat spaceWidthAppUnits =
-      NS_round(GetFirstFontMetrics(aTextRun->GetFontGroup(),
-                                   aTextRun->UseCenterBaseline())
-                   .spaceWidth *
-               aTextRun->GetAppUnitsPerDevUnit());
-
-  return spaceWidthAppUnits;
-}
-
 static gfxFloat GetMinTabAdvanceAppUnits(const gfxTextRun* aTextRun) {
   gfxFloat chWidthAppUnits = NS_round(
       GetFirstFontMetrics(aTextRun->GetFontGroup(), aTextRun->IsVertical())
@@ -1942,9 +1933,7 @@ static nscoord LetterSpacing(nsIFrame* aFrame, const nsStyleText& aStyleText) {
     // SVG text can have a scaling factor applied so that very small or very
     // large font-sizes don't suffer from poor glyph placement due to app unit
     // rounding. The used letter-spacing value must be scaled by the same
-    // factor. Unlike word-spacing (below), this applies to both lengths and
-    // percentages, as the percentage basis is 1em, not an already-scaled glyph
-    // dimension.
+    // factor.
     return GetSVGFontSizeScaleFactor(aFrame) *
            aStyleText.mLetterSpacing.Resolve(
                [&] { return aFrame->StyleFont()->mSize.ToAppUnits(); });
@@ -1955,22 +1944,19 @@ static nscoord LetterSpacing(nsIFrame* aFrame, const nsStyleText& aStyleText) {
 }
 
 // This function converts non-coord values (e.g. percentages) to nscoord.
-static nscoord WordSpacing(nsIFrame* aFrame, const gfxTextRun* aTextRun,
-                           const nsStyleText& aStyleText) {
+static nscoord WordSpacing(nsIFrame* aFrame, const nsStyleText& aStyleText) {
   if (aFrame->IsInSVGTextSubtree()) {
     // SVG text can have a scaling factor applied so that very small or very
     // large font-sizes don't suffer from poor glyph placement due to app unit
     // rounding. The used word-spacing value must be scaled by the same
-    // factor, although any percentage basis has already effectively been
-    // scaled, since it's the space glyph width, which is based on the already-
-    // scaled font-size.
-    auto spacing = aStyleText.mWordSpacing;
-    spacing.ScaleLengthsBy(GetSVGFontSizeScaleFactor(aFrame));
-    return spacing.Resolve([&] { return GetSpaceWidthAppUnits(aTextRun); });
+    // factor.
+    return GetSVGFontSizeScaleFactor(aFrame) *
+           aStyleText.mWordSpacing.Resolve(
+               [&] { return aFrame->StyleFont()->mSize.ToAppUnits(); });
   }
 
   return aStyleText.mWordSpacing.Resolve(
-      [&] { return GetSpaceWidthAppUnits(aTextRun); });
+      [&] { return aFrame->StyleFont()->mSize.ToAppUnits(); });
 }
 
 gfx::ShapedTextFlags nsTextFrame::GetSpacingFlags() const {
@@ -1984,8 +1970,7 @@ gfx::ShapedTextFlags nsTextFrame::GetSpacingFlags() const {
   // to be rare, and avoiding TEXT_ENABLE_SPACING is just an optimization.
   bool nonStandardSpacing =
       !ls.IsDefinitelyZero() || !ws.IsDefinitelyZero() ||
-      TextAutospace::Enabled(styleText->EffectiveTextAutospace(),
-                             StyleVisibility()->mTextOrientation,
+      TextAutospace::Enabled(styleText->EffectiveTextAutospace(), this,
                              CharacterDataBuffer());
   return nonStandardSpacing ? gfx::ShapedTextFlags::TEXT_ENABLE_SPACING
                             : gfx::ShapedTextFlags();
@@ -3459,7 +3444,7 @@ nsTextFrame::PropertyProvider::PropertyProvider(
       mTabWidths(nullptr),
       mTabWidthsAnalyzedLimit(0),
       mLength(aLength),
-      mWordSpacing(WordSpacing(aFrame, mTextRun, *aTextStyle)),
+      mWordSpacing(WordSpacing(aFrame, *aTextStyle)),
       mLetterSpacing(LetterSpacing(aFrame, *aTextStyle)),
       mMinTabAdvance(-1.0),
       mHyphenWidth(-1),
@@ -3489,7 +3474,7 @@ nsTextFrame::PropertyProvider::PropertyProvider(
       mTabWidths(nullptr),
       mTabWidthsAnalyzedLimit(0),
       mLength(aFrame->GetContentLength()),
-      mWordSpacing(WordSpacing(aFrame, mTextRun, *mTextStyle)),
+      mWordSpacing(WordSpacing(aFrame, *mTextStyle)),
       mLetterSpacing(LetterSpacing(aFrame, *mTextStyle)),
       mMinTabAdvance(-1.0),
       mHyphenWidth(-1),
@@ -4317,8 +4302,7 @@ void nsTextFrame::PropertyProvider::InitFontGroupAndFontMetrics() const {
 
 void nsTextFrame::PropertyProvider::InitTextAutospace() {
   const auto styleTextAutospace = mTextStyle->EffectiveTextAutospace();
-  if (TextAutospace::Enabled(styleTextAutospace,
-                             mFrame->StyleVisibility()->mTextOrientation,
+  if (TextAutospace::Enabled(styleTextAutospace, mFrame,
                              mCharacterDataBuffer)) {
     mTextAutospace.emplace(styleTextAutospace,
                            GetFontMetrics()->InterScriptSpacingWidth());
