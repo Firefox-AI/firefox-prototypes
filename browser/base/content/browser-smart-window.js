@@ -16,17 +16,12 @@ var SmartWindow = {
 
     this._initialized = true;
 
-    // Check if the smart window feature is enabled
     if (!gSmartWindowEnabled) {
       console.log("[Smart Window] Feature disabled by pref");
       return;
     }
 
-    // Initialize toggle button
     this.initToggleButton();
-
-    // Set up event listeners
-    this.setupEventListeners();
 
     // Check if this window was opened with Smart Window active from parent window
     let shouldActivateSmartWindow = false;
@@ -64,8 +59,8 @@ var SmartWindow = {
       const toggleButton = document.getElementById("smart-window-toggle");
       toggleButton?.setAttribute("checked", "true");
 
-      // Notify all tabs
-      this.updateNewTabsSmartWindowState(true);
+      // Notify observers about Smart Window state
+      Services.obs.notifyObservers(window, "smart-window-state-changed");
 
       console.log("[Smart Window] New window Smart Window activated");
     } else {
@@ -163,32 +158,6 @@ var SmartWindow = {
     }
   },
 
-  setupEventListeners() {
-    // Toggle button is handled by navigator-toolbox.js command event
-
-    // Listen for new tabs being opened to update their Smart Window state
-    if (gBrowser) {
-      gBrowser.tabContainer.addEventListener("TabOpen", e => {
-        if (this._smartWindowActive) {
-          // Give the tab a moment to load, then update its state
-          setTimeout(() => {
-            const tab = e.target;
-            // Check if the browser has the isblankpage attribute set
-            if (
-              tab.linkedBrowser &&
-              tab.linkedBrowser.hasAttribute("isblankpage")
-            ) {
-              console.log(
-                "[Smart Window] New blank page tab opened, updating state"
-              );
-              this.updateTabSmartWindowState(tab, true);
-            }
-          }, 100);
-        }
-      });
-    }
-  },
-
   toggleSmartWindow(skipSave = false) {
     console.log(
       `[Smart Window] toggleSmartWindow called, current state: ${this._smartWindowActive}, skipSave: ${skipSave}`
@@ -203,8 +172,8 @@ var SmartWindow = {
       root.setAttribute("smart-window", "true");
       toggleButton?.setAttribute("checked", "true");
 
-      // Notify all new tabs about Smart Window state change
-      this.updateNewTabsSmartWindowState(true);
+      // Notify observers about Smart Window state change
+      Services.obs.notifyObservers(window, "smart-window-state-changed");
 
       console.log("Smart Window activated");
 
@@ -218,8 +187,8 @@ var SmartWindow = {
       root.removeAttribute("smart-window");
       toggleButton?.removeAttribute("checked");
 
-      // Notify all new tabs about Smart Window state change
-      this.updateNewTabsSmartWindowState(false);
+      // Notify observers about Smart Window state change
+      Services.obs.notifyObservers(window, "smart-window-state-changed");
 
       console.log("Smart Window deactivated");
 
@@ -233,44 +202,6 @@ var SmartWindow = {
   exitSmartWindow() {
     if (this._smartWindowActive) {
       this.toggleSmartWindow();
-    }
-  },
-
-  updateTabSmartWindowState(tab, smartWindowActive) {
-    try {
-      const actor =
-        tab.linkedBrowser.browsingContext?.currentWindowGlobal?.getActor(
-          "AboutNewTab"
-        );
-      if (actor) {
-        actor.sendAsyncMessage("UpdateSmartWindowState", {
-          smartWindowActive,
-        });
-        console.log(
-          "[Smart Window] Sent UpdateSmartWindowState message to tab actor"
-        );
-      }
-    } catch (e) {
-      console.log("[Smart Window] Error updating tab:", e);
-    }
-  },
-
-  updateNewTabsSmartWindowState(smartWindowActive) {
-    console.log(
-      `[Smart Window] Broadcasting Smart Window state to new tabs: ${smartWindowActive}`
-    );
-
-    // Send message through the actor system
-    for (let tab of gBrowser.tabs) {
-      if (tab.linkedBrowser && tab.linkedBrowser.currentURI) {
-        const uri = tab.linkedBrowser.currentURI.spec;
-
-        // Check for new tab pages (might be about:newtab or about:home)
-        if (uri.startsWith("about:newtab") || uri.startsWith("about:home")) {
-          console.log(`[Smart Window] Found new tab to update: ${uri}`);
-          this.updateTabSmartWindowState(tab, smartWindowActive);
-        }
-      }
     }
   },
 

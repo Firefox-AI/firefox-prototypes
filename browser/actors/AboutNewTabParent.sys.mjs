@@ -13,6 +13,36 @@ ChromeUtils.defineESModuleGetters(lazy, {
 //   browser -> { actor, browser, browsingContext, portID, url, loaded }
 let gLoadedTabs = new Map();
 
+// Observer for smart window state changes
+let gSmartWindowObserver = {
+  observe(subject, topic) {
+    if (topic === "smart-window-state-changed") {
+      // Update all new tab pages in this window
+      for (let [browser, tabDetails] of gLoadedTabs) {
+        const window = browser.ownerGlobal;
+        const { actor } = tabDetails;
+        // Read the current state from the window's SmartWindow object
+        const smartWindowActive =
+          window.SmartWindow?._smartWindowActive || false;
+        const action = {
+          type: "SMART_WINDOW_STATE_UPDATE",
+          data: { smartWindowActive },
+        };
+        console.log(window, browser, action);
+        try {
+          actor.sendAsyncMessage("ActivityStream:MainToContent", action);
+        } catch (e) {
+          console.error("Failed to send smart window state to new tab:", e);
+          // Tab might be closing or already closed
+        }
+      }
+    }
+  },
+};
+
+// Register the observer once
+Services.obs.addObserver(gSmartWindowObserver, "smart-window-state-changed");
+
 export class AboutNewTabParent extends JSWindowActorParent {
   static get loadedTabs() {
     return gLoadedTabs;
@@ -63,6 +93,15 @@ export class AboutNewTabParent extends JSWindowActorParent {
               id: "newtabMessageCheck",
             });
           }
+          let browser = browsingContext.top.embedderElement;
+          const window = browser?.ownerGlobal;
+          if (window?.SmartWindow && window?.SmartWindow._smartWindowActive) {
+            const action = {
+              type: "SMART_WINDOW_STATE_UPDATE",
+              data: { smartWindowActive: true },
+            };
+            this.sendAsyncMessage("ActivityStream:MainToContent", action);
+          }
         }
         break;
       case "Init": {
@@ -89,6 +128,20 @@ export class AboutNewTabParent extends JSWindowActorParent {
       }
 
       case "Load":
+        let browsingContext = this.browsingContext;
+        let browser = browsingContext.top.embedderElement;
+        if (!browser) {
+          return;
+        }
+        // Check if this window has Smart Window active and notify the new tab
+        const window = browser.ownerGlobal;
+        if (window.SmartWindow && window.SmartWindow._smartWindowActive) {
+          const action = {
+            type: "SMART_WINDOW_STATE_UPDATE",
+            data: { smartWindowActive: true },
+          };
+          this.sendAsyncMessage("ActivityStream:MainToContent", action);
+        }
         this.notifyActivityStreamChannel("onNewTabLoad", message);
         break;
 

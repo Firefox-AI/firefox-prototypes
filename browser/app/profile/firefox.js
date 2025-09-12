@@ -1144,7 +1144,7 @@ pref("browser.bookmarks.openInTabClosesMenu", true);
 // the bookmarks toolbar as a default.
 pref("browser.bookmarks.defaultLocation", "toolbar");
 
-pref("browser.tabs.allow_transparent_browser", false);
+pref("browser.tabs.allow_transparent_browser", true);
 
 // Smart window feature
 pref("browser.smartwindow.enabled", true);
