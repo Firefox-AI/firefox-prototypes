@@ -41,13 +41,8 @@
   background: none !important;
 }
 
-/* Show Smart Window toggle in all non-private windows */
-#smart-window-toggle {
-  display: flex;
-}
-
 /* Hide in private windows */
 :root[privatebrowsingmode="temporary"] #smart-window-toggle {
-  display: none;
+  display: none !important
 }
 

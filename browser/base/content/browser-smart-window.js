@@ -16,6 +16,12 @@ var SmartWindow = {
 
     this._initialized = true;
 
+    // Check if the smart window feature is enabled
+    if (!gSmartWindowEnabled) {
+      console.log("[Smart Window] Feature disabled by pref");
+      return;
+    }
+
     // Initialize toggle button
     this.initToggleButton();
 
@@ -110,6 +116,14 @@ var SmartWindow = {
         return;
       }
 
+      // Only restore state if the feature is enabled
+      if (!gSmartWindowEnabled) {
+        console.log(
+          "[Smart Window] Feature disabled by pref, skipping restore"
+        );
+        return;
+      }
+
       console.log("[Smart Window] Attempting to restore state...");
 
       const savedState = SessionStore.getCustomWindowValue(
@@ -134,14 +148,18 @@ var SmartWindow = {
   },
 
   initToggleButton() {
-    const tabsToolbar = document.getElementById("TabsToolbar");
     const toggleButton = document.getElementById("smart-window-toggle");
 
     if (toggleButton) {
-      // Add click event listener to the toggle button
-      toggleButton.addEventListener("command", () => {
-        this.toggleSmartWindow();
-      });
+      // Show the button only if the feature is enabled
+      if (gSmartWindowEnabled) {
+        toggleButton.hidden = false;
+
+        // Add click event listener to the toggle button
+        toggleButton.addEventListener("command", () => {
+          this.toggleSmartWindow();
+        });
+      }
     }
   },
 
@@ -155,15 +173,15 @@ var SmartWindow = {
           // Give the tab a moment to load, then update its state
           setTimeout(() => {
             const tab = e.target;
-            if (tab.linkedBrowser && tab.linkedBrowser.currentURI) {
-              const uri = tab.linkedBrowser.currentURI.spec;
-              if (
-                uri.startsWith("about:newtab") ||
-                uri.startsWith("about:home")
-              ) {
-                console.log("[Smart Window] New tab opened, updating state");
-                this.updateTabSmartWindowState(tab, true);
-              }
+            // Check if the browser has the isblankpage attribute set
+            if (
+              tab.linkedBrowser &&
+              tab.linkedBrowser.hasAttribute("isblankpage")
+            ) {
+              console.log(
+                "[Smart Window] New blank page tab opened, updating state"
+              );
+              this.updateTabSmartWindowState(tab, true);
             }
           }, 100);
         }
@@ -275,21 +293,3 @@ var SmartWindow = {
     console.log("Smart Window shutdown complete");
   },
 };
-
-// Initialize when the window loads
-window.addEventListener(
-  "DOMContentLoaded",
-  () => {
-    SmartWindow.init();
-  },
-  { once: true }
-);
-
-// Clean up on window unload
-window.addEventListener(
-  "unload",
-  () => {
-    SmartWindow.shutdown();
-  },
-  { once: true }
-);
