@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Smart Window</title>
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/smartwindow/smartwindow.css"
+    />
+  </head>
+  <body>
+    <div id="root">
+      <div class="smart-window-container">
+        <div class="search-box">
+          <input
+            type="text"
+            id="search-input"
+            placeholder="Search or enter address"
+          />
+        </div>
+        <div id="results-container"></div>
+      </div>
+    </div>
+    <script src="chrome://browser/content/smartwindow/smartwindow.js"></script>
+  </body>
+</html>
