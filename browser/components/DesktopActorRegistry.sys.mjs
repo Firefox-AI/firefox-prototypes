@@ -658,6 +658,21 @@ let JSWINDOWACTORS = {
     matches: ["https://*/*"],
   },
 
+  SmartWindow: {
+    parent: {
+      esModuleURI: "resource:///actors/SmartWindowParent.sys.mjs",
+    },
+    child: {
+      esModuleURI: "resource:///actors/SmartWindowChild.sys.mjs",
+      events: {
+        DOMContentLoaded: {},
+      },
+    },
+    matches: ["chrome://browser/content/smartwindow/smartwindow.html*"],
+    includeChrome: true,
+    allFrames: true,
+  },
+
   ShieldFrame: {
     parent: {
       esModuleURI: "resource://normandy-content/ShieldFrameParent.sys.mjs",

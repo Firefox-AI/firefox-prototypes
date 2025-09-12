@@ -9622,28 +9622,3 @@ main section {
   opacity: 1;
   transition-duration: 0.3s;
 }
-
-/* Smart Window support - make background transparent when Smart Window is active */
-:root.smart-window-active {
-  color-scheme: light;
-  --newtab-background-color: transparent;
-  --newtab-background-color-secondary: transparent;
-}
-
-/* Smart Window search-only mode */
-.smart-window-search-only {
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  min-height: 100vh;
-  padding-top: 20vh;
-}
-
-.smart-window-search-only .newtab-main {
-  width: 100%;
-  max-width: 800px;
-}
-
-.smart-window-search-only .logo-and-wordmark-wrapper {
-  display: none;
-}

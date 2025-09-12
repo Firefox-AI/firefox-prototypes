@@ -22,6 +22,7 @@ const l10nMap = new Map([
   ["viewTabsSidebar", "sidebar-menu-synced-tabs-label"],
   ["viewBookmarksSidebar", "sidebar-menu-bookmarks-label"],
   ["viewCPMSidebar", "sidebar-menu-contextual-password-manager-label"],
+  ["viewSmartWindowSidebar", "sidebar-menu-smartwindow-label"],
 ]);
 const VISIBILITY_SETTING_PREF = "sidebar.visibility";
 const EXPAND_ON_HOVER_PREF = "sidebar.expandOnHover";

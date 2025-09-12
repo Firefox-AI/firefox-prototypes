@@ -322,22 +322,13 @@ export class BaseContent extends React.PureComponent {
   }
 
   applyBodyClasses() {
-    const { body, documentElement } = this.props.document;
+    const { body } = this.props.document;
     if (!body) {
       return;
     }
 
     if (!body.classList.contains("activity-stream")) {
       body.classList.add("activity-stream");
-    }
-
-    // Apply smart-window-active class to root html element based on Redux state
-    if (documentElement) {
-      if (this.props.SmartWindow?.active) {
-        documentElement.classList.add("smart-window-active");
-      } else {
-        documentElement.classList.remove("smart-window-active");
-      }
     }
   }
 
@@ -542,30 +533,6 @@ export class BaseContent extends React.PureComponent {
     const { App, DiscoveryStream } = props;
     const { initialized, customizeMenuVisible } = App;
     const prefs = props.Prefs.values;
-
-    // If Smart Window is active, only render the search component
-    if (props.SmartWindow?.active && prefs.showSearch) {
-      const searchHandoffEnabled = prefs["improvesearch.handoffToAwesomebar"];
-      const noSectionsEnabled = true; // Show logo in smart window mode
-
-      return (
-        <div className="smart-window-search-only">
-          <main className="newtab-main">
-            <div className="non-collapsible-section">
-              <ErrorBoundary>
-                <Search
-                  showLogo={
-                    noSectionsEnabled || prefs["logowordmark.alwaysVisible"]
-                  }
-                  handoffEnabled={searchHandoffEnabled}
-                  {...props.Search}
-                />
-              </ErrorBoundary>
-            </div>
-          </main>
-        </div>
-      );
-    }
 
     const activeWallpaper = prefs[`newtabWallpapers.wallpaper`];
     const wallpapersEnabled = prefs["newtabWallpapers.enabled"];
@@ -838,6 +805,5 @@ export const Base = connect(state => ({
   Search: state.Search,
   Wallpapers: state.Wallpapers,
   Weather: state.Weather,
-  SmartWindow: state.SmartWindow,
   weatherPlacement: selectWeatherPlacement(state),
 }))(_Base);
