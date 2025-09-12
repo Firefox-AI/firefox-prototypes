@@ -760,12 +760,11 @@ function browserWindows() {
 
 function updateBookmarkToolbarVisibility() {
   BookmarkingUI.updateEmptyToolbarMessage();
-  setToolbarVisibility(
-    BookmarkingUI.toolbar,
-    gBookmarksToolbarVisibility,
-    false,
-    false
-  );
+  // Hide bookmarks toolbar in smart windows regardless of user preference
+  const visibility = SmartWindow?.isSmartWindowActive?.()
+    ? "never"
+    : gBookmarksToolbarVisibility;
+  setToolbarVisibility(BookmarkingUI.toolbar, visibility, false, false);
 }
 
 // This is a stringbundle-like interface to gBrowserBundle, formerly a getter for
@@ -1703,7 +1702,7 @@ function OpenBrowserWindow(options = {}) {
   if (
     window.gSmartWindowEnabled &&
     window.SmartWindow &&
-    window.SmartWindow._smartWindowActive
+    window.SmartWindow.isSmartWindowActive()
   ) {
     // Create a new property bag for extra options
     const extraOptions = Cc["@mozilla.org/hash-property-bag;1"].createInstance(
@@ -3065,52 +3064,59 @@ function setToolbarVisibility(
   }
 
   if (toolbar == BookmarkingUI.toolbar) {
-    // For the bookmarks toolbar, we need to persist state before toggling
-    // the visibility in this window, because the state can be different
-    // (newtab vs never or always) even when that won't change visibility
-    // in this window.
-    if (persist) {
-      let prefValue;
-      if (typeof isVisible == "string") {
-        prefValue = isVisible;
-      } else {
-        prefValue = isVisible ? "always" : "never";
-      }
-      Services.prefs.setCharPref(
-        "browser.toolbars.bookmarks.visibility",
-        prefValue
-      );
-    }
-
-    switch (isVisible) {
-      case true:
-      case "always":
-        isVisible = true;
-        break;
-      case false:
-      case "never":
-        isVisible = false;
-        break;
-      case "newtab":
-      default: {
-        let currentURI;
-        if (!gBrowserInit.domContentLoaded) {
-          let uriToLoad = gBrowserInit.uriToLoadPromise;
-          if (uriToLoad) {
-            if (Array.isArray(uriToLoad)) {
-              // We only care about the first tab being loaded
-              uriToLoad = uriToLoad[0];
-            }
-            currentURI = URL.parse(uriToLoad)?.URI;
-            if (!currentURI) {
-              currentURI = gBrowser?.currentURI;
-            }
-          }
+    // Always hide bookmarks toolbar in smart windows
+    if (SmartWindow?.isSmartWindowActive?.()) {
+      isVisible = false;
+      // Don't persist this forced state
+      persist = false;
+    } else {
+      // For the bookmarks toolbar, we need to persist state before toggling
+      // the visibility in this window, because the state can be different
+      // (newtab vs never or always) even when that won't change visibility
+      // in this window.
+      if (persist) {
+        let prefValue;
+        if (typeof isVisible == "string") {
+          prefValue = isVisible;
         } else {
-          currentURI = gBrowser.currentURI;
+          prefValue = isVisible ? "always" : "never";
         }
-        isVisible = BookmarkingUI.isOnNewTabPage(currentURI);
-        break;
+        Services.prefs.setCharPref(
+          "browser.toolbars.bookmarks.visibility",
+          prefValue
+        );
+      }
+
+      switch (isVisible) {
+        case true:
+        case "always":
+          isVisible = true;
+          break;
+        case false:
+        case "never":
+          isVisible = false;
+          break;
+        case "newtab":
+        default: {
+          let currentURI;
+          if (!gBrowserInit.domContentLoaded) {
+            let uriToLoad = gBrowserInit.uriToLoadPromise;
+            if (uriToLoad) {
+              if (Array.isArray(uriToLoad)) {
+                // We only care about the first tab being loaded
+                uriToLoad = uriToLoad[0];
+              }
+              currentURI = URL.parse(uriToLoad)?.URI;
+              if (!currentURI) {
+                currentURI = gBrowser?.currentURI;
+              }
+            }
+          } else {
+            currentURI = gBrowser.currentURI;
+          }
+          isVisible = BookmarkingUI.isOnNewTabPage(currentURI);
+          break;
+        }
       }
     }
   }
