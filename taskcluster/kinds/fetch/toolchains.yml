@@ -346,7 +346,7 @@ mingw-w64:
     fetch:
         type: git
         repo: https://git.code.sf.net/p/mingw-w64/mingw-w64
-        revision: 2ca6f1348cab58b5b994fd5916ff57445ade22f8
+        revision: 849a151baf187f32eb57b34c00365cbc7d2353a7
 
 mingw-w64-trunk:
     description: mingw-w64 master branch source code
@@ -700,7 +700,7 @@ symbol-scrapers:
     fetch:
         type: git
         repo: https://github.com/mozilla/symbol-scrapers
-        revision: 05cb290dc97f4a3b2e30143f46d9d4c21282f799
+        revision: 4a589bc872995b76fa18b5f8746715e5c86fa4bb
 
 xz-5.4.4:
     description: xz 5.4.4 source code

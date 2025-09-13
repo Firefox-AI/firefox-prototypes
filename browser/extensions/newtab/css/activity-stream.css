@@ -4260,7 +4260,6 @@ main section {
 }
 .discovery-stream.ds-layout.ds-layout-widgets {
   margin-inline: 0;
-  margin-block-end: var(--space-xlarge);
 }
 
 .widgets-wrapper {
@@ -4269,15 +4268,15 @@ main section {
   align-items: center;
   justify-content: center;
   position: relative;
+  padding-block-end: calc(var(--space-xlarge) * 2);
 }
 .widgets-wrapper .widgets-scroll-message {
   color: var(--newtab-text-primary-color);
   position: absolute;
-  bottom: calc(var(--space-xxlarge) * -2);
-  animation: fade-in 0.25s ease-out 0.7s both;
+  bottom: 0;
   border-radius: var(--button-border-radius);
   background: var(--button-background-color);
-  padding: var(--space-small) var(--space-xlarge);
+  padding: var(--space-small) var(--space-large);
 }
 .lightWallpaper .widgets-wrapper .widgets-scroll-message {
   color-scheme: light;
@@ -4288,6 +4287,11 @@ main section {
 .widgets-wrapper .widgets-scroll-message p {
   margin: 0;
   font-weight: var(--font-weight-bold);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .widgets-wrapper .widgets-scroll-message {
+    animation: fade-in 0.25s ease-out 0.7s both;
+  }
 }
 
 .widgets-container:has(.lists), .widgets-container:has(.focus-timer) {
@@ -4346,7 +4350,7 @@ main section {
   width: var(--newtab-card-width-medium);
   background: var(--newtab-background-card);
   border-radius: var(--border-radius-large);
-  padding-block-start: var(--space-large);
+  padding-block-start: var(--space-medium);
   height: var(--newtab-card-height);
   box-shadow: var(--box-shadow-card);
   position: relative;
@@ -4364,7 +4368,7 @@ main section {
   /* adjust as needed to sit above background but below UI */
 }
 .lists .select-wrapper {
-  padding-inline: var(--space-large);
+  padding-inline: var(--space-medium);
   display: flex;
   justify-content: flex-start;
   position: relative;
@@ -4384,7 +4388,7 @@ main section {
 }
 .lists .add-task-container {
   margin-block: var(--space-small);
-  padding-inline: var(--space-large);
+  padding-inline: var(--space-medium);
   position: relative;
 }
 .lists .add-task-container .icon.icon-add {
@@ -4552,7 +4556,7 @@ main section {
   width: var(--newtab-card-width-medium);
   background: var(--newtab-background-card);
   border-radius: var(--border-radius-large);
-  padding-block: var(--space-large);
+  padding-block: var(--space-medium);
   height: var(--newtab-card-height);
   display: flex;
   flex-direction: column;
@@ -4565,7 +4569,7 @@ main section {
   margin-block-end: var(--space-medium);
   position: relative;
   width: 100%;
-  padding-inline: var(--space-large);
+  padding-inline: var(--space-medium);
 }
 
 .focus-timer-tabs-buttons {
@@ -4576,9 +4580,6 @@ main section {
 }
 .focus-timer-tabs-buttons moz-button {
   flex-grow: 1;
-}
-.focus-timer-tabs-buttons moz-button::part(button) {
-  min-height: 24px;
 }
 .focus-timer-tabs-buttons moz-button:first-of-type::part(button) {
   border-end-end-radius: 0;
@@ -4594,7 +4595,7 @@ main section {
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  padding-inline: var(--space-large);
+  padding-inline: var(--space-medium);
   margin-block-end: var(--space-medium);
 }
 .newtab-widget-timer-notification-title-wrapper h3 {
@@ -4622,9 +4623,9 @@ main section {
   --timer-violet: var(--color-violet-20);
   /* Complete timer */
   --timer-green: var(--color-green-20);
-  min-height: 120px;
+  min-height: 138px;
   position: relative;
-  width: 120px;
+  width: 138px;
   overflow: hidden;
   margin-block-end: var(--space-small);
   /* main timer colours */
@@ -4687,7 +4688,7 @@ main section {
   align-items: center;
   color: var(--text-color);
   display: flex;
-  font-size: var(--size-item-large);
+  font-size: calc(var(--font-size-large) * 2);
   font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;
   height: 100%;
@@ -4714,7 +4715,7 @@ main section {
 .timer-notification-status {
   color: var(--text-color-deemphasized);
   font-size: var(--font-size-small);
-  margin-block: var(--space-xsmall) 0;
+  margin-block-start: var(--space-small);
 }
 
 .ds-card-grid .ds-card {
@@ -7377,7 +7378,7 @@ main section {
 }
 .ds-card-grid .sections-card-ui .card-stp-button-hover-background {
   border-radius: var(--border-radius-large) var(--border-radius-large) 0 0;
-  background-color: transparent;
+  background-color: var(--button-background-color-ghost);
 }
 .ds-card-grid .sections-card-ui .ds-card-link:focus {
   border-radius: var(--border-radius-large);
@@ -7524,24 +7525,24 @@ main section {
 .ds-card-grid .refined-cards .card-stp-button-hover-background {
   height: 100%;
   padding-block-start: 0;
-  background: transparent;
+  background: var(--button-background-color-ghost);
 }
 .ds-card-grid .refined-cards .card-stp-button-hover-background .card-stp-button-position-wrapper {
   inset-block-start: unset;
   inset-block-end: var(--space-medium);
   inset-inline-end: var(--space-large);
 }
+.ds-card-grid .refined-cards .context-menu-button {
+  background-color: var(--button-background-color-ghost);
+}
 .ds-card-grid .refined-cards:hover h3, .ds-card-grid .refined-cards.active h3 {
   color: var(--color-accent-primary);
 }
-.ds-card-grid .refined-cards:hover .context-menu-button, .ds-card-grid .refined-cards.active .context-menu-button {
-  background-color: transparent;
-}
 .ds-card-grid .refined-cards:hover .context-menu-button:hover, .ds-card-grid .refined-cards.active .context-menu-button:hover {
-  background-color: var(--newtab-button-static-hover-background);
+  background-color: var(--button-background-color-ghost-hover);
 }
 .ds-card-grid .refined-cards:hover .context-menu-button:hover:active, .ds-card-grid .refined-cards.active .context-menu-button:hover:active {
-  background-color: var(--newtab-button-static-active-background);
+  background-color: var(--button-background-color-ghost-active);
 }
 .ds-card-grid .refined-cards:hover .context-menu-button:focus-visible, .ds-card-grid .refined-cards.active .context-menu-button:focus-visible {
   outline: 2px solid var(--newtab-button-focus-border);

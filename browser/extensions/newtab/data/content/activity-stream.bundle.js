@@ -13366,7 +13366,7 @@ const FocusTimer = ({
     if (arcRef?.current) {
       arcRef.current.style.clipPath = getClipPath(progress);
     }
-  }, [progress]);
+  }, [progress, timerType]);
 
   // set timer function
   const setTimerDuration = () => {
@@ -13631,10 +13631,12 @@ const FocusTimer = ({
   }, /*#__PURE__*/external_React_default().createElement("moz-button", {
     type: timerType === "focus" ? "default" : "ghost",
     "data-l10n-id": "newtab-widget-timer-mode-focus",
+    size: "small",
     onClick: () => toggleType("focus")
   }), /*#__PURE__*/external_React_default().createElement("moz-button", {
     type: timerType === "break" ? "default" : "ghost",
     "data-l10n-id": "newtab-widget-timer-mode-break",
+    size: "small",
     onClick: () => toggleType("break")
   }))), /*#__PURE__*/external_React_default().createElement("div", {
     role: "progress",
@@ -13670,7 +13672,7 @@ const FocusTimer = ({
     iconsrc: `chrome://global/skin/media/${isRunning ? "pause" : "play"}-fill.svg`,
     "data-l10n-id": isRunning ? "newtab-widget-timer-label-pause" : "newtab-widget-timer-label-play",
     onClick: toggleTimer
-  })), /*#__PURE__*/external_React_default().createElement("moz-button", {
+  })), isRunning && /*#__PURE__*/external_React_default().createElement("moz-button", {
     type: "icon ghost",
     iconsrc: "chrome://newtab/content/data/content/assets/arrow-clockwise-16.svg",
     "data-l10n-id": "newtab-widget-timer-reset",
@@ -13763,23 +13765,18 @@ const PREF_WIDGETS_LISTS_ENABLED = "widgets.lists.enabled";
 const PREF_WIDGETS_SYSTEM_LISTS_ENABLED = "widgets.system.lists.enabled";
 const PREF_WIDGETS_TIMER_ENABLED = "widgets.focusTimer.enabled";
 const PREF_WIDGETS_SYSTEM_TIMER_ENABLED = "widgets.system.focusTimer.enabled";
+const PREF_FEEDS_SECTION_TOPSTORIES = "feeds.section.topstories";
 function Widgets() {
   const prefs = (0,external_ReactRedux_namespaceObject.useSelector)(state => state.Prefs.values);
   const {
     messageData
   } = (0,external_ReactRedux_namespaceObject.useSelector)(state => state.Messages);
-  const listsState = (0,external_ReactRedux_namespaceObject.useSelector)(state => state.ListsWidget);
-  const timerState = (0,external_ReactRedux_namespaceObject.useSelector)(state => state.TimerWidget);
-  const timerType = timerState?.timerType;
   const dispatch = (0,external_ReactRedux_namespaceObject.useDispatch)();
   const nimbusListsEnabled = prefs.widgetsConfig?.listsEnabled;
   const nimbusTimerEnabled = prefs.widgetsConfig?.timerEnabled;
   const listsEnabled = (nimbusListsEnabled || prefs[PREF_WIDGETS_SYSTEM_LISTS_ENABLED]) && prefs[PREF_WIDGETS_LISTS_ENABLED];
   const timerEnabled = (nimbusTimerEnabled || prefs[PREF_WIDGETS_SYSTEM_TIMER_ENABLED]) && prefs[PREF_WIDGETS_TIMER_ENABLED];
-  const tasksCount = listsEnabled && listsState?.lists && listsState?.selected ? listsState.lists[listsState.selected]?.tasks?.length ?? 0 : 0;
-  const manyTasks = tasksCount >= 4;
-  const isTimerRunning = timerState?.[timerType].isRunning;
-  const showScrollMessage = manyTasks || isTimerRunning;
+  const recommendedStoriesEnabled = prefs[PREF_FEEDS_SECTION_TOPSTORIES];
   function handleUserInteraction(widgetName) {
     const prefName = `widgets.${widgetName}.interaction`;
     const hasInteracted = prefs[prefName];
@@ -13798,7 +13795,7 @@ function Widgets() {
   }), timerEnabled && /*#__PURE__*/external_React_default().createElement(FocusTimer, {
     dispatch: dispatch,
     handleUserInteraction: handleUserInteraction
-  })), showScrollMessage && /*#__PURE__*/external_React_default().createElement("div", {
+  })), recommendedStoriesEnabled && /*#__PURE__*/external_React_default().createElement("div", {
     className: "widgets-scroll-message fade-in",
     "aria-live": "polite"
   }, /*#__PURE__*/external_React_default().createElement("p", {
