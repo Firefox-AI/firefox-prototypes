@@ -55,6 +55,7 @@ SIGNING_SCOPE_ALIAS_TO_PROJECT = [
             "pine",
             # bug 1877483: larch has similar needs for nightlies
             "larch",
+            "cypress",
             # maple is also an L3 branch: https://phabricator.services.mozilla.com/D184833
             "maple",
         },
@@ -111,6 +112,7 @@ BEETMOVER_SCOPE_ALIAS_TO_PROJECT = [
             "pine",
             # bug 1877483: larch has similar needs for nightlies
             "larch",
+            "cypress",
         },
     ],
     [
@@ -156,6 +158,7 @@ BEETMOVER_ACTION_SCOPES = {
     "nightly-pine": "beetmover:action:push-to-nightly",
     # bug 1877483: larch has similar needs for nightlies
     "nightly-larch": "beetmover:action:push-to-nightly",
+    "nightly-cypress": "beetmover:action:push-to-nightly",
     "default": "beetmover:action:push-to-candidates",
 }
 
@@ -190,6 +193,7 @@ BALROG_SCOPE_ALIAS_TO_PROJECT = [
             "pine",
             # bug 1877483: larch has similar needs for nightlies
             "larch",
+            "cypress",
         },
     ],
     [
