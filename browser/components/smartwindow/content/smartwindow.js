@@ -27,6 +27,7 @@ class SmartWindowPage {
     this.selectedSuggestionIndex = -1;
     this.userHasEditedQuery = false;
     this.suggestionDebounceTimer = null;
+    this.lastTabInfo = null;
     this.init();
   }
 
@@ -182,12 +183,30 @@ class SmartWindowPage {
 
     this.setupEventListeners();
 
-    // Initialize with quick prompts
+    // Initialize tab info and show quick prompts
+    this.initializeTabInfo();
     this.showQuickPrompts();
 
     console.log(
       `Smart Window page initialized (sidebar mode: ${this.isSidebarMode})`
     );
+  }
+
+  initializeTabInfo() {
+    // Initialize with current tab data
+    const selectedTab = topChromeWindow.gBrowser.selectedTab;
+    const selectedBrowser = topChromeWindow.gBrowser.selectedBrowser;
+
+    this.lastTabInfo = {
+      title: selectedTab.label || "Untitled",
+      url: selectedBrowser.currentURI.spec || "",
+      favicon: selectedTab.image || "",
+    };
+
+    // Update status bar if in sidebar mode
+    if (this.isSidebarMode) {
+      this.updateTabStatus(this.lastTabInfo);
+    }
   }
 
   setupSidebarUI() {
@@ -285,9 +304,9 @@ class SmartWindowPage {
   }
 
   showQuickPrompts() {
-    // Get current tab info for context
-    const tabTitle = document.title || "";
-    const tabUrl = window.location.href || "";
+    // Use stored tab info for context
+    const tabTitle = this.lastTabInfo?.title || "";
+    const tabUrl = this.lastTabInfo?.url || "";
 
     const prompts = this.generateQuickPrompts(tabTitle, tabUrl);
     this.displaySuggestions(prompts, "Quick Prompts:");
@@ -478,6 +497,9 @@ class SmartWindowPage {
   }
 
   updateTabStatus(tabInfo) {
+    // Store the latest tab info
+    this.lastTabInfo = tabInfo;
+
     const titleEl = document.getElementById("status-title");
     const urlEl = document.getElementById("status-url");
     const faviconEl = document.getElementById("status-favicon");
@@ -501,6 +523,11 @@ class SmartWindowPage {
       faviconEl.style.display = "block";
     } else if (faviconEl) {
       faviconEl.style.display = "none";
+    }
+
+    // Update quick prompts if user hasn't edited the query
+    if (!this.userHasEditedQuery && !this.searchInput.value.trim()) {
+      this.showQuickPrompts();
     }
   }
 
