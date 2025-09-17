@@ -164,12 +164,25 @@ class SmartWindowPage {
     // Create and setup dynamic submit button
     this.setupSubmitButton();
 
+    // Check if we're in Smart Mode or Classic Mode
+    const isSmartMode =
+      topChromeWindow?.document?.documentElement?.hasAttribute("smart-window");
+
     // Auto-focus the search input
     if (this.searchInput) {
-      this.searchInput.focus();
-      // Update placeholder based on mode
-      if (this.isSidebarMode) {
-        this.searchInput.placeholder = "Ask, search, or type a URL...";
+      // Only focus if in Smart Mode
+      if (isSmartMode) {
+        this.searchInput.focus();
+      }
+
+      // Update placeholder and state based on mode
+      if (!isSmartMode) {
+        this.searchInput.disabled = true;
+        this.searchInput.placeholder =
+          "Smart Window disabled - switch back to Smart Mode to search";
+        if (this.submitButton) {
+          this.submitButton.disabled = true;
+        }
       } else {
         this.searchInput.placeholder = "Ask, search, or type a URL...";
       }
@@ -183,12 +196,14 @@ class SmartWindowPage {
 
     this.setupEventListeners();
 
-    // Initialize tab info and show quick prompts
+    // Initialize tab info and show quick prompts (only if Smart Mode is active)
     this.initializeTabInfo();
-    this.showQuickPrompts();
+    if (isSmartMode) {
+      this.showQuickPrompts();
+    }
 
     console.log(
-      `Smart Window page initialized (sidebar mode: ${this.isSidebarMode})`
+      `Smart Window page initialized (sidebar mode: ${this.isSidebarMode}, smart mode: ${isSmartMode})`
     );
   }
 
@@ -421,6 +436,39 @@ class SmartWindowPage {
       window.addEventListener("SmartWindowMessage", e => {
         if (e.detail.type === "TabUpdate") {
           this.updateTabStatus(e.detail.data);
+        }
+      });
+    }
+
+    // Listen for Smart Window mode changes from the top chrome window
+    if (topChromeWindow) {
+      topChromeWindow.addEventListener("SmartWindowModeChanged", event => {
+        const isActive = event.detail.active;
+        console.log(
+          `[SmartWindow] Mode changed to: ${isActive ? "Smart" : "Classic"}`
+        );
+
+        if (!isActive) {
+          // Disable input when switching to classic mode
+          this.searchInput.disabled = true;
+          this.searchInput.placeholder =
+            "Smart Window disabled - switch back to Smart Mode to search";
+          if (this.submitButton) {
+            this.submitButton.disabled = true;
+          }
+          // Hide suggestions
+          this.hideSuggestions();
+        } else {
+          // Re-enable input when switching back to smart mode
+          this.searchInput.disabled = false;
+          this.searchInput.placeholder = this.isSidebarMode
+            ? "Ask, search, or type a URL..."
+            : "Ask, search, or type a URL...";
+          this.updateSubmitButton(this.searchInput.value);
+          // Show quick prompts if input is empty
+          if (!this.searchInput.value.trim()) {
+            this.showQuickPrompts();
+          }
         }
       });
     }
