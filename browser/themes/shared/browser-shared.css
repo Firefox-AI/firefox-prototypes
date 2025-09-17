@@ -1414,6 +1414,15 @@ browser {
   background-color: -moz-Dialog;
 }
 
+@media (-moz-platform: macos) {
+  :root[smart-window] #PanelUI-button {
+    position: absolute;
+    top: -100%;
+    right: 0;
+    margin-top: 3px;
+  }
+}
+
 /* Smart Window mode - allow transparency for blank pages */
 :root[smart-window] browser[transparent][isblankpage],
 :root[smart-window] #sidebar {
