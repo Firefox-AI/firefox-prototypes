@@ -7626,8 +7626,17 @@ void LIRGenerator::visitSuperFunction(MSuperFunction* ins) {
   MOZ_ASSERT(ins->callee()->type() == MIRType::Object);
   MOZ_ASSERT(ins->type() == MIRType::Value);
 
-  auto* lir = new (alloc()) LSuperFunction(useRegister(ins->callee()), temp());
+  auto* lir = new (alloc()) LSuperFunction(useRegister(ins->callee()));
   defineBox(lir, ins);
+}
+
+void LIRGenerator::visitSuperFunctionAndUnbox(MSuperFunctionAndUnbox* ins) {
+  MOZ_ASSERT(ins->callee()->type() == MIRType::Object);
+  MOZ_ASSERT(ins->type() == MIRType::Object);
+
+  auto* lir = new (alloc()) LSuperFunctionAndUnbox(useRegister(ins->callee()));
+  assignSnapshot(lir, ins->bailoutKind());
+  define(lir, ins);
 }
 
 void LIRGenerator::visitInitHomeObject(MInitHomeObject* ins) {

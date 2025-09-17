@@ -4203,7 +4203,7 @@ who = [
     "Erich Gubler <erichdongubler@gmail.com>",
 ]
 criteria = "safe-to-deploy"
-delta = "26.0.0 -> 26.0.0@git:c488bbe60447d28736c26c82a32cd87794b3bf1d"
+delta = "26.0.0 -> 26.0.0@git:1791064a306881c7ddf218e69b4ffdafdae1be0d"
 importable = false
 
 [[audits.net2]]
@@ -4644,6 +4644,12 @@ delta = "1.3.1 -> 1.7.0"
 who = "Lars Eggert <lars@eggert.org>"
 criteria = "safe-to-run"
 delta = "1.7.0 -> 1.7.2"
+
+[[audits.pollster]]
+who = "Ben Dean-Kawamura <bdk@mozilla.com>"
+criteria = "safe-to-deploy"
+version = "0.3.0"
+notes = "Tiny crate with only 130 lines of code.  No unsafe code or IO."
 
 [[audits.powerfmt]]
 who = "Alex Franchuk <afranchuk@mozilla.com>"
@@ -6682,7 +6688,7 @@ who = [
     "Erich Gubler <erichdongubler@gmail.com>",
 ]
 criteria = "safe-to-deploy"
-delta = "26.0.0 -> 26.0.0@git:c488bbe60447d28736c26c82a32cd87794b3bf1d"
+delta = "26.0.0 -> 26.0.0@git:1791064a306881c7ddf218e69b4ffdafdae1be0d"
 importable = false
 
 [[audits.wgpu-core-deps-apple]]
@@ -6703,7 +6709,7 @@ who = [
     "Erich Gubler <erichdongubler@gmail.com>",
 ]
 criteria = "safe-to-deploy"
-delta = "26.0.0 -> 26.0.0@git:c488bbe60447d28736c26c82a32cd87794b3bf1d"
+delta = "26.0.0 -> 26.0.0@git:1791064a306881c7ddf218e69b4ffdafdae1be0d"
 importable = false
 
 [[audits.wgpu-core-deps-windows-linux-android]]
@@ -6724,7 +6730,7 @@ who = [
     "Erich Gubler <erichdongubler@gmail.com>",
 ]
 criteria = "safe-to-deploy"
-delta = "26.0.0 -> 26.0.0@git:c488bbe60447d28736c26c82a32cd87794b3bf1d"
+delta = "26.0.0 -> 26.0.0@git:1791064a306881c7ddf218e69b4ffdafdae1be0d"
 importable = false
 
 [[audits.wgpu-hal]]
@@ -6823,7 +6829,7 @@ who = [
     "Erich Gubler <erichdongubler@gmail.com>",
 ]
 criteria = "safe-to-deploy"
-delta = "26.0.0 -> 26.0.0@git:c488bbe60447d28736c26c82a32cd87794b3bf1d"
+delta = "26.0.0 -> 26.0.0@git:1791064a306881c7ddf218e69b4ffdafdae1be0d"
 importable = false
 
 [[audits.wgpu-types]]
@@ -6917,7 +6923,7 @@ who = [
     "Erich Gubler <erichdongubler@gmail.com>",
 ]
 criteria = "safe-to-deploy"
-delta = "26.0.0 -> 26.0.0@git:c488bbe60447d28736c26c82a32cd87794b3bf1d"
+delta = "26.0.0 -> 26.0.0@git:1791064a306881c7ddf218e69b4ffdafdae1be0d"
 importable = false
 
 [[audits.whatsys]]
