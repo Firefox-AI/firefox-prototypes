@@ -178,6 +178,16 @@ var SmartWindow = {
       // Hide bookmarks toolbar immediately
       updateBookmarkToolbarVisibility();
 
+      // Navigate all new tab pages to the smart window URL
+      this.navigateNewTabsToSmartWindow();
+
+      // Dispatch event that smart window pages can listen to
+      window.dispatchEvent(
+        new CustomEvent("SmartWindowModeChanged", {
+          detail: { active: true },
+        })
+      );
+
       console.log("Smart Window activated");
 
       // Save the state unless we're restoring
@@ -193,11 +203,47 @@ var SmartWindow = {
       // Restore bookmarks toolbar visibility based on user preference
       updateBookmarkToolbarVisibility();
 
+      // Dispatch event that smart window pages can listen to
+      window.dispatchEvent(
+        new CustomEvent("SmartWindowModeChanged", {
+          detail: { active: false },
+        })
+      );
+
       console.log("Smart Window deactivated");
 
       // Save the state unless we're restoring
       if (!skipSave) {
         this.saveState();
+      }
+    }
+  },
+
+  navigateNewTabsToSmartWindow() {
+    console.log("[Smart Window] Navigating new tabs to smart window URL");
+
+    // Iterate through all tabs
+    for (let tab of gBrowser.tabs) {
+      if (tab.linkedBrowser && tab.linkedBrowser.currentURI) {
+        const uri = tab.linkedBrowser.currentURI.spec;
+
+        // Check for new tab pages (about:newtab or about:home)
+        if (uri === "about:newtab" || uri === "about:home") {
+          console.log(
+            `[Smart Window] Converting tab from ${uri} to chrome://browser/content/smartwindow/smartwindow.html`
+          );
+
+          // Navigate to the smart window chrome URL
+          tab.linkedBrowser.loadURI(
+            Services.io.newURI(
+              "chrome://browser/content/smartwindow/smartwindow.html"
+            ),
+            {
+              triggeringPrincipal:
+                Services.scriptSecurityManager.getSystemPrincipal(),
+            }
+          );
+        }
       }
     }
   },
