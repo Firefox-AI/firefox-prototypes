@@ -1420,18 +1420,18 @@ browser {
   background-color: transparent;
 }
 
-/* Hide nav-bar children when on smart window URLs, except for PanelUI-button */
-:root[smart-window-url] #nav-bar-customization-target > *,
-:root[smart-window-url] #nav-bar > :not(#PanelUI-button) {
+/* Hide nav-bar children when in Smart Window mode AND on smart window URLs, except for PanelUI-button */
+:root[smart-window="true"][smart-window-url] #nav-bar-customization-target > *,
+:root[smart-window="true"][smart-window-url] #nav-bar > :not(#PanelUI-button) {
   visibility: hidden;
 }
 
-:root[smart-window-url] #sidebar-main,
-:root[smart-window-url] #sidebar-box {
+:root[smart-window="true"][smart-window-url] #sidebar-main,
+:root[smart-window="true"][smart-window-url] #sidebar-box {
   visibility: collapse;
 }
 
-:root[smart-window-url] #tabbrowser-tabbox {
+:root[smart-window="true"][smart-window-url] #tabbrowser-tabbox {
   box-shadow: none;
 }
 
