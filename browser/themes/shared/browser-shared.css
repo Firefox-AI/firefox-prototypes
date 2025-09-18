@@ -1449,14 +1449,13 @@ browser {
 /* Smart Window Styles */
 :root[smart-window="true"] {
   color-scheme: light !important;
-  --smart-window-border: color-mix(in srgb, currentColor 25%, transparent);
+  --smart-window-border: #8a61ff;
   --smart-window-gradient: radial-gradient(at top left, rgba(255, 192, 203, 0.7), transparent 80%),
     radial-gradient(at bottom left, rgba(173, 216, 230, 0.5), transparent 60%),
     radial-gradient(at top right, rgba(255, 228, 196, 0.6), transparent 80%),
     linear-gradient(to bottom right, #fcefff, #fffdf5);
   background: var(--smart-window-gradient) !important;
   
-  --sidebar-margin-end: 3px;
   --toolbar-bgcolor: transparent !important;
   --tab-text-color: #5a3a6d !important;
   --tab-selected-textcolor: #5a3a6d !important;
@@ -1498,15 +1497,14 @@ browser {
 /* Smart Window Right Sidebar Styles */
 .smartwindow-right-sidebar {
   width: 358px;
-  border: solid 1px var(--smart-window-border);
-  border-bottom: none;
-  border-top: none;
+  backdrop-filter: blur(24px);
+  border-inline-start: 1px solid rgba(189, 137, 213, 0.8);
+  box-shadow: 0px 4px 14px 0px rgba(0, 0, 0, 0.1);
 }
 
 #smartwindow-box {
   min-width: 300px;
   max-width: 600px;
-  margin-right: var(--sidebar-margin-end);
 }
 
 #smartwindow-header {
@@ -1543,8 +1541,6 @@ browser {
 #smartwindow-nav-button {
   order: 1000; /* Position after PanelUI-button */
   margin-inline-start: 8px;
-  display: flex;
-  align-items: center;
 }
 
 #smartwindow-nav-toggle {
@@ -1569,41 +1565,17 @@ browser {
   background: linear-gradient(135deg, #A78BFA 0%, #9333EA 100%);
 }
 
-/* Show the nav button when in smart window mode */
-:root[smart-window="true"] #smartwindow-nav-button {
+/* Hide the nav button when sidebar is visible */
+:root[smart-window-sidebar="true"] #smartwindow-nav-button {
+  display: none;
+}
+
+/* Show the nav button when sidebar is hidden (but still in smart window mode) */
+:root[smart-window="true"]:not([smart-window-sidebar="true"]) #smartwindow-nav-button {
   display: flex;
 }
 
 /* Always hide nav button when not in smart window mode */
 :root:not([smart-window="true"]) #smartwindow-nav-button {
   display: none;
-}
-
-/* Default state - spacer takes minimal space for the button */
-#smartwindow-nav-spacer {
-  min-width: auto;
-  flex: 0;
-  display: flex;
-  justify-content: flex-end;
-}
-
-/* Expand the spacer when sidebar is open to match sidebar width */
-:root[smart-window-sidebar="true"] #smartwindow-nav-spacer {
-  flex: 1;
-  min-width: var(--smartwindow-sidebar-width, 358px);
-  max-width: var(--smartwindow-sidebar-width, 358px);
-  border-top-right-radius: 4px;
-  border: solid 1px var(--smart-window-border);
-  border-bottom: none;
-  margin-right: var(--sidebar-margin-end);
-}
-
-:root[smart-window-sidebar="true"] #nav-bar > *:not(#smartwindow-nav-spacer, #PanelUI-button) {
-  border-top: solid 1px var(--smart-window-border);
-}
-
-/* Style the close button */
-#smartwindow-close {
-  list-style-image: url("chrome://global/skin/icons/close.svg");
-  -moz-context-properties: fill;
 }
