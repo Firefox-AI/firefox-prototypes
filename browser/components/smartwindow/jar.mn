@@ -7,4 +7,5 @@ browser.jar:
     content/browser/smartwindow/marked.js                    (vendor/marked.js)
     content/browser/smartwindow/smartwindow.css              (content/smartwindow.css)
     content/browser/smartwindow/smartwindow.html             (content/smartwindow.html)
-    content/browser/smartwindow/smartwindow.js               (content/smartwindow.js)
+    content/browser/smartwindow/smartwindow.mjs              (content/smartwindow.mjs)
+    content/browser/smartwindow/utils.mjs                    (content/utils.mjs)
