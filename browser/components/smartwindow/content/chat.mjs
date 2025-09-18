@@ -4,6 +4,7 @@ import {
   unsafeHTML,
 } from "chrome://global/content/vendor/lit.all.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
+import { fetchWithHistory } from "chrome://browser/content/smartwindow/utils.mjs";
 
 /**
  * A simple chat bot component that interacts with an Ollama model via streaming.
@@ -149,8 +150,6 @@ class ChatBot extends MozLitElement {
 
   render() {
     return html`
-      <h3>Ollama</h3>
-
       ${this.messages.length === 0
         ? html`<p class="welcome-message">
             Start the conversation by typing a message.
@@ -193,23 +192,6 @@ class ChatBot extends MozLitElement {
 
       <div id="bottom-anchor"></div>
     `;
-  }
-}
-
-// Dummy fetchWithHistory function for placeholder responses
-async function* fetchWithHistory(messages) {
-  const lastUserMessage = messages[messages.length - 2]; // Second to last is user message
-  const query = lastUserMessage?.content || "";
-
-  const response = `Regarding "${query}": This is a placeholder response. In a real implementation, this would connect to an AI service.`;
-
-  // Simulate streaming by yielding chunks
-  const words = response.split(" ");
-  for (let i = 0; i < words.length; i++) {
-    const chunk = (i === 0 ? "" : " ") + words[i];
-    yield chunk;
-    // Add small delay to simulate streaming
-    await new Promise(resolve => setTimeout(resolve, 50));
   }
 }
 
