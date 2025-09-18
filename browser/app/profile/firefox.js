@@ -1148,6 +1148,9 @@ pref("browser.tabs.allow_transparent_browser", true);
 
 // Smart window feature
 pref("browser.smartwindow.enabled", true);
+pref("browser.smartwindow.endpoint", "https://api.openai.com/v1");
+pref("browser.smartwindow.key", "");
+pref("browser.smartwindow.model", "gpt-4o");
 
 // Scripts & Windows prefs
 pref("dom.disable_open_during_load",              true);
