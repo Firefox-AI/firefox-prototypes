@@ -27,6 +27,7 @@ class SmartWindowPage {
     this.suggestionDebounceTimer = null;
     this.lastTabInfo = null;
     this.chatBot = null;
+    this.chatMessagesByTab = new Map(); // Store chat messages by tab ID
     this.init();
   }
 
@@ -215,6 +216,7 @@ class SmartWindowPage {
       title: selectedTab.label || "Untitled",
       url: selectedBrowser.currentURI.spec || "",
       favicon: selectedTab.image || "",
+      tabId: selectedTab.linkedPanel, // Use linkedPanel as unique tab identifier
     };
 
     // Update status bar if in sidebar mode
@@ -544,6 +546,8 @@ class SmartWindowPage {
   }
 
   updateTabStatus(tabInfo) {
+    this.saveChatMessagesForCurrentTab();
+
     // Store the latest tab info
     this.lastTabInfo = tabInfo;
 
@@ -571,6 +575,9 @@ class SmartWindowPage {
     } else if (faviconEl) {
       faviconEl.style.display = "none";
     }
+
+    // Handle chat persistence when tab changes
+    this.loadChatMessagesForTab(tabInfo.tabId);
 
     // Update quick prompts if user hasn't edited the query
     if (!this.userHasEditedQuery && !this.searchInput.value.trim()) {
@@ -953,6 +960,41 @@ class SmartWindowPage {
       );
     } else {
       this.originalSearchBoxParent.appendChild(searchBox);
+    }
+  }
+
+  loadChatMessagesForTab(tabId) {
+    // Load existing chat messages for this tab
+    const savedMessages = this.chatMessagesByTab.get(tabId) || [];
+
+    if (this.chatBot) {
+      if (savedMessages.length) {
+        // Restore saved messages and show chat mode
+        this.chatBot.messages = [...savedMessages];
+        this.chatBot.requestUpdate();
+        this.showChatMode();
+        // Scroll to bottom after messages are loaded
+        setTimeout(() => this.chatBot.scrollToBottom(), 0);
+      } else {
+        // Clear messages and hide chat mode
+        this.chatBot.messages = [];
+        this.chatBot.requestUpdate();
+        this.hideChatMode();
+      }
+    }
+  }
+
+  saveChatMessagesForCurrentTab() {
+    // Save current chat messages for the active tab
+    if (
+      this.chatBot &&
+      this.lastTabInfo &&
+      this.lastTabInfo.tabId &&
+      this.chatBot.messages.length
+    ) {
+      this.chatMessagesByTab.set(this.lastTabInfo.tabId, [
+        ...this.chatBot.messages,
+      ]);
     }
   }
 
