@@ -19,9 +19,16 @@
             placeholder="Search or enter address"
           />
         </div>
-        <div id="results-container"></div>
+        <div id="results-container">
+          <chat-bot id="chat-bot" style="display: none"></chat-bot>
+        </div>
       </div>
     </div>
+    <script src="chrome://browser/content/smartwindow/marked.js"></script>
+    <script
+      type="module"
+      src="chrome://browser/content/smartwindow/chat.mjs"
+    ></script>
     <script src="chrome://browser/content/smartwindow/smartwindow.js"></script>
   </body>
 </html>

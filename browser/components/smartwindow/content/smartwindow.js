@@ -13,7 +13,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   UrlbarQueryContext:
     "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs",
 });
-const { topChromeWindow } = window.browsingContext;
+const { embedderElement, topChromeWindow } = window.browsingContext;
 
 class SmartWindowPage {
   constructor() {
@@ -28,6 +28,7 @@ class SmartWindowPage {
     this.userHasEditedQuery = false;
     this.suggestionDebounceTimer = null;
     this.lastTabInfo = null;
+    this.chatBot = null;
     this.init();
   }
 
@@ -151,12 +152,12 @@ class SmartWindowPage {
   }
 
   onDOMReady() {
-    // Check if we're in sidebar mode by looking for sidebar=true in URL
-    const urlParams = new URLSearchParams(window.location.search);
-    this.isSidebarMode = urlParams.get("sidebar") === "true";
+    // Check if we're in sidebar mode by looking at embedder
+    this.isSidebarMode = embedderElement.id == "smartwindow-browser";
 
     this.searchInput = document.getElementById("search-input");
     this.resultsContainer = document.getElementById("results-container");
+    this.chatBot = document.getElementById("chat-bot");
 
     // Create and setup suggestions container
     this.setupSuggestionsUI();
@@ -803,23 +804,17 @@ class SmartWindowPage {
     if (this.isSidebarMode) {
       // In sidebar mode, handle different query types appropriately
       if (type === "chat") {
-        // Add to chat conversation
-        this.addMessage(query, "user");
-        this.searchInput.value = "";
-        this.updateSubmitButton("");
-
-        // Simple echo response (in real implementation, this would call AI)
-        setTimeout(() => {
-          this.addMessage(
-            `Regarding "${query}": This is a placeholder response. In a real implementation, this would connect to an AI service.`,
-            "assistant"
-          );
-        }, 500);
+        // Show chat component and submit the prompt
+        this.showChatMode();
+        if (this.chatBot) {
+          this.chatBot.submitPrompt(query);
+        }
       } else if (type === "action") {
         // Handle actions in sidebar
         this.handleAction(query);
       } else {
-        // For navigate and search, still navigate but also add to chat
+        // For navigate and search, hide chat mode and show regular messages
+        this.hideChatMode();
         this.addMessage(`Navigating: ${query}`, "user");
         this.performNavigation(query, type);
       }
@@ -858,6 +853,9 @@ class SmartWindowPage {
 
   handleAction(action) {
     const actionLower = action.toLowerCase();
+
+    // Hide chat mode for actions and show regular messages
+    this.hideChatMode();
 
     if (actionLower.includes("tab next") || actionLower.includes("tab")) {
       // Handle tab switching action
@@ -915,6 +913,28 @@ class SmartWindowPage {
 
   clearResults() {
     this.resultsContainer.textContent = "";
+  }
+
+  showChatMode() {
+    // Hide any existing messages in results container
+    const existingMessages = this.resultsContainer.querySelectorAll(".message");
+    existingMessages.forEach(msg => (msg.style.display = "none"));
+
+    // Show chat bot component
+    if (this.chatBot) {
+      this.chatBot.style.display = "block";
+    }
+  }
+
+  hideChatMode() {
+    // Hide chat bot component
+    if (this.chatBot) {
+      this.chatBot.style.display = "none";
+    }
+
+    // Show any existing messages in results container
+    const existingMessages = this.resultsContainer.querySelectorAll(".message");
+    existingMessages.forEach(msg => (msg.style.display = "block"));
   }
 }
 
