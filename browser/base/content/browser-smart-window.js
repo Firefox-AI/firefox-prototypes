@@ -143,7 +143,7 @@ var SmartWindow = {
 
   initToggleButton() {
     const toggleButton = document.getElementById("smart-window-toggle");
-    const navToggleButton = document.getElementById("smartwindow-nav-toggle");
+    const navToggleButton = document.getElementById("smartwindow-button");
 
     if (toggleButton) {
       // Show the button only if the feature is enabled
@@ -261,7 +261,7 @@ var SmartWindow = {
   showSidebar() {
     const smartWindowBox = document.getElementById("smartwindow-box");
     const smartWindowSplitter = document.getElementById("smartwindow-splitter");
-    const navToggleButton = document.getElementById("smartwindow-nav-toggle");
+    const navToggleButton = document.getElementById("smartwindow-button");
 
     if (smartWindowBox) {
       smartWindowBox.hidden = false;
@@ -283,7 +283,7 @@ var SmartWindow = {
   hideSidebar() {
     const smartWindowBox = document.getElementById("smartwindow-box");
     const smartWindowSplitter = document.getElementById("smartwindow-splitter");
-    const navToggleButton = document.getElementById("smartwindow-nav-toggle");
+    const navToggleButton = document.getElementById("smartwindow-button");
 
     if (smartWindowBox) {
       smartWindowBox.hidden = true;
