@@ -799,25 +799,28 @@ class SmartWindowPage {
     // Hide suggestions after selection
     this.hideSuggestions();
 
-    if (this.isSidebarMode) {
-      // In sidebar mode, handle different query types appropriately
-      if (type === "chat") {
-        // Show chat component and submit the prompt
-        this.showChatMode();
-        if (this.chatBot) {
-          this.chatBot.submitPrompt(query);
-        }
-      } else if (type === "action") {
+    // Handle chat queries with chatbot component in both modes
+    if (type === "chat") {
+      // Show chat component and submit the prompt
+      this.showChatMode();
+      if (this.chatBot) {
+        this.chatBot.submitPrompt(query);
+      }
+    } else if (type === "action") {
+      if (this.isSidebarMode) {
         // Handle actions in sidebar
         this.handleAction(query);
       } else {
-        // For navigate and search, hide chat mode and show regular messages
+        // In full page mode, convert actions to search
         this.hideChatMode();
-        this.addMessage(`Navigating: ${query}`, "user");
-        this.performNavigation(query, type);
+        this.performNavigation(query, "search");
       }
     } else {
-      // In full page mode, handle navigation directly
+      // For navigate and search, hide chat mode and show regular messages
+      this.hideChatMode();
+      if (this.isSidebarMode) {
+        this.addMessage(`Navigating: ${query}`, "user");
+      }
       this.performNavigation(query, type);
     }
 
@@ -913,10 +916,53 @@ class SmartWindowPage {
     this.resultsContainer.textContent = "";
   }
 
+  moveInputToBottom() {
+    // Get the search box container
+    const searchBox = document.querySelector(".search-box");
+    if (!searchBox) {
+      return;
+    }
+
+    // Store original parent and position for restoration
+    if (!this.originalSearchBoxParent) {
+      this.originalSearchBoxParent = searchBox.parentNode;
+      this.originalSearchBoxNextSibling = searchBox.nextSibling;
+    }
+
+    // Add class for bottom positioning
+    searchBox.classList.add("chat-mode-bottom");
+
+    // Move to the bottom of the body
+    document.body.appendChild(searchBox);
+  }
+
+  restoreInputPosition() {
+    const searchBox = document.querySelector(".search-box");
+    if (!searchBox || !this.originalSearchBoxParent) {
+      return;
+    }
+
+    // Remove bottom positioning class
+    searchBox.classList.remove("chat-mode-bottom");
+
+    // Restore to original position
+    if (this.originalSearchBoxNextSibling) {
+      this.originalSearchBoxParent.insertBefore(
+        searchBox,
+        this.originalSearchBoxNextSibling
+      );
+    } else {
+      this.originalSearchBoxParent.appendChild(searchBox);
+    }
+  }
+
   showChatMode() {
     // Hide any existing messages in results container
     const existingMessages = this.resultsContainer.querySelectorAll(".message");
     existingMessages.forEach(msg => (msg.style.display = "none"));
+
+    // Move input box to bottom for chat mode
+    this.moveInputToBottom();
 
     // Show chat bot component
     if (this.chatBot) {
@@ -925,6 +971,9 @@ class SmartWindowPage {
   }
 
   hideChatMode() {
+    // Restore input box to original position
+    this.restoreInputPosition();
+
     // Hide chat bot component
     if (this.chatBot) {
       this.chatBot.style.display = "none";
