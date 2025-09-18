@@ -120,9 +120,12 @@ export class SmartWindowParent extends JSWindowActorParent {
       loadFlags: Ci.nsIWebNavigation.LOAD_FLAGS_REPLACE_HISTORY,
     });
 
-    // Open the smart window sidebar
-    if (win.SidebarController && !win.SidebarController.isOpen) {
-      win.SidebarController.show("viewSmartWindowSidebar");
+    // Smart window is now a right sidebar, not part of the left sidebar system
+    // Toggle the smart window right sidebar
+    if (win.SmartWindow) {
+      if (!win.SmartWindow._smartWindowActive) {
+        win.SmartWindow.toggleSmartWindow();
+      }
     }
   }
 }
