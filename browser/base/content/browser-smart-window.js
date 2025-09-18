@@ -24,7 +24,6 @@ var SmartWindow = {
 
     this.initToggleButton();
     this.initCloseButton();
-    this.initSplitter();
 
     // Check if this window was opened with Smart Window active from parent window
     let shouldActivateSmartWindow = false;
@@ -178,47 +177,6 @@ var SmartWindow = {
     }
   },
 
-  initSplitter() {
-    const smartWindowSplitter = document.getElementById("smartwindow-splitter");
-    const smartWindowBox = document.getElementById("smartwindow-box");
-
-    if (smartWindowSplitter && smartWindowBox) {
-      // Listen for the command event which fires when splitter finishes resizing
-      smartWindowSplitter.addEventListener("command", () => {
-        this.updateCSSVariable();
-      });
-
-      // Also monitor width changes on the box element
-      const observer = new MutationObserver(() => {
-        this.updateCSSVariable();
-      });
-
-      observer.observe(smartWindowBox, {
-        attributes: true,
-        attributeFilter: ["width", "style"],
-      });
-    }
-  },
-
-  updateCSSVariable() {
-    const smartWindowBox = document.getElementById("smartwindow-box");
-    const navigatorToolbox = document.getElementById("navigator-toolbox");
-    if (navigatorToolbox) {
-      if (smartWindowBox && !smartWindowBox.hidden) {
-        const width = smartWindowBox.getBoundingClientRect().width;
-        navigatorToolbox.style.setProperty(
-          "--smartwindow-sidebar-width",
-          `${width}px`
-        );
-        console.log(
-          `[Smart Window] Updated CSS variable --smartwindow-sidebar-width to ${width}px`
-        );
-      } else {
-        navigatorToolbox.style.removeProperty("--smartwindow-sidebar-width");
-      }
-    }
-  },
-
   toggleSmartWindow(skipSave = false) {
     console.log(
       `[Smart Window] toggleSmartWindow called, current state: ${this._smartWindowActive}, skipSave: ${skipSave}`
@@ -304,32 +262,20 @@ var SmartWindow = {
     const smartWindowBox = document.getElementById("smartwindow-box");
     const smartWindowSplitter = document.getElementById("smartwindow-splitter");
     const navToggleButton = document.getElementById("smartwindow-nav-toggle");
-    const closeButton = document.getElementById("smartwindow-close");
 
     if (smartWindowBox) {
       smartWindowBox.hidden = false;
-      // Only set initial width if there's no existing width
-      if (!smartWindowBox.style.width) {
-        smartWindowBox.style.width = "358px";
-      }
+      smartWindowBox.style.width = "358px";
     }
     if (smartWindowSplitter) {
       smartWindowSplitter.hidden = false;
     }
 
-    // Toggle button visibility - hide toggle, show close
-    if (navToggleButton) {
-      navToggleButton.hidden = true;
-    }
-    if (closeButton) {
-      closeButton.hidden = false;
-    }
+    // Update button state
+    navToggleButton?.setAttribute("checked", "true");
 
     this._sidebarVisible = true;
     document.documentElement.setAttribute("smart-window-sidebar", "true");
-
-    // Update CSS variable
-    this.updateCSSVariable();
 
     console.log("Smart Window sidebar shown");
   },
@@ -338,7 +284,6 @@ var SmartWindow = {
     const smartWindowBox = document.getElementById("smartwindow-box");
     const smartWindowSplitter = document.getElementById("smartwindow-splitter");
     const navToggleButton = document.getElementById("smartwindow-nav-toggle");
-    const closeButton = document.getElementById("smartwindow-close");
 
     if (smartWindowBox) {
       smartWindowBox.hidden = true;
@@ -347,19 +292,11 @@ var SmartWindow = {
       smartWindowSplitter.hidden = true;
     }
 
-    // Toggle button visibility - show toggle, hide close
-    if (navToggleButton) {
-      navToggleButton.hidden = false;
-    }
-    if (closeButton) {
-      closeButton.hidden = true;
-    }
+    // Update button state
+    navToggleButton?.removeAttribute("checked");
 
     this._sidebarVisible = false;
     document.documentElement.removeAttribute("smart-window-sidebar");
-
-    // Remove CSS variable when hidden
-    this.updateCSSVariable();
 
     console.log("Smart Window sidebar hidden");
   },
