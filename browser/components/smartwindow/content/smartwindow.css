@@ -116,6 +116,11 @@ html, body {
   text-overflow: ellipsis;
 }
 
+.status-page-text {
+  font-size: 10px;
+  color: #666;
+}
+
 .message {
   padding: 10px 14px;
   border-radius: 12px;

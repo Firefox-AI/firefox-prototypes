@@ -238,6 +238,7 @@ class SmartWindowPage {
       <div class="status-text">
         <div class="status-title" id="status-title">Loading...</div>
         <div class="status-url" id="status-url"></div>
+        <div class="status-page-text" id="status-page-text"></div>
       </div>
     `;
 
@@ -545,7 +546,7 @@ class SmartWindowPage {
     }
   }
 
-  updateTabStatus(tabInfo) {
+  async updateTabStatus(tabInfo) {
     this.saveChatMessagesForCurrentTab();
 
     // Store the latest tab info
@@ -554,6 +555,7 @@ class SmartWindowPage {
     const titleEl = document.getElementById("status-title");
     const urlEl = document.getElementById("status-url");
     const faviconEl = document.getElementById("status-favicon");
+    const pageTextEl = document.getElementById("status-page-text");
 
     if (titleEl) {
       titleEl.textContent = tabInfo.title || "Untitled";
@@ -582,6 +584,27 @@ class SmartWindowPage {
     // Update quick prompts if user hasn't edited the query
     if (!this.userHasEditedQuery && !this.searchInput.value.trim()) {
       this.showQuickPrompts();
+    }
+
+    // Get page text and display in status
+    if (pageTextEl) {
+      try {
+        const selectedBrowser = topChromeWindow.gBrowser.selectedBrowser;
+        const readableTextResult =
+          await selectedBrowser.browsingContext.currentWindowContext
+            .getActor("GenAI")
+            .sendQuery("GetReadableText");
+        const pageText = readableTextResult.selection || "";
+
+        const preview =
+          pageText.length > 30 ? pageText.substring(0, 30) + "…" : pageText;
+        pageTextEl.textContent = pageText
+          ? `${preview} (${pageText.length})`
+          : "No text content";
+      } catch (error) {
+        console.error("Failed to get page text:", error);
+        pageTextEl.textContent = "Unable to read page text";
+      }
     }
   }
 
