@@ -548,13 +548,20 @@
                      data-l10n-id="appmenu-menu-button-closed2"/>
     </toolbaritem>
 
-    <toolbaritem id="smartwindow-nav-button"
-                 removable="false"
-                 hidden="false">
-      <toolbarbutton id="smartwindow-nav-toggle"
-                     class="toolbarbutton-1 smartwindow-toggle-button"
-                     label="Assistant"/>
-    </toolbaritem>
+    <hbox id="smartwindow-nav-spacer" class="chromeclass-toolbar-additional">
+      <toolbaritem id="smartwindow-nav-button"
+                   removable="false"
+                   hidden="false">
+        <toolbarbutton id="smartwindow-nav-toggle"
+                       class="toolbarbutton-1 smartwindow-toggle-button"
+                       label="Assistant"
+                       hidden="false"/>
+        <toolbarbutton id="smartwindow-close"
+                       class="toolbarbutton-1 smartwindow-toggle-button"
+                       label="Assistant"
+                       hidden="true"/>
+      </toolbaritem>
+    </hbox>
     <hbox class="titlebar-spacer" type="post-tabs"/>
 #include private-browsing-indicator.inc.xhtml
     <toolbarbutton class="content-analysis-indicator toolbarbutton-1 content-analysis-indicator-icon"/>
