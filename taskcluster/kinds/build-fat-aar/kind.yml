@@ -85,6 +85,7 @@ task-defaults:
                     by-project:
                         try: nightly-try
                         default: nightly
+                nightly-cypress: nightly-cypress
                 nightly-larch: nightly-larch
                 nightly-oak: nightly-oak
                 nightly-pine: nightly-pine
