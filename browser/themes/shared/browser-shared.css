@@ -1530,13 +1530,17 @@ browser {
 /* Smart Window Toggle Button in Nav Bar - now using standard toolbar button styling */
 /* The button will use the SVG icon defined in toolbarbutton-icons.css */
 
-/* Hide the nav button when sidebar is visible */
-:root[smart-window-sidebar="true"] #smartwindow-button {
-  display: none;
+/* Show the button as active/checked when sidebar is visible */
+:root[smart-window-sidebar="true"] #smartwindow-button,
+#smartwindow-button[checked="true"] {
+  fill: var(--toolbarbutton-icon-fill-attention);
+}
+#smartwindow-button[checked="true"]:not(:hover):not(:active) .toolbarbutton-icon {
+  background: none;
 }
 
-/* Show the nav button when sidebar is hidden (but still in smart window mode) */
-:root[smart-window="true"]:not([smart-window-sidebar="true"]) #smartwindow-button {
+/* Show the button in smart window mode */
+:root[smart-window="true"] #smartwindow-button {
   display: flex;
 }
 
