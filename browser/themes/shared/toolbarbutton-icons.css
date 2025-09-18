@@ -253,6 +253,10 @@
   list-style-image: url("chrome://browser/skin/library.svg");
 }
 
+#smartwindow-button {
+  list-style-image: url("chrome://browser/skin/smartwindow.svg");
+}
+
 /* Bookmark toolbar buttons and menu items */
 
 .bookmark-item {

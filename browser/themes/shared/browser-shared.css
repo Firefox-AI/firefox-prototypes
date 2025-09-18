@@ -1413,16 +1413,6 @@ popupnotificationcontent {
 browser {
   background-color: -moz-Dialog;
 }
-
-@media (-moz-platform: macos) {
-  :root[smart-window] #PanelUI-button {
-    position: absolute;
-    top: -100%;
-    right: 0;
-    margin-top: 3px;
-  }
-}
-
 /* Smart Window mode - allow transparency for blank pages */
 :root[smart-window] browser[transparent][isblankpage],
 :root[smart-window] #sidebar {
@@ -1537,45 +1527,20 @@ browser {
   background-color: var(--toolbarbutton-hover-background);
 }
 
-/* Smart Window Toggle Button in Nav Bar */
-#smartwindow-nav-button {
-  order: 1000; /* Position after PanelUI-button */
-  margin-inline-start: 8px;
-}
-
-#smartwindow-nav-toggle {
-  background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
-  border-radius: 8px;
-  border: none;
-  min-width: auto;
-  margin: 0;
-  color: white;
-  fill: white;
-}
-
-#smartwindow-nav-toggle:hover {
-  background: linear-gradient(135deg, #9F67FF 0%, #8B46FF 100%);
-}
-
-#smartwindow-nav-toggle:active {
-  background: linear-gradient(135deg, #7C3AED 0%, #6B21EA 100%);
-}
-
-#smartwindow-nav-toggle[checked] {
-  background: linear-gradient(135deg, #A78BFA 0%, #9333EA 100%);
-}
+/* Smart Window Toggle Button in Nav Bar - now using standard toolbar button styling */
+/* The button will use the SVG icon defined in toolbarbutton-icons.css */
 
 /* Hide the nav button when sidebar is visible */
-:root[smart-window-sidebar="true"] #smartwindow-nav-button {
+:root[smart-window-sidebar="true"] #smartwindow-button {
   display: none;
 }
 
 /* Show the nav button when sidebar is hidden (but still in smart window mode) */
-:root[smart-window="true"]:not([smart-window-sidebar="true"]) #smartwindow-nav-button {
+:root[smart-window="true"]:not([smart-window-sidebar="true"]) #smartwindow-button {
   display: flex;
 }
 
 /* Always hide nav button when not in smart window mode */
-:root:not([smart-window="true"]) #smartwindow-nav-button {
+:root:not([smart-window="true"]) #smartwindow-button {
   display: none;
 }
