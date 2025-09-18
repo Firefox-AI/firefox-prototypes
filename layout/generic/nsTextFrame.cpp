@@ -107,9 +107,18 @@ using namespace mozilla::gfx;
 
 namespace mozilla {
 
+// Is the given frame using a vertical-* (not sideways-*) writing-mode with
+// text-orientation:upright applied, or is it using text-combine-upright?
+static bool IsVerticalUpright(const nsIFrame* aFrame) {
+  return (aFrame->GetWritingMode().IsVertical() &&
+          !aFrame->GetWritingMode().IsVerticalSideways() &&
+          aFrame->StyleVisibility()->mTextOrientation ==
+              StyleTextOrientation::Upright) ||
+         aFrame->Style()->IsTextCombined();
+}
+
 bool TextAutospace::Enabled(const StyleTextAutospace& aStyleTextAutospace,
-                            const nsIFrame* aFrame,
-                            const CharacterDataBuffer& aBuffer) {
+                            const nsIFrame* aFrame) {
   if (aStyleTextAutospace == StyleTextAutospace::NO_AUTOSPACE) {
     return false;
   }
@@ -121,21 +130,11 @@ bool TextAutospace::Enabled(const StyleTextAutospace& aStyleTextAutospace,
     return false;
   }
 
-  WritingMode wm = aFrame->GetWritingMode();
-  if (wm.IsVertical() && !wm.IsVerticalSideways() &&
-      aFrame->StyleVisibility()->mTextOrientation ==
-          StyleTextOrientation::Upright) {
-    // If writing-mode is vertical-* and 'text-orientation: upright',
-    // a character cannot be a non-ideographic letter or numeral,
-    // so ideograph-alpha or ideograph-numeric boundaries cannot occur.
-    //
-    // Note: 'text-combine-upright' is checked in
-    // PropertyProvider::GetSpacingInternal(), so we do not check it here.
-    return false;
-  }
-
-  if (!aBuffer.Is2b()) {
-    // An 8-bit character cannot be an ideograph.
+  if (IsVerticalUpright(aFrame)) {
+    // If writing-mode is vertical-* and 'text-orientation: upright', or the
+    // frame uses text-combine-upright, a character cannot be a non-ideographic
+    // letter or numeral, so ideograph-alpha or ideograph-numeric boundaries
+    // cannot occur.
     return false;
   }
 
@@ -169,7 +168,7 @@ bool TextAutospace::ShouldApplySpacing(CharClass aPrevClass,
   return false;
 }
 
-bool TextAutospace::IsIdeograph(char32_t aChar) const {
+bool TextAutospace::IsIdeograph(char32_t aChar) {
   // All characters in the range of U+3041 to U+30FF, except those that belong
   // to Unicode Punctuation [P*] general category.
   if (0x3041 <= aChar && aChar <= 0x30FF) {
@@ -194,7 +193,7 @@ bool TextAutospace::IsIdeograph(char32_t aChar) const {
   return false;
 }
 
-TextAutospace::CharClass TextAutospace::GetCharClass(char32_t aChar) const {
+TextAutospace::CharClass TextAutospace::GetCharClass(char32_t aChar) {
   if (IsIdeograph(aChar)) {
     return CharClass::Ideograph;
   }
@@ -1970,8 +1969,7 @@ gfx::ShapedTextFlags nsTextFrame::GetSpacingFlags() const {
   // to be rare, and avoiding TEXT_ENABLE_SPACING is just an optimization.
   bool nonStandardSpacing =
       !ls.IsDefinitelyZero() || !ws.IsDefinitelyZero() ||
-      TextAutospace::Enabled(styleText->EffectiveTextAutospace(), this,
-                             CharacterDataBuffer());
+      TextAutospace::Enabled(styleText->EffectiveTextAutospace(), this);
   return nonStandardSpacing ? gfx::ShapedTextFlags::TEXT_ENABLE_SPACING
                             : gfx::ShapedTextFlags();
 }
@@ -3867,6 +3865,113 @@ static gfxFloat ComputeTabWidthAppUnits(const nsIFrame* aFrame) {
           styleText->mWordSpacing.Resolve(spaceWidth));
 }
 
+// Walk backward from aIter to prior cluster starts (within the same textframe's
+// content) and return the first non-mark autospace class.
+static Maybe<TextAutospace::CharClass> LastNonMarkCharClass(
+    gfxSkipCharsIterator& aIter, const gfxTextRun* aTextRun,
+    const CharacterDataBuffer& aBuffer) {
+  while (aIter.GetOriginalOffset() > 0) {
+    aIter.AdvanceOriginal(-1);
+    FindClusterStart(aTextRun, 0, &aIter);
+    const char32_t ch = aBuffer.ScalarValueAt(aIter.GetOriginalOffset());
+    auto cls = TextAutospace::GetCharClass(ch);
+    if (cls != TextAutospace::CharClass::CombiningMark) {
+      return Some(cls);
+    }
+  }
+  return Nothing();
+}
+
+// Return the first non-mark autospace class from the end of content in aFrame.
+static Maybe<TextAutospace::CharClass> LastNonMarkCharClassInFrame(
+    nsTextFrame* aFrame) {
+  using CharClass = TextAutospace::CharClass;
+  gfxSkipCharsIterator iter = aFrame->EnsureTextRun(nsTextFrame::eInflated);
+  iter.SetOriginalOffset(aFrame->GetContentEnd());
+  Maybe<CharClass> prevClass =
+      LastNonMarkCharClass(iter, aFrame->GetTextRun(nsTextFrame::eInflated),
+                           aFrame->CharacterDataBuffer());
+  if (prevClass) {
+    return prevClass;
+  }
+  if (aFrame->GetPrevInFlow()) {
+    // If aFrame has a prev-in-flow, it is after a line-break, so autospace does
+    // not apply here; just return Other.
+    return Some(CharClass::Other);
+  }
+  return Nothing();
+}
+
+// Look for the autospace class of the content preceding the given aFrame
+// from the mapped flows.
+static Maybe<TextAutospace::CharClass> GetPrecedingCharClassFromMappedFlows(
+    const nsTextFrame* aFrame, const gfxTextRun* aTextRun) {
+  using CharClass = TextAutospace::CharClass;
+  TextRunMappedFlow* mappedFlows = GetMappedFlows(aTextRun);
+  auto data = static_cast<TextRunUserData*>(aTextRun->GetUserData());
+  MOZ_ASSERT(mappedFlows && data, "missing mapped-flow data!");
+
+  // Search for aFrame in the mapped flows.
+  uint32_t i = 0;
+  for (; i < data->mMappedFlowCount; ++i) {
+    if (mappedFlows[i].mStartFrame == aFrame) {
+      break;
+    }
+  }
+  MOZ_ASSERT(mappedFlows[i].mStartFrame == aFrame,
+             "aFrame not found in mapped flows!");
+
+  while (i > 0) {
+    nsTextFrame* f = mappedFlows[--i].mStartFrame->LastInFlow();
+    if (Maybe<CharClass> prevClass = LastNonMarkCharClassInFrame(f)) {
+      return prevClass;
+    }
+  }
+  return Nothing();
+}
+
+// Look for the autospace class of content preceding the given frame.
+static Maybe<TextAutospace::CharClass> GetPrecedingCharClassFromFrameTree(
+    nsIFrame* aFrame) {
+  using CharClass = TextAutospace::CharClass;
+  while (!aFrame->GetPrevSibling() && aFrame->GetParent()->IsInlineFrame()) {
+    // If this is the first child of an inline container, we want to ascend to
+    // the parent and look at what precedes it.
+    aFrame = aFrame->GetParent();
+  }
+  aFrame = aFrame->GetPrevSibling();
+  while (aFrame) {
+    if (aFrame->IsPlaceholderFrame()) {
+      // Skip over out-of-flow placeholders.
+      aFrame = aFrame->GetPrevSibling();
+      continue;
+    }
+    if (aFrame->IsInlineFrame()) {
+      // Descend into inline containers and go backwards through their content.
+      aFrame = aFrame->PrincipalChildList().LastChild();
+      continue;
+    }
+    if (nsTextFrame* f = do_QueryFrame(aFrame)) {
+      // Look for the class of the last character in the textframe.
+      Maybe<CharClass> prevClass = LastNonMarkCharClassInFrame(f);
+      if (prevClass) {
+        if ((*prevClass == CharClass::NonIdeographicLetter ||
+             *prevClass == CharClass::NonIdeographicNumeral) &&
+            IsVerticalUpright(f)) {
+          // If we're in vertical writing mode with forced upright glyph
+          // orientation, these classes are not applicable.
+          return Some(CharClass::Other);
+        }
+        return prevClass;
+      }
+      aFrame = aFrame->GetPrevSibling();
+      continue;
+    }
+    return Nothing();
+  }
+  return Nothing();
+}
+
 void nsTextFrame::PropertyProvider::GetSpacingInternal(Range aRange,
                                                        Spacing* aSpacing,
                                                        bool aIgnoreTabs) const {
@@ -3922,26 +4027,46 @@ void nsTextFrame::PropertyProvider::GetSpacingInternal(Range aRange,
                    !mFrame->IsInSVGTextSubtree();
 
     using CharClass = TextAutospace::CharClass;
-    // Previous non-mark class of a scalar at a cluster start.
-    CharClass prevClass = CharClass::Other;
-    if (mTextAutospace) {
-      // We may need the class of the scalar immediately before the current
-      // aRange.
-      if (aRange.start > 0 && start.GetOriginalOffset() > 0) {
-        gfxSkipCharsIterator findPrevCluster = start;
-        do {
-          findPrevCluster.AdvanceOriginal(-1);
-          FindClusterStart(mTextRun, 0, &findPrevCluster);
-          const char32_t prevScalar = mCharacterDataBuffer.ScalarValueAt(
-              findPrevCluster.GetOriginalOffset());
-          prevClass = mTextAutospace->GetCharClass(prevScalar);
-        } while (prevClass == CharClass::CombiningMark &&
-                 findPrevCluster.GetOriginalOffset() > 0);
-      } else {
-        // Bug 1986837: Look for the last non-mark cluster start of the
-        // preceding frame, if any.
+    // The non-mark class of a previous character at a cluster start (if any).
+    Maybe<CharClass> prevClass;
+
+    // Initialization of prevClass at start-of-frame may be a bit expensive,
+    // and we don't always need that initial value, so we encapsulate it in a
+    // helper to be called on-demand.
+    auto findPrecedingClass = [&]() -> CharClass {
+      // Get the class of the character immediately before the current aRange.
+      Maybe<CharClass> prevClass;
+      if (aRange.start > 0) {
+        gfxSkipCharsIterator iter = start;
+        prevClass = LastNonMarkCharClass(iter, mTextRun, mCharacterDataBuffer);
       }
-    }
+      // If no class was found, we need to look at the preceding content (if
+      // any) to see what it ended with.
+      if (!prevClass) {
+        // If we have a prev-in-flow, we're after a line-break, so autospace
+        // does not apply here; just set prevClass to Other.
+        if (mFrame->GetPrevInFlow()) {
+          prevClass = Some(CharClass::Other);
+        } else {
+          // If the textrun is mapping multiple content flows, we may be able
+          // to find preceding content from there (without having to walk the
+          // potentially more complex frame tree).
+          if (!(mTextRun->GetFlags2() &
+                nsTextFrameUtils::Flags::IsSimpleFlow)) {
+            prevClass = GetPrecedingCharClassFromMappedFlows(mFrame, mTextRun);
+          }
+          // If we couldn't get it from an earlier flow covered by the textrun,
+          // we'll have to delve into the frame tree to see what preceded this.
+          if (!prevClass) {
+            prevClass = GetPrecedingCharClassFromFrameTree(mFrame);
+          }
+        }
+      }
+      // If no valid class was found, return `Other`, which never participates
+      // in autospacing rules.
+      return prevClass.valueOr(CharClass::Other);
+    };
+
     while (run.NextRun()) {
       uint32_t runOffsetInSubstring = run.GetSkippedOffset() - aRange.start;
       gfxSkipCharsIterator iter = run.GetPos();
@@ -3973,18 +4098,24 @@ void nsTextFrame::PropertyProvider::GetSpacingInternal(Range aRange,
             mTextRun->IsClusterStart(run.GetSkippedOffset() + i)) {
           const char32_t currScalar =
               mCharacterDataBuffer.ScalarValueAt(run.GetOriginalOffset() + i);
-          const auto currClass = mTextAutospace->GetCharClass(currScalar);
+          const auto currClass = TextAutospace::GetCharClass(currScalar);
 
           // It is rare for the current class to be is a combining mark, as
           // combining marks are not cluster starts. We still check in case a
           // stray mark appears at the start of a frame.
           if (currClass != CharClass::CombiningMark) {
-            if (!atStart &&
-                mTextAutospace->ShouldApplySpacing(prevClass, currClass)) {
+            // We don't need to do anything if at start of line, or if the
+            // current class is `Other`, which never participates in spacing.
+            if (!atStart && currClass != CharClass::Other &&
+                mTextAutospace->ShouldApplySpacing(
+                    prevClass.valueOr(findPrecedingClass()), currClass)) {
               aSpacing[runOffsetInSubstring + i].mBefore +=
                   mTextAutospace->InterScriptSpacing();
             }
-            prevClass = currClass;
+            // Even if we didn't actually need to check spacing rules here, we
+            // record the new prevClass. (Incidentally, this ensure that we'll
+            // only call the findPrecedingClass() helper once.)
+            prevClass = Some(currClass);
           }
         }
         atStart = false;
@@ -4302,8 +4433,7 @@ void nsTextFrame::PropertyProvider::InitFontGroupAndFontMetrics() const {
 
 void nsTextFrame::PropertyProvider::InitTextAutospace() {
   const auto styleTextAutospace = mTextStyle->EffectiveTextAutospace();
-  if (TextAutospace::Enabled(styleTextAutospace, mFrame,
-                             mCharacterDataBuffer)) {
+  if (TextAutospace::Enabled(styleTextAutospace, mFrame)) {
     mTextAutospace.emplace(styleTextAutospace,
                            GetFontMetrics()->InterScriptSpacingWidth());
   }

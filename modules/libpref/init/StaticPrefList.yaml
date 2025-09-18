@@ -4275,7 +4275,9 @@
 #          seen for the first time, independently of the size or last access
 #          time.
 #   *  0 : (default) The bytecode would be saved in order to minimize the
-#          page-load time.
+#          page-load time.  Cached after 4 reloads.
+#   *  1 : (performance) The bytecode would be saved in order to minimize the
+#          page-load time.  Cached after 2 reloads.
 #
 # Other values might lead to experimental strategies. For more details, have a
 # look at: ScriptLoader::ShouldCacheBytecode function.
@@ -8887,7 +8889,7 @@
 # Support for Atomics.waitAsync in JavaScript.
 - name: javascript.options.atomics_wait_async
   type: bool
-  value: false
+  value: true
   mirror: always
   set_spidermonkey_pref: startup
 
@@ -14818,17 +14820,6 @@
 #endif
   mirror: always
 
-# When this pref is true, GeckoViewStartup.sys.mjs will initialize the DoHController
-# and Fenix will automatically select the TRR provider when the browser is in
-# "Default protection" mode (ie network.trr.mode is 0).
-# The selected provider depends on remote settings and the user's region.
-# If a rollout hasn't started in the user's region, then Fenix will continue using
-# the system DNS settings.
-- name: network.android_doh.autoselect_enabled
-  type: RelaxedAtomicBool
-  value: false
-  mirror: always
-
 # Allow the network changed event to get sent when a network topology or setup
 # change is noticed while running.
 - name: network.notify.changed
@@ -17159,7 +17150,11 @@
 # - "compat" => clubcards that contain priority revocations
 - name: security.pki.crlite_channel
   type: String
+#ifdef ANDROID
+  value: "compat"
+#else
   value: "default"
+#endif
   mirror: never
 
 # The number of SCTs that must be "covered" by a CRLite filter before
