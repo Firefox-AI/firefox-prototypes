@@ -430,6 +430,7 @@ var SmartWindow = {
           url: currentBrowser.currentURI.spec,
           title: currentTab.label,
           favicon: currentTab.getAttribute("image") || "",
+          tabId: currentTab.linkedPanel,
         });
       }
     }
