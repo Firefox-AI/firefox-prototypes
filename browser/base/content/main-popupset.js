@@ -202,9 +202,6 @@ document.addEventListener(
         case "sidebar-switcher-tabs":
           SidebarController.show("viewTabsSidebar");
           break;
-        case "sidebar-switcher-smartwindow":
-          SidebarController.show("viewSmartWindowSidebar");
-          break;
         case "sidebar-reverse-position":
           SidebarController.reversePosition();
           break;

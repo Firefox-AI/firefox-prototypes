@@ -20,7 +20,6 @@ const toolsNameMap = {
   viewHistorySidebar: "history",
   viewBookmarksSidebar: "bookmarks",
   viewCPMSidebar: "passwords",
-  viewSmartWindowSidebar: "smartwindow",
 };
 const EXPAND_ON_HOVER_DEBOUNCE_RATE_MS = 200;
 const EXPAND_ON_HOVER_DEBOUNCE_TIMEOUT_MS = 1000;
@@ -167,19 +166,6 @@ var SidebarController = {
           gleanEvent: Glean.bookmarks.sidebarToggle,
           gleanClickEvent: Glean.sidebar.bookmarksIconClick,
           recordSidebarVersion: true,
-        }),
-      ],
-      [
-        "viewSmartWindowSidebar",
-        this.makeSidebar({
-          name: "smartwindow",
-          elementId: "sidebar-switcher-smartwindow",
-          url: "chrome://browser/content/smartwindow/smartwindow.html?sidebar=true",
-          menuId: "menu_smartWindowSidebar",
-          menuL10nId: "menu-view-smartwindow",
-          revampL10nId: "sidebar-menu-smartwindow-label",
-          iconUrl: "chrome://browser/skin/window.svg",
-          visible: true,
         }),
       ],
     ]);

@@ -1436,7 +1436,9 @@ browser {
 }
 
 :root[smart-window="true"][smart-window-url] #sidebar-main,
-:root[smart-window="true"][smart-window-url] #sidebar-box {
+:root[smart-window="true"][smart-window-url] #sidebar-box,
+:root[smart-window="true"][smart-window-url] #smartwindow-box,
+:root[smart-window="true"][smart-window-url] #smartwindow-splitter {
   visibility: collapse;
 }
 
@@ -1490,4 +1492,90 @@ browser {
 /* Hide in private windows */
 :root[privatebrowsingmode="temporary"] #smart-window-toggle {
   display: none !important
+}
+
+/* Smart Window Right Sidebar Styles */
+.smartwindow-right-sidebar {
+  width: 358px;
+  backdrop-filter: blur(24px);
+  border-inline-start: 1px solid rgba(189, 137, 213, 0.8);
+  box-shadow: 0px 4px 14px 0px rgba(0, 0, 0, 0.1);
+}
+
+#smartwindow-box {
+  min-width: 300px;
+  max-width: 600px;
+}
+
+#smartwindow-header {
+  height: 36px;
+  padding: 0 6px;
+  border-bottom: 1px solid rgba(240, 240, 244, 1);
+}
+
+.smartwindow-browser-stack {
+  background: transparent;
+}
+
+#smartwindow-browser {
+  background: transparent;
+}
+
+/* Splitter styling to match the left sidebar */
+#smartwindow-splitter {
+  width: 4px;
+  margin-inline-end: -4px;
+  border: 0;
+  border-inline-end: 1px solid var(--splitter-color);
+  min-width: 4px;
+  background-color: transparent;
+  position: relative;
+  z-index: 10;
+}
+
+#smartwindow-splitter:hover {
+  background-color: var(--toolbarbutton-hover-background);
+}
+
+/* Smart Window Toggle Button in Nav Bar */
+#smartwindow-nav-button {
+  order: 1000; /* Position after PanelUI-button */
+  margin-inline-start: 8px;
+}
+
+#smartwindow-nav-toggle {
+  background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
+  border-radius: 8px;
+  border: none;
+  min-width: auto;
+  margin: 0;
+  color: white;
+  fill: white;
+}
+
+#smartwindow-nav-toggle:hover {
+  background: linear-gradient(135deg, #9F67FF 0%, #8B46FF 100%);
+}
+
+#smartwindow-nav-toggle:active {
+  background: linear-gradient(135deg, #7C3AED 0%, #6B21EA 100%);
+}
+
+#smartwindow-nav-toggle[checked] {
+  background: linear-gradient(135deg, #A78BFA 0%, #9333EA 100%);
+}
+
+/* Hide the nav button when sidebar is visible */
+:root[smart-window-sidebar="true"] #smartwindow-nav-button {
+  display: none;
+}
+
+/* Show the nav button when sidebar is hidden (but still in smart window mode) */
+:root[smart-window="true"]:not([smart-window-sidebar="true"]) #smartwindow-nav-button {
+  display: flex;
+}
+
+/* Always hide nav button when not in smart window mode */
+:root:not([smart-window="true"]) #smartwindow-nav-button {
+  display: none;
 }

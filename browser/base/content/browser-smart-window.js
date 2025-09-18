@@ -7,6 +7,7 @@
 var SmartWindow = {
   _initialized: false,
   _smartWindowActive: false,
+  _sidebarVisible: false,
   SESSION_STORE_KEY: "smart-window-active",
 
   init() {
@@ -22,6 +23,7 @@ var SmartWindow = {
     }
 
     this.initToggleButton();
+    this.initCloseButton();
 
     // Check if this window was opened with Smart Window active from parent window
     let shouldActivateSmartWindow = false;
@@ -141,6 +143,7 @@ var SmartWindow = {
 
   initToggleButton() {
     const toggleButton = document.getElementById("smart-window-toggle");
+    const navToggleButton = document.getElementById("smartwindow-nav-toggle");
 
     if (toggleButton) {
       // Show the button only if the feature is enabled
@@ -152,6 +155,25 @@ var SmartWindow = {
           this.toggleSmartWindow();
         });
       }
+    }
+
+    // Initialize the nav bar toggle button (assistant button)
+    if (navToggleButton) {
+      navToggleButton.addEventListener("command", () => {
+        // Just toggle sidebar visibility, not smart window mode
+        this.toggleSidebar();
+      });
+    }
+  },
+
+  initCloseButton() {
+    const closeButton = document.getElementById("smartwindow-close");
+
+    if (closeButton) {
+      closeButton.addEventListener("command", () => {
+        // Just hide the sidebar, don't exit smart window mode
+        this.hideSidebar();
+      });
     }
   },
 
@@ -170,10 +192,24 @@ var SmartWindow = {
     }
 
     if (!this._smartWindowActive) {
-      // Activate Smart Window
+      // Activate Smart Window mode
       this._smartWindowActive = true;
       root.setAttribute("smart-window", "true");
       toggleButton?.setAttribute("checked", "true");
+
+      // Check if we're on a smart window page
+      const currentURI = gBrowser.selectedBrowser?.currentURI?.spec || "";
+      const isSmartWindowPage = currentURI.includes(
+        "smartwindow/smartwindow.html"
+      );
+
+      // Only show sidebar if NOT on a smart window page
+      if (!isSmartWindowPage) {
+        this.showSidebar();
+      } else {
+        // Hide sidebar when on smart window page
+        this.hideSidebar();
+      }
 
       // Hide bookmarks toolbar immediately
       updateBookmarkToolbarVisibility();
@@ -188,17 +224,20 @@ var SmartWindow = {
         })
       );
 
-      console.log("Smart Window activated");
+      console.log("Smart Window mode activated");
 
       // Save the state unless we're restoring
       if (!skipSave) {
         this.saveState();
       }
     } else {
-      // Deactivate Smart Window
+      // Deactivate Smart Window mode AND hide sidebar
       this._smartWindowActive = false;
       root.removeAttribute("smart-window");
       toggleButton?.removeAttribute("checked");
+
+      // Hide the sidebar
+      this.hideSidebar();
 
       // Restore bookmarks toolbar visibility based on user preference
       updateBookmarkToolbarVisibility();
@@ -210,12 +249,63 @@ var SmartWindow = {
         })
       );
 
-      console.log("Smart Window deactivated");
+      console.log("Smart Window mode deactivated");
 
       // Save the state unless we're restoring
       if (!skipSave) {
         this.saveState();
       }
+    }
+  },
+
+  showSidebar() {
+    const smartWindowBox = document.getElementById("smartwindow-box");
+    const smartWindowSplitter = document.getElementById("smartwindow-splitter");
+    const navToggleButton = document.getElementById("smartwindow-nav-toggle");
+
+    if (smartWindowBox) {
+      smartWindowBox.hidden = false;
+      smartWindowBox.style.width = "358px";
+    }
+    if (smartWindowSplitter) {
+      smartWindowSplitter.hidden = false;
+    }
+
+    // Update button state
+    navToggleButton?.setAttribute("checked", "true");
+
+    this._sidebarVisible = true;
+    document.documentElement.setAttribute("smart-window-sidebar", "true");
+
+    console.log("Smart Window sidebar shown");
+  },
+
+  hideSidebar() {
+    const smartWindowBox = document.getElementById("smartwindow-box");
+    const smartWindowSplitter = document.getElementById("smartwindow-splitter");
+    const navToggleButton = document.getElementById("smartwindow-nav-toggle");
+
+    if (smartWindowBox) {
+      smartWindowBox.hidden = true;
+    }
+    if (smartWindowSplitter) {
+      smartWindowSplitter.hidden = true;
+    }
+
+    // Update button state
+    navToggleButton?.removeAttribute("checked");
+
+    this._sidebarVisible = false;
+    document.documentElement.removeAttribute("smart-window-sidebar");
+
+    console.log("Smart Window sidebar hidden");
+  },
+
+  toggleSidebar() {
+    if (this._sidebarVisible) {
+      this.hideSidebar();
+    } else {
+      this.showSidebar();
     }
   },
 
@@ -259,18 +349,17 @@ var SmartWindow = {
   },
 
   updateSidebar() {
-    // Check if smart window sidebar is open
-    if (
-      typeof SidebarController !== "undefined" &&
-      SidebarController?.currentID === "viewSmartWindowSidebar" &&
-      SidebarController.browser
-    ) {
+    // Check if smart window right sidebar is open
+    const smartWindowBox = document.getElementById("smartwindow-box");
+    const smartWindowBrowser = document.getElementById("smartwindow-browser");
+
+    if (smartWindowBox && !smartWindowBox.hidden && smartWindowBrowser) {
       const currentTab = gBrowser.selectedTab;
       const currentBrowser = gBrowser.selectedBrowser;
 
-      // Send tab info to the sidebar
+      // Send tab info to the right sidebar
       const actor =
-        SidebarController.browser.browsingContext?.currentWindowGlobal?.getActor(
+        smartWindowBrowser.browsingContext?.currentWindowGlobal?.getActor(
           "SmartWindow"
         );
       if (actor) {
