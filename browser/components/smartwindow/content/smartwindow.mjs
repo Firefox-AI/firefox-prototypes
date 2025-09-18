@@ -836,6 +836,8 @@ class SmartWindowPage {
       if (this.chatBot) {
         this.chatBot.submitPrompt(query);
       }
+      // For chat on smart window page (not sidebar), don't open sidebar
+      // The sidebar logic is handled by performNavigation for search/navigate types
     } else if (type === "action") {
       if (this.isSidebarMode) {
         // Handle actions in sidebar
@@ -843,7 +845,7 @@ class SmartWindowPage {
       } else {
         // In full page mode, convert actions to search
         this.hideChatMode();
-        this.performNavigation(query, "search");
+        this.performNavigation(query, type);
       }
     } else {
       // For navigate and search, hide chat mode and show regular messages
@@ -852,6 +854,14 @@ class SmartWindowPage {
         this.addMessage(`Navigating: ${query}`, "user");
       }
       this.performNavigation(query, type);
+
+      // Open sidebar for search queries when not in sidebar mode and not on a new tab
+      if (type === "search" && !this.isSidebarMode) {
+        // Tell the chrome window to show the sidebar
+        if (topChromeWindow.SmartWindow) {
+          topChromeWindow.SmartWindow.showSidebar();
+        }
+      }
     }
 
     // Clear input and reset state
