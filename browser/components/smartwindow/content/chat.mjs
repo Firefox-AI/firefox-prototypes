@@ -143,8 +143,17 @@ class ChatBot extends MozLitElement {
     }
   }
 
-  async submitPrompt(_prompt) {
-    this.prompt = _prompt;
+  async submitPrompt(_prompt, tabContext = []) {
+    // If tab context is provided, enhance the prompt with context information
+    if (tabContext && tabContext.length) {
+      let contextInfo = "\n\nTab Context:";
+      tabContext.forEach((tab, index) => {
+        contextInfo += `\n${index + 1}. "${tab.title}" - ${tab.url}`;
+      });
+      this.prompt = _prompt + contextInfo;
+    } else {
+      this.prompt = _prompt;
+    }
     await this.sendPrompt();
   }
 
