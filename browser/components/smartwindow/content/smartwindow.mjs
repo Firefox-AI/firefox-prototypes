@@ -802,20 +802,12 @@ class SmartWindowPage {
   }
 
   setupSubmitButton() {
-    // Find or create submit button
-    this.submitButton =
-      document.querySelector(".search-button") ||
-      document.querySelector("button[type='submit']");
+    // Find the submit button
+    this.submitButton = document.getElementById("submit-button");
+    this.buttonText = this.submitButton?.querySelector(".button-text");
 
     if (!this.submitButton) {
-      // Create submit button if it doesn't exist
-      this.submitButton = document.createElement("button");
-      this.submitButton.className = "search-button submit-button";
-      this.submitButton.type = "button";
-
-      // Add to search box
-      const searchBox = document.querySelector(".search-box");
-      searchBox.appendChild(this.submitButton);
+      return;
     }
 
     // Set initial state
@@ -823,21 +815,31 @@ class SmartWindowPage {
 
     // Add click handler
     this.submitButton.addEventListener("click", () => {
-      this.handleEnter(this.searchInput.value);
+      if (this.searchInput.value.trim()) {
+        this.handleEnter(this.searchInput.value);
+      } else {
+        // If empty, focus the input
+        this.searchInput.focus();
+      }
     });
   }
 
   updateSubmitButton(query) {
-    if (!this.submitButton) {
+    if (!this.submitButton || !this.buttonText) {
       return;
     }
 
-    const type = query ? this.detectQueryType(query) : "search";
-    const icon = this.getQueryTypeIcon(type);
-    const label = this.getQueryTypeLabel(type);
-
-    this.submitButton.innerHTML = `${icon} ${label}`;
-    this.submitButton.disabled = !query.trim();
+    if (query.trim()) {
+      // When there's text, show the appropriate action label
+      const type = this.detectQueryType(query);
+      const label = this.getQueryTypeLabel(type);
+      this.buttonText.textContent = label;
+      this.submitButton.classList.add("has-text");
+    } else {
+      // When empty, show arrow
+      this.buttonText.textContent = "→";
+      this.submitButton.classList.remove("has-text");
+    }
   }
 
   async showQuickPrompts() {
