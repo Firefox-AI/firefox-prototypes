@@ -835,6 +835,11 @@ class SmartWindowPage {
   }
 
   async showQuickPrompts() {
+    // Don't show quick prompts if chat mode is active
+    if (this.chatBot && this.chatBot.style.display === "block") {
+      return;
+    }
+
     // Use stored tab info for context
     const tabTitle = this.lastTabInfo?.title || "";
 
@@ -1171,9 +1176,11 @@ class SmartWindowPage {
     this.updateSubmitButton(query);
 
     if (!query.trim()) {
-      // Show quick prompts when input is empty
+      // Show quick prompts when input is empty (but not if chat mode is active)
       this.userHasEditedQuery = false;
-      this.showQuickPrompts().catch(console.error);
+      if (!(this.chatBot && this.chatBot.style.display === "block")) {
+        this.showQuickPrompts().catch(console.error);
+      }
       return;
     }
 
@@ -1539,6 +1546,9 @@ class SmartWindowPage {
     if (this.chatBot) {
       this.chatBot.style.display = "block";
     }
+
+    // Hide suggestions when chat mode is active
+    this.hideSuggestions();
   }
 
   hideChatMode() {
@@ -1553,6 +1563,11 @@ class SmartWindowPage {
     // Show any existing messages in results container
     const existingMessages = this.resultsContainer.querySelectorAll(".message");
     existingMessages.forEach(msg => (msg.style.display = "block"));
+
+    // Show quick prompts again if input is empty and user hasn't edited query
+    if (!this.userHasEditedQuery && !this.searchInput.value.trim()) {
+      this.showQuickPrompts().catch(console.error);
+    }
   }
 }
 
