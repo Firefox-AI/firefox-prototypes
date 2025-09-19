@@ -87,6 +87,36 @@ class ChatBot extends MozLitElement {
       display: flex;
       justify-content: flex-end;
     }
+
+    .search-suggestions {
+      margin-top: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .search-button {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      background: #0066cc;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      align-self: flex-start;
+    }
+
+    .search-button:hover {
+      background: #0052a3;
+    }
+
+    .search-button svg {
+      flex-shrink: 0;
+    }
   `;
 
   static get properties() {
@@ -102,6 +132,7 @@ class ChatBot extends MozLitElement {
     this.prompt = "";
     this.messages = [];
     this.marked = window.marked.marked; // Use the global marked instance for markdown rendering
+    this.currentTabContext = []; // Store current tab context
   }
 
   async sendPrompt() {
@@ -115,7 +146,17 @@ class ChatBot extends MozLitElement {
     this.messages.push({ role: "Assistant", content: "" });
     this.requestUpdate();
 
-    const stream = fetchWithHistory(this.messages);
+    // Prepare messages with system prompt for the API call
+    const messagesForAPI = [...this.messages];
+    if (messagesForAPI.length) {
+      // Insert system prompt as the first message
+      messagesForAPI.unshift({
+        role: "System",
+        content: this.buildSystemPrompt(this.currentTabContext || []),
+      });
+    }
+
+    const stream = fetchWithHistory(messagesForAPI);
     try {
       // Append chunks as they arrive
       for await (const chunk of stream) {
@@ -144,6 +185,9 @@ class ChatBot extends MozLitElement {
   }
 
   async submitPrompt(_prompt, tabContext = []) {
+    // Store tab context for use in system prompt
+    this.currentTabContext = tabContext || [];
+
     // If tab context is provided, enhance the prompt with context information
     if (tabContext && tabContext.length) {
       let contextInfo = "\n\nTab Context:";
@@ -157,6 +201,76 @@ class ChatBot extends MozLitElement {
     await this.sendPrompt();
   }
 
+  buildSystemPrompt(tabContext = []) {
+    const baseSystemPrompt = `You are a helpful AI assistant integrated into Firefox's Smart Window feature. You have access to the user's current browser tab context.
+
+When responding to user queries, if you determine that a web search would be more helpful than a direct answer, include a search suggestion using this exact format: [[search: your suggested search query]]
+
+Examples of when to suggest searches:
+- User asks to find specific services, products, or locations (flights, hotels, restaurants, etc.)
+- User wants current information, prices, or availability
+- User asks for local information or businesses near a location
+- User wants to compare options or find reviews
+
+Examples:
+- User: "help me find a flight to Boston" → Include: [[search: flights to boston]]
+- User: "Where do the Red Sox play? I want to stay near there" → Include: [[search: hotels near fenway park]]
+- User: "I need restaurants near here" (with location context) → Include: [[search: restaurants near [location]]]
+
+Always provide a helpful response first, then include the search suggestion when appropriate.`;
+
+    return baseSystemPrompt;
+  }
+
+  detectSearchTokens(content) {
+    const searchRegex = /\[\[search:\s*([^\]]+)\]\]/gi;
+    const matches = [];
+    let match;
+
+    while ((match = searchRegex.exec(content)) !== null) {
+      matches.push({
+        fullMatch: match[0],
+        query: match[1].trim(),
+        startIndex: match.index,
+        endIndex: match.index + match[0].length,
+      });
+    }
+
+    return matches;
+  }
+
+  parseContentWithSearchTokens(content) {
+    const searchTokens = this.detectSearchTokens(content);
+
+    if (searchTokens.length === 0) {
+      return { cleanContent: content, searchQueries: [] };
+    }
+
+    // Remove search tokens from content for display
+    let cleanContent = content;
+    const searchQueries = [];
+
+    // Process tokens in reverse order to maintain correct indices
+    for (let i = searchTokens.length - 1; i >= 0; i--) {
+      const token = searchTokens[i];
+      searchQueries.unshift(token.query); // Add to beginning to maintain order
+      cleanContent =
+        cleanContent.slice(0, token.startIndex) +
+        cleanContent.slice(token.endIndex);
+    }
+
+    return { cleanContent: cleanContent.trim(), searchQueries };
+  }
+
+  handleSearchQuery(query) {
+    // Dispatch custom event to be handled by smartwindow.mjs
+    const event = new CustomEvent("search-suggested", {
+      detail: { query },
+      bubbles: true,
+    });
+    this.dispatchEvent(event);
+  }
+
   render() {
     return html`
       ${this.messages.length === 0
@@ -165,15 +279,55 @@ class ChatBot extends MozLitElement {
           </p>`
         : html`
             <div class="chat">
-              ${this.messages.map(
-                msg => html`
+              ${this.messages.map(msg => {
+                const { cleanContent, searchQueries } =
+                  msg.role === "Assistant"
+                    ? this.parseContentWithSearchTokens(msg.content)
+                    : { cleanContent: msg.content, searchQueries: [] };
+
+                return html`
                   <div
                     class="message ${msg.role === "User"
                       ? "user"
                       : "assistant"}"
                   >
                     <div class="message-title">${msg.role}</div>
-                    <div>${unsafeHTML(this.marked(msg.content))}</div>
+                    <div>${unsafeHTML(this.marked(cleanContent))}</div>
+                    ${searchQueries.length
+                      ? html`
+                          <div class="search-suggestions">
+                            ${searchQueries.map(
+                              query => html`
+                                <button
+                                  class="search-button"
+                                  @click=${() => this.handleSearchQuery(query)}
+                                >
+                                  <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                  >
+                                    <circle
+                                      cx="11"
+                                      cy="11"
+                                      r="8"
+                                      stroke="currentColor"
+                                      stroke-width="2"
+                                    />
+                                    <path
+                                      d="21 21l-4.35-4.35"
+                                      stroke="currentColor"
+                                      stroke-width="2"
+                                    />
+                                  </svg>
+                                  Search: ${query}
+                                </button>
+                              `
+                            )}
+                          </div>
+                        `
+                      : ""}
                     ${msg.role === "Assistant"
                       ? html`<div class="actions-wrapper">
                           <svg
@@ -194,8 +348,8 @@ class ChatBot extends MozLitElement {
                         </div>`
                       : ""}
                   </div>
-                `
-              )}
+                `;
+              })}
             </div>
           `}
 
