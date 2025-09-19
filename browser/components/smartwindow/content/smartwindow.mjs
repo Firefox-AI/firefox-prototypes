@@ -1162,6 +1162,8 @@ class SmartWindowPage {
     // Get page text and display in status
     if (pageTextEl) {
       try {
+        // Wait a moment for page to load
+        await new Promise(resolve => setTimeout(resolve, 1000));
         const selectedBrowser = topChromeWindow.gBrowser.selectedBrowser;
         const readableTextResult =
           await selectedBrowser.browsingContext.currentWindowContext

@@ -8,6 +8,7 @@ var SmartWindow = {
   _initialized: false,
   _smartWindowActive: false,
   _sidebarVisible: false,
+  _tabAttrObserver: null,
   SESSION_STORE_KEY: "smart-window-active",
 
   // Shared prompt cache across all smart window instances
@@ -28,6 +29,7 @@ var SmartWindow = {
 
     this.initToggleButton();
     this.initCloseButton();
+    this.setupTabAttrObserver();
 
     // Check if this window was opened with Smart Window active from parent window
     let shouldActivateSmartWindow = false;
@@ -449,6 +451,31 @@ var SmartWindow = {
       .join("::");
   },
 
+  setupTabAttrObserver() {
+    if (gBrowser?.tabContainer) {
+      this._tabAttrObserver = event => {
+        console.log("[Smart Window] TabAttrModified event:", event);
+        // Only update if it's a label or image change on the currently selected tab
+        if (
+          (event.detail.changed.includes("label") ||
+            event.detail.changed.includes("image")) &&
+          event.target === gBrowser.selectedTab
+        ) {
+          // Small delay to ensure the attributes have been fully updated
+          setTimeout(() => {
+            this.updateSidebar();
+          }, 50);
+        }
+      };
+
+      gBrowser.tabContainer.addEventListener(
+        "TabAttrModified",
+        this._tabAttrObserver
+      );
+      console.log("[Smart Window] Tab attribute observer set up");
+    }
+  },
+
   shutdown() {
     // Don't save state during shutdown as SessionStore may not be available
     // State is already saved on each toggle
@@ -457,15 +484,12 @@ var SmartWindow = {
     this._promptsCache.clear();
 
     // Clean up event listeners
-    if (gBrowser) {
-      const tabContainer = gBrowser.tabContainer;
-      // Remove TabOpen listener
-      const tabOpenListeners = tabContainer._getListeners?.("TabOpen") || [];
-      tabOpenListeners.forEach(listener => {
-        if (listener.toString().includes("SmartWindow")) {
-          tabContainer.removeEventListener("TabOpen", listener);
-        }
-      });
+    if (gBrowser?.tabContainer && this._tabAttrObserver) {
+      gBrowser.tabContainer.removeEventListener(
+        "TabAttrModified",
+        this._tabAttrObserver
+      );
+      this._tabAttrObserver = null;
     }
 
     console.log("Smart Window shutdown complete");
