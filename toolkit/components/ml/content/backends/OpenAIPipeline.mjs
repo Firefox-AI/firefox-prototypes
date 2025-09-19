@@ -91,18 +91,43 @@ export class OpenAIPipeline {
         apiKey: this.#options.apiKey || "ollama",
       });
 
-      const completion = await client.chat.completions.create({
+      const stream = await client.chat.completions.create({
         model: this.#options.modelId,
         messages: request.args,
+        stream: true,
       });
 
-      const output = completion.choices[0].message.content;
+      let output = "";
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || "";
+        if (content) {
+          output += content;
+
+          port?.postMessage({
+            text: content,
+            ok: true,
+          });
+
+          inferenceProgressCallback?.({
+            ok: true,
+            metadata: {
+              text: content,
+              requestId,
+              tokens: [],
+            },
+            type: Progress.ProgressType.INFERENCE,
+            statusText: Progress.ProgressStatusText.IN_PROGRESS,
+          });
+        }
+      }
+
       port?.postMessage({ done: true, finalOutput: output, ok: true });
 
       inferenceProgressCallback?.({
         ok: true,
         metadata: {
-          text: output,
+          text: "",
           requestId,
           tokens: [],
         },
