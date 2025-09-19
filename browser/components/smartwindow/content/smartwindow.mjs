@@ -860,11 +860,15 @@ class SmartWindowPage {
       return;
     }
 
-    // Add or remove the quick-prompts class
+    // Manage suggestion visibility classes
+    this.suggestionsContainer.classList.remove("hidden"); // Always show when displaying suggestions
+
     if (isQuickPrompts) {
       this.suggestionsContainer.classList.add("quick-prompts");
+      this.suggestionsContainer.classList.remove("user-edited");
     } else {
       this.suggestionsContainer.classList.remove("quick-prompts");
+      this.suggestionsContainer.classList.add("user-edited");
     }
 
     this.currentSuggestions = suggestions;
@@ -935,7 +939,12 @@ class SmartWindowPage {
 
   hideSuggestions() {
     if (this.suggestionsContainer) {
-      this.suggestionsContainer.style.display = "none";
+      // Add hidden class to explicitly hide suggestions
+      this.suggestionsContainer.classList.add("hidden");
+      this.suggestionsContainer.classList.remove(
+        "quick-prompts",
+        "user-edited"
+      );
     }
     this.currentSuggestions = [];
     this.selectedSuggestionIndex = -1;
@@ -1078,6 +1087,11 @@ class SmartWindowPage {
   async updateTabStatus(tabInfo) {
     // Close any open tab context dropdown when switching tabs
     this.closeTabDropdown();
+
+    // Hide any existing suggestions immediately to prevent showing stale prompts
+    if (!this.userHasEditedQuery && !this.searchInput.value.trim()) {
+      this.hideSuggestions();
+    }
 
     // Store the latest tab info
     this.lastTabInfo = tabInfo;
