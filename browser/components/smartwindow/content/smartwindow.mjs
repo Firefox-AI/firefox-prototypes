@@ -62,9 +62,9 @@ class SmartWindowPage {
       return "navigate";
     }
 
-    // Chat detection: starts with question words OR ends with question mark
+    // Chat detection: starts with question words (with optional punctuation) OR ends with question mark
     if (
-      /^(who|what|when|where|why|how)\s/.test(trimmedQuery) ||
+      /^(who|what|when|where|why|how|can)\b/i.test(trimmedQuery) ||
       trimmedQuery.endsWith("?")
     ) {
       return "chat";
