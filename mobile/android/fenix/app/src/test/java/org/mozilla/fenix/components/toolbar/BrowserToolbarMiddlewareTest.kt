@@ -32,6 +32,7 @@ import mozilla.components.browser.state.action.EngineAction
 import mozilla.components.browser.state.action.ShareResourceAction
 import mozilla.components.browser.state.action.TabListAction.AddTabAction
 import mozilla.components.browser.state.action.TabListAction.RemoveTabAction
+import mozilla.components.browser.state.action.TrackingProtectionAction
 import mozilla.components.browser.state.ext.getUrl
 import mozilla.components.browser.state.search.RegionState
 import mozilla.components.browser.state.search.SearchEngine
@@ -40,6 +41,7 @@ import mozilla.components.browser.state.state.ContentState
 import mozilla.components.browser.state.state.SearchState
 import mozilla.components.browser.state.state.SecurityInfoState
 import mozilla.components.browser.state.state.TabSessionState
+import mozilla.components.browser.state.state.TrackingProtectionState
 import mozilla.components.browser.state.state.content.DownloadState
 import mozilla.components.browser.state.state.content.ShareResourceState
 import mozilla.components.browser.state.state.createTab
@@ -92,6 +94,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -128,6 +131,7 @@ import org.mozilla.fenix.components.appstate.AppAction.URLCopiedToClipboard
 import org.mozilla.fenix.components.appstate.AppState
 import org.mozilla.fenix.components.appstate.OrientationMode.Landscape
 import org.mozilla.fenix.components.appstate.OrientationMode.Portrait
+import org.mozilla.fenix.components.appstate.SupportedMenuNotifications
 import org.mozilla.fenix.components.menu.MenuAccessPoint
 import org.mozilla.fenix.components.search.BOOKMARKS_SEARCH_ENGINE_ID
 import org.mozilla.fenix.components.search.HISTORY_SEARCH_ENGINE_ID
@@ -211,7 +215,12 @@ class BrowserToolbarMiddlewareTest {
     private val cookieBannersStorage: CookieBannersStorage = mockk()
     private val trackingProtectionUseCases: TrackingProtectionUseCases = mockk()
     private val publicSuffixList = PublicSuffixList(testContext)
-    private val bookmarksStorage: BookmarksStorage = mockk(relaxed = true)
+    private val bookmarksStorage: BookmarksStorage = mockk()
+
+    @Before
+    fun setup() {
+        coEvery { bookmarksStorage.getBookmarksWithUrl(any()) } returns Result.success(listOf(mockk()))
+    }
 
     @Test
     fun `WHEN initializing the toolbar THEN add browser start actions`() = runTest {
@@ -1971,6 +1980,8 @@ class BrowserToolbarMiddlewareTest {
             useCases = useCases,
         )
         every { tab.content.securityInfo.secure } returns true
+        every { tab.trackingProtection.enabled } returns true
+        every { tab.trackingProtection.ignoredOnTrackingProtection } returns false
         val expectedSecurityIndicator = ActionButtonRes(
             drawableResId = iconsR.drawable.mozac_ic_shield_checkmark_24,
             contentDescription = toolbarR.string.mozac_browser_toolbar_content_description_site_info,
@@ -2011,7 +2022,14 @@ class BrowserToolbarMiddlewareTest {
     @Test
     fun `GIVEN the website is insecure WHEN the connection becomes secure THEN update appropriate security indicator`() =
         runTest {
-            val tab = createTab(url = "URL", id = tabId)
+            val tab = createTab(
+                url = "URL",
+                id = tabId,
+                trackingProtection = TrackingProtectionState(
+                    enabled = true,
+                    ignoredOnTrackingProtection = false,
+                ),
+            )
             val browserStore = BrowserStore(
                 BrowserState(
                     tabs = listOf(tab),
@@ -2048,6 +2066,142 @@ class BrowserToolbarMiddlewareTest {
             assertEquals(1, toolbarPageActions.size)
             securityIndicator = toolbarPageActions[0] as ActionButtonRes
             assertEquals(expectedSecureIndicator, securityIndicator)
+        }
+
+    @Test
+    fun `GIVEN the tabSessionState has tracking protection disabled THEN show appropriate security indicator`() =
+        runTest {
+            val tab = createTab(
+                url = "URL",
+                id = tabId,
+                trackingProtection = TrackingProtectionState(
+                    enabled = false,
+                    ignoredOnTrackingProtection = false,
+                ),
+            )
+            val browserStore = BrowserStore(
+                BrowserState(
+                    tabs = listOf(tab),
+                    selectedTabId = tab.id,
+                ),
+            )
+            val middleware = buildMiddleware(
+                browserStore = browserStore,
+                useCases = useCases,
+            )
+            val expectedInsecureIndicator = ActionButtonRes(
+                drawableResId = iconsR.drawable.mozac_ic_shield_slash_24,
+                contentDescription = toolbarR.string.mozac_browser_toolbar_content_description_site_info,
+                onClick = StartPageActions.SiteInfoClicked,
+            )
+            val toolbarStore = buildStore(middleware).also {
+                it.dispatch(BrowserToolbarAction.Init())
+            }
+            mainLooperRule.idle()
+            val toolbarPageActions = toolbarStore.state.displayState.pageActionsStart
+            assertEquals(1, toolbarPageActions.size)
+            val securityIndicator = toolbarPageActions[0] as ActionButtonRes
+            assertEquals(expectedInsecureIndicator, securityIndicator)
+        }
+
+    @Test
+    fun `GIVEN the tabSessionState has tracking protection enabled WHEN tracking protection is disabled THEN show appropriate security indicator`() =
+        runTest {
+            val tab = createTab(
+                url = "URL",
+                id = tabId,
+                trackingProtection = TrackingProtectionState(
+                    enabled = true,
+                    ignoredOnTrackingProtection = false,
+                ),
+            )
+            val browserStore = BrowserStore(
+                BrowserState(
+                    tabs = listOf(tab),
+                    selectedTabId = tab.id,
+                ),
+            )
+            val middleware = buildMiddleware(
+                browserStore = browserStore,
+                useCases = useCases,
+            )
+            val expectedSecureIndicator = ActionButtonRes(
+                drawableResId = iconsR.drawable.mozac_ic_shield_checkmark_24,
+                contentDescription = toolbarR.string.mozac_browser_toolbar_content_description_site_info,
+                onClick = StartPageActions.SiteInfoClicked,
+            )
+            val expectedInsecureIndicator = ActionButtonRes(
+                drawableResId = iconsR.drawable.mozac_ic_shield_slash_24,
+                contentDescription = toolbarR.string.mozac_browser_toolbar_content_description_site_info,
+                onClick = StartPageActions.SiteInfoClicked,
+            )
+            val toolbarStore = buildStore(middleware).also {
+                it.dispatch(BrowserToolbarAction.Init())
+            }
+            browserStore.dispatch(UpdateSecurityInfoAction(tab.id, SecurityInfoState(true)))
+                .joinBlocking()
+            mainLooperRule.idle()
+            val toolbarPageActions = toolbarStore.state.displayState.pageActionsStart
+            assertEquals(1, toolbarPageActions.size)
+            val securityIndicator = toolbarPageActions[0] as ActionButtonRes
+            assertEquals(expectedSecureIndicator, securityIndicator)
+            browserStore.dispatch(TrackingProtectionAction.ToggleAction(tabId = tabId, enabled = false))
+                .joinBlocking()
+            mainLooperRule.idle()
+            val toolbarPageActions2 = toolbarStore.state.displayState.pageActionsStart
+            assertEquals(1, toolbarPageActions2.size)
+            val securityIndicator2 = toolbarPageActions2[0] as ActionButtonRes
+            assertEquals(expectedInsecureIndicator, securityIndicator2)
+        }
+
+    @Test
+    fun `GIVEN the tabSessionState has tracking protection disabled WHEN tracking protection is enabled THEN show appropriate security indicator`() =
+        runTest {
+            val tab = createTab(
+                url = "URL",
+                id = tabId,
+                trackingProtection = TrackingProtectionState(
+                    enabled = false,
+                    ignoredOnTrackingProtection = false,
+                ),
+            )
+            val browserStore = BrowserStore(
+                BrowserState(
+                    tabs = listOf(tab),
+                    selectedTabId = tab.id,
+                ),
+            )
+            val middleware = buildMiddleware(
+                browserStore = browserStore,
+                useCases = useCases,
+            )
+            val expectedSecureIndicator = ActionButtonRes(
+                drawableResId = iconsR.drawable.mozac_ic_shield_checkmark_24,
+                contentDescription = toolbarR.string.mozac_browser_toolbar_content_description_site_info,
+                onClick = StartPageActions.SiteInfoClicked,
+            )
+            val expectedInsecureIndicator = ActionButtonRes(
+                drawableResId = iconsR.drawable.mozac_ic_shield_slash_24,
+                contentDescription = toolbarR.string.mozac_browser_toolbar_content_description_site_info,
+                onClick = StartPageActions.SiteInfoClicked,
+            )
+            val toolbarStore = buildStore(middleware).also {
+                it.dispatch(BrowserToolbarAction.Init())
+            }
+            browserStore.dispatch(UpdateSecurityInfoAction(tab.id, SecurityInfoState(true)))
+                .joinBlocking()
+            mainLooperRule.idle()
+            val toolbarPageActions = toolbarStore.state.displayState.pageActionsStart
+            assertEquals(1, toolbarPageActions.size)
+            val securityIndicator = toolbarPageActions[0] as ActionButtonRes
+            assertEquals(expectedInsecureIndicator, securityIndicator)
+            browserStore.dispatch(TrackingProtectionAction.ToggleAction(tabId = tabId, enabled = true))
+                .joinBlocking()
+            mainLooperRule.idle()
+            val toolbarPageActions2 = toolbarStore.state.displayState.pageActionsStart
+            assertEquals(1, toolbarPageActions2.size)
+            val securityIndicator2 = toolbarPageActions2[0] as ActionButtonRes
+            assertEquals(expectedSecureIndicator, securityIndicator2)
         }
 
     @Test
@@ -2448,7 +2602,7 @@ class BrowserToolbarMiddlewareTest {
                 expectedTabCounterButton(source = Source.NavigationBar),
                 tabCounterButton,
             )
-            assertEquals(expectedMenuButton(Source.NavigationBar), menuButton)
+            assertEquals(expectedMenuButton(source = Source.NavigationBar), menuButton)
         }
     }
 
@@ -2483,8 +2637,8 @@ class BrowserToolbarMiddlewareTest {
                 ),
             )
 
-            coEvery { bookmarksStorage.getBookmarksWithUrl(tab.content.url) } returns listOf(
-                mockk(relaxed = true),
+            coEvery { bookmarksStorage.getBookmarksWithUrl(tab.content.url) } returns Result.success(
+                listOf(mockk(relaxed = true)),
             )
 
             val middleware = buildMiddleware(
@@ -2500,6 +2654,50 @@ class BrowserToolbarMiddlewareTest {
 
             assertEquals(expectedEditBookmarkButton(Source.NavigationBar), editButton)
         }
+    }
+
+    @Test
+    fun `GIVEN the menu button is not highlighted WHEN a menu item is highlighted THEN highlight menu button`() = runTest {
+        val appStore = AppStore()
+        val middleware = buildMiddleware(appStore = appStore)
+        val toolbarStore = buildStore(middleware)
+
+        mainLooperRule.idle()
+        val initialMenuButton = toolbarStore.state.displayState.browserActionsEnd[2] as ActionButtonRes
+        assertEquals(expectedMenuButton(), initialMenuButton)
+
+        appStore.dispatch(
+            AppAction.MenuNotification.AddMenuNotification(
+                SupportedMenuNotifications.Downloads,
+            ),
+        ).joinBlocking()
+        mainLooperRule.idle()
+        val updatedMenuButton = toolbarStore.state.displayState.browserActionsEnd[2] as ActionButtonRes
+        assertEquals(expectedMenuButton(true), updatedMenuButton)
+    }
+
+    @Test
+    fun `GIVEN the menu button is highlighted WHEN no menu item is highlighted THEN remove highlight from menu button`() = runTest {
+        val appStore = AppStore(
+            initialState = AppState(
+                supportedMenuNotifications = setOf(SupportedMenuNotifications.Downloads),
+            ),
+        )
+        val middleware = buildMiddleware(appStore = appStore)
+        val toolbarStore = buildStore(middleware)
+
+        mainLooperRule.idle()
+        val initialMenuButton = toolbarStore.state.displayState.browserActionsEnd[2] as ActionButtonRes
+        assertEquals(expectedMenuButton(true), initialMenuButton)
+
+        appStore.dispatch(
+            AppAction.MenuNotification.RemoveMenuNotification(
+                SupportedMenuNotifications.Downloads,
+            ),
+        ).joinBlocking()
+        mainLooperRule.idle()
+        val updatedMenuButton = toolbarStore.state.displayState.browserActionsEnd[2] as ActionButtonRes
+        assertEquals(expectedMenuButton(), updatedMenuButton)
     }
 
     private fun assertEqualsTabCounterButton(expected: TabCounterAction, actual: TabCounterAction) {
@@ -2645,9 +2843,13 @@ class BrowserToolbarMiddlewareTest {
         onClick = AddNewTab(source),
     )
 
-    private fun expectedMenuButton(source: Source = Source.AddressBar) = ActionButtonRes(
+    private fun expectedMenuButton(
+        highlighted: Boolean = false,
+        source: Source = Source.AddressBar,
+    ) = ActionButtonRes(
         drawableResId = iconsR.drawable.mozac_ic_ellipsis_vertical_24,
         contentDescription = R.string.content_description_menu,
+        highlighted = highlighted,
         onClick = MenuClicked(source),
     )
 

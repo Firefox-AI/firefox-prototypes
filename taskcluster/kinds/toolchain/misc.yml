@@ -794,6 +794,8 @@ talos-pdfs:
 win64-dxc:
     description: "DirectX Shader Compiler (x86_64)"
     attributes:
+        dxc-crash-symbols: true
+        enable-full-crashsymbols: true
         local-toolchain: true
     treeherder:
         symbol: TW64(dxc)
@@ -820,6 +822,8 @@ win64-dxc:
 win64-aarch64-dxc:
     description: "DirectX Shader Compiler (aarch64)"
     attributes:
+        dxc-crash-symbols: true
+        enable-full-crashsymbols: true
         local-toolchain: true
     treeherder:
         symbol: TWA64(dxc)
@@ -842,3 +846,17 @@ win64-aarch64-dxc:
             - vs-toolchain
         fetch:
             - dxc-src
+
+symbolicator-cli:
+    description: "symbolicator-cli from firefox profiler"
+    treeherder:
+        symbol: TL(symbolicator-cli)
+    run:
+        script: build-symbolicator-cli.sh
+        toolchain-artifact: public/build/symbolicator-cli.tar.zst
+    run-on-projects: []
+    fetches:
+        fetch:
+            - firefox-profiler
+        toolchain:
+            - linux64-node

@@ -207,6 +207,10 @@ pub struct WebRenderOptions {
     /// If true, open a debug socket to listen for remote debugger.
     /// Relies on `debugger` cargo feature being enabled.
     pub enable_debugger: bool,
+
+    /// Use a more precise method for sampling gradients.
+    pub precise_radial_gradients: bool,
+    pub precise_conic_gradients: bool,
 }
 
 impl WebRenderOptions {
@@ -280,6 +284,8 @@ impl Default for WebRenderOptions {
             low_quality_pinch_zoom: false,
             max_shared_surface_size: 2048,
             enable_debugger: true,
+            precise_radial_gradients: false,
+            precise_conic_gradients: false,
         }
     }
 }
@@ -576,6 +582,8 @@ pub fn create_webrender_instance(
         low_quality_pinch_zoom: options.low_quality_pinch_zoom,
         max_shared_surface_size: options.max_shared_surface_size,
         enable_dithering: options.enable_dithering,
+        precise_radial_gradients: options.precise_radial_gradients,
+        precise_conic_gradients: options.precise_conic_gradients,
     };
     info!("WR {:?}", config);
 
