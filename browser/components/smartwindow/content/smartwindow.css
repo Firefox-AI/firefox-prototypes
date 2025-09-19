@@ -460,9 +460,13 @@ html, body {
   white-space: nowrap;
 }
 
-/* Keep quick prompts visible but adjust opacity when chat is active */
-.chat-mode-bottom .quick-prompts-container,
-#chat-bot:not([style*="display: none"]) ~ .quick-prompts-container {
+/* Hide quick prompts in fullscreen mode when chat is active */
+.smart-window-container.chat-mode-bottom:not(.sidebar-mode) .quick-prompts-container {
+  display: none;
+}
+
+/* Keep quick prompts visible but with reduced opacity in sidebar mode when chat is active */
+.smart-window-container.sidebar-mode.chat-mode-bottom .quick-prompts-container {
   opacity: 0.6;
 }
 
@@ -514,9 +518,8 @@ html, body {
   white-space: nowrap;
 }
 
-/* Hide quick actions when chat is active */
-.chat-mode-bottom .quick-actions,
-#chat-bot:not([style*="display: none"]) ~ .quick-actions {
+/* Hide quick actions when chat is active in fullscreen mode */
+.smart-window-container.chat-mode-bottom .quick-actions {
   display: none;
 }
 
