@@ -620,13 +620,12 @@ class SmartWindowPage {
       topChromeWindow?.document?.documentElement?.hasAttribute("smart-window");
 
     // Auto-focus the search input
-    if (this.searchInput) {
-      // Only focus if in Smart Mode
-      if (isSmartMode) {
-        this.searchInput.focus();
-      }
+    if (this.searchInput && isSmartMode) {
+      this.focusSearchInputWhenReady();
+    }
 
-      // Update placeholder and state based on mode
+    // Update placeholder and state based on mode
+    if (this.searchInput) {
       if (!isSmartMode) {
         this.searchInput.disabled = true;
         this.searchInput.placeholder =
@@ -659,6 +658,19 @@ class SmartWindowPage {
     console.log(
       `Smart Window page initialized (sidebar mode: ${this.isSidebarMode}, smart mode: ${isSmartMode})`
     );
+  }
+
+  focusSearchInputWhenReady() {
+    // This can open in preloaded (background) browsers. Check visibility before focusing, and then also refocus
+    // when tab is switched to.
+    const focusWhenVisible = () => {
+      console.log("visibilitychange", document.visibilityState);
+      if (document.visibilityState === "visible") {
+        this.searchInput.focus();
+      }
+    };
+    focusWhenVisible();
+    document.addEventListener("visibilitychange", focusWhenVisible);
   }
 
   initializeTabInfo() {
@@ -731,9 +743,6 @@ class SmartWindowPage {
       this.suggestionsContainer,
       searchBox.nextSibling
     );
-
-    // Initially hidden
-    this.suggestionsContainer.style.display = "none";
   }
 
   setupSubmitButton() {
@@ -789,13 +798,24 @@ class SmartWindowPage {
       headerText = `Context Prompts (${contextTabs.length} tabs):`;
     }
 
-    this.displaySuggestions(prompts, headerText);
+    this.displaySuggestions(prompts, headerText, true); // true = isQuickPrompts
     this.userHasEditedQuery = false;
   }
 
-  displaySuggestions(suggestions, title = "Suggestions:") {
+  displaySuggestions(
+    suggestions,
+    title = "Suggestions:",
+    isQuickPrompts = false
+  ) {
     if (!this.suggestionsContainer) {
       return;
+    }
+
+    // Add or remove the quick-prompts class
+    if (isQuickPrompts) {
+      this.suggestionsContainer.classList.add("quick-prompts");
+    } else {
+      this.suggestionsContainer.classList.remove("quick-prompts");
     }
 
     this.currentSuggestions = suggestions;
@@ -816,9 +836,6 @@ class SmartWindowPage {
       const suggestionButton = this.createSuggestionButton(suggestion, index);
       suggestionsList.appendChild(suggestionButton);
     });
-
-    // Show container
-    this.suggestionsContainer.style.display = "block";
   }
 
   createSuggestionButton(suggestion, index) {
@@ -1427,11 +1444,15 @@ class SmartWindowPage {
   }
 
   moveInputToBottom() {
-    document.querySelector(".smart-window-container")?.classList.add("chat-mode-bottom");
+    document
+      .querySelector(".smart-window-container")
+      ?.classList.add("chat-mode-bottom");
   }
 
   restoreInputPosition() {
-    document.querySelector(".smart-window-container")?.classList.remove("chat-mode-bottom");
+    document
+      .querySelector(".smart-window-container")
+      ?.classList.remove("chat-mode-bottom");
   }
 
   showChatMode() {
