@@ -132,7 +132,7 @@ class SmartWindowPage {
       // Return default prompts when no context is available
       return [
         { text: "Show me similar music on YouTube", type: "search" },
-        { text: "Tips for using AI Mode", type: "chat" }
+        { text: "Tips for using AI Mode", type: "chat" },
       ];
     }
 
@@ -668,7 +668,9 @@ class SmartWindowPage {
     this.searchInput = document.getElementById("search-input");
     this.resultsContainer = document.getElementById("results-container");
     this.chatBot = document.getElementById("chat-bot");
-    this.quickPromptsContainer = document.getElementById("quick-prompts-container");
+    this.quickPromptsContainer = document.getElementById(
+      "quick-prompts-container"
+    );
 
     // Create and setup suggestions container
     this.setupSuggestionsUI();
@@ -799,12 +801,9 @@ class SmartWindowPage {
     this.suggestionsContainer.appendChild(suggestionsHeader);
     this.suggestionsContainer.appendChild(suggestionsList);
 
-    // Insert after search box
+    // Insert inside search box for proper absolute positioning
     const searchBox = document.querySelector(".search-box");
-    searchBox.parentNode.insertBefore(
-      this.suggestionsContainer,
-      searchBox.nextSibling
-    );
+    searchBox.appendChild(this.suggestionsContainer);
   }
 
   setupSubmitButton() {
@@ -881,18 +880,23 @@ class SmartWindowPage {
     this.quickPromptsContainer.innerHTML = "";
 
     // Add emoji mapping for prompt types
-    const getEmoji = (type) => {
-      switch(type) {
-        case "chat": return "💬";
-        case "search": return "🔍";
-        case "navigate": return "🌐";
-        case "action": return "⚡";
-        default: return "💡";
+    const getEmoji = type => {
+      switch (type) {
+        case "chat":
+          return "💬";
+        case "search":
+          return "🔍";
+        case "navigate":
+          return "🌐";
+        case "action":
+          return "⚡";
+        default:
+          return "💡";
       }
     };
 
     // Create pill buttons for each prompt (limit to top 2)
-    prompts.slice(0, 2).forEach((prompt) => {
+    prompts.slice(0, 2).forEach(prompt => {
       const pill = document.createElement("button");
       pill.className = "quick-prompt-pill";
 
