@@ -11,6 +11,9 @@ ChromeUtils.defineESModuleGetters(lazy, {
   UrlbarQueryContext:
     "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs",
 });
+
+import { generateSmartQuickPrompts } from "./utils.mjs";
+
 const { embedderElement, topChromeWindow } = window.browsingContext;
 
 class SmartWindowPage {
@@ -110,10 +113,57 @@ class SmartWindowPage {
     }
   }
 
-  // Simple suggestion generation (simplified version of extension's complex system)
-  generateQuickPrompts(tabTitle = "") {
+  // AI-powered suggestion generation using tab context with caching
+  async generateQuickPrompts(tabTitle = "") {
+    let contextTabs = this.getAllContextTabs();
+
+    // If no context tabs, use recent tabs (up to 5)
+    if (contextTabs.length === 0) {
+      await this.getRecentTabs();
+      contextTabs = this.recentTabs
+        .filter(tab => this.isTabEligibleForContext(tab))
+        .slice(0, 5);
+    }
+
+    // Check cache first using shared cache from topChromeWindow
+    const cacheKey =
+      topChromeWindow.SmartWindow.getContextCacheKey(contextTabs);
+    const cachedPromise =
+      topChromeWindow.SmartWindow.getPromptsFromCache(cacheKey);
+
+    if (cachedPromise) {
+      return await cachedPromise;
+    }
+
+    // Create a promise for generating prompts and cache it immediately
+    const promptsPromise = this._generatePromptsInternal(contextTabs, tabTitle);
+    topChromeWindow.SmartWindow.setPromptsCache(cacheKey, promptsPromise);
+
+    return await promptsPromise;
+  }
+
+  // Internal method to actually generate the prompts
+  async _generatePromptsInternal(contextTabs, tabTitle) {
+    // Use AI to generate smart prompts
+    try {
+      const suggestions = await generateSmartQuickPrompts(contextTabs);
+      if (suggestions && suggestions.length) {
+        return suggestions;
+      }
+    } catch (error) {
+      console.error(
+        "Failed to generate AI prompts, falling back to static prompts:",
+        error
+      );
+    }
+
+    // Fallback to static prompts
+    return this.generateFallbackPrompts(contextTabs, tabTitle);
+  }
+
+  // Fallback prompt generation (simplified version of the original logic)
+  generateFallbackPrompts(contextTabs, tabTitle = "") {
     const suggestions = [];
-    const contextTabs = this.getAllContextTabs();
 
     if (contextTabs.length > 1) {
       // Multi-tab context prompts
@@ -137,7 +187,7 @@ class SmartWindowPage {
       );
     } else {
       // Single tab context (original logic)
-      const titleWords = tabTitle
+      const titleWords = (tabTitle || contextTabs[0]?.title || "")
         .split(/\s+/)
         .filter(word => word.length > 2)
         .slice(0, 3);
@@ -488,14 +538,14 @@ class SmartWindowPage {
     return item;
   }
 
-  updateQuickPromptsWithContext() {
+  async updateQuickPromptsWithContext() {
     // Only update if user hasn't edited query and suggestions are showing
     if (
       !this.userHasEditedQuery &&
       !!this.currentSuggestions.length &&
       !this.searchInput.value.trim()
     ) {
-      this.showQuickPrompts();
+      await this.showQuickPrompts();
     }
   }
 
@@ -540,7 +590,6 @@ class SmartWindowPage {
       this.selectedTabContexts = [];
     }
     this.updateTabContextUI();
-    this.updateQuickPromptsWithContext();
 
     // Load chat messages for the new context
     this.loadChatMessagesForCurrentContext();
@@ -652,7 +701,8 @@ class SmartWindowPage {
     // Initialize tab info and show quick prompts (only if Smart Mode is active)
     this.initializeTabInfo();
     if (isSmartMode) {
-      this.showQuickPrompts();
+      // Don't await to avoid blocking initialization
+      this.showQuickPrompts().catch(console.error);
     }
 
     console.log(
@@ -784,12 +834,11 @@ class SmartWindowPage {
     this.submitButton.disabled = !query.trim();
   }
 
-  showQuickPrompts() {
+  async showQuickPrompts() {
     // Use stored tab info for context
     const tabTitle = this.lastTabInfo?.title || "";
-    const tabUrl = this.lastTabInfo?.url || "";
 
-    const prompts = this.generateQuickPrompts(tabTitle, tabUrl);
+    const prompts = await this.generateQuickPrompts(tabTitle);
 
     // Update header based on context
     const contextTabs = this.getAllContextTabs();
@@ -949,7 +998,7 @@ class SmartWindowPage {
           this.updateSubmitButton(this.searchInput.value);
           // Show quick prompts if input is empty
           if (!this.searchInput.value.trim()) {
-            this.showQuickPrompts();
+            this.showQuickPrompts().catch(console.error);
           }
         }
       });
@@ -1017,7 +1066,7 @@ class SmartWindowPage {
           this.updateSubmitButton("");
           this.userHasEditedQuery = false;
           this.selectedSuggestionIndex = -1;
-          this.showQuickPrompts();
+          this.showQuickPrompts().catch(console.error);
         } else {
           // Hide suggestions if input is already empty
           this.hideSuggestions();
@@ -1033,11 +1082,16 @@ class SmartWindowPage {
     // Store the latest tab info
     this.lastTabInfo = tabInfo;
 
-    // Reset tab context to current tab when switching (handles chat persistence)
-    this.resetContextToCurrentTab();
+    // Skip expensive operations for about:blank (happens during tab restore)
+    const isAboutBlank = tabInfo.url === "about:blank";
 
-    // Update tab context UI with new current tab info
-    this.updateTabContextUI();
+    if (!isAboutBlank) {
+      // Reset tab context to current tab when switching (handles chat persistence)
+      this.resetContextToCurrentTab();
+
+      // Update tab context UI with new current tab info
+      this.updateTabContextUI();
+    }
 
     const titleEl = document.getElementById("status-title");
     const urlEl = document.getElementById("status-url");
@@ -1067,9 +1121,13 @@ class SmartWindowPage {
 
     // Note: Chat persistence is now handled by context-based system
 
-    // Update quick prompts if user hasn't edited the query
-    if (!this.userHasEditedQuery && !this.searchInput.value.trim()) {
-      this.showQuickPrompts();
+    // Update quick prompts if user hasn't edited the query (skip for about:blank)
+    if (
+      !isAboutBlank &&
+      !this.userHasEditedQuery &&
+      !this.searchInput.value.trim()
+    ) {
+      this.showQuickPrompts().catch(console.error);
     }
 
     // Get page text and display in status
@@ -1101,7 +1159,7 @@ class SmartWindowPage {
     if (!query.trim()) {
       // Show quick prompts when input is empty
       this.userHasEditedQuery = false;
-      this.showQuickPrompts();
+      this.showQuickPrompts().catch(console.error);
       return;
     }
 
@@ -1355,7 +1413,7 @@ class SmartWindowPage {
     this.searchInput.value = "";
     this.updateSubmitButton("");
     this.userHasEditedQuery = false;
-    this.showQuickPrompts();
+    this.showQuickPrompts().catch(console.error);
   }
 
   performNavigation(query, type) {
