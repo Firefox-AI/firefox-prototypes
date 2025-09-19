@@ -985,6 +985,15 @@ class SmartWindowPage {
       });
     }
 
+    // Listen for search suggestions from chat component
+    if (this.chatBot) {
+      this.chatBot.addEventListener("search-suggested", e => {
+        const query = e.detail.query;
+        console.log("Chat suggested search:", query);
+        this.performNavigation(query, "search");
+      });
+    }
+
     // Listen for Smart Window mode changes from the top chrome window
     if (topChromeWindow) {
       topChromeWindow.addEventListener("SmartWindowModeChanged", event => {
