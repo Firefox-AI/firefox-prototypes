@@ -1635,6 +1635,9 @@ class SmartWindowPage {
 
     // Hide suggestions when chat mode is active
     this.hideSuggestions();
+
+    // In fullscreen mode, quick prompts are hidden via CSS when chat is active
+    // In sidebar mode, they remain visible with reduced opacity
   }
 
   hideChatMode() {
