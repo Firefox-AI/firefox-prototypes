@@ -268,8 +268,13 @@ html, body {
   border-left: 3px solid #fbbc05;
 }
 
-/* Hide quick prompts (not actual suggestions) when not in bottom chat mode */
-.smart-window-container:not(.chat-mode-bottom) .suggestions-container.quick-prompts {
+/* Hide quick prompts (not actual suggestions) when not in bottom chat mode and user has typed something */
+.smart-window-container:not(.chat-mode-bottom) .suggestions-container.quick-prompts.user-edited {
+  display: none;
+}
+
+/* Only hide when explicitly hidden (empty suggestions) */
+.suggestions-container.hidden {
   display: none;
 }
 
