@@ -28,6 +28,12 @@ class SmartWindowPage {
     this.lastTabInfo = null;
     this.chatBot = null;
     this.chatMessagesByTab = new Map(); // Store chat messages by tab ID
+
+    // Tab context management
+    this.selectedTabContexts = []; // Array of tab info objects selected for context
+    this.recentTabs = []; // Cache of recent tabs
+    this.tabContextElements = {};
+
     this.init();
   }
 
@@ -105,41 +111,486 @@ class SmartWindowPage {
   }
 
   // Simple suggestion generation (simplified version of extension's complex system)
-  generateQuickPrompts(tabTitle = "", tabUrl = "") {
+  generateQuickPrompts(tabTitle = "") {
     const suggestions = [];
-    const titleWords = tabTitle
-      .split(/\s+/)
-      .filter(word => word.length > 2)
-      .slice(0, 3);
-    const topic = titleWords.join(" ") || "this";
+    const contextTabs = this.getAllContextTabs();
 
-    // 2 chat prompts
-    suggestions.push(
-      { text: `What is ${topic} about?`, type: "chat" },
-      { text: `How does ${topic} work?`, type: "chat" }
-    );
+    if (contextTabs.length > 1) {
+      // Multi-tab context prompts
+      const tabTitles = contextTabs
+        .map(tab => tab.title)
+        .filter(title => title && title !== "Untitled");
+      const uniqueTitles = [...new Set(tabTitles)].slice(0, 3);
 
-    // 2 search queries
-    suggestions.push(
-      { text: `${topic} guide`, type: "search" },
-      { text: `${topic} tutorial`, type: "search" }
-    );
+      if (uniqueTitles.length) {
+        const topics = uniqueTitles.join(", ");
+        suggestions.push(
+          { text: `Compare ${topics}`, type: "chat" },
+          { text: `What do ${topics} have in common?`, type: "chat" }
+        );
+      }
 
-    // 1 current domain if available
-    if (tabUrl) {
-      const domain = tabUrl
-        .replace(/^https?:\/\//, "")
-        .replace(/^www\./, "")
-        .split("/")[0];
-      if (domain && domain !== "about:blank") {
-        suggestions.push({ text: domain, type: "navigate" });
+      // Context-aware search
+      suggestions.push(
+        { text: `research across ${contextTabs.length} tabs`, type: "search" },
+        { text: `summarize content from selected tabs`, type: "chat" }
+      );
+    } else {
+      // Single tab context (original logic)
+      const titleWords = tabTitle
+        .split(/\s+/)
+        .filter(word => word.length > 2)
+        .slice(0, 3);
+      const topic = titleWords.join(" ") || "this";
+
+      // 2 chat prompts
+      suggestions.push(
+        { text: `What is ${topic} about?`, type: "chat" },
+        { text: `How does ${topic} work?`, type: "chat" }
+      );
+
+      // 2 search queries
+      suggestions.push(
+        { text: `${topic} guide`, type: "search" },
+        { text: `${topic} tutorial`, type: "search" }
+      );
+    }
+
+    // Add domain suggestions from context tabs
+    const domains = new Set();
+    for (const tab of contextTabs) {
+      if (tab.url) {
+        try {
+          const domain = tab.url
+            .replace(/^https?:\/\//, "")
+            .replace(/^www\./, "")
+            .split("/")[0];
+          if (
+            domain &&
+            domain !== "about:blank" &&
+            !domain.startsWith("about:")
+          ) {
+            domains.add(domain);
+          }
+        } catch (e) {
+          // Skip invalid URLs
+        }
       }
     }
+
+    // Add up to 2 unique domains
+    const domainArray = Array.from(domains).slice(0, 2);
+    domainArray.forEach(domain => {
+      suggestions.push({ text: domain, type: "navigate" });
+    });
 
     // 1 action
     suggestions.push({ text: "tab next", type: "action" });
 
     return suggestions;
+  }
+
+  // Tab Context Management Methods
+  initializeTabContextUI() {
+    // Get references to tab context elements
+    this.tabContextElements = {
+      bar: document.getElementById("tab-context-bar"),
+      currentTabButton: document.getElementById("current-tab-button"),
+      currentTabFavicon: document.getElementById("current-tab-favicon"),
+      currentTabTitle: document.getElementById("current-tab-title"),
+      removeCurrentTab: document.getElementById("remove-current-tab"),
+      addTabsButton: document.getElementById("add-tabs-button"),
+      addTabsIcon: document.querySelector(".add-tabs-icon"),
+      addTabsText: document.querySelector(".add-tabs-text"),
+      overlappingFavicons: document.getElementById("overlapping-favicons"),
+      tabDropdown: document.getElementById("tab-dropdown"),
+      dropdownList: document.getElementById("dropdown-list"),
+    };
+
+    // Set up event listeners for tab context UI
+    this.setupTabContextEventListeners();
+
+    // Initialize with current tab in context
+    this.updateTabContextUI();
+  }
+
+  setupTabContextEventListeners() {
+    // Current tab button - click opens dropdown (except for X button)
+    this.tabContextElements.currentTabButton.addEventListener("click", e => {
+      if (!e.target.classList.contains("remove-tab-button")) {
+        e.stopPropagation();
+        this.toggleTabDropdown();
+      }
+    });
+
+    // Remove current tab button
+    this.tabContextElements.removeCurrentTab.addEventListener("click", e => {
+      e.stopPropagation();
+      if (this.lastTabInfo) {
+        this.removeTabFromContext(this.lastTabInfo.tabId);
+      }
+    });
+
+    // Add tabs button
+    this.tabContextElements.addTabsButton.addEventListener("click", e => {
+      e.stopPropagation();
+      this.toggleTabDropdown();
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener("click", e => {
+      if (!this.tabContextElements.bar.contains(e.target)) {
+        this.closeTabDropdown();
+      }
+    });
+  }
+
+  async getRecentTabs() {
+    try {
+      const allTabs = Array.from(topChromeWindow.gBrowser.tabs);
+      const recentTabs = [];
+
+      for (const tab of allTabs) {
+        const browser = topChromeWindow.gBrowser.getBrowserForTab(tab);
+        const tabInfo = {
+          title: tab.label || "Untitled",
+          url: browser.currentURI.spec || "",
+          favicon: tab.image || "",
+          tabId: tab.linkedPanel,
+          tab, // Store reference for later use
+        };
+
+        // Only include eligible tabs
+        if (this.isTabEligibleForContext(tabInfo)) {
+          recentTabs.push(tabInfo);
+        }
+      }
+
+      // Sort by last accessed time (more recent first)
+      recentTabs.sort((a, b) => {
+        const aTime = a.tab.lastAccessed || 0;
+        const bTime = b.tab.lastAccessed || 0;
+        return bTime - aTime;
+      });
+
+      this.recentTabs = recentTabs.slice(0, 20); // Keep only 20 most recent
+      return this.recentTabs;
+    } catch (error) {
+      console.error("Error getting recent tabs:", error);
+      return [];
+    }
+  }
+
+  addTabToContext(tabInfo) {
+    // Check if tab is already in context
+    const exists = this.selectedTabContexts.some(
+      tab => tab.tabId === tabInfo.tabId
+    );
+    if (!exists) {
+      // Save chat messages for the old context
+      this.saveChatMessagesForCurrentContext();
+
+      this.selectedTabContexts.push(tabInfo);
+      this.updateTabContextUI();
+      this.updateQuickPromptsWithContext();
+
+      // Load chat messages for the new context
+      this.loadChatMessagesForCurrentContext();
+    }
+  }
+
+  removeTabFromContext(tabId) {
+    // Save chat messages for the old context
+    this.saveChatMessagesForCurrentContext();
+
+    this.selectedTabContexts = this.selectedTabContexts.filter(
+      tab => tab.tabId !== tabId
+    );
+    this.updateTabContextUI();
+    this.updateQuickPromptsWithContext();
+
+    // Load chat messages for the new context
+    this.loadChatMessagesForCurrentContext();
+  }
+
+  updateTabContextUI() {
+    // Update current tab button - show only if current tab is in context
+    if (this.isCurrentTabInContext()) {
+      this.tabContextElements.currentTabButton.classList.remove("hidden");
+
+      if (this.lastTabInfo.favicon) {
+        this.tabContextElements.currentTabFavicon.src =
+          this.lastTabInfo.favicon;
+        this.tabContextElements.currentTabFavicon.style.display = "block";
+      } else {
+        this.tabContextElements.currentTabFavicon.style.display = "none";
+      }
+    } else {
+      this.tabContextElements.currentTabButton.classList.add("hidden");
+    }
+
+    // Update add tabs button
+    this.updateAddTabsButtonState();
+  }
+
+  updateAddTabsButtonState() {
+    // Count non-current tabs for the "add tabs" button display
+    const nonCurrentTabs = this.selectedTabContexts.filter(
+      tab => !this.lastTabInfo || tab.tabId !== this.lastTabInfo.tabId
+    );
+    const nonCurrentTabsCount = nonCurrentTabs.length;
+
+    const addTabsIcon = this.tabContextElements.addTabsIcon;
+    const addTabsText = this.tabContextElements.addTabsText;
+    const overlappingFavicons = this.tabContextElements.overlappingFavicons;
+
+    if (nonCurrentTabsCount === 0) {
+      // State 1: No additional tabs
+      addTabsIcon.style.display = "inline";
+      addTabsText.style.display = "inline";
+      addTabsText.textContent = "add tabs";
+      overlappingFavicons.style.display = "none";
+    } else {
+      // State 2/3: Show overlapping favicons
+      addTabsIcon.style.display = "none";
+      addTabsText.style.display = "none";
+      overlappingFavicons.style.display = "flex";
+
+      // Update favicon stack
+      const faviconStack = overlappingFavicons.querySelector(".favicon-stack");
+      const tabCount = overlappingFavicons.querySelector(".tab-count");
+
+      faviconStack.innerHTML = "";
+
+      // Show up to 3 overlapping favicons from non-current tabs
+      const tabsToShow = nonCurrentTabs.slice(0, 3);
+      tabsToShow.forEach(tab => {
+        const favicon = document.createElement("img");
+        favicon.className = "stacked-favicon";
+        favicon.src = tab.favicon || "";
+        favicon.alt = tab.title || "";
+        faviconStack.appendChild(favicon);
+      });
+
+      // Update count text
+      const countText =
+        nonCurrentTabsCount === 1 ? "1 tab" : `${nonCurrentTabsCount} tabs`;
+      tabCount.textContent = countText;
+    }
+  }
+
+  async toggleTabDropdown() {
+    const dropdown = this.tabContextElements.tabDropdown;
+
+    if (dropdown.style.display === "block") {
+      this.closeTabDropdown();
+    } else {
+      this.openTabDropdown();
+    }
+  }
+
+  async openTabDropdown() {
+    const dropdown = this.tabContextElements.tabDropdown;
+    const dropdownList = this.tabContextElements.dropdownList;
+
+    // Get recent tabs
+    await this.getRecentTabs();
+
+    // Clear existing items
+    dropdownList.innerHTML = "";
+
+    // Add current tab if eligible
+    if (this.lastTabInfo && this.isTabEligibleForContext(this.lastTabInfo)) {
+      const isSelected = this.isCurrentTabInContext();
+      const currentTabItem = this.createDropdownItem(
+        this.lastTabInfo,
+        isSelected
+      );
+      dropdownList.appendChild(currentTabItem);
+    }
+
+    // Add recent tabs (excluding current tab)
+    for (const tab of this.recentTabs) {
+      if (tab.tabId !== this.lastTabInfo?.tabId) {
+        const isSelected = this.selectedTabContexts.some(
+          selected => selected.tabId === tab.tabId
+        );
+        const tabItem = this.createDropdownItem(tab, isSelected);
+        dropdownList.appendChild(tabItem);
+      }
+    }
+
+    // Show dropdown
+    dropdown.style.display = "block";
+    this.tabContextElements.addTabsButton.classList.add("active");
+  }
+
+  closeTabDropdown() {
+    this.tabContextElements.tabDropdown.style.display = "none";
+    this.tabContextElements.addTabsButton.classList.remove("active");
+  }
+
+  createDropdownItem(tabInfo, isSelected) {
+    const item = document.createElement("div");
+    item.className = "dropdown-item";
+    item.dataset.tabId = tabInfo.tabId;
+
+    // Create checkbox
+    const checkbox = document.createElement("div");
+    checkbox.className = `dropdown-checkbox ${isSelected ? "checked" : ""}`;
+
+    // Create favicon
+    const favicon = document.createElement("img");
+    favicon.className = "tab-favicon";
+    favicon.src = tabInfo.favicon || "";
+    favicon.alt = "";
+
+    // Create title
+    const title = document.createElement("div");
+    title.className = "tab-title";
+    title.textContent = tabInfo.title || "Untitled";
+
+    // Create URL
+    const url = document.createElement("div");
+    url.className = "tab-url";
+    try {
+      const urlObj = new URL(tabInfo.url);
+      url.textContent =
+        urlObj.hostname + (urlObj.pathname !== "/" ? urlObj.pathname : "");
+    } catch (e) {
+      url.textContent = tabInfo.url;
+    }
+
+    item.appendChild(checkbox);
+    item.appendChild(favicon);
+
+    const textContainer = document.createElement("div");
+    textContainer.style.flex = "1";
+    textContainer.style.minWidth = "0";
+    textContainer.appendChild(title);
+    textContainer.appendChild(url);
+    item.appendChild(textContainer);
+
+    // Add click handler
+    item.addEventListener("click", () => {
+      const isCurrentlySelected = checkbox.classList.contains("checked");
+
+      // Treat all tabs the same way
+      if (isCurrentlySelected) {
+        this.removeTabFromContext(tabInfo.tabId);
+        checkbox.classList.remove("checked");
+      } else {
+        this.addTabToContext(tabInfo);
+        checkbox.classList.add("checked");
+      }
+    });
+
+    return item;
+  }
+
+  updateQuickPromptsWithContext() {
+    // Only update if user hasn't edited query and suggestions are showing
+    if (
+      !this.userHasEditedQuery &&
+      !!this.currentSuggestions.length &&
+      !this.searchInput.value.trim()
+    ) {
+      this.showQuickPrompts();
+    }
+  }
+
+  getAllContextTabs() {
+    return this.selectedTabContexts;
+  }
+
+  // Helper function to check if a tab is eligible for context (filters out internal URLs)
+  isTabEligibleForContext(tabInfo) {
+    if (!tabInfo || !tabInfo.url) {
+      return false;
+    }
+
+    const url = tabInfo.url.toLowerCase();
+
+    // Filter out browser internal URLs
+    return (
+      !url.startsWith("about:") &&
+      !url.startsWith("chrome:") &&
+      !url.startsWith("moz-extension:") &&
+      !url.startsWith("resource:") &&
+      url !== "about:blank"
+    );
+  }
+
+  // Helper to check if current tab is in context
+  isCurrentTabInContext() {
+    return (
+      this.lastTabInfo &&
+      this.selectedTabContexts.some(tab => tab.tabId === this.lastTabInfo.tabId)
+    );
+  }
+
+  // Reset context to current tab (if eligible)
+  resetContextToCurrentTab() {
+    // Save chat messages for the old context before changing
+    this.saveChatMessagesForCurrentContext();
+
+    if (this.lastTabInfo && this.isTabEligibleForContext(this.lastTabInfo)) {
+      this.selectedTabContexts = [this.lastTabInfo];
+    } else {
+      this.selectedTabContexts = [];
+    }
+    this.updateTabContextUI();
+    this.updateQuickPromptsWithContext();
+
+    // Load chat messages for the new context
+    this.loadChatMessagesForCurrentContext();
+  }
+
+  // Save chat messages to all tabs in current context
+  saveChatMessagesForCurrentContext() {
+    if (this.chatBot && this.chatBot.messages && this.chatBot.messages.length) {
+      // Save to all tabs in current context
+      for (const tab of this.selectedTabContexts) {
+        this.chatMessagesByTab.set(tab.tabId, [...this.chatBot.messages]);
+      }
+    }
+  }
+
+  // Load chat messages for the current context (prioritize current tab)
+  loadChatMessagesForCurrentContext() {
+    if (this.chatBot) {
+      let savedMessages = [];
+
+      // Try to load from current tab first
+      if (this.lastTabInfo && this.isCurrentTabInContext()) {
+        savedMessages =
+          this.chatMessagesByTab.get(this.lastTabInfo.tabId) || [];
+      }
+
+      // If no messages from current tab, try other tabs in context
+      if (savedMessages.length === 0) {
+        for (const tab of this.selectedTabContexts) {
+          savedMessages = this.chatMessagesByTab.get(tab.tabId) || [];
+          if (savedMessages.length) {
+            break;
+          }
+        }
+      }
+
+      if (savedMessages.length) {
+        // Restore saved messages and show chat mode
+        this.chatBot.messages = [...savedMessages];
+        this.chatBot.requestUpdate();
+        this.showChatMode();
+        // Scroll to bottom after messages are loaded
+        setTimeout(() => this.chatBot.scrollToBottom(), 0);
+      } else {
+        // Clear messages and hide chat mode
+        this.chatBot.messages = [];
+        this.chatBot.requestUpdate();
+        this.hideChatMode();
+      }
+    }
   }
 
   init() {
@@ -196,6 +647,9 @@ class SmartWindowPage {
 
     this.setupEventListeners();
 
+    // Initialize tab context UI
+    this.initializeTabContextUI();
+
     // Initialize tab info and show quick prompts (only if Smart Mode is active)
     this.initializeTabInfo();
     if (isSmartMode) {
@@ -219,7 +673,8 @@ class SmartWindowPage {
       tabId: selectedTab.linkedPanel, // Use linkedPanel as unique tab identifier
     };
 
-    // Update status bar if in sidebar mode
+    // Initialize tab context and update status bar if in sidebar mode
+    this.resetContextToCurrentTab();
     if (this.isSidebarMode) {
       this.updateTabStatus(this.lastTabInfo);
     }
@@ -326,7 +781,15 @@ class SmartWindowPage {
     const tabUrl = this.lastTabInfo?.url || "";
 
     const prompts = this.generateQuickPrompts(tabTitle, tabUrl);
-    this.displaySuggestions(prompts, "Quick Prompts:");
+
+    // Update header based on context
+    const contextTabs = this.getAllContextTabs();
+    let headerText = "Quick Prompts:";
+    if (contextTabs.length > 1) {
+      headerText = `Context Prompts (${contextTabs.length} tabs):`;
+    }
+
+    this.displaySuggestions(prompts, headerText);
     this.userHasEditedQuery = false;
   }
 
@@ -547,10 +1010,17 @@ class SmartWindowPage {
   }
 
   async updateTabStatus(tabInfo) {
-    this.saveChatMessagesForCurrentTab();
+    // Close any open tab context dropdown when switching tabs
+    this.closeTabDropdown();
 
     // Store the latest tab info
     this.lastTabInfo = tabInfo;
+
+    // Reset tab context to current tab when switching (handles chat persistence)
+    this.resetContextToCurrentTab();
+
+    // Update tab context UI with new current tab info
+    this.updateTabContextUI();
 
     const titleEl = document.getElementById("status-title");
     const urlEl = document.getElementById("status-url");
@@ -578,8 +1048,7 @@ class SmartWindowPage {
       faviconEl.style.display = "none";
     }
 
-    // Handle chat persistence when tab changes
-    this.loadChatMessagesForTab(tabInfo.tabId);
+    // Note: Chat persistence is now handled by context-based system
 
     // Update quick prompts if user hasn't edited the query
     if (!this.userHasEditedQuery && !this.searchInput.value.trim()) {
@@ -831,10 +1300,11 @@ class SmartWindowPage {
 
     // Handle chat queries with chatbot component in both modes
     if (type === "chat") {
-      // Show chat component and submit the prompt
+      // Show chat component and submit the prompt with tab context
       this.showChatMode();
       if (this.chatBot) {
-        this.chatBot.submitPrompt(query);
+        const contextTabs = this.getAllContextTabs();
+        this.chatBot.submitPrompt(query, contextTabs);
       }
       // For chat on smart window page (not sidebar), don't open sidebar
       // The sidebar logic is handled by performNavigation for search/navigate types
@@ -993,41 +1463,6 @@ class SmartWindowPage {
       );
     } else {
       this.originalSearchBoxParent.appendChild(searchBox);
-    }
-  }
-
-  loadChatMessagesForTab(tabId) {
-    // Load existing chat messages for this tab
-    const savedMessages = this.chatMessagesByTab.get(tabId) || [];
-
-    if (this.chatBot) {
-      if (savedMessages.length) {
-        // Restore saved messages and show chat mode
-        this.chatBot.messages = [...savedMessages];
-        this.chatBot.requestUpdate();
-        this.showChatMode();
-        // Scroll to bottom after messages are loaded
-        setTimeout(() => this.chatBot.scrollToBottom(), 0);
-      } else {
-        // Clear messages and hide chat mode
-        this.chatBot.messages = [];
-        this.chatBot.requestUpdate();
-        this.hideChatMode();
-      }
-    }
-  }
-
-  saveChatMessagesForCurrentTab() {
-    // Save current chat messages for the active tab
-    if (
-      this.chatBot &&
-      this.lastTabInfo &&
-      this.lastTabInfo.tabId &&
-      this.chatBot.messages.length
-    ) {
-      this.chatMessagesByTab.set(this.lastTabInfo.tabId, [
-        ...this.chatBot.messages,
-      ]);
     }
   }
 
