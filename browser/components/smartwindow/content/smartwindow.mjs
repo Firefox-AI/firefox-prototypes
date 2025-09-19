@@ -126,6 +126,11 @@ class SmartWindowPage {
         .slice(0, 5);
     }
 
+    // For non-sidebar mode (full page), don't show quick prompts if no context tabs
+    if (!this.isSidebarMode && contextTabs.length === 0) {
+      return [];
+    }
+
     // Check cache first using shared cache from topChromeWindow
     const cacheKey =
       topChromeWindow.SmartWindow.getContextCacheKey(contextTabs);
@@ -845,6 +850,12 @@ class SmartWindowPage {
     const tabTitle = this.lastTabInfo?.title || "";
 
     const prompts = await this.generateQuickPrompts(tabTitle);
+
+    // Don't display anything if no prompts
+    if (!prompts || prompts.length === 0) {
+      this.hideSuggestions();
+      return;
+    }
 
     // Update header based on context
     const contextTabs = this.getAllContextTabs();
