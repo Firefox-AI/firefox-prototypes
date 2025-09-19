@@ -13,36 +13,52 @@
     <div id="root">
       <div class="smart-window-container">
         <div class="search-box">
+          <div class="input-container">
+            <input
+              type="text"
+              id="search-input"
+              placeholder="Ask, search, or type a URL"
+            />
+          </div>
           <div class="tab-context-bar" id="tab-context-bar">
-            <div class="current-tab-button" id="current-tab-button">
-              <img class="tab-favicon" id="current-tab-favicon" src="" alt="" />
-              <span class="tab-title" id="current-tab-title">current tab</span>
-              <button class="remove-tab-button" id="remove-current-tab">
-                ×
-              </button>
-            </div>
-            <div class="add-tabs-button" id="add-tabs-button">
-              <span class="add-tabs-icon">+</span>
-              <span class="add-tabs-text">add tabs</span>
-              <div
-                class="overlapping-favicons"
-                id="overlapping-favicons"
-                style="display: none"
-              >
-                <div class="favicon-stack"></div>
-                <span class="tab-count">0 tabs</span>
+            <div class="tab-context-left">
+              <div class="current-tab-button" id="current-tab-button">
+                <img
+                  class="tab-favicon"
+                  id="current-tab-favicon"
+                  src=""
+                  alt=""
+                />
+                <span class="tab-title" id="current-tab-title"
+                  >current tab</span
+                >
+                <button class="remove-tab-button" id="remove-current-tab">
+                  ×
+                </button>
               </div>
+              <div class="add-tabs-button" id="add-tabs-button">
+                <span class="add-tabs-icon">+</span>
+                <span class="add-tabs-text">Add images, tabs, files</span>
+                <div
+                  class="overlapping-favicons"
+                  id="overlapping-favicons"
+                  style="display: none"
+                >
+                  <div class="favicon-stack"></div>
+                  <span class="tab-count">0 tabs</span>
+                </div>
+              </div>
+            </div>
+            <div class="tab-context-right">
+              <button class="submit-button" id="submit-button">
+                <span class="button-text">→</span>
+              </button>
             </div>
             <div class="tab-dropdown" id="tab-dropdown" style="display: none">
               <div class="dropdown-header">Select tabs for context:</div>
               <div class="dropdown-list" id="dropdown-list"></div>
             </div>
           </div>
-          <input
-            type="text"
-            id="search-input"
-            placeholder="Search or enter address"
-          />
         </div>
         <div id="results-container">
           <chat-bot id="chat-bot" style="display: none"></chat-bot>
