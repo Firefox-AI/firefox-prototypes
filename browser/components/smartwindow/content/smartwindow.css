@@ -73,6 +73,8 @@ html, body {
 /* Sidebar chat mode styles */
 .sidebar-mode .smart-window-container {
   padding-top: 0; /* Keep sidebar compact */
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar-mode #results-container {
@@ -367,6 +369,103 @@ html, body {
   background-color: transparent;
 }
 
+/* Quick Prompts Container */
+.quick-prompts-container {
+  width: 100%;
+  max-width: 700px;
+  margin: 20px auto;
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 8px;
+  transition: opacity 0.2s ease;
+}
+
+/* Quick prompts are always visible now */
+
+/* Quick Prompt Pill Buttons */
+.quick-prompt-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 17px;
+  height: 48px;
+  background: rgba(191, 143, 204, 0.2);
+  mix-blend-mode: multiply;
+  border: 1px solid rgba(125, 32, 124, 0.15);
+  border-radius: 58px;
+  box-shadow: 0px 0.25px 0.75px 0px rgba(0, 0, 0, 0.05),
+              0px 2px 6px 0px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro", sans-serif;
+  font-size: 13px;
+  color: #15141a;
+  white-space: nowrap;
+}
+
+.quick-prompt-pill:hover {
+  background: rgba(191, 143, 204, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0px 2px 8px 0px rgba(0, 0, 0, 0.15);
+}
+
+.quick-prompt-emoji {
+  font-size: 14px;
+  line-height: 1;
+  width: 17px;
+  text-align: center;
+}
+
+.quick-prompt-text {
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* Position quick prompts differently in sidebar */
+.sidebar-mode .quick-prompts-container {
+  margin: 12px auto 10px;
+  max-width: 100%;
+  padding: 0 16px;
+  gap: 8px;
+  order: 1; /* Place at top in sidebar */
+}
+
+.sidebar-mode .search-box {
+  order: 2; /* Place after quick prompts */
+}
+
+.sidebar-mode #results-container {
+  order: 3; /* Place after search box */
+}
+
+.sidebar-mode .quick-prompt-pill {
+  padding: 4px 10px;
+  height: 32px;
+  font-size: 13px;
+  flex: 1;
+  min-width: 0;
+  gap: 4px;
+}
+
+.sidebar-mode .quick-prompt-pill .quick-prompt-emoji {
+  font-size: 14px;
+  width: 17px;
+}
+
+.sidebar-mode .quick-prompt-text {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Keep quick prompts visible but adjust opacity when chat is active */
+.chat-mode-bottom .quick-prompts-container,
+#chat-bot:not([style*="display: none"]) ~ .quick-prompts-container {
+  opacity: 0.6;
+}
+
 /* Quick Actions Buttons */
 .quick-actions {
   position: fixed;
@@ -377,6 +476,11 @@ html, body {
   align-items: center;
   gap: 40px;
   z-index: 100;
+}
+
+/* Hide quick actions in sidebar mode */
+.sidebar-mode .quick-actions {
+  display: none;
 }
 
 .quick-action-button {
