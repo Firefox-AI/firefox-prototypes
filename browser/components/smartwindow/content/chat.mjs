@@ -196,7 +196,16 @@ class ChatBot extends MozLitElement {
   }
 
   buildSystemPrompt(tabContext = []) {
+    const currentDate = new Date().toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
     let systemPrompt = `You are a helpful AI assistant integrated into Firefox's Smart Window feature. You have access to the user's current browser tab context.
+
+Current date: ${currentDate}
 
 When responding to user queries, if you determine that a web search would be more helpful than a direct answer, include a search suggestion using this exact format: [[search: your suggested search query]]
 
