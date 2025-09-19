@@ -36,6 +36,7 @@ class SmartWindowPage {
     this.selectedTabContexts = []; // Array of tab info objects selected for context
     this.recentTabs = []; // Cache of recent tabs
     this.tabContextElements = {};
+    this.currentTabPageText = ""; // Store readable text from current tab
 
     this.init();
   }
@@ -1168,6 +1169,9 @@ class SmartWindowPage {
             .sendQuery("GetReadableText");
         const pageText = readableTextResult.selection || "";
 
+        // Store page text for use in chat system prompt
+        this.currentTabPageText = pageText;
+
         const preview =
           pageText.length > 30 ? pageText.substring(0, 30) + "…" : pageText;
         pageTextEl.textContent = pageText
@@ -1409,7 +1413,13 @@ class SmartWindowPage {
       this.showChatMode();
       if (this.chatBot) {
         const contextTabs = this.getAllContextTabs();
-        this.chatBot.submitPrompt(query, contextTabs);
+        // Pass page text if current tab is in context
+        const includePageText = this.isCurrentTabInContext();
+        this.chatBot.submitPrompt(
+          query,
+          contextTabs,
+          includePageText ? this.currentTabPageText : ""
+        );
       }
       // For chat on smart window page (not sidebar), don't open sidebar
       // The sidebar logic is handled by performNavigation for search/navigate types

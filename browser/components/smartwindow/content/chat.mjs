@@ -133,6 +133,7 @@ class ChatBot extends MozLitElement {
     this.messages = [];
     this.marked = window.marked.marked; // Use the global marked instance for markdown rendering
     this.currentTabContext = []; // Store current tab context
+    this.currentPageText = ""; // Store current page text content
   }
 
   async sendPrompt() {
@@ -184,25 +185,18 @@ class ChatBot extends MozLitElement {
     }
   }
 
-  async submitPrompt(_prompt, tabContext = []) {
-    // Store tab context for use in system prompt
+  async submitPrompt(_prompt, tabContext = [], currentPageText = "") {
+    // Store tab context and page text for use in system prompt
     this.currentTabContext = tabContext || [];
+    this.currentPageText = currentPageText || "";
 
-    // If tab context is provided, enhance the prompt with context information
-    if (tabContext && tabContext.length) {
-      let contextInfo = "\n\nTab Context:";
-      tabContext.forEach((tab, index) => {
-        contextInfo += `\n${index + 1}. "${tab.title}" - ${tab.url}`;
-      });
-      this.prompt = _prompt + contextInfo;
-    } else {
-      this.prompt = _prompt;
-    }
+    // Keep the user prompt clean - context will be included in system prompt
+    this.prompt = _prompt;
     await this.sendPrompt();
   }
 
   buildSystemPrompt(tabContext = []) {
-    const baseSystemPrompt = `You are a helpful AI assistant integrated into Firefox's Smart Window feature. You have access to the user's current browser tab context.
+    let systemPrompt = `You are a helpful AI assistant integrated into Firefox's Smart Window feature. You have access to the user's current browser tab context.
 
 When responding to user queries, if you determine that a web search would be more helpful than a direct answer, include a search suggestion using this exact format: [[search: your suggested search query]]
 
@@ -219,7 +213,30 @@ Examples:
 
 Always provide a helpful response first, then include the search suggestion when appropriate.`;
 
-    return baseSystemPrompt;
+    // Include tab context information
+    const contextTabs = this.currentTabContext || tabContext;
+    if (contextTabs && contextTabs.length) {
+      systemPrompt += `\n\nTab Context:`;
+      contextTabs.forEach((tab, index) => {
+        systemPrompt += `\n${index + 1}. "${tab.title}" - ${tab.url}`;
+      });
+    }
+
+    // Include page content if available (when current tab is in context)
+    if (this.currentPageText && this.currentPageText.trim()) {
+      // Truncate page text to avoid overly long prompts (max 3000 chars)
+      const truncatedText =
+        this.currentPageText.length > 3000
+          ? this.currentPageText.substring(0, 3000) + "..."
+          : this.currentPageText;
+
+      systemPrompt += `\n\nCurrent page content:\n${truncatedText}
+
+Use this page content to provide more contextual and relevant search suggestions. For example, if the page mentions dates, locations, or specific topics, incorporate those details into your search suggestions.`;
+    }
+    console.log("Built system prompt:", systemPrompt);
+
+    return systemPrompt;
   }
 
   detectSearchTokens(content) {
