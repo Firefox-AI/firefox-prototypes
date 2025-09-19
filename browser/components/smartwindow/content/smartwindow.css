@@ -21,24 +21,34 @@ html, body {
 
 .search-box {
   width: 100%;
-  max-width: 600px;
+  max-width: 700px;
   margin: 0 auto 20px;
   position: relative;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 18px;
+  border: 1px solid rgba(199, 199, 199, 0.5);
+  box-shadow: 0px 0.25px 0.75px 0px rgba(0, 0, 0, 0.05),
+              0px 2px 20px 0px rgba(255, 82, 255, 0.15);
+  padding: 14px 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  backdrop-filter: blur(10px);
 }
 
 #search-input {
   width: 100%;
-  padding: 12px 16px 54px 16px; /* Add bottom padding for tab context bar */
-  font-size: 16px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
+  padding: 10px;
+  font-size: 15px;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro", sans-serif;
+  border: none;
   outline: none;
-  transition: all 0.2s;
+  background: transparent;
+  color: #15141a;
 }
 
-#search-input:focus {
-  border-color: rgba(0, 122, 255, 0.5);
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+#search-input::placeholder {
+  color: rgba(21, 20, 26, 0.69);
 }
 
 #results-container {
@@ -141,42 +151,54 @@ html, body {
   color: #000;
 }
 
-/* Search box layout for submit button */
-.search-box {
-  position: relative;
+/* Input container */
+.input-container {
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.search-box #search-input {
-  flex: 1;
+  gap: 10px;
+  min-height: 36px;
 }
 
 /* Submit button styles */
 .submit-button {
-  padding: 12px 16px;
+  padding: 4px 16px;
+  min-height: 32px;
+  min-width: 50px;
   border: none;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #007AFF 0%, #5856D6 100%);
+  border-radius: 24px;
+  background: rgba(180, 99, 190, 0.3);
   color: white;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 400;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro", sans-serif;
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
-  min-width: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.submit-button .button-text {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.submit-button.has-text {
+  background: rgba(180, 99, 190, 0.5);
 }
 
 .submit-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+  background: rgba(180, 99, 190, 0.4);
+}
+
+.submit-button.has-text:hover {
+  background: rgba(180, 99, 190, 0.6);
 }
 
 .submit-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  transform: none;
 }
 
 /* Suggestions container */
@@ -350,17 +372,31 @@ html, body {
   align-items: center;
   display: flex;
   gap: 8px;
-  left: 16px;
-  pointer-events: auto;
-  position: absolute;
-  right: 16px;
-  top: 46px;
-  z-index: 10;
+  padding: 0 10px;
+  height: 36px;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  position: relative;
+  justify-content: space-between;
+}
+
+/* Tab context left section */
+.tab-context-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.5;
+}
+
+/* Tab context right section */
+.tab-context-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 /* Current Tab Button */
 .current-tab-button {
-  display: flex;
+  display: none; /* Hidden by default like in Figma */
   align-items: center;
   gap: 8px;
   padding: 6px 8px;
@@ -423,21 +459,19 @@ html, body {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
-  border: 1px solid rgba(0, 122, 255, 0.2);
-  border-radius: 6px;
   cursor: pointer;
-  font-size: 12px;
-  color: #007AFF;
-  font-weight: 500;
+  font-size: 13px;
+  color: #15141a;
+  font-weight: 400;
   transition: all 0.2s ease;
   position: relative;
+  border: none;
+  background: transparent;
+  padding: 0;
 }
 
-.add-tabs-button:hover {
-  background: rgba(0, 122, 255, 0.15);
-  border-color: rgba(0, 122, 255, 0.4);
-  transform: translateY(-1px);
+.add-tabs-button:hover .add-tabs-icon {
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .add-tabs-button.active {
@@ -446,12 +480,23 @@ html, body {
 }
 
 .add-tabs-icon {
-  font-size: 14px;
-  font-weight: bold;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: normal;
+  color: #15141a;
+  opacity: 0.5;
+  border-radius: 50%;
+  transition: background 0.2s ease;
 }
 
 .add-tabs-text {
-  font-size: 12px;
+  font-size: 13px;
+  color: #15141a;
+  opacity: 1;
 }
 
 /* Overlapping Favicons Display */
@@ -506,7 +551,7 @@ html, body {
 /* Tab Dropdown */
 .tab-dropdown {
   position: absolute;
-  bottom: 100%;
+  bottom: calc(100% + 8px);
   left: 0;
   right: 0;
   background: rgba(255, 255, 255, 0.95);
@@ -515,7 +560,6 @@ html, body {
   backdrop-filter: blur(10px);
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
   z-index: 1000;
-  margin-bottom: 4px;
   overflow: scroll;
   max-height: 180px;
 }
