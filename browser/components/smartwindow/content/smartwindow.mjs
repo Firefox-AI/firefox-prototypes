@@ -22,6 +22,7 @@ class SmartWindowPage {
     this.resultsContainer = null;
     this.submitButton = null;
     this.suggestionsContainer = null;
+    this.quickPromptsContainer = null;
     this.isSidebarMode = false;
     this.messages = [];
     this.currentSuggestions = [];
@@ -126,9 +127,13 @@ class SmartWindowPage {
         .slice(0, 5);
     }
 
-    // For non-sidebar mode (full page), don't show quick prompts if no context tabs
-    if (!this.isSidebarMode && contextTabs.length === 0) {
-      return [];
+    // Always show some prompts, even without context
+    if (contextTabs.length === 0) {
+      // Return default prompts when no context is available
+      return [
+        { text: "Show me similar music on YouTube", type: "search" },
+        { text: "Tips for using AI Mode", type: "chat" }
+      ];
     }
 
     // Check cache first using shared cache from topChromeWindow
@@ -663,6 +668,7 @@ class SmartWindowPage {
     this.searchInput = document.getElementById("search-input");
     this.resultsContainer = document.getElementById("results-container");
     this.chatBot = document.getElementById("chat-bot");
+    this.quickPromptsContainer = document.getElementById("quick-prompts-container");
 
     // Create and setup suggestions container
     this.setupSuggestionsUI();
@@ -843,8 +849,7 @@ class SmartWindowPage {
   }
 
   async showQuickPrompts() {
-    // Don't show quick prompts if chat mode is active
-    if (this.chatBot && this.chatBot.style.display === "block") {
+    if (!this.quickPromptsContainer) {
       return;
     }
 
@@ -855,19 +860,67 @@ class SmartWindowPage {
 
     // Don't display anything if no prompts
     if (!prompts || prompts.length === 0) {
-      this.hideSuggestions();
+      // Still don't hide - keep existing prompts if any
       return;
     }
 
-    // Update header based on context
-    const contextTabs = this.getAllContextTabs();
-    let headerText = "Quick Prompts:";
-    if (contextTabs.length > 1) {
-      headerText = `Context Prompts (${contextTabs.length} tabs):`;
+    // Display quick prompts as pills
+    this.displayQuickPrompts(prompts);
+    this.userHasEditedQuery = false;
+  }
+
+  displayQuickPrompts(prompts) {
+    if (!this.quickPromptsContainer) {
+      return;
     }
 
-    this.displaySuggestions(prompts, headerText, true); // true = isQuickPrompts
-    this.userHasEditedQuery = false;
+    // Show container
+    this.quickPromptsContainer.classList.remove("hidden");
+
+    // Clear existing prompts
+    this.quickPromptsContainer.innerHTML = "";
+
+    // Add emoji mapping for prompt types
+    const getEmoji = (type) => {
+      switch(type) {
+        case "chat": return "💬";
+        case "search": return "🔍";
+        case "navigate": return "🌐";
+        case "action": return "⚡";
+        default: return "💡";
+      }
+    };
+
+    // Create pill buttons for each prompt (limit to top 2)
+    prompts.slice(0, 2).forEach((prompt) => {
+      const pill = document.createElement("button");
+      pill.className = "quick-prompt-pill";
+
+      const emoji = document.createElement("span");
+      emoji.className = "quick-prompt-emoji";
+      emoji.textContent = getEmoji(prompt.type);
+
+      const text = document.createElement("span");
+      text.className = "quick-prompt-text";
+      text.textContent = prompt.text;
+
+      pill.appendChild(emoji);
+      pill.appendChild(text);
+
+      // Add click handler
+      pill.addEventListener("click", () => {
+        this.searchInput.value = prompt.text;
+        this.handleEnter(prompt.text);
+      });
+
+      this.quickPromptsContainer.appendChild(pill);
+    });
+  }
+
+  hideQuickPrompts() {
+    if (this.quickPromptsContainer) {
+      this.quickPromptsContainer.classList.add("hidden");
+    }
   }
 
   displaySuggestions(
@@ -1103,7 +1156,7 @@ class SmartWindowPage {
           this.updateSubmitButton("");
           this.userHasEditedQuery = false;
           this.selectedSuggestionIndex = -1;
-          this.showQuickPrompts().catch(console.error);
+          this.hideSuggestions();
         } else {
           // Hide suggestions if input is already empty
           this.hideSuggestions();
@@ -1204,11 +1257,10 @@ class SmartWindowPage {
     this.updateSubmitButton(query);
 
     if (!query.trim()) {
-      // Show quick prompts when input is empty (but not if chat mode is active)
+      // Show quick prompts when input is empty
       this.userHasEditedQuery = false;
-      if (!(this.chatBot && this.chatBot.style.display === "block")) {
-        this.showQuickPrompts().catch(console.error);
-      }
+      this.hideSuggestions(); // Hide suggestions dropdown
+      this.showQuickPrompts().catch(console.error);
       return;
     }
 
@@ -1468,7 +1520,7 @@ class SmartWindowPage {
     this.searchInput.value = "";
     this.updateSubmitButton("");
     this.userHasEditedQuery = false;
-    this.showQuickPrompts().catch(console.error);
+    this.hideSuggestions();
   }
 
   performNavigation(query, type) {
@@ -1598,9 +1650,9 @@ class SmartWindowPage {
     const existingMessages = this.resultsContainer.querySelectorAll(".message");
     existingMessages.forEach(msg => (msg.style.display = "block"));
 
-    // Show quick prompts again if input is empty and user hasn't edited query
+    // Hide suggestions if input is empty and user hasn't edited query
     if (!this.userHasEditedQuery && !this.searchInput.value.trim()) {
-      this.showQuickPrompts().catch(console.error);
+      this.hideSuggestions();
     }
   }
 }
