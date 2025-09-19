@@ -367,6 +367,55 @@ html, body {
   background-color: transparent;
 }
 
+/* Quick Actions Buttons */
+.quick-actions {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  z-index: 100;
+}
+
+.quick-action-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  transition: all 0.2s ease;
+  color: rgba(125, 32, 124, 0.8);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro", sans-serif;
+}
+
+.quick-action-button:hover {
+  transform: translateY(-2px);
+  color: rgba(125, 32, 124, 1);
+}
+
+.quick-action-icon {
+  width: 24px;
+  height: 24px;
+  color: currentColor;
+}
+
+.quick-action-text {
+  font-size: 13px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+/* Hide quick actions when chat is active */
+.chat-mode-bottom .quick-actions,
+#chat-bot:not([style*="display: none"]) ~ .quick-actions {
+  display: none;
+}
+
 /* Tab Context Bar Styles */
 .tab-context-bar {
   align-items: center;
