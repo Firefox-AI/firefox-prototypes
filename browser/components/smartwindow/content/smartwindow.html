@@ -63,6 +63,26 @@
         <div id="results-container">
           <chat-bot id="chat-bot" style="display: none"></chat-bot>
         </div>
+        <div class="quick-actions" id="quick-actions">
+          <button class="quick-action-button" id="history-button">
+            <svg class="quick-action-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" fill="currentColor"/>
+            </svg>
+            <span class="quick-action-text">History</span>
+          </button>
+          <button class="quick-action-button" id="chats-button">
+            <svg class="quick-action-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" fill="currentColor"/>
+            </svg>
+            <span class="quick-action-text">Chats</span>
+          </button>
+          <button class="quick-action-button" id="downloads-button">
+            <svg class="quick-action-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M5 20h14v-2H5v2zM12 10h3l-4 4-4-4h3V3h2v7z" fill="currentColor"/>
+            </svg>
+            <span class="quick-action-text">Downloads</span>
+          </button>
+        </div>
       </div>
     </div>
     <script src="chrome://browser/content/smartwindow/marked.js"></script>
