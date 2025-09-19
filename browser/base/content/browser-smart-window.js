@@ -10,6 +10,10 @@ var SmartWindow = {
   _sidebarVisible: false,
   SESSION_STORE_KEY: "smart-window-active",
 
+  // Shared prompt cache across all smart window instances
+  _promptsCache: new Map(),
+  _promptsCacheExpiry: 5 * 60 * 1000, // 5 minutes cache
+
   init() {
     if (this._initialized) {
       return;
@@ -373,9 +377,84 @@ var SmartWindow = {
     }
   },
 
+  // Prompt cache management methods
+  getPromptsFromCache(cacheKey) {
+    const cached = this._promptsCache.get(cacheKey);
+    const now = Date.now();
+
+    if (cached && now - cached.timestamp < this._promptsCacheExpiry) {
+      console.log("[SmartWindow] Using cached prompts for context:", cacheKey);
+      // Return the promise if it's still pending, or the resolved result
+      return cached.promise;
+    }
+
+    return null;
+  },
+
+  setPromptsCache(cacheKey, promiseOrResult) {
+    const timestamp = Date.now();
+
+    // If it's a promise, store it directly
+    if (promiseOrResult && typeof promiseOrResult.then === "function") {
+      this._promptsCache.set(cacheKey, {
+        promise: promiseOrResult,
+        timestamp,
+      });
+
+      // When the promise resolves, replace it with the result for future use
+      promiseOrResult
+        .then(result => {
+          // Only update if this cache entry still exists and hasn't been replaced
+          const current = this._promptsCache.get(cacheKey);
+          if (current && current.timestamp === timestamp) {
+            this._promptsCache.set(cacheKey, {
+              promise: Promise.resolve(result),
+              timestamp,
+            });
+          }
+        })
+        .catch(error => {
+          // Remove failed promises from cache so they can be retried
+          const current = this._promptsCache.get(cacheKey);
+          if (current && current.timestamp === timestamp) {
+            this._promptsCache.delete(cacheKey);
+          }
+        });
+    } else {
+      // If it's already a result, wrap it in a resolved promise
+      this._promptsCache.set(cacheKey, {
+        promise: Promise.resolve(promiseOrResult),
+        timestamp,
+      });
+    }
+
+    // Clean up old cache entries
+    this.cleanupPromptsCache();
+  },
+
+  cleanupPromptsCache() {
+    const now = Date.now();
+    for (const [key, value] of this._promptsCache.entries()) {
+      if (now - value.timestamp >= this._promptsCacheExpiry) {
+        this._promptsCache.delete(key);
+      }
+    }
+  },
+
+  // Generate a cache key based on context tabs
+  getContextCacheKey(contextTabs) {
+    return contextTabs
+      .map(tab => `${tab.title}|${tab.url}`)
+      .sort()
+      .join("::");
+  },
+
   shutdown() {
     // Don't save state during shutdown as SessionStore may not be available
     // State is already saved on each toggle
+
+    // Clean up prompt cache
+    this._promptsCache.clear();
 
     // Clean up event listeners
     if (gBrowser) {
