@@ -323,6 +323,14 @@ html, body {
   }
 }
 
+.smart-window-container.chat-mode-bottom .suggestions-container {
+  order: 9;
+}
+
+.smart-window-container.chat-mode-bottom .search-box {
+  order: 10;
+}
+
 #chat-bot {
   background-color: transparent;
 }
