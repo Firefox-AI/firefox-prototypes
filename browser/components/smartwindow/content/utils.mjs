@@ -42,8 +42,14 @@ export async function* fetchWithHistory(messages) {
       content: msg.content,
     }));
 
-    const result = await engineInstance.run({ args: openAIMessages });
-    yield result.finalOutput || "No response received";
+    // Use runWithGenerator to get streaming chunks directly
+    for await (const chunk of engineInstance.runWithGenerator({
+      args: openAIMessages,
+    })) {
+      if (chunk.text) {
+        yield chunk.text;
+      }
+    }
   } catch (error) {
     console.error("ML Engine error:", error);
     yield `Error: Failed to connect to AI service. Please check browser.smartwindow.* preferences. ${error.message}`;
