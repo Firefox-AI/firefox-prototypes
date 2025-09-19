@@ -31,7 +31,6 @@ class SmartWindowPage {
     this.suggestionDebounceTimer = null;
     this.lastTabInfo = null;
     this.chatBot = null;
-    this.chatMessagesByTab = new Map(); // Store chat messages by tab ID
 
     // Tab context management
     this.selectedTabContexts = []; // Array of tab info objects selected for context
@@ -611,7 +610,10 @@ class SmartWindowPage {
     if (this.chatBot && this.chatBot.messages && this.chatBot.messages.length) {
       // Save to all tabs in current context
       for (const tab of this.selectedTabContexts) {
-        this.chatMessagesByTab.set(tab.tabId, [...this.chatBot.messages]);
+        topChromeWindow.SmartWindow.setChatMessages(
+          tab.tabId,
+          this.chatBot.messages
+        );
       }
     }
   }
@@ -623,14 +625,17 @@ class SmartWindowPage {
 
       // Try to load from current tab first
       if (this.lastTabInfo && this.isCurrentTabInContext()) {
-        savedMessages =
-          this.chatMessagesByTab.get(this.lastTabInfo.tabId) || [];
+        savedMessages = topChromeWindow.SmartWindow.getChatMessages(
+          this.lastTabInfo.tabId
+        );
       }
 
       // If no messages from current tab, try other tabs in context
       if (savedMessages.length === 0) {
         for (const tab of this.selectedTabContexts) {
-          savedMessages = this.chatMessagesByTab.get(tab.tabId) || [];
+          savedMessages = topChromeWindow.SmartWindow.getChatMessages(
+            tab.tabId
+          );
           if (savedMessages.length) {
             break;
           }
@@ -1528,6 +1533,14 @@ class SmartWindowPage {
   }
 
   performNavigation(query, type) {
+    // Save chat messages for current tab before navigating
+    if (this.chatBot && this.chatBot.messages && this.chatBot.messages.length) {
+      topChromeWindow.SmartWindow.setChatMessages(
+        topChromeWindow.gBrowser.selectedTab.linkedPanel,
+        this.chatBot.messages
+      );
+    }
+
     let url = query;
 
     if (type === "navigate") {

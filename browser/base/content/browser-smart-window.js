@@ -15,6 +15,9 @@ var SmartWindow = {
   _promptsCache: new Map(),
   _promptsCacheExpiry: 5 * 60 * 1000, // 5 minutes cache
 
+  // Chat message storage by tab ID (no expiration)
+  _chatMessagesByTab: new Map(),
+
   init() {
     if (this._initialized) {
       return;
@@ -451,6 +454,27 @@ var SmartWindow = {
       .join("::");
   },
 
+  // Chat message management methods
+  getChatMessages(tabId) {
+    return this._chatMessagesByTab.get(tabId) || [];
+  },
+
+  setChatMessages(tabId, messages) {
+    if (messages && messages.length) {
+      this._chatMessagesByTab.set(tabId, [...messages]);
+    } else {
+      this._chatMessagesByTab.delete(tabId);
+    }
+  },
+
+  clearChatMessages(tabId) {
+    this._chatMessagesByTab.delete(tabId);
+  },
+
+  clearAllChatMessages() {
+    this._chatMessagesByTab.clear();
+  },
+
   setupTabAttrObserver() {
     if (gBrowser?.tabContainer) {
       this._tabAttrObserver = event => {
@@ -482,6 +506,9 @@ var SmartWindow = {
 
     // Clean up prompt cache
     this._promptsCache.clear();
+
+    // Clean up chat messages
+    this._chatMessagesByTab.clear();
 
     // Clean up event listeners
     if (gBrowser?.tabContainer && this._tabAttrObserver) {
