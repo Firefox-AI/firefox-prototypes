@@ -1427,43 +1427,11 @@ class SmartWindowPage {
   }
 
   moveInputToBottom() {
-    // Get the search box container
-    const searchBox = document.querySelector(".search-box");
-    if (!searchBox) {
-      return;
-    }
-
-    // Store original parent and position for restoration
-    if (!this.originalSearchBoxParent) {
-      this.originalSearchBoxParent = searchBox.parentNode;
-      this.originalSearchBoxNextSibling = searchBox.nextSibling;
-    }
-
-    // Add class for bottom positioning
-    searchBox.classList.add("chat-mode-bottom");
-
-    // Move to the bottom of the body
-    document.body.appendChild(searchBox);
+    document.querySelector(".smart-window-container")?.classList.add("chat-mode-bottom");
   }
 
   restoreInputPosition() {
-    const searchBox = document.querySelector(".search-box");
-    if (!searchBox || !this.originalSearchBoxParent) {
-      return;
-    }
-
-    // Remove bottom positioning class
-    searchBox.classList.remove("chat-mode-bottom");
-
-    // Restore to original position
-    if (this.originalSearchBoxNextSibling) {
-      this.originalSearchBoxParent.insertBefore(
-        searchBox,
-        this.originalSearchBoxNextSibling
-      );
-    } else {
-      this.originalSearchBoxParent.appendChild(searchBox);
-    }
+    document.querySelector(".smart-window-container")?.classList.remove("chat-mode-bottom");
   }
 
   showChatMode() {
