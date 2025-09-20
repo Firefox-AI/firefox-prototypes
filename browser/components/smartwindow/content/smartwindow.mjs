@@ -20,6 +20,7 @@ const { embedderElement, topChromeWindow } = window.browsingContext;
 class SmartWindowPage {
   constructor() {
     this.searchInput = null;
+    this.smartbar = null;
     this.resultsContainer = null;
     this.submitButton = null;
     this.suggestionsContainer = null;
@@ -33,20 +34,17 @@ class SmartWindowPage {
     this.lastTabInfo = null;
     this.chatBot = null;
 
-    // Tab context management
-    this.selectedTabContexts = []; // Array of tab info objects selected for context
-    this.recentTabs = []; // Cache of recent tabs
+    this.selectedTabContexts = [];
+    this.recentTabs = [];
     this.tabContextElements = {};
-    this.currentTabPageText = ""; // Store readable text from current tab
+    this.currentTabPageText = "";
 
     this.init();
   }
 
-  // Query type detection functions (ported from utils.ts)
   detectQueryType(query) {
     const trimmedQuery = query.trim().toLowerCase();
 
-    // URL detection: starts with http/https or contains protocol-like patterns
     if (
       /^(about|https?):/.test(trimmedQuery) ||
       /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(\/.*)?$/.test(
@@ -56,7 +54,6 @@ class SmartWindowPage {
       return "navigate";
     }
 
-    // Domain detection: no spaces with at least one period (supports subdomains and paths)
     if (
       /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(trimmedQuery) &&
       !trimmedQuery.includes(" ")
@@ -64,7 +61,6 @@ class SmartWindowPage {
       return "navigate";
     }
 
-    // Chat detection: starts with question words (with optional punctuation) OR ends with question mark
     if (
       /^(who|what|when|where|why|how|can)\b/i.test(trimmedQuery) ||
       trimmedQuery.endsWith("?")
@@ -72,7 +68,6 @@ class SmartWindowPage {
       return "chat";
     }
 
-    // Action detection: starts with "tab" or "find" or "tab switch:"
     if (
       trimmedQuery.startsWith("tab") ||
       trimmedQuery.startsWith("find") ||
@@ -81,7 +76,6 @@ class SmartWindowPage {
       return "action";
     }
 
-    // Default to search
     return "search";
   }
 
@@ -136,7 +130,6 @@ class SmartWindowPage {
       ];
     }
 
-    // Check cache first using shared cache from topChromeWindow
     const cacheKey =
       topChromeWindow.SmartWindow.getContextCacheKey(contextTabs);
     const cachedPromise =
@@ -146,7 +139,6 @@ class SmartWindowPage {
       return await cachedPromise;
     }
 
-    // Create a promise for generating prompts and cache it immediately
     const promptsPromise = this._generatePromptsInternal(contextTabs, tabTitle);
     topChromeWindow.SmartWindow.setPromptsCache(cacheKey, promptsPromise);
 
@@ -233,9 +225,7 @@ class SmartWindowPage {
           ) {
             domains.add(domain);
           }
-        } catch (e) {
-          // Skip invalid URLs
-        }
+        } catch (e) {}
       }
     }
 
@@ -253,7 +243,6 @@ class SmartWindowPage {
 
   // Tab Context Management Methods
   initializeTabContextUI() {
-    // Get references to tab context elements
     this.tabContextElements = {
       bar: document.getElementById("tab-context-bar"),
       currentTabButton: document.getElementById("current-tab-button"),
@@ -268,10 +257,8 @@ class SmartWindowPage {
       dropdownList: document.getElementById("dropdown-list"),
     };
 
-    // Set up event listeners for tab context UI
     this.setupTabContextEventListeners();
 
-    // Initialize with current tab in context
     this.updateTabContextUI();
   }
 
@@ -334,7 +321,7 @@ class SmartWindowPage {
         return bTime - aTime;
       });
 
-      this.recentTabs = recentTabs.slice(0, 20); // Keep only 20 most recent
+      this.recentTabs = recentTabs.slice(0, 20);
       return this.recentTabs;
     } catch (error) {
       console.error("Error getting recent tabs:", error);
@@ -375,7 +362,6 @@ class SmartWindowPage {
   }
 
   updateTabContextUI() {
-    // Update current tab button - show only if current tab is in context
     if (this.isCurrentTabInContext()) {
       this.tabContextElements.currentTabButton.classList.remove("hidden");
 
@@ -390,7 +376,6 @@ class SmartWindowPage {
       this.tabContextElements.currentTabButton.classList.add("hidden");
     }
 
-    // Update add tabs button
     this.updateAddTabsButtonState();
   }
 
@@ -417,7 +402,6 @@ class SmartWindowPage {
       addTabsText.style.display = "none";
       overlappingFavicons.style.display = "flex";
 
-      // Update favicon stack
       const faviconStack = overlappingFavicons.querySelector(".favicon-stack");
       const tabCount = overlappingFavicons.querySelector(".tab-count");
 
@@ -433,7 +417,6 @@ class SmartWindowPage {
         faviconStack.appendChild(favicon);
       });
 
-      // Update count text
       const countText =
         nonCurrentTabsCount === 1 ? "1 tab" : `${nonCurrentTabsCount} tabs`;
       tabCount.textContent = countText;
@@ -454,10 +437,8 @@ class SmartWindowPage {
     const dropdown = this.tabContextElements.tabDropdown;
     const dropdownList = this.tabContextElements.dropdownList;
 
-    // Get recent tabs
     await this.getRecentTabs();
 
-    // Clear existing items
     dropdownList.innerHTML = "";
 
     // Add current tab if eligible
@@ -481,7 +462,6 @@ class SmartWindowPage {
       }
     }
 
-    // Show dropdown
     dropdown.style.display = "block";
     this.tabContextElements.addTabsButton.classList.add("active");
   }
@@ -551,10 +531,11 @@ class SmartWindowPage {
 
   async updateQuickPromptsWithContext() {
     // Only update if user hasn't edited query and suggestions are showing
+    const editorText = this.smartbar ? this.smartbar.getText() : "";
     if (
       !this.userHasEditedQuery &&
       !!this.currentSuggestions.length &&
-      !this.searchInput.value.trim()
+      !editorText.trim()
     ) {
       await this.showQuickPrompts();
     }
@@ -651,7 +632,6 @@ class SmartWindowPage {
         // Scroll to bottom after messages are loaded
         setTimeout(() => this.chatBot.scrollToBottom(), 0);
       } else {
-        // Clear messages and hide chat mode
         this.chatBot.messages = [];
         this.chatBot.requestUpdate();
         this.hideChatMode();
@@ -668,42 +648,50 @@ class SmartWindowPage {
   }
 
   onDOMReady() {
-    // Check if we're in sidebar mode by looking at embedder
     this.isSidebarMode = embedderElement.id == "smartwindow-browser";
 
-    this.searchInput = document.getElementById("search-input");
+    const searchInputContainer = document.getElementById("search-input");
+
+    if (searchInputContainer) {
+      const editorDiv = document.createElement("div");
+      editorDiv.id = "tiptap-editor";
+      editorDiv.className = searchInputContainer.className;
+      searchInputContainer.parentNode.replaceChild(
+        editorDiv,
+        searchInputContainer
+      );
+
+      this.smartbar = attachToElement(editorDiv, {
+        onKeyDown: event => this.handleKeyDown(event),
+        onUpdate: text => this.handleSearch(text),
+      });
+
+      this.searchInput = editorDiv;
+    }
+
     this.resultsContainer = document.getElementById("results-container");
     this.chatBot = document.getElementById("chat-bot");
     this.quickPromptsContainer = document.getElementById(
       "quick-prompts-container"
     );
 
-    // Create and setup suggestions container
     this.setupSuggestionsUI();
 
-    // Create and setup dynamic submit button
     this.setupSubmitButton();
 
-    // Check if we're in Smart Mode or Classic Mode
     const isSmartMode =
       topChromeWindow?.document?.documentElement?.hasAttribute("smart-window");
 
-    // Auto-focus the search input
-    if (this.searchInput && isSmartMode) {
+    if (this.smartbar && isSmartMode) {
       this.focusSearchInputWhenReady();
     }
 
-    // Update placeholder and state based on mode
-    if (this.searchInput) {
+    if (this.smartbar) {
       if (!isSmartMode) {
-        this.searchInput.disabled = true;
-        this.searchInput.placeholder =
-          "Smart Window disabled - switch back to Smart Mode to search";
+        this.smartbar.setEditable(false);
         if (this.submitButton) {
           this.submitButton.disabled = true;
         }
-      } else {
-        this.searchInput.placeholder = "Ask, search, or type a URL...";
       }
     }
 
@@ -715,28 +703,21 @@ class SmartWindowPage {
 
     this.setupEventListeners();
 
-    // Initialize tab context UI
     this.initializeTabContextUI();
 
-    // Initialize tab info and show quick prompts (only if Smart Mode is active)
     this.initializeTabInfo();
     if (isSmartMode) {
       // Don't await to avoid blocking initialization
       this.showQuickPrompts().catch(console.error);
     }
-
-    console.log(
-      `Smart Window page initialized (sidebar mode: ${this.isSidebarMode}, smart mode: ${isSmartMode})`
-    );
   }
 
   focusSearchInputWhenReady() {
     // This can open in preloaded (background) browsers. Check visibility before focusing, and then also refocus
     // when tab is switched to.
     const focusWhenVisible = () => {
-      console.log("visibilitychange", document.visibilityState);
-      if (document.visibilityState === "visible") {
-        this.searchInput.focus();
+      if (document.visibilityState === "visible" && this.smartbar) {
+        this.smartbar.focus();
       }
     };
     focusWhenVisible();
@@ -744,7 +725,6 @@ class SmartWindowPage {
   }
 
   initializeTabInfo() {
-    // Initialize with current tab data
     const selectedTab = topChromeWindow.gBrowser.selectedTab;
     const selectedBrowser = topChromeWindow.gBrowser.selectedBrowser;
 
@@ -755,7 +735,6 @@ class SmartWindowPage {
       tabId: selectedTab.linkedPanel, // Use linkedPanel as unique tab identifier
     };
 
-    // Initialize tab context and update status bar if in sidebar mode
     this.resetContextToCurrentTab();
     if (this.isSidebarMode) {
       this.updateTabStatus(this.lastTabInfo);
@@ -781,7 +760,6 @@ class SmartWindowPage {
 
     statusBar.appendChild(statusContent);
 
-    // Insert before search box
     const searchBox = document.querySelector(".search-box");
     searchBox.parentNode.insertBefore(statusBar, searchBox);
   }
@@ -807,7 +785,6 @@ class SmartWindowPage {
     this.suggestionsContainer.appendChild(suggestionsHeader);
     this.suggestionsContainer.appendChild(suggestionsList);
 
-    // Insert inside search box for proper absolute positioning
     const searchBox = document.querySelector(".search-box");
     searchBox.appendChild(this.suggestionsContainer);
   }
@@ -826,11 +803,14 @@ class SmartWindowPage {
 
     // Add click handler
     this.submitButton.addEventListener("click", () => {
-      if (this.searchInput.value.trim()) {
-        this.handleEnter(this.searchInput.value);
+      const text = this.smartbar ? this.smartbar.getText() : "";
+      if (text.trim()) {
+        this.handleEnter(text);
       } else {
-        // If empty, focus the input
-        this.searchInput.focus();
+        // If empty, focus the editor
+        if (this.smartbar) {
+          this.smartbar.focus();
+        }
       }
     });
   }
@@ -869,7 +849,6 @@ class SmartWindowPage {
       return;
     }
 
-    // Display quick prompts as pills
     this.displayQuickPrompts(prompts);
     this.userHasEditedQuery = false;
   }
@@ -919,7 +898,9 @@ class SmartWindowPage {
 
       // Add click handler
       pill.addEventListener("click", () => {
-        this.searchInput.value = prompt.text;
+        if (this.smartbar) {
+          this.smartbar.setContent(prompt.text);
+        }
         this.handleEnter(prompt.text);
       });
 
@@ -991,13 +972,16 @@ class SmartWindowPage {
 
     // Add event listeners
     button.addEventListener("mouseenter", () => {
+      // Only update visual selection on hover, don't change editor content
       this.selectSuggestion(index);
-      this.searchInput.value = suggestion.text;
-      this.updateSubmitButton(suggestion.text);
     });
 
     button.addEventListener("click", e => {
       e.preventDefault();
+      // Set the content when clicking
+      if (this.smartbar) {
+        this.smartbar.setContent(suggestion.text);
+      }
       this.handleEnter(suggestion.text);
     });
 
@@ -1033,27 +1017,15 @@ class SmartWindowPage {
   }
 
   setupEventListeners() {
-    this.searchInput.addEventListener("input", e => {
-      this.handleSearch(e.target.value);
-    });
-
-    this.searchInput.addEventListener("keydown", e => {
-      this.handleKeyDown(e);
-    });
-
-    // Add mouse leave handler to suggestions container to clear input
     if (this.suggestionsContainer) {
       this.suggestionsContainer.addEventListener("mouseleave", () => {
-        if (!this.userHasEditedQuery && this.selectedSuggestionIndex >= 0) {
-          this.searchInput.value = "";
-          this.updateSubmitButton("");
+        if (this.selectedSuggestionIndex >= 0) {
           this.selectedSuggestionIndex = -1;
           this.updateSuggestionSelection();
         }
       });
     }
 
-    // Listen for messages from the actor
     if (this.isSidebarMode) {
       window.addEventListener("SmartWindowMessage", e => {
         if (e.detail.type === "TabUpdate") {
@@ -1062,43 +1034,37 @@ class SmartWindowPage {
       });
     }
 
-    // Listen for search suggestions from chat component
     if (this.chatBot) {
       this.chatBot.addEventListener("search-suggested", e => {
         const query = e.detail.query;
-        console.log("Chat suggested search:", query);
         this.performNavigation(query, "search");
       });
     }
 
-    // Listen for Smart Window mode changes from the top chrome window
     if (topChromeWindow) {
       topChromeWindow.addEventListener("SmartWindowModeChanged", event => {
         const isActive = event.detail.active;
-        console.log(
-          `[SmartWindow] Mode changed to: ${isActive ? "Smart" : "Classic"}`
-        );
 
         if (!isActive) {
-          // Disable input when switching to classic mode
-          this.searchInput.disabled = true;
-          this.searchInput.placeholder =
-            "Smart Window disabled - switch back to Smart Mode to search";
+          // Disable editor when switching to classic mode
+          if (this.smartbar) {
+            this.smartbar.setEditable(false);
+          }
           if (this.submitButton) {
             this.submitButton.disabled = true;
           }
           // Hide suggestions
           this.hideSuggestions();
         } else {
-          // Re-enable input when switching back to smart mode
-          this.searchInput.disabled = false;
-          this.searchInput.placeholder = this.isSidebarMode
-            ? "Ask, search, or type a URL..."
-            : "Ask, search, or type a URL...";
-          this.updateSubmitButton(this.searchInput.value);
-          // Show quick prompts if input is empty
-          if (!this.searchInput.value.trim()) {
-            this.showQuickPrompts().catch(console.error);
+          // Re-enable editor when switching back to smart mode
+          if (this.smartbar) {
+            this.smartbar.setEditable(true);
+            const text = this.smartbar.getText();
+            this.updateSubmitButton(text);
+            // Show quick prompts if input is empty
+            if (!text.trim()) {
+              this.showQuickPrompts().catch(console.error);
+            }
           }
         }
       });
@@ -1107,17 +1073,25 @@ class SmartWindowPage {
 
   handleKeyDown(e) {
     const suggestionsVisible = !!this.currentSuggestions.length;
-
     switch (e.key) {
       case "Enter":
-        e.preventDefault();
-        if (this.selectedSuggestionIndex >= 0 && suggestionsVisible) {
-          const suggestion =
-            this.currentSuggestions[this.selectedSuggestionIndex];
-          this.handleEnter(suggestion.text);
-        } else {
-          this.handleEnter(this.searchInput.value);
+        // Only handle Enter without Shift (Shift+Enter creates new line)
+        if (!e.shiftKey) {
+          e.preventDefault();
+          if (this.selectedSuggestionIndex >= 0 && suggestionsVisible) {
+            const suggestion =
+              this.currentSuggestions[this.selectedSuggestionIndex];
+            // Set the content before submitting when selecting a suggestion
+            if (this.smartbar) {
+              this.smartbar.setContent(suggestion.text);
+            }
+            this.handleEnter(suggestion.text);
+          } else {
+            const text = this.smartbar ? this.smartbar.getText() : "";
+            this.handleEnter(text);
+          }
         }
+        // If Shift is pressed, let Tiptap handle it for new line
         break;
 
       case "ArrowDown":
@@ -1127,12 +1101,7 @@ class SmartWindowPage {
             this.selectedSuggestionIndex + 1,
             this.currentSuggestions.length - 1
           );
-          if (this.selectedSuggestionIndex >= 0) {
-            const suggestion =
-              this.currentSuggestions[this.selectedSuggestionIndex];
-            this.searchInput.value = suggestion.text;
-            this.updateSubmitButton(suggestion.text);
-          }
+          // Only update visual selection, not the editor content
           this.updateSuggestionSelection();
         }
         break;
@@ -1144,25 +1113,19 @@ class SmartWindowPage {
             this.selectedSuggestionIndex - 1,
             -1
           );
-          if (this.selectedSuggestionIndex >= 0) {
-            const suggestion =
-              this.currentSuggestions[this.selectedSuggestionIndex];
-            this.searchInput.value = suggestion.text;
-            this.updateSubmitButton(suggestion.text);
-          } else {
-            this.searchInput.value = "";
-            this.updateSubmitButton("");
-            this.userHasEditedQuery = false;
-          }
+          // Only update visual selection, not the editor content
           this.updateSuggestionSelection();
         }
         break;
 
       case "Escape":
         e.preventDefault();
-        if (this.searchInput.value.trim()) {
+        const currentText = this.smartbar ? this.smartbar.getText() : "";
+        if (currentText.trim()) {
           // Clear input and reset to quick prompts
-          this.searchInput.value = "";
+          if (this.smartbar) {
+            this.smartbar.clear();
+          }
           this.updateSubmitButton("");
           this.userHasEditedQuery = false;
           this.selectedSuggestionIndex = -1;
@@ -1180,7 +1143,8 @@ class SmartWindowPage {
     this.closeTabDropdown();
 
     // Hide any existing suggestions immediately to prevent showing stale prompts
-    if (!this.userHasEditedQuery && !this.searchInput.value.trim()) {
+    const editorText = this.smartbar ? this.smartbar.getText() : "";
+    if (!this.userHasEditedQuery && !editorText.trim()) {
       this.hideSuggestions();
     }
 
@@ -1224,14 +1188,8 @@ class SmartWindowPage {
       faviconEl.style.display = "none";
     }
 
-    // Note: Chat persistence is now handled by context-based system
-
     // Update quick prompts if user hasn't edited the query (skip for about:blank)
-    if (
-      !isAboutBlank &&
-      !this.userHasEditedQuery &&
-      !this.searchInput.value.trim()
-    ) {
+    if (!isAboutBlank && !this.userHasEditedQuery && !editorText.trim()) {
       this.showQuickPrompts().catch(console.error);
     }
 
@@ -1266,6 +1224,12 @@ class SmartWindowPage {
     // Update submit button based on query
     this.updateSubmitButton(query);
 
+    // Clear any existing debounce timer first
+    if (this.suggestionDebounceTimer) {
+      clearTimeout(this.suggestionDebounceTimer);
+      this.suggestionDebounceTimer = null;
+    }
+
     if (!query.trim()) {
       // Show quick prompts when input is empty
       this.userHasEditedQuery = false;
@@ -1277,11 +1241,6 @@ class SmartWindowPage {
     // Mark that user has manually edited the query
     this.userHasEditedQuery = true;
 
-    // Clear any existing debounce timer
-    if (this.suggestionDebounceTimer) {
-      clearTimeout(this.suggestionDebounceTimer);
-    }
-
     // Debounce live suggestions
     this.suggestionDebounceTimer = setTimeout(() => {
       this.generateLiveSuggestions(query);
@@ -1290,8 +1249,6 @@ class SmartWindowPage {
 
   async generateLiveSuggestions(query) {
     try {
-      console.log(`User is searching for: ${query}`);
-
       const context = new lazy.UrlbarQueryContext({
         searchString: query.trim(),
         allowAutofill: false,
@@ -1310,7 +1267,6 @@ class SmartWindowPage {
 
       // Start the query and wait for results
       await lazy.UrlbarProvidersManager.startQuery(context, controller);
-      console.log("Search results:", context.results);
 
       // Process the results similar to api.ts getUrlbarSuggestions
       const suggestions = [];
@@ -1526,8 +1482,10 @@ class SmartWindowPage {
       }
     }
 
-    // Clear input and reset state
-    this.searchInput.value = "";
+    // Clear editor and reset state
+    if (this.smartbar) {
+      this.smartbar.clear();
+    }
     this.updateSubmitButton("");
     this.userHasEditedQuery = false;
     this.hideSuggestions();
@@ -1576,7 +1534,6 @@ class SmartWindowPage {
         "assistant"
       );
     } else if (actionLower.startsWith("find ")) {
-      // Handle find action
       const searchTerm = action.slice(5).trim();
       this.addMessage(`Searching for: ${searchTerm}`, "user");
       this.addMessage(
@@ -1588,7 +1545,9 @@ class SmartWindowPage {
       this.addMessage(`Action "${action}" is not yet supported.`, "assistant");
     }
 
-    this.searchInput.value = "";
+    if (this.smartbar) {
+      this.smartbar.clear();
+    }
     this.updateSubmitButton("");
   }
 
@@ -1598,7 +1557,6 @@ class SmartWindowPage {
     messageDiv.textContent = text;
     this.resultsContainer.appendChild(messageDiv);
 
-    // Scroll to bottom
     this.resultsContainer.scrollTop = this.resultsContainer.scrollHeight;
 
     // Store message
@@ -1672,7 +1630,8 @@ class SmartWindowPage {
     existingMessages.forEach(msg => (msg.style.display = "block"));
 
     // Hide suggestions if input is empty and user hasn't edited query
-    if (!this.userHasEditedQuery && !this.searchInput.value.trim()) {
+    const editorText = this.smartbar ? this.smartbar.getText() : "";
+    if (!this.userHasEditedQuery && !editorText.trim()) {
       this.hideSuggestions();
     }
   }
