@@ -37,7 +37,7 @@ html, body {
   backdrop-filter: blur(10px);
 }
 
-#search-input {
+#search-input, #tiptap-editor {
   width: 100%;
   padding: 10px;
   font-size: 15px;
@@ -50,6 +50,41 @@ html, body {
 
 #search-input::placeholder {
   color: rgba(21, 20, 26, 0.69);
+}
+
+/* Tiptap Editor Styles */
+#tiptap-editor {
+  min-height: 40px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+#tiptap-editor .ProseMirror {
+  outline: none;
+  padding: 0;
+  min-height: 20px;
+}
+
+#tiptap-editor .ProseMirror p {
+  margin: 0;
+  padding: 0;
+}
+
+#tiptap-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: rgba(21, 20, 26, 0.69);
+  pointer-events: none;
+  height: 0;
+}
+
+#tiptap-editor .ProseMirror:focus {
+  outline: none;
+}
+
+/* Ensure single line appearance by default */
+#tiptap-editor .ProseMirror p:not(:first-child) {
+  margin-top: 0.5em;
 }
 
 #results-container {
@@ -366,12 +401,43 @@ html, body {
   }
 }
 
-.smart-window-container.chat-mode-bottom .suggestions-container {
-  order: 9;
+/* Chat mode bottom - fix input at bottom */
+.smart-window-container.chat-mode-bottom {
+  padding: 20px;
+  position: relative;
+}
+
+.smart-window-container.chat-mode-bottom #chat-bot {
+  /* Make chat bot scrollable and take remaining space */
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 80px; /* Leave space for fixed search box */
 }
 
 .smart-window-container.chat-mode-bottom .search-box {
-  order: 10;
+  /* Fix search box at the bottom */
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 40px);
+  max-width: 700px;
+  margin: 0;
+  z-index: 10;
+  /* More opaque background when fixed */
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+}
+
+.smart-window-container.chat-mode-bottom .suggestions-container {
+  /* Position suggestions above the input */
+  position: absolute;
+  top: auto; /* Override the default top positioning */
+  bottom: calc(100% + 8px); /* Place above the search box */
+  left: 0;
+  right: 0;
+  margin-bottom: 0;
+  z-index: 10000;
 }
 
 #chat-bot {
@@ -487,6 +553,37 @@ html, body {
 /* Keep quick prompts visible but with reduced opacity in sidebar mode when chat is active */
 .smart-window-container.sidebar-mode.chat-mode-bottom .quick-prompts-container {
   opacity: 0.6;
+}
+
+/* Sidebar mode with chat-mode-bottom */
+.smart-window-container.sidebar-mode.chat-mode-bottom {
+  padding: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.smart-window-container.sidebar-mode.chat-mode-bottom #chat-bot {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 60px; /* Less space needed in sidebar */
+}
+
+.smart-window-container.sidebar-mode.chat-mode-bottom .search-box {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  transform: none;
+  width: 100%;
+  max-width: none;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  /* Opaque background for sidebar mode too */
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(20px);
 }
 
 /* Quick Actions Buttons */
