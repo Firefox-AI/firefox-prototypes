@@ -13,6 +13,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
 });
 
 import { generateSmartQuickPrompts } from "./utils.mjs";
+import { attachToElement } from "chrome://browser/content/smartwindow/smartbar.mjs";
 
 const { embedderElement, topChromeWindow } = window.browsingContext;
 
