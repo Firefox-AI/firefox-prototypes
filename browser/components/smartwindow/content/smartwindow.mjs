@@ -742,6 +742,8 @@ class SmartWindowPage {
   }
 
   setupSidebarUI() {
+    this.moveInputToBottom();
+
     // Create status bar for current tab info
     const statusBar = document.createElement("div");
     statusBar.id = "status-bar";
@@ -1617,8 +1619,9 @@ class SmartWindowPage {
   }
 
   hideChatMode() {
-    // Restore input box to original position
-    this.restoreInputPosition();
+    if (!this.isSidebarMode) {
+      this.restoreInputPosition();
+    }
 
     // Hide chat bot component
     if (this.chatBot) {

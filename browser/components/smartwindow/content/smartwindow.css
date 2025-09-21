@@ -2,6 +2,7 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro", sans-serif;
 }
 
 html, body {
@@ -41,7 +42,6 @@ html, body {
   width: 100%;
   padding: 10px;
   font-size: 15px;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro", sans-serif;
   border: none;
   outline: none;
   background: transparent;
@@ -208,7 +208,6 @@ html, body {
   color: white;
   font-size: 15px;
   font-weight: 400;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro", sans-serif;
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
@@ -458,8 +457,6 @@ html, body {
   z-index: 1; /* Lower than suggestions dropdown */
 }
 
-/* Quick prompts are always visible now */
-
 /* Quick Prompt Pill Buttons */
 .quick-prompt-pill {
   display: flex;
@@ -475,7 +472,6 @@ html, body {
               0px 2px 6px 0px rgba(0, 0, 0, 0.1);
   cursor: pointer;
   transition: all 0.2s ease;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro", sans-serif;
   font-size: 13px;
   color: #15141a;
   white-space: nowrap;
@@ -614,7 +610,6 @@ html, body {
   padding: 8px;
   transition: all 0.2s ease;
   color: rgba(125, 32, 124, 0.8);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro", sans-serif;
 }
 
 .quick-action-button:hover {
@@ -767,7 +762,6 @@ html, body {
 
 .add-tabs-text {
   font-size: 13px;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro", sans-serif;
   color: #15141a;
   opacity: 1;
 }
