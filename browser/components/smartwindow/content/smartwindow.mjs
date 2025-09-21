@@ -23,12 +23,9 @@ class SmartWindowPage {
     this.smartbar = null;
     this.resultsContainer = null;
     this.submitButton = null;
-    this.suggestionsContainer = null;
     this.quickPromptsContainer = null;
     this.isSidebarMode = false;
     this.messages = [];
-    this.currentSuggestions = [];
-    this.selectedSuggestionIndex = -1;
     this.userHasEditedQuery = false;
     this.suggestionDebounceTimer = null;
     this.lastTabInfo = null;
@@ -534,7 +531,8 @@ class SmartWindowPage {
     const editorText = this.smartbar ? this.smartbar.getText() : "";
     if (
       !this.userHasEditedQuery &&
-      !!this.currentSuggestions.length &&
+      this.smartbar &&
+      this.smartbar.hasSuggestions() &&
       !editorText.trim()
     ) {
       await this.showQuickPrompts();
@@ -664,6 +662,9 @@ class SmartWindowPage {
       this.smartbar = attachToElement(editorDiv, {
         onKeyDown: event => this.handleKeyDown(event),
         onUpdate: text => this.handleSearch(text),
+        onSuggestionSelect: suggestion => this.handleEnter(suggestion.text),
+        getQueryTypeIcon: type => this.getQueryTypeIcon(type),
+        getQueryTypeLabel: type => this.getQueryTypeLabel(type),
       });
 
       this.searchInput = editorDiv;
@@ -674,8 +675,6 @@ class SmartWindowPage {
     this.quickPromptsContainer = document.getElementById(
       "quick-prompts-container"
     );
-
-    this.setupSuggestionsUI();
 
     this.setupSubmitButton();
 
@@ -766,31 +765,6 @@ class SmartWindowPage {
     searchBox.parentNode.insertBefore(statusBar, searchBox);
   }
 
-  setupSuggestionsUI() {
-    // Create suggestions container
-    this.suggestionsContainer = document.createElement("div");
-    this.suggestionsContainer.id = "suggestions-container";
-    this.suggestionsContainer.className = "suggestions-container";
-
-    // Create suggestions header
-    const suggestionsHeader = document.createElement("div");
-    suggestionsHeader.className = "suggestions-header";
-    suggestionsHeader.innerHTML = `
-      <span class="suggestions-title">Quick Prompts:</span>
-    `;
-
-    // Create suggestions list
-    const suggestionsList = document.createElement("div");
-    suggestionsList.className = "suggestions-list";
-    suggestionsList.id = "suggestions-list";
-
-    this.suggestionsContainer.appendChild(suggestionsHeader);
-    this.suggestionsContainer.appendChild(suggestionsList);
-
-    const searchBox = document.querySelector(".search-box");
-    searchBox.appendChild(this.suggestionsContainer);
-  }
-
   setupSubmitButton() {
     // Find the submit button
     this.submitButton = document.getElementById("submit-button");
@@ -808,11 +782,9 @@ class SmartWindowPage {
       const text = this.smartbar ? this.smartbar.getText() : "";
       if (text.trim()) {
         this.handleEnter(text);
-      } else {
+      } else if (this.smartbar) {
         // If empty, focus the editor
-        if (this.smartbar) {
-          this.smartbar.focus();
-        }
+        this.smartbar.focus();
       }
     });
   }
@@ -883,17 +855,17 @@ class SmartWindowPage {
     };
 
     // Create pill buttons for each prompt (limit to top 2)
-    prompts.slice(0, 2).forEach(prompt => {
+    prompts.slice(0, 2).forEach(quickPrompt => {
       const pill = document.createElement("button");
       pill.className = "quick-prompt-pill";
 
       const emoji = document.createElement("span");
       emoji.className = "quick-prompt-emoji";
-      emoji.textContent = getEmoji(prompt.type);
+      emoji.textContent = getEmoji(quickPrompt.type);
 
       const text = document.createElement("span");
       text.className = "quick-prompt-text";
-      text.textContent = prompt.text;
+      text.textContent = quickPrompt.text;
 
       pill.appendChild(emoji);
       pill.appendChild(text);
@@ -901,9 +873,9 @@ class SmartWindowPage {
       // Add click handler
       pill.addEventListener("click", () => {
         if (this.smartbar) {
-          this.smartbar.setContent(prompt.text);
+          this.smartbar.setContent(quickPrompt.text);
         }
-        this.handleEnter(prompt.text);
+        this.handleEnter(quickPrompt.text);
       });
 
       this.quickPromptsContainer.appendChild(pill);
@@ -916,118 +888,7 @@ class SmartWindowPage {
     }
   }
 
-  displaySuggestions(
-    suggestions,
-    title = "Suggestions:",
-    isQuickPrompts = false
-  ) {
-    if (!this.suggestionsContainer) {
-      return;
-    }
-
-    // Manage suggestion visibility classes
-    this.suggestionsContainer.classList.remove("hidden"); // Always show when displaying suggestions
-
-    if (isQuickPrompts) {
-      this.suggestionsContainer.classList.add("quick-prompts");
-      this.suggestionsContainer.classList.remove("user-edited");
-    } else {
-      this.suggestionsContainer.classList.remove("quick-prompts");
-      this.suggestionsContainer.classList.add("user-edited");
-    }
-
-    this.currentSuggestions = suggestions;
-    this.selectedSuggestionIndex = -1;
-
-    // Update header
-    const header =
-      this.suggestionsContainer.querySelector(".suggestions-title");
-    if (header) {
-      header.textContent = title;
-    }
-
-    // Clear and populate suggestions list
-    const suggestionsList = document.getElementById("suggestions-list");
-    suggestionsList.innerHTML = "";
-
-    suggestions.forEach((suggestion, index) => {
-      const suggestionButton = this.createSuggestionButton(suggestion, index);
-      suggestionsList.appendChild(suggestionButton);
-    });
-  }
-
-  createSuggestionButton(suggestion, index) {
-    const button = document.createElement("button");
-    button.className = `suggestion-button suggestion-${suggestion.type}`;
-    button.dataset.index = index;
-
-    const icon = document.createElement("span");
-    icon.className = "suggestion-icon";
-    icon.textContent = this.getQueryTypeIcon(suggestion.type);
-
-    const text = document.createElement("span");
-    text.className = "suggestion-text";
-    text.textContent = suggestion.text;
-
-    button.appendChild(icon);
-    button.appendChild(text);
-
-    // Add event listeners
-    button.addEventListener("mouseenter", () => {
-      // Only update visual selection on hover, don't change editor content
-      this.selectSuggestion(index);
-    });
-
-    button.addEventListener("click", e => {
-      e.preventDefault();
-      // Set the content when clicking
-      if (this.smartbar) {
-        this.smartbar.setContent(suggestion.text);
-      }
-      this.handleEnter(suggestion.text);
-    });
-
-    return button;
-  }
-
-  selectSuggestion(index) {
-    this.selectedSuggestionIndex = index;
-    this.updateSuggestionSelection();
-  }
-
-  updateSuggestionSelection() {
-    const suggestionButtons = document.querySelectorAll(".suggestion-button");
-    suggestionButtons.forEach((button, index) => {
-      button.classList.toggle(
-        "selected",
-        index === this.selectedSuggestionIndex
-      );
-    });
-  }
-
-  hideSuggestions() {
-    if (this.suggestionsContainer) {
-      // Add hidden class to explicitly hide suggestions
-      this.suggestionsContainer.classList.add("hidden");
-      this.suggestionsContainer.classList.remove(
-        "quick-prompts",
-        "user-edited"
-      );
-    }
-    this.currentSuggestions = [];
-    this.selectedSuggestionIndex = -1;
-  }
-
   setupEventListeners() {
-    if (this.suggestionsContainer) {
-      this.suggestionsContainer.addEventListener("mouseleave", () => {
-        if (this.selectedSuggestionIndex >= 0) {
-          this.selectedSuggestionIndex = -1;
-          this.updateSuggestionSelection();
-        }
-      });
-    }
-
     if (this.isSidebarMode) {
       window.addEventListener("SmartWindowMessage", e => {
         if (e.detail.type === "TabUpdate") {
@@ -1056,17 +917,17 @@ class SmartWindowPage {
             this.submitButton.disabled = true;
           }
           // Hide suggestions
-          this.hideSuggestions();
-        } else {
-          // Re-enable editor when switching back to smart mode
           if (this.smartbar) {
-            this.smartbar.setEditable(true);
-            const text = this.smartbar.getText();
-            this.updateSubmitButton(text);
-            // Show quick prompts if input is empty
-            if (!text.trim()) {
-              this.showQuickPrompts().catch(console.error);
-            }
+            this.smartbar.hideSuggestions();
+          }
+        } else if (this.smartbar) {
+          // Re-enable editor when switching back to smart mode
+          this.smartbar.setEditable(true);
+          const text = this.smartbar.getText();
+          this.updateSubmitButton(text);
+          // Show quick prompts if input is empty
+          if (!text.trim()) {
+            this.showQuickPrompts().catch(console.error);
           }
         }
       });
@@ -1074,20 +935,23 @@ class SmartWindowPage {
   }
 
   handleKeyDown(e) {
-    const suggestionsVisible = !!this.currentSuggestions.length;
+    const suggestionsVisible = this.smartbar
+      ? this.smartbar.hasSuggestions()
+      : false;
     switch (e.key) {
       case "Enter":
         // Only handle Enter without Shift (Shift+Enter creates new line)
         if (!e.shiftKey) {
           e.preventDefault();
-          if (this.selectedSuggestionIndex >= 0 && suggestionsVisible) {
-            const suggestion =
-              this.currentSuggestions[this.selectedSuggestionIndex];
+          const selectedSuggestion = this.smartbar
+            ? this.smartbar.getSelectedSuggestion()
+            : null;
+          if (selectedSuggestion) {
             // Set the content before submitting when selecting a suggestion
             if (this.smartbar) {
-              this.smartbar.setContent(suggestion.text);
+              this.smartbar.setContent(selectedSuggestion.text);
             }
-            this.handleEnter(suggestion.text);
+            this.handleEnter(selectedSuggestion.text);
           } else {
             const text = this.smartbar ? this.smartbar.getText() : "";
             this.handleEnter(text);
@@ -1099,24 +963,18 @@ class SmartWindowPage {
       case "ArrowDown":
         if (suggestionsVisible) {
           e.preventDefault();
-          this.selectedSuggestionIndex = Math.min(
-            this.selectedSuggestionIndex + 1,
-            this.currentSuggestions.length - 1
-          );
-          // Only update visual selection, not the editor content
-          this.updateSuggestionSelection();
+          if (this.smartbar) {
+            this.smartbar.navigateSuggestions("down");
+          }
         }
         break;
 
       case "ArrowUp":
         if (suggestionsVisible) {
           e.preventDefault();
-          this.selectedSuggestionIndex = Math.max(
-            this.selectedSuggestionIndex - 1,
-            -1
-          );
-          // Only update visual selection, not the editor content
-          this.updateSuggestionSelection();
+          if (this.smartbar) {
+            this.smartbar.navigateSuggestions("up");
+          }
         }
         break;
 
@@ -1130,11 +988,12 @@ class SmartWindowPage {
           }
           this.updateSubmitButton("");
           this.userHasEditedQuery = false;
-          this.selectedSuggestionIndex = -1;
-          this.hideSuggestions();
-        } else {
+          if (this.smartbar) {
+            this.smartbar.hideSuggestions();
+          }
+        } else if (this.smartbar) {
           // Hide suggestions if input is already empty
-          this.hideSuggestions();
+          this.smartbar.hideSuggestions();
         }
         break;
     }
@@ -1147,7 +1006,9 @@ class SmartWindowPage {
     // Hide any existing suggestions immediately to prevent showing stale prompts
     const editorText = this.smartbar ? this.smartbar.getText() : "";
     if (!this.userHasEditedQuery && !editorText.trim()) {
-      this.hideSuggestions();
+      if (this.smartbar) {
+        this.smartbar.hideSuggestions();
+      }
     }
 
     // Store the latest tab info
@@ -1235,7 +1096,9 @@ class SmartWindowPage {
     if (!query.trim()) {
       // Show quick prompts when input is empty
       this.userHasEditedQuery = false;
-      this.hideSuggestions(); // Hide suggestions dropdown
+      if (this.smartbar) {
+        this.smartbar.hideSuggestions();
+      }
       this.showQuickPrompts().catch(console.error);
       return;
     }
@@ -1410,7 +1273,9 @@ class SmartWindowPage {
         }
       }
 
-      this.displaySuggestions(suggestions.slice(0, 10), "Suggestions:");
+      if (this.smartbar) {
+        this.smartbar.showSuggestions(suggestions.slice(0, 10), "Suggestions:");
+      }
     } catch (error) {
       console.error("Error getting live suggestions:", error);
 
@@ -1428,7 +1293,9 @@ class SmartWindowPage {
         { text: "github.com", type: "navigate" }
       );
 
-      this.displaySuggestions(suggestions, "Suggestions:");
+      if (this.smartbar) {
+        this.smartbar.showSuggestions(suggestions, "Suggestions:");
+      }
     }
   }
 
@@ -1440,7 +1307,9 @@ class SmartWindowPage {
     const type = this.detectQueryType(query);
 
     // Hide suggestions after selection
-    this.hideSuggestions();
+    if (this.smartbar) {
+      this.smartbar.hideSuggestions();
+    }
 
     // Handle chat queries with chatbot component in both modes
     if (type === "chat") {
@@ -1490,7 +1359,9 @@ class SmartWindowPage {
     }
     this.updateSubmitButton("");
     this.userHasEditedQuery = false;
-    this.hideSuggestions();
+    if (this.smartbar) {
+      this.smartbar.hideSuggestions();
+    }
   }
 
   performNavigation(query, type) {
@@ -1612,7 +1483,9 @@ class SmartWindowPage {
     }
 
     // Hide suggestions when chat mode is active
-    this.hideSuggestions();
+    if (this.smartbar) {
+      this.smartbar.hideSuggestions();
+    }
 
     // In fullscreen mode, quick prompts are hidden via CSS when chat is active
     // In sidebar mode, they remain visible with reduced opacity
@@ -1635,7 +1508,9 @@ class SmartWindowPage {
     // Hide suggestions if input is empty and user hasn't edited query
     const editorText = this.smartbar ? this.smartbar.getText() : "";
     if (!this.userHasEditedQuery && !editorText.trim()) {
-      this.hideSuggestions();
+      if (this.smartbar) {
+        this.smartbar.hideSuggestions();
+      }
     }
   }
 }
