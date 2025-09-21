@@ -70,8 +70,13 @@ export function attachToElement(element, options = {}) {
     ],
     content: "",
     onUpdate: ({ editor: editorInstance }) => {
+      const text = editorInstance.getText();
+      // Hide suggestions if input is empty
+      if (!text.trim() && suggestionsContainer && !suggestionsContainer.classList.contains("hidden")) {
+        hideSuggestions();
+      }
       if (onUpdate) {
-        onUpdate(editorInstance.getText());
+        onUpdate(text);
       }
     },
     editorProps: {
@@ -242,6 +247,8 @@ export function attachToElement(element, options = {}) {
 
     clear() {
       editor.commands.setContent("");
+      // Hide suggestions when clearing
+      hideSuggestions();
       // Refocus after clearing
       editor.commands.focus("end");
     },
