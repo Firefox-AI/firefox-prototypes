@@ -1420,24 +1420,24 @@ browser {
 }
 
 /* Hide nav-bar children when in Smart Window mode AND on smart window URLs, except for PanelUI-button */
-:root[smart-window="true"][smart-window-url] #nav-bar-customization-target > *,
-:root[smart-window="true"][smart-window-url] #nav-bar > :not(#PanelUI-button) {
+:root[smart-window][smart-window-url] #nav-bar-customization-target > *,
+:root[smart-window][smart-window-url] #nav-bar > :not(#PanelUI-button) {
   visibility: hidden;
 }
 
-:root[smart-window="true"][smart-window-url] #sidebar-main,
-:root[smart-window="true"][smart-window-url] #sidebar-box,
-:root[smart-window="true"][smart-window-url] #smartwindow-box,
-:root[smart-window="true"][smart-window-url] #smartwindow-splitter {
+:root[smart-window][smart-window-url] #sidebar-main,
+:root[smart-window][smart-window-url] #sidebar-box,
+:root[smart-window][smart-window-url] #smartwindow-box,
+:root[smart-window][smart-window-url] #smartwindow-splitter {
   visibility: collapse;
 }
 
-:root[smart-window="true"][smart-window-url] #tabbrowser-tabbox {
+:root[smart-window][smart-window-url] #tabbrowser-tabbox {
   box-shadow: none;
 }
 
 /* Smart Window Styles */
-:root[smart-window="true"] {
+:root[smart-window] {
   color-scheme: light !important;
   --smart-window-border: #8a61ff;
   --smart-window-gradient: radial-gradient(at top left, rgba(255, 192, 203, 0.7), transparent 80%),
@@ -1445,7 +1445,7 @@ browser {
     radial-gradient(at top right, rgba(255, 228, 196, 0.6), transparent 80%),
     linear-gradient(to bottom right, #fcefff, #fffdf5);
   background: var(--smart-window-gradient) !important;
-  
+
   --toolbar-bgcolor: transparent !important;
   --tab-text-color: #5a3a6d !important;
   --tab-selected-textcolor: #5a3a6d !important;
@@ -1463,8 +1463,8 @@ browser {
   /* Ideally override this only on new tab */
   --tabpanel-background-color: transparent !important;
 }
-:root[smart-window="true"] #navigator-toolbox,
-:root[smart-window="true"] #browser {
+:root[smart-window] #navigator-toolbox,
+:root[smart-window] #browser {
   background: none !important
 }
 
@@ -1568,11 +1568,11 @@ browser {
 }
 
 /* Show the button in smart window mode */
-:root[smart-window="true"] #smartwindow-button {
+:root[smart-window] #smartwindow-button {
   display: flex;
 }
 
 /* Always hide nav button when not in smart window mode */
-:root:not([smart-window="true"]) #smartwindow-button {
+:root:not([smart-window]) #smartwindow-button {
   display: none;
 }
