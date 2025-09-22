@@ -6,6 +6,7 @@
 
 var SmartWindow = {
   _initialized: false,
+  _viewInitialized: false,
   _smartWindowActive: false,
   _sidebarVisible: false,
   _tabAttrObserver: null,
@@ -65,10 +66,6 @@ var SmartWindow = {
       // Activate Smart Window immediately for proper state
       this._smartWindowActive = true;
       document.documentElement.setAttribute("smart-window", "true");
-
-      // Update UI elements
-      const toggleButton = document.getElementById("smart-window-toggle");
-      toggleButton?.setAttribute("checked", "true");
 
       console.log("[Smart Window] New window Smart Window activated");
     } else {
@@ -150,6 +147,26 @@ var SmartWindow = {
     }
   },
 
+  _ensureViewInitialized() {
+    if (this._viewInitialized) {
+      return;
+    }
+    let view = PanelMultiView.getViewNode(document, "smart-window-toggle-view");
+    view.addEventListener("command", event => {
+      switch (event.target.id) {
+        case "smart-window-switch-classic":
+        // fall through
+        case "smart-window-switch-smart":
+          this.toggleSmartWindow();
+          break;
+        case "smart-window-open-private":
+          OpenBrowserWindow({ private: true });
+          break;
+      }
+    });
+    this._viewInitialized = true;
+  },
+
   initToggleButton() {
     const toggleButton = document.getElementById("smart-window-toggle");
     const navToggleButton = document.getElementById("smartwindow-button");
@@ -160,8 +177,9 @@ var SmartWindow = {
         toggleButton.hidden = false;
 
         // Add click event listener to the toggle button
-        toggleButton.addEventListener("command", () => {
-          this.toggleSmartWindow();
+        toggleButton.addEventListener("command", event => {
+          this._ensureViewInitialized();
+          PanelUI.showSubView("smart-window-toggle-view", event.target, event);
         });
       }
     }
@@ -192,7 +210,6 @@ var SmartWindow = {
     );
 
     const root = document.documentElement;
-    const toggleButton = document.getElementById("smart-window-toggle");
 
     // Remove any preloaded new tab page browser when switching modes
     // This ensures the next new tab will use the correct type
@@ -204,7 +221,6 @@ var SmartWindow = {
       // Activate Smart Window mode
       this._smartWindowActive = true;
       root.setAttribute("smart-window", "true");
-      toggleButton?.setAttribute("checked", "true");
 
       // Check if we're on a smart window page
       const currentURI = gBrowser.selectedBrowser?.currentURI?.spec || "";
@@ -243,7 +259,6 @@ var SmartWindow = {
       // Deactivate Smart Window mode AND hide sidebar
       this._smartWindowActive = false;
       root.removeAttribute("smart-window");
-      toggleButton?.removeAttribute("checked");
 
       // Hide the sidebar
       this.hideSidebar();
