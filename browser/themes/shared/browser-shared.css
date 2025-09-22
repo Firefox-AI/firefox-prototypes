@@ -1436,6 +1436,11 @@ browser {
   box-shadow: none;
 }
 
+:root[smart-window] .tabbrowser-tab > .tab-stack > .tab-background[selected] {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.80) 0%, rgba(255, 255, 255, 0.00) 100%);
+  outline-color: #FFF;
+}
+
 /* Smart Window Styles */
 :root[smart-window] {
   color-scheme: light !important;
