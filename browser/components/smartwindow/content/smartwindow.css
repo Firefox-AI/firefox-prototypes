@@ -52,10 +52,19 @@ html, body {
   color: rgba(21, 20, 26, 0.69);
 }
 
+/* Smartbar wrapper to take full available space */
+.smartbar-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0; /* Allow shrinking */
+}
+
 /* Tiptap Editor Styles */
 #tiptap-editor {
+  flex: 1;
   min-height: 40px;
-  max-height: 120px;
   overflow-y: auto;
 }
 
@@ -192,9 +201,10 @@ html, body {
 /* Input container */
 .input-container {
   display: flex;
-  align-items: center;
+  align-items: stretch; /* Change from center to stretch for full height */
   gap: 10px;
   min-height: 36px;
+  flex: 1; /* Take available space */
 }
 
 /* Submit button styles */
