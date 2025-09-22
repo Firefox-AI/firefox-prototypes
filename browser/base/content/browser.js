@@ -1721,11 +1721,13 @@ function toOpenWindowByType(inType, uri, features) {
 function OpenBrowserWindow(options = {}) {
   let timerId = Glean.browserTimings.newWindow.start();
 
-  // Pass Smart Window state to new window (only if feature is enabled)
+  // Pass Smart Window state to new window (only if feature is enabled, and
+  // we're not opening a private window).
   if (
     window.gSmartWindowEnabled &&
     window.SmartWindow &&
-    window.SmartWindow.isSmartWindowActive()
+    window.SmartWindow.isSmartWindowActive() &&
+    !options.private
   ) {
     // Create a new property bag for extra options
     const extraOptions = Cc["@mozilla.org/hash-property-bag;1"].createInstance(
