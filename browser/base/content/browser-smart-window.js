@@ -217,11 +217,10 @@ var SmartWindow = {
       NewTabPagePreloading.removePreloadedBrowser(window);
     }
 
-    if (!this._smartWindowActive) {
-      // Activate Smart Window mode
-      this._smartWindowActive = true;
-      root.setAttribute("smart-window", "true");
-
+    // Toggle internal state.
+    this._smartWindowActive = !this._smartWindowActive;
+    root.toggleAttribute("smart-window", this._smartWindowActive);
+    if (this._smartWindowActive) {
       // Check if we're on a smart window page
       const currentURI = gBrowser.selectedBrowser?.currentURI?.spec || "";
       const isSmartWindowPage = currentURI.includes(
@@ -236,49 +235,32 @@ var SmartWindow = {
         this.hideSidebar();
       }
 
-      // Hide bookmarks toolbar immediately
-      updateBookmarkToolbarVisibility();
-
       // Navigate all new tab pages to the smart window URL
       this.navigateNewTabsToSmartWindow();
 
-      // Dispatch event that smart window pages can listen to
-      window.dispatchEvent(
-        new CustomEvent("SmartWindowModeChanged", {
-          detail: { active: true },
-        })
-      );
-
-      console.log("Smart Window mode activated");
-
-      // Save the state unless we're restoring
-      if (!skipSave) {
-        this.saveState();
-      }
     } else {
-      // Deactivate Smart Window mode AND hide sidebar
-      this._smartWindowActive = false;
-      root.removeAttribute("smart-window");
-
       // Hide the sidebar
       this.hideSidebar();
+    }
 
-      // Restore bookmarks toolbar visibility based on user preference
-      updateBookmarkToolbarVisibility();
+    // Update bookmarks toolbar visibility based on user preference
+    updateBookmarkToolbarVisibility();
 
-      // Dispatch event that smart window pages can listen to
-      window.dispatchEvent(
-        new CustomEvent("SmartWindowModeChanged", {
-          detail: { active: false },
-        })
-      );
+    // Update the hamburger menu item location.
+    this.updateHamburgerMenu();
 
-      console.log("Smart Window mode deactivated");
+    // Dispatch event that smart window pages can listen to
+    window.dispatchEvent(
+      new CustomEvent("SmartWindowModeChanged", {
+        detail: { active: this._smartWindowActive },
+      })
+    );
 
-      // Save the state unless we're restoring
-      if (!skipSave) {
-        this.saveState();
-      }
+    console.log("Smart Window mode", this._smartWindowActive ? "activated" : "deactivated");
+
+    // Save the state unless we're restoring
+    if (!skipSave) {
+      this.saveState();
     }
   },
 
@@ -331,6 +313,15 @@ var SmartWindow = {
     } else {
       this.showSidebar();
     }
+  },
+
+  updateHamburgerMenu() {
+    let item = PanelUI.menuButton.parentElement;
+    let toolbar = this._smartWindowActive
+      ? document.getElementById("TabsToolbar")
+      : document.getElementById("nav-bar");
+    let titlebarItems = toolbar.querySelector(".titlebar-buttonbox-container");
+    titlebarItems.before(item);
   },
 
   navigateNewTabsToSmartWindow() {
