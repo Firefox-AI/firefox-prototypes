@@ -13,3 +13,7 @@ smart-window-toggleview-switch-smart =
 smart-window-toggleview-new-window-subheader = New window
 smart-window-toggleview-open-private =
     .label = Private
+
+toolbar-button-assistant =
+    .label = Assistant
+    .tooltiptext = Toggle Assistant
