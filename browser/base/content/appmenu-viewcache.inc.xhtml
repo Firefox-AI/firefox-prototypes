@@ -837,5 +837,26 @@
              mainview-with-header="true">
   </panelview>
 
+  <panelview id="smart-window-toggle-view" class="PanelUI-subView">
+    <vbox class="panel-subview-body">
+      <toolbarbutton id="smart-window-switch-classic"
+                    class="subviewbutton"
+                    data-l10n-id="smart-window-toggleview-switch-classic"
+                    />
+      <toolbarbutton id="smart-window-switch-smart"
+                    class="subviewbutton"
+                    data-l10n-id="smart-window-toggleview-switch-smart"
+                    />
+      <toolbarseparator/>
+      <html:h2 id="panelMenu_recentBookmarks"
+          data-l10n-id="smart-window-toggleview-new-window-subheader"
+          class="subview-subheader"/>
+      <toolbarbutton id="smart-window-open-private"
+                    class="subviewbutton"
+                    data-l10n-id="smart-window-toggleview-open-private"
+                    />
+    </vbox>
+  </panelview>
+
 #include ../../components/reportbrokensite/content/reportBrokenSitePanel.inc.xhtml
 </html:template>

@@ -1472,16 +1472,44 @@ browser {
 #smart-window-toggle {
   -moz-appearance: none;
   appearance: none;
+  list-style-image: url("chrome://branding/content/icon32.png");
+  border-radius: var(--border-radius-medium);
+  box-shadow: 0 0 4px 0 rgba(0, 0, 0, 0.15) inset;
+
+  & > .toolbarbutton-icon {
+    width: calc(2 * var(--toolbarbutton-inner-padding) + 20px);
+    height: calc(2 * var(--toolbarbutton-inner-padding) + 20px);
+  }
+
+  :root[smart-window] & {
+    list-style-image: url("chrome://browser/skin/smart-window.svg");
+  }
+
+  /* Hide in private windows */
+  :root[privatebrowsingmode="temporary"] & {
+    display: none !important
+  }
+}
+
+#smart-window-toggle-view .toolbarbutton-icon {
+  width: 16px;
+  height: 16px;
+  /* XXXgijs: this is hacky; there aren't any other panel menu entries
+     with icons so it seems that we don't have shared styling for icons
+     anymore. */
+  margin-inline-end: 8px;
+}
+
+#smart-window-switch-classic {
+  list-style-image: url("chrome://branding/content/icon32.png");
+}
+
+#smart-window-switch-smart {
   list-style-image: url("chrome://browser/skin/smart-window.svg");
 }
 
-#smart-window-toggle[checked] image {
-  background: none !important;
-}
-
-/* Hide in private windows */
-:root[privatebrowsingmode="temporary"] #smart-window-toggle {
-  display: none !important
+#smart-window-open-private {
+  list-style-image: url("chrome://global/skin/icons/indicator-private-browsing.svg");
 }
 
 /* Smart Window Right Sidebar Styles */
