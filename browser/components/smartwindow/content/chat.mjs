@@ -11,6 +11,7 @@ import {
   createClickableInsightToken,
   createInsightsOverlay,
   insightsStyles,
+  deleteInsight,
 } from "chrome://browser/content/smartwindow/insights.mjs";
 
 /**
@@ -216,7 +217,7 @@ class ChatBot extends MozLitElement {
     });
 
     let systemPrompt = `You are a helpful AI assistant integrated into Firefox's Smart Window feature. You have access to the user's current browser tab context.
-    
+
     Current date: ${currentDate}`;
 
     systemPrompt += buildInsightsSystemPrompt();
@@ -333,6 +334,16 @@ Use this page content to provide more contextual and relevant search suggestions
     this.requestUpdate();
   }
 
+  handleDeleteInsight(insight, category) {
+    // Delete the insight directly from INSIGHTS_DATA
+    if (deleteInsight(insight, category)) {
+      // Remove from conversation insights if present
+      this.conversationInsights.delete(insight);
+      // Force a re-render
+      this.requestUpdate();
+    }
+  }
+
   render() {
     return html`
       ${this.messages.length === 0
@@ -439,7 +450,8 @@ Use this page content to provide more contextual and relevant search suggestions
       ${this.showInsightsOverlay
         ? createInsightsOverlay(
             this.closeInsightsOverlay.bind(this),
-            this.conversationInsights
+            this.conversationInsights,
+            this.handleDeleteInsight.bind(this)
           )
         : ""}
     `;

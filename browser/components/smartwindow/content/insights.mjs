@@ -145,12 +145,14 @@ User Insights List:`;
 
   // Build insights list from data
   Object.entries(INSIGHTS_DATA).forEach(([category, insights]) => {
-    const insightString = insights
-      .map(insight =>
-        insight.startsWith("e.g., ") ? insight : `e.g., ${insight}`
-      )
-      .join(", ");
-    systemPrompt += `\n- ${category}: ${insightString}.`;
+    if (insights.length) {
+      const insightString = insights
+        .map(insight =>
+          insight.startsWith("e.g., ") ? insight : `e.g., ${insight}`
+        )
+        .join(", ");
+      systemPrompt += `\n- ${category}: ${insightString}.`;
+    }
   });
 
   systemPrompt += `
@@ -161,6 +163,20 @@ Examples of Insight Tagging:
 - User asks about shoes: "For hiking boots, check REI [[insight: REI]] based on your outdoor gear research [[insight: outdoor gear research]]."`;
 
   return systemPrompt;
+}
+
+/**
+ * Deletes an insight from the INSIGHTS_DATA object
+ */
+export function deleteInsight(insight, category) {
+  if (INSIGHTS_DATA[category]) {
+    const index = INSIGHTS_DATA[category].indexOf(insight);
+    if (index > -1) {
+      INSIGHTS_DATA[category].splice(index, 1);
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -201,7 +217,11 @@ export function createClickableInsightToken(insight, onInsightClick) {
 /**
  * Creates the insights overlay component
  */
-export function createInsightsOverlay(onClose, usedInsights = new Set()) {
+export function createInsightsOverlay(
+  onClose,
+  usedInsights = new Set(),
+  onDeleteInsight = null
+) {
   return html`
     <div class="insights-overlay" @click=${onClose}>
       <div class="insights-modal" @click=${e => e.stopPropagation()}>
@@ -222,6 +242,7 @@ export function createInsightsOverlay(onClose, usedInsights = new Set()) {
               ).length;
               return { category, insights, usedCount };
             })
+            .filter(({ insights }) => !!insights.length)
             .sort((a, b) => {
               // Sort by used count (descending), then alphabetically
               if (a.usedCount !== b.usedCount) {
@@ -244,7 +265,52 @@ export function createInsightsOverlay(onClose, usedInsights = new Set()) {
                             ? "Used in this conversation"
                             : ""}
                         >
-                          ${insight}
+                          <span class="insight-text">${insight}</span>
+                          ${onDeleteInsight
+                            ? html`
+                                <button
+                                  class="delete-insight-btn"
+                                  @click=${e => {
+                                    e.stopPropagation();
+                                    onDeleteInsight(insight, category);
+                                  }}
+                                  title="Delete this insight"
+                                >
+                                  <svg
+                                    width="12"
+                                    height="12"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                  >
+                                    <path
+                                      d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"
+                                      stroke="currentColor"
+                                      stroke-width="2"
+                                      stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                    />
+                                    <line
+                                      x1="10"
+                                      y1="11"
+                                      x2="10"
+                                      y2="17"
+                                      stroke="currentColor"
+                                      stroke-width="2"
+                                      stroke-linecap="round"
+                                    />
+                                    <line
+                                      x1="14"
+                                      y1="11"
+                                      x2="14"
+                                      y2="17"
+                                      stroke="currentColor"
+                                      stroke-width="2"
+                                      stroke-linecap="round"
+                                    />
+                                  </svg>
+                                </button>
+                              `
+                            : ""}
                         </span>
                       `
                     )}
@@ -387,6 +453,14 @@ export const insightsStyles = css`
     border-radius: 8px;
     border: 1px solid #d0d0d0;
     transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+  }
+
+  .insight-item:hover {
+    background: #e8e8e8;
   }
 
   .insight-item.used {
@@ -395,6 +469,38 @@ export const insightsStyles = css`
     border-color: #b3d7f2;
     font-weight: 600;
     box-shadow: 0 2px 4px rgba(0, 102, 204, 0.1);
+  }
+
+  .insight-item.used:hover {
+    background: #d4edfc;
+  }
+
+  .insight-text {
+    flex: 1;
+  }
+
+  .delete-insight-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #666;
+    padding: 0.25rem;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: all 0.2s;
+    margin: 0;
+  }
+
+  .insight-item:hover .delete-insight-btn {
+    opacity: 1;
+  }
+
+  .delete-insight-btn:hover {
+    background: #ff4444;
+    color: white;
   }
 
   .used-insights {
