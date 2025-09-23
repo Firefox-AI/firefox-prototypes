@@ -1468,6 +1468,10 @@ browser {
     --tabpanel-background-color: transparent !important;
     --chrome-content-separator-color: none !important;
   }
+
+  #urlbar-container {
+    --toolbarbutton-border-radius: var(--border-radius-circle) !important;
+  }
 }
 :root[smart-window] #navigator-toolbox,
 :root[smart-window] #browser {
