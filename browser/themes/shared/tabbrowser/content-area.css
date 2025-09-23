@@ -112,6 +112,9 @@
         border-start-end-radius: var(--border-radius-medium);
       }
     }
+    :root[smart-window-sidebar]:not([inDOMFullscreen]) #tabbrowser-tabbox & {
+      border-start-end-radius: var(--border-radius-medium) !important;
+    }
   }
 }
 
