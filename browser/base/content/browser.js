@@ -1358,6 +1358,18 @@ function loadOneOrMoreURIs(aURIString, aTriggeringPrincipal, aPolicyContainer) {
 
 function openLocation(event) {
   if (window.location.href == AppConstants.BROWSER_CHROME_URL) {
+    // URL bar is hidden in smart windows sometimes:
+    if (
+      gSmartWindowEnabled &&
+      SmartWindow.isSmartWindowActive() &&
+      !gURLBar.inputField.checkVisibility({
+        flush: false,
+        checkVisibilityCSS: true,
+      })
+    ) {
+      SmartWindow.focusContentSmartbar();
+      return;
+    }
     gURLBar.select();
     gURLBar.view.autoOpen({ event });
     return;
