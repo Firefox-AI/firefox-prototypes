@@ -17,6 +17,18 @@ smart-window-toggleview-open-private =
 smart-window-toggleview-status-label-active = Smart Window
 smart-window-toggleview-status-label-inactive = Classic Firefox
 
+appmenuitem-new-smart-window =
+    .label = New smart window
+appmenuitem-new-classic-window =
+    .label = New classic window
+
+menu-file-new-classic-window =
+    .label = New Classic Window
+    .accesskey = C
+menu-file-new-smart-window =
+    .label = New Smart Window
+    .accesskey = S
+
 toolbar-button-assistant =
     .label = Assistant
     .tooltiptext = Toggle Assistant

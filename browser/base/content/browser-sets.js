@@ -15,6 +15,12 @@ document.addEventListener(
           case "cmd_newNavigator":
             OpenBrowserWindow();
             break;
+          case "cmd_newSmartWindow":
+            OpenBrowserWindow({ smartWindow: true });
+            break;
+          case "cmd_newClassicWindow":
+            OpenBrowserWindow({ smartWindow: false });
+            break;
           case "cmd_handleBackspace":
             BrowserCommands.handleBackspace();
             break;
