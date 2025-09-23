@@ -149,11 +149,16 @@ var SmartWindow = {
 
   _ensureViewInitialized() {
     let view = PanelMultiView.getViewNode(document, "smart-window-toggle-view");
-    document.l10n.setAttributes(view.querySelector(".toggle-status-label"),
-      this._smartWindowActive ? "smart-window-toggleview-status-label-active"
-      : "smart-window-toggleview-status-label-inactive");
-    view.querySelector("#smart-window-switch-classic").hidden = !this._smartWindowActive;
-    view.querySelector("#smart-window-switch-smart").hidden = this._smartWindowActive;
+    document.l10n.setAttributes(
+      view.querySelector(".toggle-status-label"),
+      this._smartWindowActive
+        ? "smart-window-toggleview-status-label-active"
+        : "smart-window-toggleview-status-label-inactive"
+    );
+    view.querySelector("#smart-window-switch-classic").hidden =
+      !this._smartWindowActive;
+    view.querySelector("#smart-window-switch-smart").hidden =
+      this._smartWindowActive;
 
     if (this._viewInitialized) {
       return;
@@ -243,7 +248,6 @@ var SmartWindow = {
 
       // Navigate all new tab pages to the smart window URL
       this.navigateNewTabsToSmartWindow();
-
     } else {
       // Hide the sidebar
       this.hideSidebar();
@@ -262,7 +266,10 @@ var SmartWindow = {
       })
     );
 
-    console.log("Smart Window mode", this._smartWindowActive ? "activated" : "deactivated");
+    console.log(
+      "Smart Window mode",
+      this._smartWindowActive ? "activated" : "deactivated"
+    );
 
     // Save the state unless we're restoring
     if (!skipSave) {
@@ -509,6 +516,14 @@ var SmartWindow = {
         this._tabAttrObserver
       );
       console.log("[Smart Window] Tab attribute observer set up");
+    }
+  },
+
+  focusContentSmartbar() {
+    if (gBrowser.currentURI.spec.includes("smartwindow/smartwindow.html")) {
+      gBrowser.selectedBrowser.contentDocument?.dispatchEvent(
+        new CustomEvent("FocusSmartSearchInput")
+      );
     }
   },
 
