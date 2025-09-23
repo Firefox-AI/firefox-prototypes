@@ -278,54 +278,45 @@ var SmartWindow = {
   },
 
   showSidebar() {
-    const smartWindowBox = document.getElementById("smartwindow-box");
-    const smartWindowSplitter = document.getElementById("smartwindow-splitter");
-    const navToggleButton = document.getElementById("smart-window-button");
-
-    if (smartWindowBox) {
-      smartWindowBox.hidden = false;
-      smartWindowBox.style.width = "358px";
-    }
-    if (smartWindowSplitter) {
-      smartWindowSplitter.hidden = false;
-    }
-
-    // Update button state
-    navToggleButton?.setAttribute("checked", "true");
-
     this._sidebarVisible = true;
-    document.documentElement.setAttribute("smart-window-sidebar", "true");
-
-    console.log("Smart Window sidebar shown");
+    this._updateSidebarState();
   },
 
   hideSidebar() {
+    this._sidebarVisible = false;
+    this._updateSidebarState();
+  },
+
+  _updateSidebarState() {
     const smartWindowBox = document.getElementById("smartwindow-box");
     const smartWindowSplitter = document.getElementById("smartwindow-splitter");
     const navToggleButton = document.getElementById("smart-window-button");
 
     if (smartWindowBox) {
-      smartWindowBox.hidden = true;
+      smartWindowBox.hidden = !this._sidebarVisible;
+      if (!this._sidebarVisible) {
+        smartWindowBox.style.width = "358px";
+      }
     }
     if (smartWindowSplitter) {
-      smartWindowSplitter.hidden = true;
+      smartWindowSplitter.hidden = !this._sidebarVisible;
     }
 
-    // Update button state
-    navToggleButton?.removeAttribute("checked");
+    navToggleButton?.toggleAttribute("checked", this._sidebarVisible);
+    document.documentElement.toggleAttribute(
+      "smart-window-sidebar",
+      this._sidebarVisible
+    );
 
-    this._sidebarVisible = false;
-    document.documentElement.removeAttribute("smart-window-sidebar");
-
-    console.log("Smart Window sidebar hidden");
+    console.log(
+      "Smart Window sidebar",
+      this._sidebarVisible ? "shown" : "hidden"
+    );
   },
 
   toggleSidebar() {
-    if (this._sidebarVisible) {
-      this.hideSidebar();
-    } else {
-      this.showSidebar();
-    }
+    this._sidebarVisible = !this._sidebarVisible;
+    this._updateSidebarState();
   },
 
   updateHamburgerMenu() {
