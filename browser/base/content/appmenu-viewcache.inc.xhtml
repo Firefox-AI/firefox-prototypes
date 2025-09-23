@@ -839,6 +839,11 @@
 
   <panelview id="smart-window-toggle-view" class="PanelUI-subView">
     <vbox class="panel-subview-body">
+      <toolbaritem id="smart-window-toggle-status" xmlns="http://www.w3.org/1999/xhtml" closemenu="none">
+        <img role="presentation" class="toggle-status-logo"/>
+        <label data-l10n-id="smart-window-toggleview-status-subheader" class="text-deemphasized"/>
+        <label data-l10n-id="smart-window-toggleview-status-label" class="toggle-status-label"/>
+      </toolbaritem>
       <toolbarbutton id="smart-window-switch-classic"
                     class="subviewbutton"
                     data-l10n-id="smart-window-toggleview-switch-classic"
@@ -848,9 +853,6 @@
                     data-l10n-id="smart-window-toggleview-switch-smart"
                     />
       <toolbarseparator/>
-      <html:h2 id="panelMenu_recentBookmarks"
-          data-l10n-id="smart-window-toggleview-new-window-subheader"
-          class="subview-subheader"/>
       <toolbarbutton id="smart-window-open-private"
                     class="subviewbutton"
                     data-l10n-id="smart-window-toggleview-open-private"

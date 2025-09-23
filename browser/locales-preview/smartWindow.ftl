@@ -7,12 +7,15 @@ toolbar-button-smart-window-toggle =
     .tooltiptext = Switch between smart and normal windows.
 
 smart-window-toggleview-switch-classic =
-    .label = Classic
+    .label = Switch to Classic Firefox
 smart-window-toggleview-switch-smart =
-    .label = Smart window
-smart-window-toggleview-new-window-subheader = New window
+    .label = Switch to Smart window
+smart-window-toggleview-status-subheader = Current mode
 smart-window-toggleview-open-private =
-    .label = Private
+    .label = Open new private window
+
+smart-window-toggleview-status-label-active = Smart Window
+smart-window-toggleview-status-label-inactive = Classic Firefox
 
 toolbar-button-assistant =
     .label = Assistant
