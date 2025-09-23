@@ -1497,8 +1497,8 @@ browser {
 }
 
 #smart-window-toggle-view .toolbarbutton-icon {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   /* XXXgijs: this is hacky; there aren't any other panel menu entries
      with icons so it seems that we don't have shared styling for icons
      anymore. */
@@ -1515,6 +1515,41 @@ browser {
 
 #smart-window-open-private {
   list-style-image: url("chrome://global/skin/icons/indicator-private-browsing.svg");
+}
+
+#smart-window-toggle-status {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  grid-template-areas: "logo desc" "logo status";
+  gap: 2px 8px;
+  margin-inline: 12px;
+  margin-block-end: 4px;
+
+  & > .toggle-status-logo {
+    grid-area: logo;
+    width: 20px;
+    height: 20px;
+    margin-block: auto;
+    margin-inline-start: 4px;
+    content: url("chrome://branding/content/icon64.png");
+
+    :root[smart-window] & {
+      content: url("chrome://browser/skin/smart-window.svg");
+    }
+  }
+
+  & > .text-deemphasized {
+    grid-area: desc;
+    font-weight: normal;
+    /* XXXgijs --font-size-small token seems to be unset here? */
+    font-size: 0.9em;
+  }
+
+  & > .toggle-status-label {
+    grid-area: status;
+    font-weight: var(--font-weight-bold);
+  }
 }
 
 /* Smart Window Right Sidebar Styles */
