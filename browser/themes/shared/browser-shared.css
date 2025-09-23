@@ -1601,22 +1601,46 @@ browser {
 
 /* Smart Window Toggle Button in Nav Bar - now using standard toolbar button styling */
 /* The button will use the SVG icon defined in toolbarbutton-icons.css */
+#smart-window-button {
+  appearance: none;
+  border-radius: var(--border-radius-circle);
+  height: 24px;
+  border: 1px solid transparent;
 
-/* Show the button as active/checked when sidebar is visible */
-:root[smart-window-sidebar="true"] #smart-window-button,
-#smart-window-button[checked="true"] {
-  fill: var(--toolbarbutton-icon-fill-attention);
-}
-#smart-window-button[checked="true"]:not(:hover):not(:active) .toolbarbutton-icon {
-  background: none;
-}
+  padding: 3px 7px;
+  --toolbarbutton-inner-padding: auto;
+  gap: 5px;
 
-/* Show the button in smart window mode */
-:root[smart-window] #smart-window-button {
-  display: flex;
-}
+  margin-block: auto;
+  margin-inline-end: 8px;
 
-/* Always hide nav button when not in smart window mode */
-:root:not([smart-window]) #smart-window-button {
-  display: none;
+  color: #fff;
+  fill: currentColor;
+  list-style-image: url(chrome://browser/skin/notification-icons/desktop-notification.svg);
+  background: linear-gradient(260deg, rgba(255, 183, 148, 0.80) -49.13%, rgba(181, 62, 175, 0.80) 63.71%, rgba(131, 62, 181, 0.80) 128.68%);
+
+  &[checked] {
+    color: var(--text-color);
+    border-color: rgba(191, 143, 204, 0.15);
+    background: linear-gradient(260deg, rgba(255, 183, 148, 0.10) -49.13%, rgba(181, 62, 175, 0.10) 63.71%, rgba(131, 62, 181, 0.10) 128.68%);
+    fill: var(--icon-color);
+    list-style-image: url(chrome://global/skin/icons/close.svg);
+  }
+
+  > .toolbarbutton-text {
+    display: block;
+    background: transparent !important;
+    font-weight: 590;
+  }
+
+  > .toolbarbutton-icon {
+    order: 2;
+    border-radius: 0;
+    background: transparent !important;
+  }
+
+  /* Always hide nav button when not in smart window mode */
+  :root:not([smart-window]) & {
+    display: none;
+  }
 }
