@@ -1459,7 +1459,6 @@ browser {
   --toolbar-textcolor: #5a3a6d !important;
   --toolbar-color: #5a3a6d !important;
   --toolbarbutton-icon-fill: #5a3a6d !important;
-  --chrome-content-separator-color: rgba(138, 97, 255, 0.2) !important;
   --chrome-content-separator-color: none !important;
   --urlbar-text-color: #5a3a6d !important;
   --toolbar-field-color: #5a3a6d !important;
@@ -1479,11 +1478,13 @@ browser {
   appearance: none;
   list-style-image: url("chrome://branding/content/icon32.png");
   border-radius: var(--border-radius-medium);
-  box-shadow: 0 0 4px 0 rgba(0, 0, 0, 0.15) inset;
 
   & > .toolbarbutton-icon {
-    width: calc(2 * var(--toolbarbutton-inner-padding) + 20px);
-    height: calc(2 * var(--toolbarbutton-inner-padding) + 20px);
+    width: 20px;
+    height: 20px;
+    box-shadow: 0 0 4px 0 rgba(0, 0, 0, 0.15) inset;
+    box-sizing: content-box;
+    padding: 5px 6px;
   }
 
   :root[smart-window] & {
@@ -1557,7 +1558,7 @@ browser {
   width: 358px;
   backdrop-filter: blur(24px);
   border-inline-start: 1px solid rgba(189, 137, 213, 0.8);
-  box-shadow: 0px 4px 14px 0px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.1);
 }
 
 #smartwindow-box {
