@@ -148,10 +148,16 @@ var SmartWindow = {
   },
 
   _ensureViewInitialized() {
+    let view = PanelMultiView.getViewNode(document, "smart-window-toggle-view");
+    document.l10n.setAttributes(view.querySelector(".toggle-status-label"),
+      this._smartWindowActive ? "smart-window-toggleview-status-label-active"
+      : "smart-window-toggleview-status-label-inactive");
+    view.querySelector("#smart-window-switch-classic").hidden = !this._smartWindowActive;
+    view.querySelector("#smart-window-switch-smart").hidden = this._smartWindowActive;
+
     if (this._viewInitialized) {
       return;
     }
-    let view = PanelMultiView.getViewNode(document, "smart-window-toggle-view");
     view.addEventListener("command", event => {
       switch (event.target.id) {
         case "smart-window-switch-classic":
