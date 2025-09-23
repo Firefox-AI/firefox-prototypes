@@ -30,5 +30,5 @@ menu-file-new-smart-window =
     .accesskey = S
 
 toolbar-button-assistant =
-    .label = Assistant
+    .label = Ask
     .tooltiptext = Toggle Assistant
