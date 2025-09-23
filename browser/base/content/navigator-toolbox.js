@@ -45,7 +45,6 @@ document.addEventListener(
         #bookmarks-toolbar-button,
         #PlacesToolbar,
         #import-button,
-        #smart-window-button,
         #bookmarks-menu-button,
         #BMB_bookmarksPopup,
         #BMB_viewBookmarksSidebar,
@@ -73,9 +72,6 @@ document.addEventListener(
           MigrationUtils.showMigrationWizard(window, {
             entrypoint: MigrationUtils.MIGRATION_ENTRYPOINTS.BOOKMARKS_TOOLBAR,
           });
-          break;
-        case "smart-window-button":
-          SmartWindow.toggleSidebar();
           break;
 
         case "bookmarks-menu-button":
