@@ -1106,14 +1106,14 @@ class SmartWindowPage {
     await new Promise(resolve => setTimeout(resolve, 1000));
     const selectedBrowser = topChromeWindow.gBrowser.selectedBrowser;
     try {
-      const readableTextResult =
+      /** @type {{ text: string, method: string }} */
+      const { text } =
         await selectedBrowser.browsingContext.currentWindowContext
           .getActor("GenAI")
-          .sendQuery("GetReadableText");
-      const pageText = readableTextResult.selection || "";
+          .sendQuery("ExtractPageContent");
 
       // Store page text for use in chat system prompt
-      this.currentTabPageText = pageText;
+      this.currentTabPageText = text;
     } catch (error) {
       this.currentTabPageText = "Couldn't read page text.";
       console.error("Failed to get page text:", error);
