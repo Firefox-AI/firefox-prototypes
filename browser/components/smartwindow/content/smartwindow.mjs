@@ -740,9 +740,7 @@ class SmartWindowPage {
     }
   }
 
-  setupSidebarUI() {
-    this.moveInputToBottom();
-
+  #createStatusBar() {
     // Create status bar for current tab info
     const statusBar = document.createElement("div");
     statusBar.id = "status-bar";
@@ -762,7 +760,64 @@ class SmartWindowPage {
     statusBar.appendChild(statusContent);
 
     const searchBox = document.querySelector(".search-box");
-    searchBox.parentNode.insertBefore(statusBar, searchBox);
+    searchBox.before(statusBar);
+    this.#fillStatusBar();
+    return statusBar;
+  }
+
+  #toggleStatusBar() {
+    let statusBar = document.getElementById("status-bar");
+    let shouldOpen = !statusBar || statusBar.hidden;
+    if (shouldOpen) {
+      if (!statusBar) {
+        statusBar = this.#createStatusBar();
+      } else {
+        this.#fillStatusBar();
+      }
+    }
+    statusBar.hidden = !shouldOpen;
+  }
+
+  #fillStatusBar() {
+    let tabInfo = this.lastTabInfo;
+    const titleEl = document.getElementById("status-title");
+    const urlEl = document.getElementById("status-url");
+    const faviconEl = document.getElementById("status-favicon");
+    const pageTextEl = document.getElementById("status-page-text");
+
+    if (titleEl) {
+      titleEl.textContent = tabInfo.title || "Untitled";
+    }
+    if (urlEl) {
+      // Format URL for display
+      let displayUrl = tabInfo.url;
+      try {
+        const url = new URL(tabInfo.url);
+        displayUrl = url.hostname + (url.pathname !== "/" ? url.pathname : "");
+      } catch (e) {
+        // Keep original for non-standard URLs
+      }
+      urlEl.textContent = displayUrl;
+    }
+    if (faviconEl && tabInfo.favicon) {
+      faviconEl.src = tabInfo.favicon;
+      faviconEl.style.display = "block";
+    } else if (faviconEl) {
+      faviconEl.style.display = "none";
+    }
+
+    if (pageTextEl) {
+      let pageText = this.currentTabPageText;
+      const preview =
+        pageText.length > 30 ? pageText.substring(0, 30) + "…" : pageText;
+      pageTextEl.textContent = pageText
+        ? `${preview} (${pageText.length})`
+        : "No text content";
+    }
+  }
+
+  setupSidebarUI() {
+    this.moveInputToBottom();
   }
 
   setupSubmitButton() {
@@ -892,6 +947,19 @@ class SmartWindowPage {
     document.addEventListener("FocusSmartSearchInput", () => {
       this.smartbar.focus();
     });
+    document.addEventListener(
+      "keypress",
+      e => {
+        if (
+          e.key == "?" &&
+          (navigator.platform == "MacIntel" ? e.metaKey : e.ctrlKey)
+        ) {
+          e.preventDefault();
+          this.#toggleStatusBar();
+        }
+      },
+      { capture: true }
+    );
     if (this.isSidebarMode) {
       window.addEventListener("SmartWindowMessage", e => {
         if (e.detail.type === "TabUpdate") {
@@ -1028,61 +1096,31 @@ class SmartWindowPage {
       this.updateTabContextUI();
     }
 
-    const titleEl = document.getElementById("status-title");
-    const urlEl = document.getElementById("status-url");
-    const faviconEl = document.getElementById("status-favicon");
-    const pageTextEl = document.getElementById("status-page-text");
-
-    if (titleEl) {
-      titleEl.textContent = tabInfo.title || "Untitled";
-    }
-    if (urlEl) {
-      // Format URL for display
-      let displayUrl = tabInfo.url;
-      try {
-        const url = new URL(tabInfo.url);
-        displayUrl = url.hostname + (url.pathname !== "/" ? url.pathname : "");
-      } catch (e) {
-        // Keep original for non-standard URLs
-      }
-      urlEl.textContent = displayUrl;
-    }
-    if (faviconEl && tabInfo.favicon) {
-      faviconEl.src = tabInfo.favicon;
-      faviconEl.style.display = "block";
-    } else if (faviconEl) {
-      faviconEl.style.display = "none";
-    }
-
     // Update quick prompts if user hasn't edited the query (skip for about:blank)
     if (!isAboutBlank && !this.userHasEditedQuery && !editorText.trim()) {
       this.showQuickPrompts().catch(console.error);
     }
 
     // Get page text and display in status
-    if (pageTextEl) {
-      try {
-        // Wait a moment for page to load
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const selectedBrowser = topChromeWindow.gBrowser.selectedBrowser;
-        const readableTextResult =
-          await selectedBrowser.browsingContext.currentWindowContext
-            .getActor("GenAI")
-            .sendQuery("GetReadableText");
-        const pageText = readableTextResult.selection || "";
+    // Wait a moment for page to load
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    const selectedBrowser = topChromeWindow.gBrowser.selectedBrowser;
+    try {
+      const readableTextResult =
+        await selectedBrowser.browsingContext.currentWindowContext
+          .getActor("GenAI")
+          .sendQuery("GetReadableText");
+      const pageText = readableTextResult.selection || "";
 
-        // Store page text for use in chat system prompt
-        this.currentTabPageText = pageText;
+      // Store page text for use in chat system prompt
+      this.currentTabPageText = pageText;
+    } catch (error) {
+      this.currentTabPageText = "Couldn't read page text.";
+      console.error("Failed to get page text:", error);
+    }
 
-        const preview =
-          pageText.length > 30 ? pageText.substring(0, 30) + "…" : pageText;
-        pageTextEl.textContent = pageText
-          ? `${preview} (${pageText.length})`
-          : "No text content";
-      } catch (error) {
-        console.error("Failed to get page text:", error);
-        pageTextEl.textContent = "Unable to read page text";
-      }
+    if (document.getElementById("status-bar")?.hidden === false) {
+      this.#fillStatusBar();
     }
   }
 
