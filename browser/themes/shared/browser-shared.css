@@ -1469,10 +1469,11 @@ browser {
     --chrome-content-separator-color: none !important;
   }
 
-  #urlbar-container {
-    --toolbarbutton-border-radius: var(--border-radius-circle) !important;
+  #urlbar:not([open]) > .urlbar-background {
+    border-radius: var(--border-radius-circle);
   }
 }
+
 :root[smart-window] #navigator-toolbox,
 :root[smart-window] #browser {
   background: none !important
