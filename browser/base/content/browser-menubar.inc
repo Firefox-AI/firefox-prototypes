@@ -17,6 +17,10 @@
                 <menuitem id="menu_newNavigator"
                           key="key_newNavigator"
                           command="cmd_newNavigator" data-l10n-id="menu-file-new-window"/>
+                <menuitem id="menu_newSmartWindow"
+                          command="cmd_newSmartWindow" data-l10n-id="menu-file-new-smart-window"/>
+                <menuitem id="menu_newClassicWindow"
+                          command="cmd_newClassicWindow" data-l10n-id="menu-file-new-classic-window"/>
                 <menuitem id="menu_newPrivateWindow"
                           command="Tools:PrivateBrowsing"
                           key="key_privatebrowsing" data-l10n-id="menu-file-new-private-window"/>
