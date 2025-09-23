@@ -5,6 +5,13 @@ import {
 } from "chrome://global/content/vendor/lit.all.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
 import { fetchWithHistory } from "chrome://browser/content/smartwindow/utils.mjs";
+import {
+  buildInsightsSystemPrompt,
+  detectInsightTokens,
+  createClickableInsightToken,
+  createInsightsOverlay,
+  insightsStyles,
+} from "chrome://browser/content/smartwindow/insights.mjs";
 
 /**
  * A simple chat bot component that interacts with an Ollama model via streaming.
@@ -118,28 +125,7 @@ class ChatBot extends MozLitElement {
       flex-shrink: 0;
     }
 
-    .used-insights {
-      margin-top: 0.5rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-
-    .insights-label {
-      font-size: 0.75rem;
-      color: #666;
-      font-weight: 500;
-    }
-
-    .insight-tag {
-      font-size: 0.75rem;
-      background: #e8f4fd;
-      color: #0066cc;
-      padding: 0.25rem 0.5rem;
-      border-radius: 12px;
-      border: 1px solid #b3d7f2;
-    }
+    ${insightsStyles}
   `;
 
   static get properties() {
@@ -147,6 +133,7 @@ class ChatBot extends MozLitElement {
       prompt: { type: String },
       messages: { type: Array },
       marked: { type: Object },
+      showInsightsOverlay: { type: Boolean },
     };
   }
 
@@ -157,6 +144,8 @@ class ChatBot extends MozLitElement {
     this.marked = window.marked.marked; // Use the global marked instance for markdown rendering
     this.currentTabContext = []; // Store current tab context
     this.currentPageText = ""; // Store current page text content
+    this.showInsightsOverlay = false; // Track insights overlay visibility
+    this.conversationInsights = new Set(); // Track all insights used in conversation
   }
 
   async sendPrompt() {
@@ -227,31 +216,10 @@ class ChatBot extends MozLitElement {
     });
 
     let systemPrompt = `You are a helpful AI assistant integrated into Firefox's Smart Window feature. You have access to the user's current browser tab context.
+    
+    Current date: ${currentDate}`;
 
-Current date: ${currentDate}`;
-
-    systemPrompt += `
-
-When responding, if you use any user insights from the list below to personalize your response (even implicitly), you must reference them by including [[insight: specific term]] inline, directly after the phrase or sentence where the insight is applied. Use specific terms from the list rather than broad categories, and include multiple tags if multiple insights are relevant. This enables better personalization features—do not skip tagging if an insight influences your answer. Only tag insights you actually use; avoid tagging irrelevant ones.
-
-User Insights List:
-- Health & Wellness: Frequent interest in mental wellness (e.g., Headspace), nutrition tracking (e.g., MyFitnessPal, Healthline), pediatric resources (e.g., KidsHealth, BabyCenter), and holistic health (e.g., WebMD).
-- Food & Cooking: Strong focus on healthy, family-friendly recipes (e.g., EatingWell, Cooking Light), meal planning, savory pies, quick recipes, and seasonal cooking.
-- Shopping & Deals: High deal-seeking behavior (e.g., RetailMeNot, CouponCabin), grocery shopping (e.g., Walmart, Costco), budget-conscious purchases, and comparison shopping (e.g., Amazon, eBay).
-- Parenting & Family: Active interest in child development, family activities, pregnancy resources (e.g., BabyCenter, WhatToExpect), and family-oriented meal planning.
-- Travel & Outdoor: Flies from SJC, family-friendly trips, hiking trails (e.g., AllTrails, REI), accommodation booking (e.g., Booking.com, Airbnb), road trips, and outdoor gear research.
-- Fashion & Lifestyle: Minimalist/sustainable fashion (e.g., white t-shirts, jeans from ASOS, Zara), luxury brands (e.g., Chanel, Gucci), and affordable clothing searches.
-- Entertainment & Media: Pop music playlists, streaming (e.g., Netflix, Hulu, Disney+), movie theaters/reviews (e.g., IMDb, Rotten Tomatoes), and diverse media like anime or news (e.g., CNN, BBC).
-- Productivity & Work: Use of tools like Google Workspace, Trello, Notion, LinkedIn for networking, and workflow optimization.
-- Academic & Research: Scholarly resources (e.g., Google Scholar, JSTOR, Coursera, edX), self-learning (e.g., Khan Academy), and STEM focus (e.g., biology, engineering scholarships).
-- Home Improvement & DIY: Interior design (e.g., Houzz), repairs (e.g., Home Depot, Lowe's), and organization projects.
-- Financial & Investment: Market monitoring (e.g., Yahoo Finance, Bloomberg), personal finance, and investment research.
-- Other: Book reading (e.g., Goodreads), local services (e.g., Yelp for cafes/restaurants), photography gear (e.g., Sony cameras), and environmental awareness.
-
-Examples of Insight Tagging:
-- User asks about flights: Weave in personalization like "Since you often fly from SJC [[insight: SJC]], consider direct options..." and add another if relevant, e.g., "...using sites like Booking.com [[insight: booking.com]]."
-- User asks about meals: "This recipe fits your interest in seasonal cooking [[insight: seasonal cooking]] and healthy recipes [[insight: healthy recipes]]."
-- User asks about shoes: "For hiking boots, check REI [[insight: REI]] based on your outdoor gear research [[insight: outdoor gear research]]."`;
+    systemPrompt += buildInsightsSystemPrompt();
 
     systemPrompt += `
 
@@ -313,26 +281,9 @@ Use this page content to provide more contextual and relevant search suggestions
     return matches;
   }
 
-  detectInsightTokens(content) {
-    const insightRegex = /\[\[insight:\s*([^\]]+)\]\]/gi;
-    const matches = [];
-    let match;
-
-    while ((match = insightRegex.exec(content)) !== null) {
-      matches.push({
-        fullMatch: match[0],
-        insight: match[1].trim(),
-        startIndex: match.index,
-        endIndex: match.index + match[0].length,
-      });
-    }
-
-    return matches;
-  }
-
   parseContentWithTokens(content) {
     const searchTokens = this.detectSearchTokens(content);
-    const insightTokens = this.detectInsightTokens(content);
+    const insightTokens = detectInsightTokens(content);
     const allTokens = [...searchTokens, ...insightTokens].sort(
       (a, b) => b.startIndex - a.startIndex
     );
@@ -352,6 +303,8 @@ Use this page content to provide more contextual and relevant search suggestions
         searchQueries.unshift(token.query); // Add to beginning to maintain order
       } else if (token.insight) {
         usedInsights.unshift(token.insight); // Add to beginning to maintain order
+        // Track this insight as used in the conversation
+        this.conversationInsights.add(token.insight);
       }
       cleanContent =
         cleanContent.slice(0, token.startIndex) +
@@ -368,6 +321,16 @@ Use this page content to provide more contextual and relevant search suggestions
       bubbles: true,
     });
     this.dispatchEvent(event);
+  }
+
+  handleInsightClick() {
+    this.showInsightsOverlay = true;
+    this.requestUpdate();
+  }
+
+  closeInsightsOverlay() {
+    this.showInsightsOverlay = false;
+    this.requestUpdate();
   }
 
   render() {
@@ -401,10 +364,11 @@ Use this page content to provide more contextual and relevant search suggestions
                             <span class="insights-label"
                               >Referenced insights:</span
                             >
-                            ${usedInsights.map(
-                              insight => html`
-                                <span class="insight-tag">${insight}</span>
-                              `
+                            ${usedInsights.map(insight =>
+                              createClickableInsightToken(
+                                insight,
+                                this.handleInsightClick.bind(this)
+                              )
                             )}
                           </div>
                         `
@@ -471,6 +435,13 @@ Use this page content to provide more contextual and relevant search suggestions
           `}
 
       <div id="bottom-anchor"></div>
+
+      ${this.showInsightsOverlay
+        ? createInsightsOverlay(
+            this.closeInsightsOverlay.bind(this),
+            this.conversationInsights
+          )
+        : ""}
     `;
   }
 }
