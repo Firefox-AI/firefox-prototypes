@@ -2,6 +2,6 @@
 . "$topsrcdir/browser/config/mozconfigs/win32/common-win32"
 . "$topsrcdir/browser/config/mozconfigs/win32/common-opt"
 
-ac_add_options --with-branding=browser/branding/nightly
+ac_add_options --with-branding=browser/branding/demo
 
 . "$topsrcdir/build/mozconfig.common.override"
