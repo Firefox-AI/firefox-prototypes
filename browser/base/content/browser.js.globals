@@ -16,6 +16,8 @@
   "isInitialPage",
   "browserWindows",
   "updateBookmarkToolbarVisibility",
+  "updateNavBarForSmartWindow",
+  "gSmartWindowEnabled",
   "gNavigatorBundle",
   "updateFxaToolbarMenu",
   "UpdateBackForwardCommands",
