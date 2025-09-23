@@ -2,6 +2,6 @@
 
 ac_add_options --enable-instruments
 
-ac_add_options --with-branding=browser/branding/nightly
+ac_add_options --with-branding=browser/branding/demo
 
 . "$topsrcdir/build/mozconfig.common.override"
