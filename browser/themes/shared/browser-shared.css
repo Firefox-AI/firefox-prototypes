@@ -1459,13 +1459,15 @@ browser {
   --toolbar-textcolor: #5a3a6d !important;
   --toolbar-color: #5a3a6d !important;
   --toolbarbutton-icon-fill: #5a3a6d !important;
-  --chrome-content-separator-color: none !important;
   --urlbar-text-color: #5a3a6d !important;
   --toolbar-field-color: #5a3a6d !important;
   --toolbar-field-focus-color: #5a3a6d !important;
 
   /* Ideally override this only on new tab */
-  --tabpanel-background-color: transparent !important;
+  &[smart-window-url] {
+    --tabpanel-background-color: transparent !important;
+    --chrome-content-separator-color: none !important;
+  }
 }
 :root[smart-window] #navigator-toolbox,
 :root[smart-window] #browser {
@@ -1557,7 +1559,6 @@ browser {
 .smartwindow-right-sidebar {
   width: 358px;
   backdrop-filter: blur(24px);
-  border-inline-start: 1px solid rgba(189, 137, 213, 0.8);
 }
 
 #smartwindow-box {
@@ -1581,11 +1582,10 @@ browser {
 
 /* Splitter styling to match the left sidebar */
 #smartwindow-splitter {
-  width: 4px;
-  margin-inline-end: -4px;
+  width: 5px;
+  margin-inline-end: -5px;
   border: 0;
-  border-inline-end: 1px solid var(--splitter-color);
-  min-width: 4px;
+  min-width: 5px;
   background-color: transparent;
   position: relative;
   z-index: 10;

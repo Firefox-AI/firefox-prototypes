@@ -88,6 +88,10 @@
           border-start-end-radius: 0;
         }
       }
+      :root[smart-window-sidebar]:not([inDOMFullscreen]) & {
+        overflow: clip;
+        border-start-end-radius: var(--border-radius-medium) !important;
+      }
     }
   }
 }
