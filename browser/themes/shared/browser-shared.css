@@ -1558,7 +1558,6 @@ browser {
   width: 358px;
   backdrop-filter: blur(24px);
   border-inline-start: 1px solid rgba(189, 137, 213, 0.8);
-  box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.1);
 }
 
 #smartwindow-box {
@@ -1600,20 +1599,20 @@ browser {
 /* The button will use the SVG icon defined in toolbarbutton-icons.css */
 
 /* Show the button as active/checked when sidebar is visible */
-:root[smart-window-sidebar="true"] #smartwindow-button,
-#smartwindow-button[checked="true"] {
+:root[smart-window-sidebar="true"] #smart-window-button,
+#smart-window-button[checked="true"] {
   fill: var(--toolbarbutton-icon-fill-attention);
 }
-#smartwindow-button[checked="true"]:not(:hover):not(:active) .toolbarbutton-icon {
+#smart-window-button[checked="true"]:not(:hover):not(:active) .toolbarbutton-icon {
   background: none;
 }
 
 /* Show the button in smart window mode */
-:root[smart-window] #smartwindow-button {
+:root[smart-window] #smart-window-button {
   display: flex;
 }
 
 /* Always hide nav button when not in smart window mode */
-:root:not([smart-window]) #smartwindow-button {
+:root:not([smart-window]) #smart-window-button {
   display: none;
 }
