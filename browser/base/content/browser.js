@@ -1721,13 +1721,15 @@ function toOpenWindowByType(inType, uri, features) {
 function OpenBrowserWindow(options = {}) {
   let timerId = Glean.browserTimings.newWindow.start();
 
-  // Pass Smart Window state to new window (only if feature is enabled, and
-  // we're not opening a private window).
+  // If opening a new window, if we're in a smart window and not asked for
+  // a private open, make the new window smart, too.
+  let canInheritSmartWindow =
+    window.SmartWindow?.isSmartWindowActive() &&
+    !options.private &&
+    !Object.hasOwn(options, "smartWindow");
   if (
     window.gSmartWindowEnabled &&
-    window.SmartWindow &&
-    window.SmartWindow.isSmartWindowActive() &&
-    !options.private
+    (options.smartWindow || canInheritSmartWindow)
   ) {
     // Create a new property bag for extra options
     const extraOptions = Cc["@mozilla.org/hash-property-bag;1"].createInstance(
@@ -1923,6 +1925,15 @@ let gFileMenu = {
       );
     }
     PrintUtils.updatePrintSetupMenuHiddenState();
+
+    let smartWindowMenu = event.target.querySelector("#menu_newSmartWindow");
+    let classicWindowMenu = event.target.querySelector(
+      "#menu_newClassicWindow"
+    );
+    smartWindowMenu.hidden =
+      !window.gSmartWindowEnabled || SmartWindow.isSmartWindowActive();
+    classicWindowMenu.hidden =
+      !window.gSmartWindowEnabled || !SmartWindow.isSmartWindowActive();
   },
 };
 

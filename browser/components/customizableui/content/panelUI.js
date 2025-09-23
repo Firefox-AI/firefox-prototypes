@@ -663,6 +663,16 @@ const PanelUI = {
       ASRouter.addImpression(message);
     }
     updateZoomUI(gBrowser.selectedBrowser);
+    let classicWindowButton = panelview.querySelector(
+      "#appMenu-new-classic-window"
+    );
+    let smartWindowButton = panelview.querySelector(
+      "#appMenu-new-smart-window"
+    );
+    smartWindowButton.hidden =
+      !gSmartWindowEnabled || SmartWindow.isSmartWindowActive();
+    classicWindowButton.hidden =
+      !gSmartWindowEnabled || !smartWindowButton.hidden;
   },
 
   _onHelpViewShow() {

@@ -16,6 +16,8 @@
   <!-- The event listeners are defined by _initCommandSet in browser-init.js -->
   <commandset id="mainCommandSet">
     <command id="cmd_newNavigator" />
+    <command id="cmd_newSmartWindow" />
+    <command id="cmd_newClassicWindow" />
     <command id="cmd_handleBackspace" />
     <command id="cmd_handleShiftBackspace" />
 
