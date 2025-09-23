@@ -889,6 +889,9 @@ class SmartWindowPage {
   }
 
   setupEventListeners() {
+    document.addEventListener("FocusSmartSearchInput", () => {
+      this.smartbar.focus();
+    });
     if (this.isSidebarMode) {
       window.addEventListener("SmartWindowMessage", e => {
         if (e.detail.type === "TabUpdate") {
