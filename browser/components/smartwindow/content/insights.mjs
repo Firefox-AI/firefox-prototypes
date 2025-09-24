@@ -52,8 +52,6 @@ export const INSIGHTS_DATA = {
     "hiking trails",
     "AllTrails",
     "REI",
-    "accommodation booking",
-    "Booking.com",
     "Airbnb",
     "road trips",
     "outdoor gear research",
@@ -146,11 +144,7 @@ User Insights List:`;
   // Build insights list from data
   Object.entries(INSIGHTS_DATA).forEach(([category, insights]) => {
     if (insights.length) {
-      const insightString = insights
-        .map(insight =>
-          insight.startsWith("e.g., ") ? insight : `e.g., ${insight}`
-        )
-        .join(", ");
+      const insightString = insights.join(", ");
       systemPrompt += `\n- ${category}: ${insightString}.`;
     }
   });
@@ -158,7 +152,7 @@ User Insights List:`;
   systemPrompt += `
 
 Examples of Insight Tagging:
-- User asks about flights: Weave in personalization like "Since you often fly from SJC [[insight: SJC]], consider direct options..." and add another if relevant, e.g., "...using sites like Booking.com [[insight: Booking.com]]."
+- User asks about flights: Weave in personalization like "Since you often fly from SJC [[insight: SJC]], consider direct options..."
 - User asks about meals: "This recipe fits your interest in seasonal cooking [[insight: seasonal cooking]] and healthy recipes [[insight: healthy recipes]]."
 - User asks about shoes: "For hiking boots, check REI [[insight: REI]] based on your outdoor gear research [[insight: outdoor gear research]]."`;
 
