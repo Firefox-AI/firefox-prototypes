@@ -1866,6 +1866,9 @@ pref("browser.newtabpage.activity-stream.images.smart", true);
 // enable location search for newtab weather widget
 pref("browser.newtabpage.activity-stream.weather.locationSearchEnabled", true);
 
+// opt-in enabled for certain locales for newtab weather widget
+pref("browser.newtabpage.activity-stream.weather.optInDisplayed", false);
+
 // List of regions that get weather by default.
 pref("browser.newtabpage.activity-stream.discoverystream.region-weather-config", "US,CA,DE,GB,FR,ES,IT,CH,AT,BE,IE,NL,PL,CZ,SE,SG,HU,SK,FI,DK,NO,PT");
 
@@ -3494,7 +3497,7 @@ pref("toolkit.contentRelevancy.log", false);
 
 // The number of days after which to rotate the context ID. 0 means to disable
 // rotation altogether.
-pref("browser.contextual-services.contextId.rotation-in-days", 15);
+pref("browser.contextual-services.contextId.rotation-in-days", 7);
 pref("browser.contextual-services.contextId.rust-component.enabled", true);
 
 // Pref to enable the IP protection feature

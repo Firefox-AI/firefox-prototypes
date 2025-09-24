@@ -636,7 +636,6 @@ CanonicalBrowsingContext::CreateLoadingSessionHistoryEntryForLoad(
   // gets it's entries list initialized to the contiguous entries ending in the
   // new entry.
   if (Navigation::IsAPIEnabled()) {
-    nsCOMPtr<nsIURI> targetURI = entry->GetURI();
     bool sessionHistoryLoad =
         existingLoadingInfo && existingLoadingInfo->mLoadIsFromSessionHistory;
 
@@ -673,42 +672,32 @@ CanonicalBrowsingContext::CreateLoadingSessionHistoryEntryForLoad(
       }
     }
 
-    nsCOMPtr<nsIURI> uri = mActiveEntry ? mActiveEntry->GetURI() : nullptr;
+    nsCOMPtr<nsIURI> uri =
+        mActiveEntry ? mActiveEntry->GetURIOrInheritedForAboutBlank() : nullptr;
+    nsCOMPtr<nsIURI> targetURI = entry->GetURIOrInheritedForAboutBlank();
     bool sameOrigin =
         NS_SUCCEEDED(nsContentUtils::GetSecurityManager()->CheckSameOriginURI(
             targetURI, uri, false, false));
-    if (entry->isInList() || (mActiveEntry && mActiveEntry->isInList())) {
-      nsCOMPtr<nsIURI> sameOriginURI = entry->GetURI();
+    if (entry->isInList() ||
+        (mActiveEntry && mActiveEntry->isInList() && sameOrigin)) {
       nsSHistory::WalkContiguousEntriesInOrder(
           entry->isInList() ? entry : mActiveEntry,
-          [sameOriginURI, activeEntry = mActiveEntry,
+          [activeEntry = mActiveEntry,
            entries = &loadingInfo->mContiguousEntries,
            navigationType = *navigationType](auto* aEntry) {
-            if (nsCOMPtr<SessionHistoryEntry> entry = do_QueryObject(aEntry)) {
-              nsCOMPtr candidateURI = entry->GetURI();
-              if (NS_FAILED(
-                      nsContentUtils::GetSecurityManager()->CheckSameOriginURI(
-                          candidateURI, sameOriginURI, false, false))) {
-                return false;
-              }
-
-              if (navigationType == NavigationType::Replace &&
-                  entry == activeEntry) {
-                // In the case of a replace navigation, we end up dropping the
-                // active entry and all following entries.
-                return false;
-              }
-              entries->AppendElement(entry->Info());
-              if (navigationType == NavigationType::Push &&
-                  entry == activeEntry) {
-                // In the case of a push navigation, we end up keeping the
-                // current active entry but drop all following entries.
-                return false;
-              }
-
-              return true;
+            nsCOMPtr<SessionHistoryEntry> entry = do_QueryObject(aEntry);
+            MOZ_ASSERT(entry);
+            if (navigationType == NavigationType::Replace &&
+                entry == activeEntry) {
+              // In the case of a replace navigation, we end up dropping the
+              // active entry and all following entries.
+              return false;
             }
-            return false;
+            entries->AppendElement(entry->Info());
+            // In the case of a push navigation, we end up keeping the
+            // current active entry but drop all following entries.
+            return !(navigationType == NavigationType::Push &&
+                     entry == activeEntry);
           });
     }
 
@@ -720,7 +709,7 @@ CanonicalBrowsingContext::CreateLoadingSessionHistoryEntryForLoad(
       int32_t index = 0;
       MOZ_LOG_FMT(gNavigationLog, LogLevel::Debug,
                   "Preparing contiguous for {} ({}load))",
-                  targetURI->GetSpecOrDefault(),
+                  entry->Info().GetURI()->GetSpecOrDefault(),
                   sessionHistoryLoad ? "history " : "");
       for (const auto& entry : loadingInfo->mContiguousEntries) {
         MOZ_LOG_FMT(gNavigationLog, LogLevel::Debug,
