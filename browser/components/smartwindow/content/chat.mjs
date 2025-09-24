@@ -232,9 +232,10 @@ Examples of when to suggest searches:
 - User asks for local information or businesses near a location
 - User wants to compare options or find reviews
 
+IMPORTANT: When the page content contains dates, times, or temporal information, incorporate these details into your search suggestions to make them more specific and relevant.
+
 Examples:
 - User: "help me find a flight to Boston" → Include: [[search: flights sjc to boston]]
-- User: "Where do the Red Sox play? I want to stay near there" → Include: [[search: hotels near fenway park]]
 
 Always provide a helpful response first, then include the search suggestion when appropriate.`;
 
@@ -257,7 +258,14 @@ Always provide a helpful response first, then include the search suggestion when
 
       systemPrompt += `\n\nCurrent page content:\n${truncatedText}
 
-Use this page content to provide more contextual and relevant search suggestions. For example, if the page mentions dates, locations, or specific topics, incorporate those details into your search suggestions.`;
+Use this page content to provide more contextual and relevant search suggestions. Pay special attention to:
+- Dates, times, or temporal references (e.g., "September 25", "March 10", "this weekend", "next month")
+- Locations, venues, or addresses
+- Specific topics, events, or activities mentioned
+
+When creating search suggestions, incorporate these contextual details to make searches more precise. For example:
+- If page shows "Sep 25" and user asks about hotels → [[search: hotels near fenway park september 25]]
+- If page mentions "conference in Austin March 10-12" and user wants restaurants → [[search: restaurants near austin convention center march 10]]`;
     }
 
     console.log("Built system prompt:", systemPrompt);
