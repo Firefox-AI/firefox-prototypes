@@ -233,7 +233,7 @@ class SmartWindowPage {
     });
 
     // 1 action
-    suggestions.push({ text: "tab next", type: "action" });
+    //suggestions.push({ text: "tab next", type: "action" });
 
     return suggestions;
   }
@@ -1297,7 +1297,7 @@ class SmartWindowPage {
         // Add some generic suggestions if still short
         if (suggestions.length < 6) {
           const fallbacks = [
-            { text: "tab next", type: "action" },
+            //{ text: "tab next", type: "action" },
             { text: "github.com", type: "navigate" },
             { text: query + " guide", type: "search" },
             { text: query + " tutorial", type: "search" },

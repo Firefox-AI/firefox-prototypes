@@ -92,7 +92,7 @@ class ChatBot extends MozLitElement {
     }
 
     .actions-wrapper {
-      display: flex;
+      display: none;
       justify-content: flex-end;
     }
 

@@ -221,7 +221,7 @@ export function createInsightsOverlay(
       <div class="insights-modal" @click=${e => e.stopPropagation()}>
         <div class="insights-header">
           <h3>
-            User Insights
+            Transparency dashboard
             ${usedInsights.size > 0
               ? html`<span class="used-count">${usedInsights.size} used</span>`
               : ""}
