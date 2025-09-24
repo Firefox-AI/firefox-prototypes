@@ -38,6 +38,10 @@ html, body {
   backdrop-filter: blur(10px);
 }
 
+.search-box:focus-within {
+  background: white;
+}
+
 #search-input, #tiptap-editor {
   width: 100%;
   padding: 10px;
@@ -251,14 +255,14 @@ html, body {
 /* Suggestions container */
 .suggestions-container {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% - 12px);
   left: 0;
   right: 0;
   width: 100%;
   max-width: 700px;
   background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 12px;
+  outline: 1px solid rgba(199, 199, 199, 0.5);
+  border-radius: 0 0 12px 12px;
   padding: 12px;
   backdrop-filter: blur(10px);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
@@ -266,7 +270,7 @@ html, body {
 }
 
 .suggestions-header {
-  display: flex;
+  display: none;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
@@ -292,7 +296,7 @@ html, body {
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 0;
   border-radius: 8px;
   background: transparent;
   color: #333;
@@ -305,8 +309,7 @@ html, body {
 
 .suggestion-button:hover,
 .suggestion-button.selected {
-  background: rgba(0, 122, 255, 0.1);
-  border-color: rgba(0, 122, 255, 0.3);
+  background: rgba(221, 207, 255, 0.80);
   transform: translateY(-1px);
 }
 
@@ -322,23 +325,9 @@ html, body {
   font-size: 13px;
   line-height: 1.3;
   color: #333;
-}
-
-/* Type-specific left border colors */
-.suggestion-search {
-  border-left: 3px solid #4285f4;
-}
-
-.suggestion-chat {
-  border-left: 3px solid #34a853;
-}
-
-.suggestion-navigate {
-  border-left: 3px solid #ea4335;
-}
-
-.suggestion-action {
-  border-left: 3px solid #fbbc05;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Hide quick prompts (not actual suggestions) when not in bottom chat mode and user has typed something */
@@ -420,7 +409,7 @@ html, body {
   /* Make chat bot scrollable and take remaining space */
   flex: 1;
   overflow-y: auto;
-  margin-bottom: 80px; /* Leave space for fixed search box */
+  margin-bottom: 120px; /* Leave space for fixed search box */
 }
 
 .smart-window-container.chat-mode-bottom .search-box {
@@ -433,19 +422,18 @@ html, body {
   max-width: 700px;
   margin: 0;
   z-index: 10;
-  /* More opaque background when fixed */
-  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
 }
 
 .smart-window-container.chat-mode-bottom .suggestions-container {
   /* Position suggestions above the input */
+  border-radius: 12px 12px 0 0; /* Rounded top corners only */
+  bottom: calc(100% - 12px); /* Place above the search box */
   position: absolute;
   top: auto; /* Override the default top positioning */
-  bottom: calc(100% + 8px); /* Place above the search box */
   left: 0;
   right: 0;
-  margin-bottom: 0;
+  margin: 0;
   z-index: 10000;
 }
 
@@ -587,8 +575,6 @@ html, body {
   border-left: none;
   border-right: none;
   border-bottom: none;
-  /* Opaque background for sidebar mode too */
-  background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(20px);
 }
 
@@ -601,7 +587,6 @@ html, body {
   display: flex;
   align-items: center;
   gap: 40px;
-  z-index: 100;
 }
 
 /* Hide quick actions in sidebar mode */
