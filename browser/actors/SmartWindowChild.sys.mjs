@@ -63,6 +63,13 @@ export class SmartWindowChild extends JSWindowActorChild {
           })
         );
         break;
+
+      case "SmartWindow:FocusSmartbar":
+        // Focus the smartbar in the sidebar
+        this.contentWindow.document.dispatchEvent(
+          new this.contentWindow.CustomEvent("FocusSmartSearchInput")
+        );
+        break;
     }
   }
 }
