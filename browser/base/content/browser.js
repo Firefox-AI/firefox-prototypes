@@ -1743,23 +1743,30 @@ function OpenBrowserWindow(options = {}) {
     window.gSmartWindowEnabled &&
     (options.smartWindow || canInheritSmartWindow)
   ) {
-    // Create a new property bag for extra options
-    const extraOptions = Cc["@mozilla.org/hash-property-bag;1"].createInstance(
-      Ci.nsIWritablePropertyBag2
-    );
-    extraOptions.setPropertyAsBool("smartWindowActive", true);
-
-    // Create the args array with null URI and our extraOptions
-    const argsArray = Cc["@mozilla.org/array;1"].createInstance(
+    options.args ??= Cc["@mozilla.org/array;1"].createInstance(
       Ci.nsIMutableArray
     );
 
-    // Add null for URI (position 0)
-    argsArray.appendElement(null);
-    // Add extraOptions (position 1)
-    argsArray.appendElement(extraOptions);
+    if (!options.args.length) {
+      let str = Cc["@mozilla.org/supports-string;1"].createInstance(
+        Ci.nsISupportsString
+      );
+      str.data = "chrome://browser/content/smartwindow/smartwindow.html";
+      options.args.appendElement(str);
+    }
+    if (options.args.length < 2) {
+      options.args.appendElement(
+        Cc["@mozilla.org/hash-property-bag;1"].createInstance(
+          Ci.nsIWritablePropertyBag2
+        )
+      );
+    }
+    let extraOptions = options.args.queryElementAt(
+      1,
+      Ci.nsIWritablePropertyBag2
+    );
+    extraOptions.setPropertyAsBool("smart-window", true);
 
-    options.args = argsArray;
     console.log(
       "[OpenBrowserWindow] Passing Smart Window state to new window via extraOptions"
     );
