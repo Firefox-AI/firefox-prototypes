@@ -207,6 +207,12 @@ XPCOMUtils.defineLazyPreferenceGetter(
   "gRestoreWindowsToVirtualDesktop",
   "browser.sessionstore.restore_windows_to_virtual_desktop"
 );
+XPCOMUtils.defineLazyPreferenceGetter(
+  lazy,
+  "smartWindowEnabled",
+  "browser.smartwindow.enabled",
+  false
+);
 
 /**
  * |true| if we are in debug mode, |false| otherwise.
@@ -2020,6 +2026,10 @@ var SessionStoreInternal = {
       this._windows[aWindow.__SSi].isTaskbarTab = true;
     }
 
+    this._windows[aWindow.__SSi].isSmartWindow =
+      lazy.smartWindowEnabled &&
+      aWindow.document.documentElement.hasAttribute("smart-window");
+
     let tabbrowser = aWindow.gBrowser;
 
     // add tab change listeners to all already existing tabs
@@ -2445,6 +2455,10 @@ var SessionStoreInternal = {
         LastSession.setState(savedState);
         this._restoreWithoutRestart = true;
       }
+
+      winData.isSmartWindow =
+        lazy.smartWindowEnabled &&
+        aWindow.document.documentElement.hasAttribute("smart-window");
 
       // clear this window from the list, since it has definitely been closed.
       delete this._windows[aWindow.__SSi];
@@ -6502,6 +6516,10 @@ var SessionStoreInternal = {
     var hidden = aWinData.hidden ? aWinData.hidden.split(",") : [];
     var isTaskbarTab =
       aWindow.document.documentElement.hasAttribute("taskbartab");
+    aWindow.document.documentElement.toggleAttribute(
+      "smart-window",
+      lazy.smartWindowEnabled && !!aWinData.isSmartWindow
+    );
     if (!isTaskbarTab) {
       WINDOW_HIDEABLE_FEATURES.forEach(function (aItem) {
         aWindow[aItem].visible = !hidden.includes(aItem);
