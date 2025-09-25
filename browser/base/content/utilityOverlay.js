@@ -36,7 +36,7 @@ ChromeUtils.defineLazyGetter(this, "ReferrerInfo", () =>
 Object.defineProperty(this, "BROWSER_NEW_TAB_URL", {
   enumerable: true,
   get() {
-    if (window.SmartWindow && window.SmartWindow.isSmartWindowActive()) {
+    if (window.SmartWindow?.isSmartWindowActive()) {
       return "chrome://browser/content/smartwindow/smartwindow.html";
     }
 

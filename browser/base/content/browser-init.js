@@ -103,18 +103,17 @@ var gBrowserInit = {
         toolbarMenubar.setAttribute("data-l10n-attrs", "toolbarname");
       }
     }
-    // If opening a Taskbar Tab window, add an attribute to the top-level element
-    // to inform window styling.
-    if (window.arguments && window.arguments[1]) {
+    // Transform taskbar/smart-window extra options to window attributes.
+    if (window.arguments?.[1] instanceof Ci.nsIPropertyBag2) {
       let extraOptions = window.arguments[1];
-      if (
-        extraOptions instanceof Ci.nsIWritablePropertyBag2 &&
-        extraOptions.hasKey("taskbartab")
-      ) {
+      if (extraOptions.hasKey("taskbartab")) {
         window.document.documentElement.setAttribute(
           "taskbartab",
           extraOptions.getPropertyAsAString("taskbartab")
         );
+      }
+      if (extraOptions.get("smart-window")) {
+        document.documentElement.setAttribute("smart-window", "true");
       }
     }
 
