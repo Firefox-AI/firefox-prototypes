@@ -1916,6 +1916,7 @@ var SessionStoreInternal = {
         break;
       case "TabPinned":
       case "TabUnpinned":
+      case "SmartWindowModeChanged":
       case "SwapDocShells":
         this.saveStateDelayed(win);
         break;
@@ -2029,6 +2030,9 @@ var SessionStoreInternal = {
     this._windows[aWindow.__SSi].isSmartWindow =
       lazy.smartWindowEnabled &&
       aWindow.document.documentElement.hasAttribute("smart-window");
+    if (lazy.smartWindowEnabled) {
+      aWindow.addEventListener("SmartWindowModeChanged", this);
+    }
 
     let tabbrowser = aWindow.gBrowser;
 
@@ -2369,6 +2373,8 @@ var SessionStoreInternal = {
 
     let browsers = Array.from(tabbrowser.browsers);
 
+    aWindow.removeEventListener("SmartWindowModeChanged", this);
+
     TAB_EVENTS.forEach(function (aEvent) {
       tabbrowser.tabContainer.removeEventListener(aEvent, this, true);
     }, this);
@@ -2455,10 +2461,6 @@ var SessionStoreInternal = {
         LastSession.setState(savedState);
         this._restoreWithoutRestart = true;
       }
-
-      winData.isSmartWindow =
-        lazy.smartWindowEnabled &&
-        aWindow.document.documentElement.hasAttribute("smart-window");
 
       // clear this window from the list, since it has definitely been closed.
       delete this._windows[aWindow.__SSi];
@@ -5451,6 +5453,10 @@ var SessionStoreInternal = {
     if (workspaceID) {
       winData.workspaceID = workspaceID;
     }
+
+    winData.isSmartWindow =
+      lazy.smartWindowEnabled &&
+      aWindow.document.documentElement.hasAttribute("smart-window");
   },
 
   /**
