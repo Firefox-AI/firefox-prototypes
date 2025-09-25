@@ -17,9 +17,6 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.view.OneShotPreDrawListener
 import androidx.core.view.isVisible
 import androidx.fragment.app.activityViewModels
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import mozilla.components.browser.domains.autocomplete.CustomDomainsProvider
 import mozilla.components.browser.domains.autocomplete.ShippedDomainsProvider
 import mozilla.components.browser.state.selector.findTab
@@ -56,8 +53,11 @@ import org.mozilla.focus.topsites.TopSitesOverlay
 import org.mozilla.focus.ui.theme.FocusTheme
 import org.mozilla.focus.utils.SupportUtils
 import org.mozilla.focus.utils.ViewUtils
-import kotlin.coroutines.CoroutineContext
 
+/**
+ * Custom exception used to trigger a crash in Focus.
+ * This can be triggered by typing "focus:crash" into the URL bar.
+ */
 class FocusCrashException : Exception()
 
 /**
@@ -68,8 +68,7 @@ class FocusCrashException : Exception()
 @Suppress("LargeClass", "TooManyFunctions")
 class UrlInputFragment :
     BaseFragment(),
-    View.OnClickListener,
-    CoroutineScope {
+    View.OnClickListener {
     companion object {
         const val FRAGMENT_TAG = "url_input"
 
@@ -117,9 +116,6 @@ class UrlInputFragment :
         }
     }
 
-    private var job = Job()
-    override val coroutineContext: CoroutineContext
-        get() = job + Dispatchers.Main
     private val shippedDomainsProvider = ShippedDomainsProvider()
     private val customDomainsProvider = CustomDomainsProvider()
     private var _binding: FragmentUrlinputBinding? = null
@@ -153,10 +149,6 @@ class UrlInputFragment :
     override fun onResume() {
         super.onResume()
 
-        if (job.isCancelled) {
-            job = Job()
-        }
-
         activity?.let {
             shippedDomainsProvider.initialize(it.applicationContext)
             customDomainsProvider.initialize(it.applicationContext)
@@ -184,7 +176,6 @@ class UrlInputFragment :
     }
 
     override fun onPause() {
-        job.cancel()
         super.onPause()
         view?.hideKeyboard()
     }
@@ -222,8 +213,19 @@ class UrlInputFragment :
         return binding.root
     }
 
-    @Suppress("LongMethod")
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        setupTopSitesView()
+        setupSearchSuggestionsFragment()
+        observeSearchSuggestions()
+        observeAutocompleteSuggestions()
+        setupToolbarAndFeatures()
+        setupUiInteractions()
+        initializeViewStates()
+    }
+
+    private fun setupTopSitesView() {
         binding.topSites.apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
@@ -232,32 +234,38 @@ class UrlInputFragment :
                 }
             }
         }
+    }
 
+    private fun setupSearchSuggestionsFragment() {
         childFragmentManager.beginTransaction()
             .replace(binding.searchViewContainer.id, SearchSuggestionsFragment.create())
             .commit()
+    }
 
+    private fun observeSearchSuggestions() {
         searchSuggestionsViewModel.selectedSearchSuggestion.observe(
             viewLifecycleOwner,
-        ) {
-            val isSuggestion = searchSuggestionsViewModel.searchQuery.value != it
-            it?.let {
-                if (searchSuggestionsViewModel.alwaysSearch) {
-                    onSearch(it, isSuggestion = false, alwaysSearch = true)
-                } else {
-                    onSearch(it, isSuggestion)
-                }
+        ) { suggestion ->
+            suggestion?.let {
+                val isActualSuggestion = searchSuggestionsViewModel.searchQuery.value != it
+                val alwaysSearchEnabled = searchSuggestionsViewModel.alwaysSearch
+                val finalIsSuggestion = if (alwaysSearchEnabled) false else isActualSuggestion
+                onSearch(it, isSuggestion = finalIsSuggestion, alwaysSearch = alwaysSearchEnabled)
                 searchSuggestionsViewModel.clearSearchSuggestion()
             }
         }
+    }
 
+    private fun observeAutocompleteSuggestions() {
         searchSuggestionsViewModel.autocompleteSuggestion.observe(viewLifecycleOwner) { text ->
             if (text != null) {
                 searchSuggestionsViewModel.clearAutocompleteSuggestion()
                 binding.browserToolbar.setSearchTerms(text)
             }
         }
+    }
 
+    private fun setupToolbarAndFeatures() {
         binding.browserToolbar.private = true
 
         toolbarIntegration.set(
@@ -284,15 +292,19 @@ class UrlInputFragment :
                 },
             ),
             owner = this,
-            view = view,
+            view = requireView(),
         )
+    }
 
+    private fun setupUiInteractions() {
         binding.dismissView.setOnClickListener(this)
 
         OneShotPreDrawListener.add(binding.urlInputContainerView) {
             animateFirstDraw()
         }
+    }
 
+    private fun initializeViewStates() {
         if (isOverlay) {
             binding.landingLayout.isVisible = false
         } else {
@@ -300,19 +312,16 @@ class UrlInputFragment :
                 requireContext(),
                 R.drawable.home_background,
             )
-
             binding.dismissView.isVisible = false
-
             binding.menuView.isVisible = true
         }
 
-        tab?.let { tab ->
-            binding.browserToolbar.url = if (tab.content.hasSearchTerms) {
-                tab.content.searchTerms
+        tab?.let { currentTab ->
+            binding.browserToolbar.url = if (currentTab.content.hasSearchTerms) {
+                currentTab.content.searchTerms
             } else {
-                tab.content.url
+                currentTab.content.url
             }
-
             binding.searchViewContainer.isVisible = false
             binding.menuView.isVisible = false
         }
@@ -344,6 +353,14 @@ class UrlInputFragment :
         )
     }
 
+    /**
+     * Handles the back button press.
+     *
+     * If the fragment is an overlay, it will animate and dismiss the fragment.
+     * Otherwise, it will allow the default back button behavior.
+     *
+     * @return True if the back button press was handled by this fragment, false otherwise.
+     */
     fun onBackPressed(): Boolean {
         if (isOverlay) {
             animateAndDismiss()
@@ -365,7 +382,6 @@ class UrlInputFragment :
         super.onConfigurationChanged(newConfig)
 
         if (newConfig.orientation != Configuration.ORIENTATION_UNDEFINED) {
-            // Make sure we update the background for landscape / portrait orientations.
             binding.backgroundView.background = AppCompatResources.getDrawable(
                 requireContext(),
                 R.drawable.home_background,
