@@ -177,6 +177,9 @@
         "isPopup": {
           "type": "boolean"
         },
+        "isSmartWindow": {
+          "type": "boolean"
+        },
         "screenX": {
           "type": "integer"
         },
