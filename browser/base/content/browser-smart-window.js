@@ -312,11 +312,29 @@ var SmartWindow = {
       "Smart Window sidebar",
       this._sidebarVisible ? "shown" : "hidden"
     );
+
+    // Focus smartbar when sidebar becomes visible
+    if (this._sidebarVisible) {
+      this._focusSidebarSmartbar();
+    }
   },
 
   toggleSidebar() {
     this._sidebarVisible = !this._sidebarVisible;
     this._updateSidebarState();
+  },
+
+  _focusSidebarSmartbar() {
+    const smartWindowBrowser = document.getElementById("smartwindow-browser");
+    if (smartWindowBrowser) {
+      const actor =
+        smartWindowBrowser.browsingContext?.currentWindowGlobal?.getActor(
+          "SmartWindow"
+        );
+      if (actor) {
+        actor.sendAsyncMessage("SmartWindow:FocusSmartbar");
+      }
+    }
   },
 
   updateHamburgerMenu() {
