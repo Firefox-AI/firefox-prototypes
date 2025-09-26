@@ -658,6 +658,7 @@ class SmartWindowPage {
       this.setupSidebarUI();
     }
 
+    this.setupKeyUI();
     this.setupEventListeners();
 
     this.initializeTabContextUI();
@@ -667,6 +668,43 @@ class SmartWindowPage {
       // Don't await to avoid blocking initialization
       this.showQuickPrompts().catch(console.error);
     }
+  }
+
+  setupKeyUI() {
+    // Setup key input event listeners
+    const keyInput = document.getElementById("key-input");
+    const keySubmit = document.getElementById("key-submit");
+    const keyError = document.getElementById("key-error");
+
+    const handleKeySubmit = async () => {
+      const key = keyInput.value.trim();
+      if (!key) {
+        keyError.textContent = "Please enter your API key";
+        keyError.style.display = "block";
+        return;
+      }
+
+      try {
+        Services.prefs.setStringPref("browser.smartwindow.key", key);
+        this.focusSearchInputWhenReady();
+      } catch (error) {
+        console.error("Key setup error:", error);
+        keyError.textContent = "Failed to setup key. Please try again.";
+        keyError.style.display = "block";
+      }
+    };
+
+    keySubmit.addEventListener("click", handleKeySubmit);
+    keyInput.addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleKeySubmit();
+      }
+      // Hide error when user starts typing
+      if (keyError.style.display !== "none") {
+        keyError.style.display = "none";
+      }
+    });
   }
 
   focusSearchInputWhenReady() {
