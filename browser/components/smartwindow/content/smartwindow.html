@@ -8,10 +8,29 @@
       rel="stylesheet"
       href="chrome://browser/content/smartwindow/smartwindow.css"
     />
-    <link rel="icon" href="chrome://browser/skin/notification-icons/desktop-notification.svg" />
+    <link
+      rel="icon"
+      href="chrome://browser/skin/notification-icons/desktop-notification.svg"
+    />
   </head>
   <body>
     <div id="root">
+      <div class="key-setup-container">
+        <div class="key-setup-content">
+          <h2>Enter API Key</h2>
+          <p>Enter your API key to enable Smart Window features:</p>
+          <div class="key-input-container">
+            <input
+              type="password"
+              id="key-input"
+              placeholder="Enter API key"
+              class="key-input"
+            />
+            <button id="key-submit" class="key-submit-button">Setup</button>
+          </div>
+          <div class="key-error" id="key-error" style="display: none"></div>
+        </div>
+      </div>
       <div class="smart-window-container">
         <div class="search-box">
           <div class="input-container">
