@@ -605,6 +605,13 @@ def target_tasks_cypress(full_task_graph, parameters, graph_config):
         # bug 1899403: no need for android tasks
         if "android" in task.attributes.get("build_platform", ""):
             return False
+        # cypress hack: disable l10n tasks
+        if "l10n" in task.kind:
+            return False
+        # msix tasks require l10n tasks; disable them to avoid indirectly
+        # needing l10n
+        if "msix" in task.label:
+            return False
         return True
 
     return [l for l in filtered_for_project if filter(full_task_graph[l])]
@@ -873,6 +880,14 @@ def make_desktop_nightly_filter(platforms):
                 task.attributes.get("shipping_product")
                 in {None, "firefox", "thunderbird"},
                 task.kind not in {"l10n"},  # no on-change l10n
+                # cypress hack: get rid of l10n tasks
+                "l10n" not in task.label,
+                "locale" not in task.attributes,
+                "l10n_chunk" not in task.attributes,
+                # some tasks only have `l10n` in their kind, not label
+                "l10n" not in task.kind,
+                # msix tasks will pull in l10n, remove them
+                "msix" not in task.kind,
             ]
         )
 
