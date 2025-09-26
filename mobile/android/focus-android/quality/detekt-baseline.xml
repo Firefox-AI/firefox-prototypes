@@ -2,21 +2,6 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
-    <ID>ForbiddenSuppress:AddToHomescreenDialogFragment.kt$AddToHomescreenDialogFragment$@Suppress("LongMethod")</ID>
-    <ID>ForbiddenSuppress:BrowserFragment.kt$BrowserFragment$@Suppress("ComplexCondition", "LongMethod")</ID>
-    <ID>ForbiddenSuppress:PromoteSearchWidgetDialogCompose.kt$@Suppress("LongMethod")</ID>
-    <ID>OutdatedDocumentation:AppAdapter.kt$AppAdapter : Adapter</ID>
-    <ID>OutdatedDocumentation:AppReviewUtils.kt$AppReviewUtils$fun addAppOpenings(context: Context)</ID>
-    <ID>OutdatedDocumentation:AppReviewUtils.kt$AppReviewUtils$fun showAppReview(activity: Activity)</ID>
-    <ID>OutdatedDocumentation:AppState.kt$AppState : State</ID>
-    <ID>OutdatedDocumentation:AppState.kt$Screen</ID>
-    <ID>OutdatedDocumentation:AppState.kt$Screen$Locked : Screen</ID>
-    <ID>OutdatedDocumentation:DefaultTopSitesStorage.kt$DefaultTopSitesStorage : TopSitesStorageObservable</ID>
-    <ID>OutdatedDocumentation:Language.kt$Language</ID>
-    <ID>OutdatedDocumentation:LanguageListItem.kt$LanguageListItem</ID>
-    <ID>OutdatedDocumentation:LanguageStorage.kt$LanguageStorage$fun saveCurrentLanguageInSharePref(languageTag: String)</ID>
-    <ID>OutdatedDocumentation:PrivateNotificationFeature.kt$PrivateNotificationFeature : LifecycleAwareFeature</ID>
-    <ID>OutdatedDocumentation:SitePermissionOptionsFragmentCompose.kt$@Composable fun OptionsPermissionList( optionsListItems: List&lt;SitePermissionOptionListItem&gt;, state: MutableState&lt;Int&gt;, permissionLabel: String?, goToPhoneSettings: () -&gt; Unit, componentPermissionBlockedByAndroidVisibility: Boolean, )</ID>
     <ID>UndocumentedPublicClass:AddToHomescreenDialogFragment.kt$AddToHomescreenDialogFragment$Companion</ID>
     <ID>UndocumentedPublicClass:AdvancedSettingsFragment.kt$AdvancedSettingsFragment : BaseSettingsFragmentOnSharedPreferenceChangeListener</ID>
     <ID>UndocumentedPublicClass:AppAction.kt$AppAction$NavigateUp : AppAction</ID>
@@ -36,7 +21,6 @@
     <ID>UndocumentedPublicClass:BaseFragment.kt$BaseFragment : Fragment</ID>
     <ID>UndocumentedPublicClass:BaseSettingsFragment.kt$BaseSettingsFragment : PreferenceFragmentCompatMenuProvider</ID>
     <ID>UndocumentedPublicClass:BiometricAuthenticationFragment.kt$BiometricAuthenticationFragment$Companion</ID>
-    <ID>UndocumentedPublicClass:BrowserFragment.kt$BrowserFragment$Companion</ID>
     <ID>UndocumentedPublicClass:BrowserToolbarIntegration.kt$BrowserToolbarIntegration : LifecycleAwareFeature</ID>
     <ID>UndocumentedPublicClass:Config.kt$Config</ID>
     <ID>UndocumentedPublicClass:ConnectionDetailsPanel.kt$ConnectionDetailsPanel : BottomSheetDialog</ID>
@@ -169,10 +153,6 @@
     <ID>UndocumentedPublicFunction:AutocompleteListFragment.kt$AutocompleteListFragment.DomainListAdapter$fun refresh(context: Context, body: (() -&gt; Unit)? = null)</ID>
     <ID>UndocumentedPublicFunction:AutocompleteListFragment.kt$AutocompleteListFragment.DomainListAdapter$fun selection(): List&lt;String&gt;</ID>
     <ID>UndocumentedPublicFunction:BaseFragment.kt$BaseFragment$fun cancelAnimation()</ID>
-    <ID>UndocumentedPublicFunction:BrowserFragment.kt$BrowserFragment$fun crashReporterIsVisible(): Boolean</ID>
-    <ID>UndocumentedPublicFunction:BrowserFragment.kt$BrowserFragment$fun erase(shouldEraseAllTabs: Boolean = false)</ID>
-    <ID>UndocumentedPublicFunction:BrowserFragment.kt$BrowserFragment$fun handleTabCrash(crash: Crash)</ID>
-    <ID>UndocumentedPublicFunction:BrowserFragment.kt$BrowserFragment$fun showTrackingProtectionPanel()</ID>
     <ID>UndocumentedPublicFunction:BrowsersCache.kt$BrowsersCache$@Synchronized fun all(context: Context): Browsers</ID>
     <ID>UndocumentedPublicFunction:ClientWrapper.kt$ClientWrapper$@Deprecated("Non-private Client usage should be prevented") fun unwrap(): Client</ID>
     <ID>UndocumentedPublicFunction:CookiesPreference.kt$CookiesPreference$fun updateSummary()</ID>
@@ -217,7 +197,6 @@
     <ID>UndocumentedPublicFunction:OnboardingInteractor.kt$OnboardingInteractor$fun onMakeFocusDefaultBrowserButtonClicked(activityResultLauncher: ActivityResultLauncher&lt;Intent&gt;)</ID>
     <ID>UndocumentedPublicFunction:Performance.kt$Performance$fun processIntentIfPerformanceTest(bundle: Bundle?, context: Context)</ID>
     <ID>UndocumentedPublicFunction:PreferenceSwitch.kt$PreferenceSwitch$fun onClickListener(listener: () -&gt; Unit)</ID>
-    <ID>UndocumentedPublicFunction:PromoteSearchWidgetDialogCompose.kt$@Suppress("LongMethod") @Composable fun PromoteSearchWidgetDialogCompose( onAddSearchWidgetButtonClick: () -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
     <ID>UndocumentedPublicFunction:RadioButtonPreference.kt$GroupableRadioButton$fun addToRadioGroup(radioButton: GroupableRadioButton)</ID>
     <ID>UndocumentedPublicFunction:RadioButtonPreference.kt$GroupableRadioButton$fun updateRadioValue(isChecked: Boolean)</ID>
     <ID>UndocumentedPublicFunction:RadioButtonPreference.kt$RadioButtonPreference$fun onClickListener(listener: (() -&gt; Unit))</ID>

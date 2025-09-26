@@ -268,6 +268,35 @@ class SelectableProfileServiceClass extends EventEmitter {
     return this.#isEnabled;
   }
 
+  #setOverlayIcon({ win }) {
+    if (!this.#badge || !("nsIWinTaskbar" in Ci)) {
+      return;
+    }
+
+    let iconController = null;
+    if (!TASKBAR_ICON_CONTROLLERS.has(win)) {
+      iconController = Cc["@mozilla.org/windows-taskbar;1"]
+        .getService(Ci.nsIWinTaskbar)
+        .getOverlayIconController(win.docShell);
+      TASKBAR_ICON_CONTROLLERS.set(win, iconController);
+    } else {
+      iconController = TASKBAR_ICON_CONTROLLERS.get(win);
+    }
+
+    if (this.#currentProfile.hasCustomAvatar) {
+      iconController?.setOverlayIcon(
+        this.#badge.image,
+        this.#badge.description
+      );
+    } else {
+      iconController?.setOverlayIcon(
+        this.#badge.image,
+        this.#badge.description,
+        this.#badge.iconPaintContext
+      );
+    }
+  }
+
   async #attemptFlushProfileService() {
     try {
       await this.#profileService.asyncFlush();
@@ -477,18 +506,7 @@ class SelectableProfileServiceClass extends EventEmitter {
     lazy.EveryWindow.registerCallback(
       this.#everyWindowCallbackId,
       window => {
-        if (this.#badge && "nsIWinTaskbar" in Ci) {
-          let iconController = Cc["@mozilla.org/windows-taskbar;1"]
-            .getService(Ci.nsIWinTaskbar)
-            .getOverlayIconController(window.docShell);
-          TASKBAR_ICON_CONTROLLERS.set(window, iconController);
-
-          iconController.setOverlayIcon(
-            this.#badge.image,
-            this.#badge.description,
-            this.#badge.iconPaintContext
-          );
-        }
+        this.#setOverlayIcon({ win: window });
 
         // Update the window title because the currentProfile, needed in the
         // .*-with-profile titles, didn't exist when the title was initially set.
@@ -518,15 +536,7 @@ class SelectableProfileServiceClass extends EventEmitter {
     switch (event.type) {
       case "activate": {
         this.#windowActivated.arm();
-        if ("nsIWinTaskbar" in Ci && this.#badge) {
-          let iconController = TASKBAR_ICON_CONTROLLERS.get(event.target);
-
-          iconController?.setOverlayIcon(
-            this.#badge.image,
-            this.#badge.description,
-            this.#badge.iconPaintContext
-          );
-        }
+        this.#setOverlayIcon({ win: event.target });
         break;
       }
     }
@@ -677,23 +687,7 @@ class SelectableProfileServiceClass extends EventEmitter {
             .setBadgeImage(this.#badge.image, this.#badge.iconPaintContext);
         } else if ("nsIWinTaskbar" in Ci) {
           for (let win of lazy.EveryWindow.readyWindows) {
-            let iconController = Cc["@mozilla.org/windows-taskbar;1"]
-              .getService(Ci.nsIWinTaskbar)
-              .getOverlayIconController(win.docShell);
-            TASKBAR_ICON_CONTROLLERS.set(win, iconController);
-
-            if (this.#currentProfile.hasCustomAvatar) {
-              iconController.setOverlayIcon(
-                this.#badge.image,
-                this.#badge.description
-              );
-            } else {
-              iconController.setOverlayIcon(
-                this.#badge.image,
-                this.#badge.description,
-                this.#badge.iconPaintContext
-              );
-            }
+            this.#setOverlayIcon({ win });
           }
         }
       } else if (count <= 1 && this.#badge) {
@@ -1210,7 +1204,7 @@ class SelectableProfileServiceClass extends EventEmitter {
       avatar: this.#defaultAvatars[randomIndex],
       themeId: DEFAULT_THEME_ID,
       themeFg: isDark ? "rgb(255,255,255)" : "rgb(21,20,26)",
-      themeBg: isDark ? "rgb(28, 27, 34)" : "rgb(240, 240, 244)",
+      themeBg: isDark ? "rgb(28,27,34)" : "rgb(240,240,244)",
     };
 
     let path =
@@ -1295,18 +1289,23 @@ class SelectableProfileServiceClass extends EventEmitter {
     });
     if (missing.length) {
       throw new Error(
-        "Unable to insertProfile due to missing keys: ",
-        missing.join(",")
+        `Unable to insertProfile due to missing keys: ${missing.join(",")}`
       );
     }
-    await this.#connection.execute(
-      `INSERT INTO Profiles VALUES (NULL, :path, :name, :avatar, :themeId, :themeFg, :themeBg);`,
+    const rows = await this.#connection.execute(
+      `INSERT INTO Profiles
+       VALUES (NULL, :path, :name, :avatar, :themeId, :themeFg, :themeBg)
+       RETURNING id;`,
       profileData
     );
+    const profileId = rows[0].getResultByName("id");
+    if (!profileId) {
+      throw new Error(`Unable to insertProfile with values: ${profileData}`);
+    }
 
     ProfilesDatastoreService.notify();
 
-    return this.getProfileByName(profileData.name);
+    return this.getProfile(profileId);
   }
 
   async deleteProfile(aProfile) {
@@ -1317,7 +1316,7 @@ class SelectableProfileServiceClass extends EventEmitter {
     }
 
     // First attempt to remove the profile's directories. This will attempt to
-    // local the directories and so will throw an exception if the profile is
+    // locate the directories and so will throw an exception if the profile is
     // currently in use.
     await this.#profileService.removeProfileFilesByPath(
       await aProfile.rootDir,

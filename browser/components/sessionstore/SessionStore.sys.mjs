@@ -5962,7 +5962,6 @@ var SessionStoreInternal = {
         return true;
       } catch (error) {
         // Can't setup speculative connection for this url.
-        console.error(error);
         return false;
       }
     }
