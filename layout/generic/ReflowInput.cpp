@@ -109,10 +109,10 @@ static nscoord FontSizeInflationListMarginAdjustment(const nsIFrame* aFrame) {
 
 SizeComputationInput::SizeComputationInput(
     nsIFrame* aFrame, gfxContext* aRenderingContext,
-    AnchorPosReferencedAnchors* aReferencedAnchors)
+    AnchorPosReferenceData* aAnchorPosReferenceData)
     : mFrame(aFrame),
       mRenderingContext(aRenderingContext),
-      mReferencedAnchors(aReferencedAnchors),
+      mAnchorPosReferenceData(aAnchorPosReferenceData),
       mWritingMode(aFrame->GetWritingMode()),
       mIsThemed(aFrame->IsThemed()),
       mComputedMargin(mWritingMode),
@@ -180,9 +180,9 @@ ReflowInput::ReflowInput(nsPresContext* aPresContext,
                          InitFlags aFlags,
                          const StyleSizeOverrides& aSizeOverrides,
                          ComputeSizeFlags aComputeSizeFlags,
-                         AnchorPosReferencedAnchors* aReferencedAnchors)
+                         AnchorPosReferenceData* aAnchorPosReferenceData)
     : SizeComputationInput(aFrame, aParentReflowInput.mRenderingContext,
-                           aReferencedAnchors),
+                           aAnchorPosReferenceData),
       mParentReflowInput(&aParentReflowInput),
       mFloatManager(aParentReflowInput.mFloatManager),
       mLineLayout(mFrame->IsLineParticipant() ? aParentReflowInput.mLineLayout
@@ -369,7 +369,8 @@ nscoord SizeComputationInput::ComputeISizeValue(
           mRenderingContext, wm, aContainingBlockSize, contentEdgeToBoxSizing,
           boxSizingToMarginEdgeISize, aSize,
           *mFrame->StylePosition()->BSize(
-              wm, AnchorPosResolutionParams::From(mFrame, mReferencedAnchors)),
+              wm,
+              AnchorPosResolutionParams::From(mFrame, mAnchorPosReferenceData)),
           mFrame->GetAspectRatio())
       .mISize;
 }
@@ -1569,7 +1570,7 @@ void ReflowInput::CalculateHypotheticalPosition(
     // the static position for a fixed-positioned frame, we need to adjust the
     // origin to exclude the scrollbar or scrollbar-gutter area. The
     // ViewportFrame's containing block rect is passed into
-    // nsAbsoluteContainingBlock::ReflowAbsoluteFrame(), and it will add the
+    // AbsoluteContainingBlock::ReflowAbsoluteFrame(), and it will add the
     // rect's origin to the fixed-positioned frame's final position if needed.
     //
     // Note: The origin of the containing block rect is adjusted in
@@ -1895,7 +1896,7 @@ void ReflowInput::InitAbsoluteConstraints(const ReflowInput* aCBReflowInput,
     // Solve for 'left'.
     if (iSizeIsAuto) {
       // XXXldb This, and the corresponding code in
-      // nsAbsoluteContainingBlock.cpp, could probably go away now that
+      // AbsoluteContainingBlock.cpp, could probably go away now that
       // we always compute widths.
       offsets.IStart(cbwm) = NS_AUTOOFFSET;
     } else {
@@ -1909,7 +1910,7 @@ void ReflowInput::InitAbsoluteConstraints(const ReflowInput* aCBReflowInput,
     // Solve for 'right'.
     if (iSizeIsAuto) {
       // XXXldb This, and the corresponding code in
-      // nsAbsoluteContainingBlock.cpp, could probably go away now that
+      // AbsoluteContainingBlock.cpp, could probably go away now that
       // we always compute widths.
       offsets.IEnd(cbwm) = NS_AUTOOFFSET;
     } else {
@@ -2989,7 +2990,7 @@ bool SizeComputationInput::ComputeMargin(WritingMode aCBWM,
     }
     LogicalMargin m(aCBWM);
     const auto anchorResolutionParams =
-        AnchorPosResolutionParams::From(mFrame, mReferencedAnchors);
+        AnchorPosResolutionParams::From(mFrame, mAnchorPosReferenceData);
     for (const LogicalSide side : LogicalSides::All) {
       m.Side(side, aCBWM) = nsLayoutUtils::ComputeCBDependentValue(
           aPercentBasis,

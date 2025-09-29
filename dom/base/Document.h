@@ -23,7 +23,6 @@
 #include "mozilla/Assertions.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/BasicEvents.h"
-#include "mozilla/BitSet.h"
 #include "mozilla/CORSMode.h"
 #include "mozilla/CallState.h"
 #include "mozilla/ContentBlockingNotifier.h"
@@ -3411,10 +3410,10 @@ class Document : public nsINode,
   void Close(mozilla::ErrorResult& rv);
   MOZ_CAN_RUN_SCRIPT void Write(
       const mozilla::dom::Sequence<OwningTrustedHTMLOrString>& aText,
-      mozilla::ErrorResult& rv);
+      nsIPrincipal* aSubjectPrincipal, mozilla::ErrorResult& rv);
   MOZ_CAN_RUN_SCRIPT void Writeln(
       const mozilla::dom::Sequence<OwningTrustedHTMLOrString>& aText,
-      mozilla::ErrorResult& rv);
+      nsIPrincipal* aSubjectPrincipal, mozilla::ErrorResult& rv);
   Nullable<WindowProxyHolder> GetDefaultView() const;
   Element* GetActiveElement();
   enum class IncludeChromeOnly : bool { No, Yes };
@@ -4419,11 +4418,13 @@ class Document : public nsINode,
 
   MOZ_CAN_RUN_SCRIPT void WriteCommon(const nsAString& aText,
                                       bool aNewlineTerminate, bool aIsTrusted,
+                                      nsIPrincipal* aSubjectPrincipal,
                                       mozilla::ErrorResult& aRv);
   // A version of WriteCommon used by WebIDL bindings
   MOZ_CAN_RUN_SCRIPT void WriteCommon(
       const mozilla::dom::Sequence<OwningTrustedHTMLOrString>& aText,
-      bool aNewlineTerminate, mozilla::ErrorResult& rv);
+      bool aNewlineTerminate, nsIPrincipal* aSubjectPrincipal,
+      mozilla::ErrorResult& rv);
 
   void* GenerateParserKey(void);
 

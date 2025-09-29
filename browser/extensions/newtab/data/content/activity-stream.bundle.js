@@ -296,6 +296,7 @@ for (const type of [
   "WEATHER_QUERY_UPDATE",
   "WEATHER_SEARCH_ACTIVE",
   "WEATHER_UPDATE",
+  "WEATHER_USER_OPT_IN_LOCATION",
   "WEBEXT_CLICK",
   "WEBEXT_DISMISS",
   "WIDGETS_LISTS_CHANGE_SELECTED",
@@ -11582,9 +11583,13 @@ function LocationSearch({
   const [selectedLocation, setSelectedLocation] = (0,external_React_namespaceObject.useState)("");
   const suggestedLocations = (0,external_ReactRedux_namespaceObject.useSelector)(state => state.Weather.suggestedLocations);
   const locationSearchString = (0,external_ReactRedux_namespaceObject.useSelector)(state => state.Weather.locationSearchString);
+  const prefs = (0,external_ReactRedux_namespaceObject.useSelector)(state => state.Prefs.values);
+  const showWeatherOptIn = prefs["system.showWeatherOptIn"];
+  const optInAccepted = prefs["weather.optInAccepted"];
   const [userInput, setUserInput] = (0,external_React_namespaceObject.useState)(locationSearchString || "");
   const inputRef = (0,external_React_namespaceObject.useRef)(null);
   const dispatch = (0,external_ReactRedux_namespaceObject.useDispatch)();
+  const canUseUserLocation = showWeatherOptIn && optInAccepted;
   (0,external_React_namespaceObject.useEffect)(() => {
     if (selectedLocation) {
       dispatch(actionCreators.AlsoToMain({
@@ -11607,13 +11612,32 @@ function LocationSearch({
   (0,external_React_namespaceObject.useEffect)(() => {
     inputRef?.current?.focus();
   }, [inputRef]);
+  function handleOptInLocation() {
+    (0,external_ReactRedux_namespaceObject.batch)(() => {
+      dispatch(actionCreators.AlsoToMain({
+        type: actionTypes.WEATHER_USER_OPT_IN_LOCATION
+      }));
+      dispatch(actionCreators.BroadcastToContent({
+        type: actionTypes.WEATHER_SEARCH_ACTIVE,
+        data: false
+      }));
+    });
+  }
   function handleChange(event) {
     const {
       value
     } = event.target;
     setUserInput(value);
+
+    // If a user from a location listed optIn-region-weather-config pref selects Yes from the opt-in dialog,
+    // a persistent value of "Use my location" will show up when focussed on the Input element
+    if (value === "Use my location") {
+      handleOptInLocation();
+      return;
+    }
+
     // if the user input contains less than three characters and suggestedLocations is not an empty array,
-    // reset suggestedLocations to [] so there arent incorrect items in the datalist
+    // reset suggestedLocations to [] so there aren't incorrect items in the datalist
     if (value.length < 3 && suggestedLocations.length) {
       dispatch(actionCreators.AlsoToMain({
         type: actionTypes.WEATHER_LOCATION_SUGGESTIONS_UPDATE,
@@ -11668,10 +11692,13 @@ function LocationSearch({
     onClick: handleCloseSearch
   }), /*#__PURE__*/external_React_default().createElement("datalist", {
     id: "merino-location-list"
-  }, (suggestedLocations || []).map(merinoLcation => /*#__PURE__*/external_React_default().createElement("option", {
-    value: merinoLcation.key,
-    key: merinoLcation.key
-  }, merinoLcation.localized_name, ",", " ", merinoLcation.administrative_area.localized_name)))));
+  }, canUseUserLocation && /*#__PURE__*/external_React_default().createElement("option", {
+    value: "Use my location",
+    selected: true
+  }, "Use my location"), (suggestedLocations || []).map(merinoLocation => /*#__PURE__*/external_React_default().createElement("option", {
+    value: merinoLocation.key,
+    key: merinoLocation.key
+  }, merinoLocation.localized_name, ",", " ", merinoLocation.administrative_area.localized_name)))));
 }
 
 ;// CONCATENATED MODULE: ./content-src/components/Weather/Weather.jsx
@@ -11856,8 +11883,14 @@ class _Weather extends (external_React_default()).PureComponent {
     this.props.dispatch(actionCreators.SetPref("weather.optInDisplayed", false));
   };
   handleAcceptOptIn = () => {
-    this.props.dispatch(actionCreators.SetPref("weather.optInAccepted", true));
-    this.props.dispatch(actionCreators.SetPref("weather.optInDisplayed", false));
+    (0,external_ReactRedux_namespaceObject.batch)(() => {
+      this.props.dispatch(actionCreators.SetPref("weather.optInAccepted", true));
+      this.props.dispatch(actionCreators.SetPref("weather.optInDisplayed", false));
+      this.props.dispatch(actionCreators.BroadcastToContent({
+        type: actionTypes.WEATHER_SEARCH_ACTIVE,
+        data: true
+      }));
+    });
   };
   render() {
     // Check if weather should be rendered
@@ -11887,9 +11920,12 @@ class _Weather extends (external_React_default()).PureComponent {
     const nimbusOptInDisplayed = Prefs.values.trainhopConfig?.weather?.optInDisplayed;
     const optInUserChoice = Prefs.values["weather.optInAccepted"];
     const nimbusOptInUserChoice = Prefs.values.trainhopConfig?.weather?.optInAccepted;
+    const staticWeather = Prefs.values["weather.staticData.enabled"];
+    const nimbusStaticWeather = Prefs.values.trainhopConfig?.weather?.staticDataEnabled;
     const optInPrompt = nimbusOptInDisplayed ?? optInDisplayed ?? false;
     const userChoice = nimbusOptInUserChoice ?? optInUserChoice ?? false;
     const isUserWeatherEnabled = Prefs.values.showWeather;
+    const staticDataEnabled = nimbusStaticWeather ?? staticWeather ?? false;
 
     // Opt-in dialog should only show if:
     // - weather enabled on customization menu
@@ -11898,9 +11934,15 @@ class _Weather extends (external_React_default()).PureComponent {
     // - user hasn't accepted the opt-in yet
     const shouldShowOptInDialog = isUserWeatherEnabled && isOptInEnabled && optInPrompt && !userChoice;
 
+    // Show static weather data only if:
+    // - weather is enabled on customization menu
+    // weather opt-in pref is enabled
+    // static weather data is enabled
+    const showStaticData = isUserWeatherEnabled && isOptInEnabled && staticDataEnabled;
+
     // Note: The temperature units/display options will become secondary menu items
     const WEATHER_SOURCE_CONTEXT_MENU_OPTIONS = [...(Prefs.values["weather.locationSearchEnabled"] ? ["ChangeWeatherLocation"] : []), ...(Prefs.values["weather.temperatureUnits"] === "f" ? ["ChangeTempUnitCelsius"] : ["ChangeTempUnitFahrenheit"]), ...(Prefs.values["weather.display"] === "simple" ? ["ChangeWeatherDisplayDetailed"] : ["ChangeWeatherDisplaySimple"]), "HideWeather", "OpenLearnMoreURL"];
-    const WEATHER_SOURCE_ERROR_CONTEXT_MENU_OPTIONS = [...(Prefs.values["weather.locationSearchEnabled"] ? ["ChangeWeatherLocation"] : []), "HideWeather", "OpenLearnMoreURL"];
+    const WEATHER_SOURCE_SHORTENED_CONTEXT_MENU_OPTIONS = [...(Prefs.values["weather.locationSearchEnabled"] ? ["ChangeWeatherLocation"] : []), "HideWeather", "OpenLearnMoreURL"];
     const contextMenu = contextOpts => /*#__PURE__*/external_React_default().createElement("div", {
       className: "weatherButtonContextMenuWrapper"
     }, /*#__PURE__*/external_React_default().createElement("button", {
@@ -11931,7 +11973,23 @@ class _Weather extends (external_React_default()).PureComponent {
         className: outerClassName
       }, /*#__PURE__*/external_React_default().createElement("div", {
         className: "weatherCard"
-      }, /*#__PURE__*/external_React_default().createElement("a", {
+      }, showStaticData ? /*#__PURE__*/external_React_default().createElement("div", {
+        className: "weatherInfoLink staticWeatherInfo"
+      }, /*#__PURE__*/external_React_default().createElement("div", {
+        className: "weatherIconCol"
+      }, /*#__PURE__*/external_React_default().createElement("span", {
+        className: "weatherIcon iconId3"
+      })), /*#__PURE__*/external_React_default().createElement("div", {
+        className: "weatherText"
+      }, /*#__PURE__*/external_React_default().createElement("div", {
+        className: "weatherForecastRow"
+      }, /*#__PURE__*/external_React_default().createElement("span", {
+        className: "weatherTemperature"
+      }, "22\xB0", Prefs.values["weather.temperatureUnits"])), /*#__PURE__*/external_React_default().createElement("div", {
+        className: "weatherCityRow"
+      }, /*#__PURE__*/external_React_default().createElement("span", {
+        className: "weatherCity"
+      }, "New York City")))) : /*#__PURE__*/external_React_default().createElement("a", {
         "data-l10n-id": "newtab-weather-see-forecast",
         "data-l10n-args": "{\"provider\": \"AccuWeather\xAE\"}",
         href: WEATHER_SUGGESTION.forecast.url,
@@ -11957,7 +12015,7 @@ class _Weather extends (external_React_default()).PureComponent {
         className: "weatherHighLowTemps"
       }, /*#__PURE__*/external_React_default().createElement("span", null, WEATHER_SUGGESTION.forecast.high[Prefs.values["weather.temperatureUnits"]], "\xB0", Prefs.values["weather.temperatureUnits"]), /*#__PURE__*/external_React_default().createElement("span", null, "\u2022"), /*#__PURE__*/external_React_default().createElement("span", null, WEATHER_SUGGESTION.forecast.low[Prefs.values["weather.temperatureUnits"]], "\xB0", Prefs.values["weather.temperatureUnits"])), /*#__PURE__*/external_React_default().createElement("span", {
         className: "weatherTextSummary"
-      }, WEATHER_SUGGESTION.current_conditions.summary)) : null)), contextMenu(WEATHER_SOURCE_CONTEXT_MENU_OPTIONS)), /*#__PURE__*/external_React_default().createElement("span", {
+      }, WEATHER_SUGGESTION.current_conditions.summary)) : null)), contextMenu(showStaticData ? WEATHER_SOURCE_SHORTENED_CONTEXT_MENU_OPTIONS : WEATHER_SOURCE_CONTEXT_MENU_OPTIONS)), /*#__PURE__*/external_React_default().createElement("span", {
         className: "weatherSponsorText"
       }, /*#__PURE__*/external_React_default().createElement("span", {
         "data-l10n-id": "newtab-weather-sponsored",
@@ -11993,7 +12051,7 @@ class _Weather extends (external_React_default()).PureComponent {
       className: "icon icon-info-warning"
     }), " ", /*#__PURE__*/external_React_default().createElement("p", {
       "data-l10n-id": "newtab-weather-error-not-available"
-    }), contextMenu(WEATHER_SOURCE_ERROR_CONTEXT_MENU_OPTIONS)));
+    }), contextMenu(WEATHER_SOURCE_SHORTENED_CONTEXT_MENU_OPTIONS)));
   }
 }
 const Weather_Weather = (0,external_ReactRedux_namespaceObject.connect)(state => ({
@@ -13874,6 +13932,9 @@ function Widgets() {
     if (hasInteracted === false) {
       dispatch(actionCreators.SetPref(prefName, true));
     }
+  }
+  if (!(listsEnabled || timerEnabled)) {
+    return null;
   }
   return /*#__PURE__*/external_React_default().createElement("div", {
     className: "widgets-wrapper"
@@ -16341,7 +16402,7 @@ class BaseContent extends (external_React_default()).PureComponent {
     this.updateWallpaper = this.updateWallpaper.bind(this);
     this.prefersDarkQuery = null;
     this.handleColorModeChange = this.handleColorModeChange.bind(this);
-    this.shouldDisplayTopicSelectionModal = this.shouldDisplayTopicSelectionModal.bind(this);
+    this.onVisible = this.onVisible.bind(this);
     this.toggleDownloadHighlight = this.toggleDownloadHighlight.bind(this);
     this.handleDismissDownloadHighlight = this.handleDismissDownloadHighlight.bind(this);
     this.applyBodyClasses = this.applyBodyClasses.bind(this);
@@ -16361,6 +16422,10 @@ class BaseContent extends (external_React_default()).PureComponent {
       });
     }
   }
+  onVisible() {
+    this.setFirstVisibleTimestamp();
+    this.shouldDisplayTopicSelectionModal();
+  }
   componentDidMount() {
     this.applyBodyClasses();
     __webpack_require__.g.addEventListener("scroll", this.onWindowScroll);
@@ -16368,13 +16433,11 @@ class BaseContent extends (external_React_default()).PureComponent {
     const prefs = this.props.Prefs.values;
     const wallpapersEnabled = prefs["newtabWallpapers.enabled"];
     if (this.props.document.visibilityState === Base_VISIBLE) {
-      this.setFirstVisibleTimestamp();
-      this.shouldDisplayTopicSelectionModal();
+      this.onVisible();
     } else {
       this._onVisibilityChange = () => {
         if (this.props.document.visibilityState === Base_VISIBLE) {
-          this.setFirstVisibleTimestamp();
-          this.shouldDisplayTopicSelectionModal();
+          this.onVisible();
           this.props.document.removeEventListener(Base_VISIBILITY_CHANGE_EVENT, this._onVisibilityChange);
           this._onVisibilityChange = null;
         }

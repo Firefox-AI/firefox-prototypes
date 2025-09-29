@@ -585,14 +585,16 @@ void nsWindow::DispatchDeactivateEvent() {
 }
 
 void nsWindow::DispatchResized() {
-  LOG("nsWindow::DispatchResized() size [%d, %d]", (int)(mBounds.width),
-      (int)(mBounds.height));
-
   if (mIsDestroyed) {
     return;
   }
 
   auto clientSize = GetClientSize();
+
+  LOG("nsWindow::DispatchResized() size [%d, %d] client size [%d, %d]",
+      (int)(mBounds.width), (int)(mBounds.height), (int)clientSize.width,
+      (int)clientSize.height);
+
   // Check mBounds size
   if (mCompositorSession &&
       !wr::WindowSizeSanityCheck(mBounds.width, mBounds.height)) {
@@ -863,7 +865,7 @@ static void FetchAndAdjustPenData(WidgetMouseEvent& aGeckoEvent,
     MOZ_ASSERT(aGeckoEvent.mPressure >= 0.0 && aGeckoEvent.mPressure <= 1.0);
   }
 
-  LOGW("FetchAndAdjustPenData(): pressure %f\n", aGeckoEvent.mPressure);
+  LOGW("FetchAndAdjustPenData(): pressure %.2f\n", aGeckoEvent.mPressure);
 
   aGeckoEvent.mInputSource = dom::MouseEvent_Binding::MOZ_SOURCE_PEN;
   aGeckoEvent.pointerId = 1;
@@ -1127,10 +1129,11 @@ void nsWindow::ResizeInt(const Maybe<LayoutDeviceIntPoint>& aMove,
 }
 
 void nsWindow::Resize(double aWidth, double aHeight, bool aRepaint) {
-  LOG("nsWindow::Resize %f %f\n", aWidth, aHeight);
-
   double scale =
       BoundsUseDesktopPixels() ? GetDesktopToDeviceScale().scale : 1.0;
+  LOG("nsWindow::Resize %.2f x %.2f (scaled %.2f x %.2f)", aWidth, aHeight,
+      scale * aWidth, scale * aHeight);
+
   auto size = LayoutDeviceIntSize::Round(scale * aWidth, scale * aHeight);
 
   ResizeInt(Nothing(), size);
@@ -1138,13 +1141,16 @@ void nsWindow::Resize(double aWidth, double aHeight, bool aRepaint) {
 
 void nsWindow::Resize(double aX, double aY, double aWidth, double aHeight,
                       bool aRepaint) {
-  LOG("nsWindow::Resize [%f,%f] -> [%f x %f] repaint %d\n", aX, aY, aWidth,
-      aHeight, aRepaint);
-
   double scale =
       BoundsUseDesktopPixels() ? GetDesktopToDeviceScale().scale : 1.0;
   auto size = LayoutDeviceIntSize::Round(scale * aWidth, scale * aHeight);
   auto topLeft = LayoutDeviceIntPoint::Round(scale * aX, scale * aY);
+
+  LOG("nsWindow::Resize [%.2f,%.2f] -> [%.2f x %.2f] scaled [%.2f,%.2f] -> "
+      "[%.2f x %.2f] "
+      "repaint %d\n",
+      aX, aY, aWidth, aHeight, scale * aX, scale * aY, scale * aWidth,
+      scale * aHeight, aRepaint);
 
   ResizeInt(Some(topLeft), size);
 }
@@ -3382,11 +3388,11 @@ void nsWindow::RecomputeBounds(MayChangeCsdMargin aMayChangeCsdMargin) {
   auto unconstrainedBounds = mBounds;
   mBounds.SizeTo(GetSafeWindowSize(mBounds.Size()));
 
-  LOG("bounds: %s -> %s (%s unconstrained, frame = %s, toplevel = %s)",
+  LOG("bounds old: %s new -> %s (%s unconstrained, frame = %s, toplevel = %s)",
       ToString(oldBounds).c_str(), ToString(mBounds).c_str(),
       ToString(unconstrainedBounds).c_str(), ToString(frameBounds).c_str(),
       ToString(toplevelBounds).c_str());
-  LOG("margin: %s -> %s", ToString(oldMargin).c_str(),
+  LOG("margin old: %s new -> %s", ToString(oldMargin).c_str(),
       ToString(mClientMargin).c_str());
 
   const bool clientMarginsChanged = oldMargin != mClientMargin;
@@ -4119,11 +4125,13 @@ gboolean nsWindow::OnShellConfigureEvent(GdkEventConfigure* aEvent) {
   //   coordinates are root coordinates.
 
 #ifdef MOZ_LOGGING
-  int scale = mGdkWindow ? gdk_window_get_scale_factor(mGdkWindow) : -1;
-  LOG("configure event %d,%d -> %d x %d direct mGdkWindow scale %d "
-      "(scaled size %d x %d)\n",
-      aEvent->x, aEvent->y, aEvent->width, aEvent->height, scale,
-      aEvent->width * scale, aEvent->height * scale);
+  if (LOG_ENABLED()) {
+    auto scale = FractionalScaleFactor();
+    LOG("nsWindow::OnShellConfigureEvent() [%d,%d] -> [%d x %d] scale %.2f "
+        "(scaled size %.2f x %.2f)\n",
+        aEvent->x, aEvent->y, aEvent->width, aEvent->height, scale,
+        aEvent->width * scale, aEvent->height * scale);
+  }
 #endif
 
   if (mPendingConfigures > 0) {
@@ -4134,7 +4142,7 @@ gboolean nsWindow::OnShellConfigureEvent(GdkEventConfigure* aEvent) {
   // OnScaleEvent event. Skip that for toplevel windows only.
   if (mGdkWindow && IsTopLevelWidget() &&
       mCeiledScaleFactor != gdk_window_get_scale_factor(mGdkWindow)) {
-    LOG("  scale factor changed to %d,return early",
+    LOG("  scale factor changed to %d, return early",
         gdk_window_get_scale_factor(mGdkWindow));
     return FALSE;
   }
@@ -4144,8 +4152,13 @@ gboolean nsWindow::OnShellConfigureEvent(GdkEventConfigure* aEvent) {
 }
 
 void nsWindow::OnContainerSizeAllocate(GtkAllocation* aAllocation) {
-  LOG("nsWindow::OnContainerSizeAllocate %d,%d -> %d x %d\n", aAllocation->x,
-      aAllocation->y, aAllocation->width, aAllocation->height);
+  LOG("nsWindow::OnContainerSizeAllocate [%d,%d] -> [%d x %d] scaled[%.2f] "
+      "[%.2f x "
+      "%.2f]",
+      aAllocation->x, aAllocation->y, aAllocation->width, aAllocation->height,
+      FractionalScaleFactor(), aAllocation->width * FractionalScaleFactor(),
+      aAllocation->height * FractionalScaleFactor());
+
   mHasReceivedSizeAllocate = true;
   if (!mGdkWindow) {
     return;
@@ -4209,7 +4222,7 @@ void nsWindow::OnDeleteEvent() {
 }
 
 void nsWindow::OnEnterNotifyEvent(GdkEventCrossing* aEvent) {
-  LOG("enter notify (win=%p, sub=%p): %f, %f mode %d, detail %d\n",
+  LOG("enter notify (win=%p, sub=%p): %.2f, %.2f mode %d, detail %d\n",
       aEvent->window, aEvent->subwindow, aEvent->x, aEvent->y, aEvent->mode,
       aEvent->detail);
   // This skips NotifyVirtual and NotifyNonlinearVirtual enter notify events
@@ -4286,7 +4299,7 @@ static bool IsBogusLeaveNotifyEvent(GdkWindow* aWindow,
 }
 
 void nsWindow::OnLeaveNotifyEvent(GdkEventCrossing* aEvent) {
-  LOG("leave notify (win=%p, sub=%p): %f, %f mode %d, detail %d\n",
+  LOG("leave notify (win=%p, sub=%p): %.2f, %.2f mode %d, detail %d\n",
       aEvent->window, aEvent->subwindow, aEvent->x, aEvent->y, aEvent->mode,
       aEvent->detail);
 
@@ -4416,8 +4429,8 @@ void nsWindow::EmulateResizeDrag(GdkEventMotion* aEvent) {
   } else {  // GTK_ORIENTATION_HORIZONTAL
     size.height = int(size.width / mAspectRatio);
   }
-  LOG("  aspect ratio correction %d x %d aspect %f\n", size.width, size.height,
-      mAspectRatio);
+  LOG("  aspect ratio correction %d x %d aspect %.2f\n", size.width,
+      size.height, mAspectRatio);
   gtk_window_resize(GTK_WINDOW(mShell), size.width, size.height);
 }
 
@@ -5167,8 +5180,8 @@ void nsWindow::OnScrollEvent(GdkEventScroll* aEvent) {
               (gboolean(*)(const GdkEvent*))dlsym(
                   RTLD_DEFAULT, "gdk_event_is_scroll_stop_event");
 
-          LOG("[%d] pan smooth event dx=%f dy=%f inprogress=%d\n", aEvent->time,
-              aEvent->delta_x, aEvent->delta_y, mPanInProgress);
+          LOG("[%d] pan smooth event dx=%.2f dy=%.2f inprogress=%d\n",
+              aEvent->time, aEvent->delta_x, aEvent->delta_y, mPanInProgress);
           auto eventType = PanGestureInput::PANGESTURE_PAN;
           if (sGdkEventIsScrollStopEvent((GdkEvent*)aEvent)) {
             eventType = PanGestureInput::PANGESTURE_END;
@@ -5282,7 +5295,7 @@ void nsWindow::OnScrollEvent(GdkEventScroll* aEvent) {
 
 void nsWindow::OnSmoothScrollEvent(uint32_t aTime, float aDeltaX,
                                    float aDeltaY) {
-  LOG("OnSmoothScrollEvent time %d dX %f dY %f", aTime, aDeltaX, aDeltaY);
+  LOG("OnSmoothScrollEvent time %d dX %.2f dY %.2f", aTime, aDeltaX, aDeltaY);
 
   // This event was already handled by OnSmoothScrollEvent().
   mLastSmoothScrollEventTime = aTime;
@@ -5822,7 +5835,8 @@ void nsWindow::OnTouchpadHoldEvent(GdkTouchpadGesturePhase aPhase, guint aTime,
 }
 
 gboolean nsWindow::OnTouchEvent(GdkEventTouch* aEvent) {
-  LOG("OnTouchEvent: x=%f y=%f type=%d\n", aEvent->x, aEvent->y, aEvent->type);
+  LOG("OnTouchEvent: x=%.2f y=%.2f type=%d\n", aEvent->x, aEvent->y,
+      aEvent->type);
   if (!mHandleTouchEvent) {
     // If a popup window was spawned (e.g. as the result of a long-press)
     // and touch events got diverted to that window within a touch sequence,
@@ -9040,7 +9054,7 @@ double nsWindow::FractionalScaleFactor() {
   if (mSurface) {
     auto scale = mSurface->GetScale();
     if (scale != sNoScale) {
-      LOGVERBOSE("nsWindow::FractionalScaleFactor(): fractional scale %f",
+      LOGVERBOSE("nsWindow::FractionalScaleFactor(): fractional scale %.2f",
                  scale);
       return scale;
     }
@@ -9775,7 +9789,7 @@ void nsWindow::LockAspectRatio(bool aShouldLock) {
     float height = DevicePixelsToGdkCoordRoundDown(mLastSizeRequest.height);
 
     mAspectRatio = width / height;
-    LOG("nsWindow::LockAspectRatio() width %f height %f aspect %f", width,
+    LOG("nsWindow::LockAspectRatio() width %.2f height %.2f aspect %.2f", width,
         height, mAspectRatio);
   } else {
     mAspectRatio = 0.0;
@@ -9807,8 +9821,8 @@ bool nsWindow::SetEGLNativeWindowSize(
     if (lastSizeLog != sizeLog) {
       lastSizeLog = sizeLog;
       LOGVERBOSE(
-          "nsWindow::SetEGLNativeWindowSize() %d x %d scale %f (unscaled "
-          "%f x %f)",
+          "nsWindow::SetEGLNativeWindowSize() %d x %d scale %.2f (unscaled "
+          "%.2f x %.2f)",
           aEGLWindowSize.width, aEGLWindowSize.height, scale,
           aEGLWindowSize.width / scale, aEGLWindowSize.height / scale);
     }

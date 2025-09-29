@@ -1071,18 +1071,22 @@ class PropertyRestrictions:
 
         return props
 
-    # https://drafts.csswg.org/css-pseudo/#marker-pseudo
+    # https://drafts.csswg.org/css-lists-3/#marker-properties
     @staticmethod
     def marker(data):
         return set(
             [
                 "color",
+                "content",
+                "direction",
+                "line-height",
                 "text-combine-upright",
+                "text-emphasis-color",
+                "text-emphasis-position",
+                "text-emphasis-style",
+                "text-shadow",
                 "text-transform",
                 "unicode-bidi",
-                "direction",
-                "content",
-                "line-height",
                 "-moz-osx-font-smoothing",
             ]
             + PropertyRestrictions.shorthand(data, "text-wrap")

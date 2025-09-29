@@ -92,7 +92,7 @@ import org.mozilla.fenix.tabstray.syncedtabs.OnTabCloseClick as OnSyncedTabClose
  * @param onInactiveTabsCFRDismiss Invoked when the inactive tabs CFR is dismissed.
  * @param onUnlockPbmClick Invoked when user clicks on the Unlock button.
  */
-@Suppress("LongMethod", "LongParameterList", "ComplexMethod")
+@Suppress("LongMethod", "LongParameterList")
 @Composable
 fun TabsTray(
     tabsTrayStore: TabsTrayStore,
@@ -206,6 +206,9 @@ fun TabsTray(
                 },
                 onExitSelectModeClick = {
                     tabsTrayStore.dispatch(TabsTrayAction.ExitSelectMode)
+                },
+                onThreeDotMenuShown = {
+                    tabsTrayStore.dispatch(TabsTrayAction.ThreeDotMenuShown)
                 },
             )
         }

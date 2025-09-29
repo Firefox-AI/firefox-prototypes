@@ -119,7 +119,6 @@ class nsLineLink;
 template <typename Link, bool>
 class GenericLineListIterator;
 using LineListIterator = GenericLineListIterator<nsLineLink, false>;
-class nsAbsoluteContainingBlock;
 class nsContainerFrame;
 class nsPlaceholderFrame;
 class nsStyleChangeList;
@@ -138,6 +137,8 @@ enum class PeekOffsetOption : uint16_t;
 enum class PseudoStyleType : uint8_t;
 enum class TableSelectionMode : uint32_t;
 
+class AbsoluteContainingBlock;
+class AnchorPosReferenceData;
 class EffectSet;
 class LazyLogModule;
 class nsDisplayItem;
@@ -149,6 +150,8 @@ class ScrollContainerFrame;
 class ServoRestyleState;
 class WidgetGUIEvent;
 class WidgetMouseEvent;
+
+void DeleteAnchorPosReferenceData(AnchorPosReferenceData*);
 
 struct PeekOffsetStruct;
 
@@ -1433,8 +1436,9 @@ class nsIFrame : public nsQueryFrame {
 
   NS_DECLARE_FRAME_PROPERTY_DELETABLE(UsedMarginProperty, nsMargin)
   NS_DECLARE_FRAME_PROPERTY_DELETABLE(UsedPaddingProperty, nsMargin)
-  NS_DECLARE_FRAME_PROPERTY_DELETABLE(AnchorPosReferences,
-                                      AnchorPosReferencedAnchors);
+  NS_DECLARE_FRAME_PROPERTY_WITH_DTOR(AnchorPosReferences,
+                                      mozilla::AnchorPosReferenceData,
+                                      mozilla::DeleteAnchorPosReferenceData);
 
   // This tracks the start and end page value for a frame.
   //
@@ -4675,7 +4679,7 @@ class nsIFrame : public nsQueryFrame {
     return !!(mState & NS_FRAME_HAS_ABSPOS_CHILDREN);
   }
   bool HasAbsolutelyPositionedChildren() const;
-  nsAbsoluteContainingBlock* GetAbsoluteContainingBlock() const;
+  mozilla::AbsoluteContainingBlock* GetAbsoluteContainingBlock() const;
   void MarkAsAbsoluteContainingBlock();
   void MarkAsNotAbsoluteContainingBlock();
   // Child frame types override this function to select their own child list
@@ -5931,8 +5935,10 @@ inline nsIFrame* nsFrameList::BackwardFrameTraversal::Prev(nsIFrame* aFrame) {
 }
 
 inline AnchorPosResolutionParams AnchorPosResolutionParams::From(
-    const nsIFrame* aFrame, AnchorPosReferencedAnchors* aReferencedAnchors) {
-  return {aFrame, aFrame->StyleDisplay()->mPosition, aReferencedAnchors};
+    const nsIFrame* aFrame,
+    mozilla::AnchorPosReferenceData* aAnchorPosReferenceData) {
+  return {aFrame, aFrame->StyleDisplay()->mPosition,
+          aFrame->StylePosition()->mPositionArea, aAnchorPosReferenceData};
 }
 
 #endif /* nsIFrame_h___ */

@@ -4434,7 +4434,7 @@
 # (https://w3c.github.io/trusted-types/dist/spec/) is enabled.
 - name: dom.security.trusted_types.enabled
   type: RelaxedAtomicBool
-  value: False
+  value: @IS_NIGHTLY_BUILD@
   mirror: always
 
 # If true, all content requests will get upgraded to HTTPS://
@@ -8070,6 +8070,20 @@
   mirror: once
 
 # Use a more precise method for sampling gradients when *not* using SWGL .
+- name: gfx.webrender.precise-linear-gradients
+  type: bool
+  rust: true
+  value: false
+  mirror: once
+
+# Use a more precise method for sampling gradients when using SWGL.
+- name: gfx.webrender.precise-linear-gradients-swgl
+  type: bool
+  rust: true
+  value: false
+  mirror: once
+
+# Use a more precise method for sampling gradients when *not* using SWGL .
 - name: gfx.webrender.precise-radial-gradients
   type: bool
   rust: true
@@ -9788,7 +9802,7 @@
 # https://drafts.csswg.org/css-anchor-position-1/
 - name: layout.css.anchor-positioning.enabled
   type: RelaxedAtomicBool
-  value: false
+  value: @IS_NIGHTLY_BUILD@
   mirror: always
   rust: true
 
