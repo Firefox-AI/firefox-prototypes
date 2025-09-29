@@ -12,11 +12,14 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs",
 });
 
-import { generateSmartQuickPrompts } from "./utils.mjs";
+import { detectQueryType, generateSmartQuickPrompts } from "./utils.mjs";
 import { attachToElement } from "chrome://browser/content/smartwindow/smartbar.mjs";
 
 const { embedderElement, topChromeWindow } = window.browsingContext;
 
+/**
+ *
+ */
 class SmartWindowPage {
   constructor() {
     this.searchInput = null;
@@ -37,43 +40,6 @@ class SmartWindowPage {
     this.currentTabPageText = "";
 
     this.init();
-  }
-
-  detectQueryType(query) {
-    const trimmedQuery = query.trim().toLowerCase();
-
-    if (
-      /^(about|https?):/.test(trimmedQuery) ||
-      /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(\/.*)?$/.test(
-        trimmedQuery.replace(/^https?:\/\//, "")
-      )
-    ) {
-      return "navigate";
-    }
-
-    if (
-      /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(trimmedQuery) &&
-      !trimmedQuery.includes(" ")
-    ) {
-      return "navigate";
-    }
-
-    if (
-      /^(who|what|when|where|why|how|can)\b/i.test(trimmedQuery) ||
-      trimmedQuery.endsWith("?")
-    ) {
-      return "chat";
-    }
-
-    if (
-      trimmedQuery.startsWith("tab") ||
-      trimmedQuery.startsWith("find") ||
-      trimmedQuery.startsWith("tab switch:")
-    ) {
-      return "action";
-    }
-
-    return "search";
   }
 
   getQueryTypeIcon(type) {
@@ -844,14 +810,14 @@ class SmartWindowPage {
     });
   }
 
-  updateSubmitButton(query) {
+  async updateSubmitButton(query) {
     if (!this.submitButton || !this.buttonText) {
       return;
     }
 
     if (query.trim()) {
       // When there's text, show the appropriate action label
-      const type = this.detectQueryType(query);
+      const type = await detectQueryType(query);
       const label = this.getQueryTypeLabel(type);
       this.buttonText.textContent = label;
       this.submitButton.classList.add("has-text");
@@ -1251,7 +1217,7 @@ class SmartWindowPage {
         // Next 4 search results - run through detectQueryType to determine final type
         const remainingResults = searchResults.slice(1, 5);
         for (const result of remainingResults) {
-          const detectedType = this.detectQueryType(result.text);
+          const detectedType = await detectQueryType(result.text);
           suggestions.push({
             text: result.text,
             type: detectedType,
@@ -1279,7 +1245,7 @@ class SmartWindowPage {
 
       // If we don't have enough suggestions, add some fallbacks
       if (suggestions.length < 4) {
-        const queryType = this.detectQueryType(query);
+        const queryType = await detectQueryType(query);
 
         // Add the query itself if not already present
         if (!suggestions.some(s => s.text === query)) {
@@ -1322,7 +1288,7 @@ class SmartWindowPage {
 
       // Fall back to simple suggestions on error
       const suggestions = [];
-      const type = this.detectQueryType(query);
+      const type = await detectQueryType(query);
 
       suggestions.push(
         { text: query, type },
@@ -1340,12 +1306,12 @@ class SmartWindowPage {
     }
   }
 
-  handleEnter(query) {
+  async handleEnter(query) {
     if (!query.trim()) {
       return;
     }
 
-    const type = this.detectQueryType(query);
+    const type = await detectQueryType(query);
 
     // Hide suggestions after selection
     if (this.smartbar) {
