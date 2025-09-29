@@ -6,6 +6,7 @@ import { createEngine } from "chrome://global/content/ml/EngineProcess.sys.mjs";
 
 /**
  * Detects the type of query based on patterns in the text.
+ * Uses navigate heuristics for URLs/domains, then ML model for chat/search classification.
  *
  * @param {string} query - The query string to analyze
  * @returns {Promise<string>} The detected query type: "navigate", "chat", "action", or "search"
@@ -13,38 +14,29 @@ import { createEngine } from "chrome://global/content/ml/EngineProcess.sys.mjs";
 export async function detectQueryType(query) {
   const trimmedQuery = query.trim().toLowerCase();
 
+  // navigate heuristics (protocols or domain without spaces)
   if (
-    /^(about|https?):/.test(trimmedQuery) ||
-    /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(\/.*)?$/.test(
-      trimmedQuery.replace(/^https?:\/\//, "")
-    )
-  ) {
-    return "navigate";
-  }
-
-  if (
-    /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(trimmedQuery) &&
+    (/^(about|https?):/.test(trimmedQuery) ||
+      /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(\/.*)?$/.test(
+        trimmedQuery.replace(/^https?:\/\//, "")
+      )) &&
     !trimmedQuery.includes(" ")
   ) {
     return "navigate";
   }
 
-  if (
-    /^(who|what|when|where|why|how|can)\b/i.test(trimmedQuery) ||
-    trimmedQuery.endsWith("?")
-  ) {
-    return "chat";
+  // Use ML model for chat vs search classification
+  try {
+    const engine = await createEngine({
+      modelId: "mozilla/query-intent-detection",
+      modelRevision: "v0.1.0",
+      taskName: "text-classification",
+    });
+    return (await engine.run({ args: [[query]] }))[0].label.toLowerCase();
+  } catch (error) {
+    console.error("Error using intent detection model:", error);
+    return "search";
   }
-
-  if (
-    trimmedQuery.startsWith("tab") ||
-    trimmedQuery.startsWith("find") ||
-    trimmedQuery.startsWith("tab switch:")
-  ) {
-    return "action";
-  }
-
-  return "search";
 }
 
 /**
