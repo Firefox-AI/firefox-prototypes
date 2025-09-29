@@ -5,6 +5,49 @@
 import { createEngine } from "chrome://global/content/ml/EngineProcess.sys.mjs";
 
 /**
+ * Detects the type of query based on patterns in the text.
+ *
+ * @param {string} query - The query string to analyze
+ * @returns {Promise<string>} The detected query type: "navigate", "chat", "action", or "search"
+ */
+export async function detectQueryType(query) {
+  const trimmedQuery = query.trim().toLowerCase();
+
+  if (
+    /^(about|https?):/.test(trimmedQuery) ||
+    /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(\/.*)?$/.test(
+      trimmedQuery.replace(/^https?:\/\//, "")
+    )
+  ) {
+    return "navigate";
+  }
+
+  if (
+    /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(trimmedQuery) &&
+    !trimmedQuery.includes(" ")
+  ) {
+    return "navigate";
+  }
+
+  if (
+    /^(who|what|when|where|why|how|can)\b/i.test(trimmedQuery) ||
+    trimmedQuery.endsWith("?")
+  ) {
+    return "chat";
+  }
+
+  if (
+    trimmedQuery.startsWith("tab") ||
+    trimmedQuery.startsWith("find") ||
+    trimmedQuery.startsWith("tab switch:")
+  ) {
+    return "action";
+  }
+
+  return "search";
+}
+
+/**
  * Creates an OpenAI engine instance configured with Smart Window preferences.
  *
  * @returns {Promise<object>} The configured engine instance
