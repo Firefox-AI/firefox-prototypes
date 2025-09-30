@@ -7,7 +7,6 @@
 #include "jit/CodeGenerator.h"
 
 #include "mozilla/Assertions.h"
-#include "mozilla/Casting.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/EndianUtils.h"
 #include "mozilla/EnumeratedArray.h"
@@ -17621,10 +17620,18 @@ void CodeGenerator::visitLoadFixedSlotT(LLoadFixedSlotT* ins) {
 
 template <typename T>
 static void EmitLoadAndUnbox(MacroAssembler& masm, const T& src, MIRType type,
-                             bool fallible, AnyRegister dest, Label* fail) {
+                             bool fallible, AnyRegister dest, Register64 temp,
+                             Label* fail) {
+  MOZ_ASSERT_IF(type == MIRType::Double, temp != Register64::Invalid());
   if (type == MIRType::Double) {
     MOZ_ASSERT(dest.isFloat());
-    masm.ensureDouble(src, dest.fpu(), fail);
+#if defined(JS_NUNBOX32)
+    auto tempVal = ValueOperand(temp.high, temp.low);
+#else
+    auto tempVal = ValueOperand(temp.reg);
+#endif
+    masm.loadValue(src, tempVal);
+    masm.ensureDouble(tempVal, dest.fpu(), fail);
     return;
   }
   if (fallible) {
@@ -17660,12 +17667,14 @@ void CodeGenerator::visitLoadFixedSlotAndUnbox(LLoadFixedSlotAndUnbox* ins) {
   MIRType type = mir->type();
   Register input = ToRegister(ins->object());
   AnyRegister result = ToAnyRegister(ins->output());
+  Register64 maybeTemp = ToTempRegister64OrInvalid(ins->temp0());
   size_t slot = mir->slot();
 
   Address address(input, NativeObject::getFixedSlotOffset(slot));
 
   Label bail;
-  EmitLoadAndUnbox(masm, address, type, mir->fallible(), result, &bail);
+  EmitLoadAndUnbox(masm, address, type, mir->fallible(), result, maybeTemp,
+                   &bail);
   if (mir->fallible()) {
     bailoutFrom(&bail, ins->snapshot());
   }
@@ -17677,12 +17686,14 @@ void CodeGenerator::visitLoadDynamicSlotAndUnbox(
   MIRType type = mir->type();
   Register input = ToRegister(ins->slots());
   AnyRegister result = ToAnyRegister(ins->output());
+  Register64 maybeTemp = ToTempRegister64OrInvalid(ins->temp0());
   size_t slot = mir->slot();
 
   Address address(input, slot * sizeof(JS::Value));
 
   Label bail;
-  EmitLoadAndUnbox(masm, address, type, mir->fallible(), result, &bail);
+  EmitLoadAndUnbox(masm, address, type, mir->fallible(), result, maybeTemp,
+                   &bail);
   if (mir->fallible()) {
     bailoutFrom(&bail, ins->snapshot());
   }
@@ -17693,12 +17704,14 @@ void CodeGenerator::visitLoadElementAndUnbox(LLoadElementAndUnbox* ins) {
   MIRType type = mir->type();
   Register elements = ToRegister(ins->elements());
   AnyRegister result = ToAnyRegister(ins->output());
+  Register64 maybeTemp = ToTempRegister64OrInvalid(ins->temp0());
 
   auto source = ToAddressOrBaseObjectElementIndex(elements, ins->index());
 
   Label bail;
   source.match([&](const auto& source) {
-    EmitLoadAndUnbox(masm, source, type, mir->fallible(), result, &bail);
+    EmitLoadAndUnbox(masm, source, type, mir->fallible(), result, maybeTemp,
+                     &bail);
   });
 
   if (mir->fallible()) {
@@ -17825,7 +17838,7 @@ void CodeGenerator::visitLoadFixedSlotUnboxAndAtomize(
 
   Label bail;
   EmitLoadAndUnbox(masm, slotAddr, MIRType::String, mir->fallible(), result,
-                   &bail);
+                   Register64::Invalid(), &bail);
   emitMaybeAtomizeSlot(ins, result.gpr(), slotAddr,
                        TypedOrValueRegister(MIRType::String, result));
 
@@ -17846,7 +17859,7 @@ void CodeGenerator::visitLoadDynamicSlotUnboxAndAtomize(
 
   Label bail;
   EmitLoadAndUnbox(masm, slotAddr, MIRType::String, mir->fallible(), result,
-                   &bail);
+                   Register64::Invalid(), &bail);
   emitMaybeAtomizeSlot(ins, result.gpr(), slotAddr,
                        TypedOrValueRegister(MIRType::String, result));
 
