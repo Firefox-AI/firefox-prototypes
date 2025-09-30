@@ -637,12 +637,14 @@ class SmartWindowPage {
     const isSmartMode =
       topChromeWindow?.document?.documentElement?.hasAttribute("smart-window");
 
-    if (this.smartbar && isSmartMode) {
+    const isEnabled = this.isSidebarMode || isSmartMode;
+
+    if (this.smartbar && isEnabled) {
       this.focusSearchInputWhenReady();
     }
 
     if (this.smartbar) {
-      if (!isSmartMode) {
+      if (!isEnabled) {
         this.smartbar.setEditable(false);
         if (this.submitButton) {
           this.submitButton.disabled = true;
