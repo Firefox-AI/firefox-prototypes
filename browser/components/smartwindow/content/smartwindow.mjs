@@ -1199,24 +1199,9 @@ class SmartWindowPage {
       const searchResults = urlbarSuggestions.filter(s => s.type === "search");
 
       if (searchResults.length) {
-        // First search result - create both search and chat variants
-        const firstResult = searchResults[0];
-
-        // Original as search type
-        suggestions.push({
-          text: firstResult.text,
-          type: "search",
-        });
-
-        // Same text with "?" as chat type
-        suggestions.push({
-          text: firstResult.text + "?",
-          type: "chat",
-        });
-
-        // Next 4 search results - run through detectQueryType to determine final type
-        const remainingResults = searchResults.slice(1, 5);
-        for (const result of remainingResults) {
+        // Process search results through detectQueryType to determine final type
+        const resultsToProcess = searchResults.slice(0, 6);
+        for (const result of resultsToProcess) {
           const detectedType = await detectQueryType(result.text);
           suggestions.push({
             text: result.text,
@@ -1252,14 +1237,6 @@ class SmartWindowPage {
           suggestions.push({ text: query, type: queryType });
         }
 
-        // Add query variants
-        if (
-          queryType === "search" &&
-          !suggestions.some(s => s.text === query + "?")
-        ) {
-          suggestions.push({ text: query + "?", type: "chat" });
-        }
-
         // Add some generic suggestions if still short
         if (suggestions.length < 6) {
           const fallbacks = [
@@ -1292,10 +1269,6 @@ class SmartWindowPage {
 
       suggestions.push(
         { text: query, type },
-        {
-          text: query + (type === "search" ? "?" : ""),
-          type: type === "search" ? "chat" : "search",
-        },
         { text: "tab next", type: "action" },
         { text: "github.com", type: "navigate" }
       );
