@@ -31,12 +31,15 @@ export async function detectQueryType(query) {
   try {
     if (!queryIntentEngine) {
       queryIntentEngine = await createEngine({
+        engineId: "smart-intent",
         modelId: "mozilla/query-intent-detection",
         modelRevision: "v0.1.0",
         taskName: "text-classification",
       });
     }
-    return (await queryIntentEngine.run({ args: [[query]] }))[0].label.toLowerCase();
+    return (
+      await queryIntentEngine.run({ args: [[query]] })
+    )[0].label.toLowerCase();
   } catch (error) {
     console.error("Error using intent detection model:", error);
     return "search";
@@ -54,6 +57,7 @@ export async function createOpenAIEngine() {
       apiKey: Services.prefs.getStringPref("browser.smartwindow.key"),
       backend: "openai",
       baseURL: Services.prefs.getStringPref("browser.smartwindow.endpoint"),
+      engineId: "smart-openai",
       modelId: Services.prefs.getStringPref("browser.smartwindow.model"),
       modelRevision: "main",
       taskName: "text-generation",
