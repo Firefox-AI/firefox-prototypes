@@ -1418,21 +1418,30 @@ browser {
   background-color: transparent;
 }
 
-/* Hide nav-bar children when in Smart Window mode AND on smart window URLs, except for PanelUI-button */
-:root[smart-window][smart-window-url] #nav-bar-customization-target > *,
-:root[smart-window][smart-window-url] #nav-bar > :not(#PanelUI-button) {
-  visibility: hidden;
+/* Hide nav-bar children when in Smart Window mode AND on smart window URLs. */
+/* stylelint-disable-next-line media-query-no-invalid */
+@media -moz-pref("sidebar.verticalTabs") {
+  :root[smart-window][smart-window-url] #nav-bar-customization-target > *:not(#sidebar-button) {
+    visibility: hidden;
+  }
 }
 
-:root[smart-window][smart-window-url] #sidebar-main,
-:root[smart-window][smart-window-url] #sidebar-box,
+/* stylelint-disable-next-line media-query-no-invalid */
+@media not -moz-pref("sidebar.verticalTabs") {
+  :root[smart-window][smart-window-url] #nav-bar,
+  :root[smart-window][smart-window-url] #sidebar-main,
+  :root[smart-window][smart-window-url] #sidebar-box {
+    visibility: collapse;
+  }
+
+  :root[smart-window][smart-window-url] #tabbrowser-tabbox {
+    box-shadow: none;
+  }
+}
+
 :root[smart-window][smart-window-url] #smartwindow-box,
 :root[smart-window][smart-window-url] #smartwindow-splitter {
   visibility: collapse;
-}
-
-:root[smart-window][smart-window-url] #tabbrowser-tabbox {
-  box-shadow: none;
 }
 
 :root[smart-window] .tabbrowser-tab > .tab-stack > .tab-background[selected] {
@@ -1638,7 +1647,9 @@ browser {
     background: transparent !important;
   }
 
-  /* Always hide nav button when not in smart window mode */
+  /* Always hide nav button when not in smart window mode, or when using
+   * smart window in full page mode. */
+  :root[smart-window][smart-window-url] &,
   :root:not([smart-window]) & {
     display: none;
   }
