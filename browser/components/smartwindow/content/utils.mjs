@@ -28,6 +28,7 @@ export async function detectQueryType(query) {
   // Use ML model for chat vs search classification
   try {
     const engine = await createEngine({
+      engineId: "smart-intent",
       modelId: "mozilla/query-intent-detection",
       modelRevision: "v0.1.0",
       taskName: "text-classification",
@@ -50,6 +51,7 @@ export async function createOpenAIEngine() {
       apiKey: Services.prefs.getStringPref("browser.smartwindow.key"),
       backend: "openai",
       baseURL: Services.prefs.getStringPref("browser.smartwindow.endpoint"),
+      engineId: "smart-openai",
       modelId: Services.prefs.getStringPref("browser.smartwindow.model"),
       modelRevision: "main",
       taskName: "text-generation",
