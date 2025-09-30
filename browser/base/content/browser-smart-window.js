@@ -33,6 +33,13 @@ var SmartWindow = {
     this.setupTabAttrObserver();
     this.reconcileUIToSmartWindowState();
 
+    window
+      .matchMedia(`-moz-pref("sidebar.verticalTabs")`)
+      .addEventListener("change", () => {
+        console.log("Vertical tabs switcheroo");
+        this.reconcileUIToSmartWindowState();
+      });
+
     console.log(
       "[Smart Window]",
       this.isSmartWindowActive() ? "Smart" : "Classic",
@@ -141,7 +148,7 @@ var SmartWindow = {
     updateBookmarkToolbarVisibility();
 
     // Update the hamburger menu item location.
-    this.updateHamburgerMenu();
+    this.updateHamburgerMenuAndModeSwitch();
 
     // Dispatch event that smart window pages can listen to
     window.dispatchEvent(
@@ -218,13 +225,16 @@ var SmartWindow = {
     }
   },
 
-  updateHamburgerMenu() {
+  updateHamburgerMenuAndModeSwitch() {
     let item = PanelUI.menuButton.parentElement;
-    let toolbar = this.isSmartWindowActive()
-      ? document.getElementById("TabsToolbar")
-      : document.getElementById("nav-bar");
+    let toolbar =
+      this.isSmartWindowActive() &&
+      !Services.prefs.getBoolPref("sidebar.verticalTabs", false)
+        ? document.getElementById("TabsToolbar")
+        : document.getElementById("nav-bar");
     let titlebarItems = toolbar.querySelector(".titlebar-buttonbox-container");
     titlebarItems.before(item);
+    item.after(document.getElementById("smart-window-toggle"));
   },
 
   navigateNewTabsToSmartWindow() {
