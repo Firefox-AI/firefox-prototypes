@@ -66,6 +66,7 @@ export function attachToElement(element, options = {}) {
       }),
       Placeholder.configure({
         placeholder: "Ask, search, or type a URL...",
+        showOnlyWhenEditable: false,
       }),
     ],
     content: "",
