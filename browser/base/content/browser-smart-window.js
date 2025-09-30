@@ -29,8 +29,7 @@ var SmartWindow = {
       return;
     }
 
-    this.initToggleButton();
-    this.initCloseButton();
+    this.initButtons();
     this.setupTabAttrObserver();
 
     console.log(
@@ -71,17 +70,19 @@ var SmartWindow = {
     this._viewInitialized = true;
   },
 
-  initToggleButton() {
-    const toggleButton = document.getElementById("smart-window-toggle");
-    const navToggleButton = document.getElementById("smart-window-button");
+  initButtons() {
+    const modeSwitcherButton = document.getElementById("smart-window-toggle");
+    const sidebarButton = document.getElementById(
+      "smart-window-sidebar-button"
+    );
 
-    if (toggleButton) {
+    if (modeSwitcherButton) {
       // Show the button only if the feature is enabled
       if (gSmartWindowEnabled) {
-        toggleButton.hidden = false;
+        modeSwitcherButton.hidden = false;
 
         // Add click event listener to the toggle button
-        toggleButton.addEventListener("command", event => {
+        modeSwitcherButton.addEventListener("command", event => {
           this._ensureViewInitialized();
           PanelUI.showSubView("smart-window-toggle-view", event.target, event);
         });
@@ -89,21 +90,9 @@ var SmartWindow = {
     }
 
     // Initialize the nav bar toggle button (assistant button)
-    if (navToggleButton) {
-      navToggleButton.addEventListener("command", () => {
-        // Just toggle sidebar visibility, not smart window mode
+    if (sidebarButton) {
+      sidebarButton.addEventListener("command", () => {
         this.toggleSidebar();
-      });
-    }
-  },
-
-  initCloseButton() {
-    const closeButton = document.getElementById("smartwindow-close");
-
-    if (closeButton) {
-      closeButton.addEventListener("command", () => {
-        // Just hide the sidebar, don't exit smart window mode
-        this.hideSidebar();
       });
     }
   },
@@ -177,7 +166,9 @@ var SmartWindow = {
   _updateSidebarState() {
     const smartWindowBox = document.getElementById("smartwindow-box");
     const smartWindowSplitter = document.getElementById("smartwindow-splitter");
-    const navToggleButton = document.getElementById("smart-window-button");
+    const sidebarButton = document.getElementById(
+      "smart-window-sidebar-button"
+    );
 
     if (smartWindowBox) {
       smartWindowBox.hidden = !this._sidebarVisible;
@@ -189,7 +180,7 @@ var SmartWindow = {
       smartWindowSplitter.hidden = !this._sidebarVisible;
     }
 
-    navToggleButton?.toggleAttribute("checked", this._sidebarVisible);
+    sidebarButton?.toggleAttribute("checked", this._sidebarVisible);
     document.documentElement.toggleAttribute(
       "smart-window-sidebar",
       this._sidebarVisible
