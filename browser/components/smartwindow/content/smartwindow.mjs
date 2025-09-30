@@ -614,27 +614,17 @@ class SmartWindowPage {
   onDOMReady() {
     this.isSidebarMode = embedderElement.id == "smartwindow-browser";
 
-    const searchInputContainer = document.getElementById("search-input");
+    const editorDiv = document.getElementById("tiptap-editor");
 
-    if (searchInputContainer) {
-      const editorDiv = document.createElement("div");
-      editorDiv.id = "tiptap-editor";
-      editorDiv.className = searchInputContainer.className;
-      searchInputContainer.parentNode.replaceChild(
-        editorDiv,
-        searchInputContainer
-      );
+    this.smartbar = attachToElement(editorDiv, {
+      onKeyDown: event => this.handleKeyDown(event),
+      onUpdate: text => this.handleSearch(text),
+      onSuggestionSelect: suggestion => this.handleEnter(suggestion.text),
+      getQueryTypeIcon: type => this.getQueryTypeIcon(type),
+      getQueryTypeLabel: type => this.getQueryTypeLabel(type),
+    });
 
-      this.smartbar = attachToElement(editorDiv, {
-        onKeyDown: event => this.handleKeyDown(event),
-        onUpdate: text => this.handleSearch(text),
-        onSuggestionSelect: suggestion => this.handleEnter(suggestion.text),
-        getQueryTypeIcon: type => this.getQueryTypeIcon(type),
-        getQueryTypeLabel: type => this.getQueryTypeLabel(type),
-      });
-
-      this.searchInput = editorDiv;
-    }
+    this.searchInput = editorDiv;
 
     this.resultsContainer = document.getElementById("results-container");
     this.chatBot = document.getElementById("chat-bot");
