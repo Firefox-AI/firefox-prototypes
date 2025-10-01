@@ -34,10 +34,7 @@
       <div class="smart-window-container">
         <div class="search-box">
           <div class="input-container">
-            <div
-              id="tiptap-editor"
-              class="tiptap-editor"
-            ></div>
+            <div id="tiptap-editor" class="tiptap-editor"></div>
           </div>
           <div class="tab-context-bar" id="tab-context-bar">
             <div class="tab-context-left">
@@ -69,6 +66,14 @@
               </div>
             </div>
             <div class="tab-context-right">
+              <select class="model-picker" id="model-picker">
+                <option value="qwen3-235b-a22b-instruct-2507-maas">qwen</option>
+                <option value="gpt-4o">gpt-4o</option>
+                <option value="gpt-5-mini">gpt-5-mini</option>
+                <option value="gpt-5">gpt-5</option>
+                <option value="gpt-3.5-turbo">gpt-3.5</option>
+                <option value="mistral-small-2503">mistral</option>
+              </select>
               <button class="submit-button" id="submit-button">
                 <span class="button-text">→</span>
               </button>
