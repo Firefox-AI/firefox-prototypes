@@ -33,6 +33,7 @@ class SmartWindowPage {
     this.suggestionDebounceTimer = null;
     this.lastTabInfo = null;
     this.chatBot = null;
+    this.modelPicker = null;
 
     this.selectedTabContexts = [];
     this.recentTabs = [];
@@ -838,6 +839,23 @@ class SmartWindowPage {
         this.smartbar.focus();
       }
     });
+
+    // Setup model picker
+    this.modelPicker = document.getElementById("model-picker");
+    if (this.modelPicker) {
+      // Set initial value from pref
+      this.modelPicker.value = Services.prefs.getStringPref(
+        "browser.smartwindow.model"
+      );
+
+      // Update pref when model changes
+      this.modelPicker.addEventListener("change", () => {
+        Services.prefs.setStringPref(
+          "browser.smartwindow.model",
+          this.modelPicker.value
+        );
+      });
+    }
   }
 
   async updateSubmitButton(query) {
