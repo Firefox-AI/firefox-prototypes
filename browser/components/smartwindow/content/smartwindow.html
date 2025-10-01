@@ -9,16 +9,28 @@
       href="chrome://browser/content/smartwindow/smartwindow.css"
     />
     <link rel="icon" href="chrome://browser/skin/notification-icons/desktop-notification.svg" />
+    <script
+      type="module"
+      src="chrome://browser/content/smartwindow/mentionInput.mjs"
+    ></script>
   </head>
   <body>
     <div id="root">
       <div class="smart-window-container">
+            <mention-input placeholder="Ask, search, or type a URL"></mention-input>
+        
         <div class="search-box">
           <div class="input-container">
             <div
               id="tiptap-editor"
               class="tiptap-editor"
             ></div>
+
+            <input
+              type="text"
+              id="search-input"
+              placeholder="Ask, search, or type a URL"
+            />
           </div>
           <div class="tab-context-bar" id="tab-context-bar">
             <div class="tab-context-left">

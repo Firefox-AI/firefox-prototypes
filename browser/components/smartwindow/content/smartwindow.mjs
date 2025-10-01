@@ -667,6 +667,25 @@ class SmartWindowPage {
       // Don't await to avoid blocking initialization
       this.showQuickPrompts().catch(console.error);
     }
+
+    const mentionInput = document.querySelector("mention-input");
+    if (mentionInput) {
+       const firefox =
+        'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Firefox_logo%2C_2019.svg/1024px-Firefox_logo%2C_2019.svg.png?20250401130810'
+      const nightly =
+        'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Firefox_Nightly_logo%2C_2019.svg/1971px-Firefox_Nightly_logo%2C_2019.svg.png'
+      const reddit =
+        'https://cdn3.iconfinder.com/data/icons/2018-social-media-logotypes/1000/2018_social_media_popular_app_logo_reddit-512.png'
+
+      
+            mentionInput.mentionOptions = [
+        { type: 'tab', value: 'https://blog.nightly.mozilla.org/', image: nightly },
+        { type: 'tab', value: 'https://www.firefox.com/en-US/', image: firefox },
+        { type: 'tab', value: 'https://www.reddit.com/r/bicycling/', image: reddit },
+        { type: 'user', value: 'Trevor' },
+        { type: 'user', value: 'Merlin' },
+      ]
+    }
   }
 
   focusSearchInputWhenReady() {
