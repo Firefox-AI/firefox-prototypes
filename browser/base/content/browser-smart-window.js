@@ -31,6 +31,7 @@ var SmartWindow = {
 
     this.initButtons();
     this.setupTabAttrObserver();
+    this.reconcileUIToSmartWindowState();
 
     console.log(
       "[Smart Window]",
@@ -97,12 +98,10 @@ var SmartWindow = {
     }
   },
 
-  toggleSmartWindow(skipSave = false) {
+  toggleSmartWindow() {
     console.log(
-      `[Smart Window] toggleSmartWindow called, current state: ${this.isSmartWindowActive()}, skipSave: ${skipSave}`
+      `[Smart Window] toggleSmartWindow called, current state: ${this.isSmartWindowActive()}`
     );
-
-    const root = document.documentElement;
 
     // Remove any preloaded new tab page browser when switching modes
     // This ensures the next new tab will use the correct type
@@ -111,7 +110,11 @@ var SmartWindow = {
     }
 
     // Toggle internal state.
-    root.toggleAttribute("smart-window");
+    document.documentElement.toggleAttribute("smart-window");
+    this.reconcileUIToSmartWindowState();
+  },
+
+  reconcileUIToSmartWindowState() {
     if (this.isSmartWindowActive()) {
       // Check if we're on a smart window page
       const currentURI = gBrowser.selectedBrowser?.currentURI?.spec || "";
