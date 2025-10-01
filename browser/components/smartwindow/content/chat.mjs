@@ -323,10 +323,11 @@ When creating search suggestions, incorporate these contextual details to make s
     return { cleanContent: cleanContent.trim(), searchQueries, usedInsights };
   }
 
-  handleSearchQuery(query) {
+  handleSearchQuery(query, clickEvent) {
     // Dispatch custom event to be handled by smartwindow.mjs
+    // Todo - render this as a link to default search provider instead of using a button with events.
     const event = new CustomEvent("search-suggested", {
-      detail: { query },
+      detail: { query, clickEvent },
       bubbles: true,
     });
     this.dispatchEvent(event);
@@ -400,7 +401,7 @@ When creating search suggestions, incorporate these contextual details to make s
                               query => html`
                                 <button
                                   class="search-button"
-                                  @click=${() => this.handleSearchQuery(query)}
+                                  @click=${(e) => this.handleSearchQuery(query, e)}
                                 >
                                   <svg
                                     width="16"
