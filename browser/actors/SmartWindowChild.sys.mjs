@@ -27,10 +27,6 @@ export class SmartWindowChild extends JSWindowActorChild {
         this.sendAsyncMessage("SmartWindow:DoSearch", message.data);
         break;
 
-      case "SmartWindow:Navigate":
-        this.sendAsyncMessage("SmartWindow:DoNavigate", message.data);
-        break;
-
       case "SmartWindow:UpdateResults":
         this.contentWindow.dispatchEvent(
           new this.contentWindow.CustomEvent("SmartWindowMessage", {
