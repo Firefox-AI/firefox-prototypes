@@ -251,6 +251,7 @@ export class OpenAIPipeline {
       const backendError = this.#errorFactory(error);
       port?.postMessage({ done: true, ok: false, error: backendError });
       inferenceProgressCallback?.({
+        message: backendError.message,
         ok: false,
         metadata: {
           text: "",
