@@ -22,10 +22,6 @@ export class SmartWindowParent extends JSWindowActorParent {
       case "SmartWindow:DoNavigate":
         this.handleNavigate(message.data.query);
         break;
-
-      case "SmartWindow:Navigate":
-        this.handleSmartWindowNavigation(message.data.url);
-        break;
     }
   }
 
@@ -101,31 +97,5 @@ export class SmartWindowParent extends JSWindowActorParent {
     browser.loadURI(Services.io.newURI(url), {
       triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
     });
-  }
-
-  handleSmartWindowNavigation(url) {
-    const browser = this.browsingContext.top.embedderElement;
-    if (!browser) {
-      return;
-    }
-
-    const win = browser.ownerGlobal;
-    if (!win) {
-      return;
-    }
-
-    // Load the new URL with REPLACE flag to replace the smart window in history
-    browser.loadURI(Services.io.newURI(url), {
-      triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
-      loadFlags: Ci.nsIWebNavigation.LOAD_FLAGS_REPLACE_HISTORY,
-    });
-
-    // Smart window is now a right sidebar, not part of the left sidebar system
-    // Toggle the smart window right sidebar
-    if (win.SmartWindow) {
-      if (!win.SmartWindow._smartWindowActive) {
-        win.SmartWindow.toggleSmartWindow();
-      }
-    }
   }
 }
