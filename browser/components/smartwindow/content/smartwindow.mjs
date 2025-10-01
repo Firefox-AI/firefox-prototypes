@@ -1382,6 +1382,12 @@ class SmartWindowPage {
       }
     }
 
+    // Clear any pending suggestion timer to prevent race condition
+    if (this.suggestionDebounceTimer) {
+      clearTimeout(this.suggestionDebounceTimer);
+      this.suggestionDebounceTimer = null;
+    }
+
     // Clear editor and reset state
     if (this.smartbar) {
       this.smartbar.clear();

@@ -161,6 +161,11 @@ export function attachToElement(element, options = {}) {
       return;
     }
 
+    // Don't show suggestions if the input is empty
+    if (!editor.getText().trim()) {
+      return;
+    }
+
     suggestionsContainer.classList.remove("hidden");
 
     if (isQuickPrompts) {
@@ -265,7 +270,6 @@ export function attachToElement(element, options = {}) {
       }
     },
 
-    // Suggestions API
     showSuggestions,
     hideSuggestions,
     navigateSuggestions,
