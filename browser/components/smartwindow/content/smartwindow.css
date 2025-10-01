@@ -215,6 +215,29 @@ html, body {
   flex: 1; /* Take available space */
 }
 
+/* Model picker styles */
+.model-picker {
+  background: transparent;
+  border: 0;
+  color: #15141a;
+  cursor: pointer;
+  font-size: 13px;
+  margin-right: 8px;
+  min-height: 32px;
+  opacity: 0.5;
+  padding: 4px 12px;
+  text-align: end;
+  transition: all 0.2s ease;
+
+  @media not -moz-pref("browser.smartwindow.endpoint", "https://stage.llm-proxy.nonprod.dataservices.mozgcp.net/") {
+    display: none;
+  }
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
 /* Submit button styles */
 .submit-button {
   padding: 4px 16px;
