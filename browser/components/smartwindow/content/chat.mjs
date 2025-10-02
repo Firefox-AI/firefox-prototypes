@@ -401,7 +401,8 @@ When creating search suggestions, incorporate these contextual details to make s
                               query => html`
                                 <button
                                   class="search-button"
-                                  @click=${(e) => this.handleSearchQuery(query, e)}
+                                  @click=${e =>
+                                    this.handleSearchQuery(query, e)}
                                 >
                                   <svg
                                     width="16"
