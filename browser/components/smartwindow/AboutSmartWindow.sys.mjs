@@ -5,6 +5,9 @@
 const ABOUT_SMARTWINDOW_URL =
   "chrome://browser/content/smartwindow/smartwindow.html";
 
+/**
+ *
+ */
 export class AboutSmartWindow {
   static get aboutModuleInfo() {
     return {
