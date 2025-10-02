@@ -16116,8 +16116,10 @@ function selectionToInsertionEnd(tr2, startLen, bias) {
 }
 var InputRule = class {
   constructor(config) {
+    var _a;
     this.find = config.find;
     this.handler = config.handler;
+    this.undoable = (_a = config.undoable) != null ? _a : true;
   }
 };
 var inputRuleMatcherHandler = (text, find2) => {
@@ -16193,12 +16195,14 @@ function run$2(config) {
     if (handler === null || !tr2.steps.length) {
       return;
     }
-    tr2.setMeta(plugin, {
-      transform: tr2,
-      from: from2,
-      to,
-      text,
-    });
+    if (rule.undoable) {
+      tr2.setMeta(plugin, {
+        transform: tr2,
+        from: from2,
+        to,
+        text,
+      });
+    }
     view.dispatch(tr2);
     matched = true;
   });
@@ -16472,17 +16476,30 @@ function run2(config) {
   });
   const handlers2 = [];
   state.doc.nodesBetween(from2, to, (node, pos) => {
-    if (!node.isTextblock || node.type.spec.code) {
+    var _a, _b, _c, _d, _e;
+    if (
+      ((_b = (_a = node.type) == null ? void 0 : _a.spec) == null
+        ? void 0
+        : _b.code) ||
+      !(node.isText || node.isTextblock || node.isInline)
+    ) {
       return;
     }
+    const contentSize =
+      (_e =
+        (_d = (_c = node.content) == null ? void 0 : _c.size) != null
+          ? _d
+          : node.nodeSize) != null
+        ? _e
+        : 0;
     const resolvedFrom = Math.max(from2, pos);
-    const resolvedTo = Math.min(to, pos + node.content.size);
-    const textToMatch = node.textBetween(
-      resolvedFrom - pos,
-      resolvedTo - pos,
-      void 0,
-      "￼"
-    );
+    const resolvedTo = Math.min(to, pos + contentSize);
+    if (resolvedFrom >= resolvedTo) {
+      return;
+    }
+    const textToMatch = node.isText
+      ? node.text || ""
+      : node.textBetween(resolvedFrom - pos, resolvedTo - pos, void 0, "￼");
     const matches2 = pasteRuleMatcherHandler(
       textToMatch,
       rule.find,
@@ -16723,86 +16740,86 @@ var ExtensionManager = class {
   get plugins() {
     const { editor } = this;
     const extensions = sortExtensions([...this.extensions].reverse());
-    const inputRules = [];
-    const pasteRules = [];
-    const allPlugins = extensions
-      .map(extension => {
-        const context = {
-          name: extension.name,
-          options: extension.options,
-          storage: this.editor.extensionStorage[extension.name],
-          editor,
-          type: getSchemaTypeByName(extension.name, this.schema),
-        };
-        const plugins = [];
-        const addKeyboardShortcuts = getExtensionField(
-          extension,
-          "addKeyboardShortcuts",
-          context
-        );
-        let defaultBindings = {};
-        if (
-          extension.type === "mark" &&
-          getExtensionField(extension, "exitable", context)
-        ) {
-          defaultBindings.ArrowRight = () =>
-            Mark2.handleExit({ editor, mark: extension });
-        }
-        if (addKeyboardShortcuts) {
-          const bindings = Object.fromEntries(
-            Object.entries(addKeyboardShortcuts()).map(([shortcut, method]) => {
-              return [shortcut, () => method({ editor })];
-            })
-          );
-          defaultBindings = { ...defaultBindings, ...bindings };
-        }
-        const keyMapPlugin = keymap(defaultBindings);
-        plugins.push(keyMapPlugin);
-        const addInputRules = getExtensionField(
-          extension,
-          "addInputRules",
-          context
-        );
-        if (
-          isExtensionRulesEnabled(extension, editor.options.enableInputRules) &&
-          addInputRules
-        ) {
-          inputRules.push(...addInputRules());
-        }
-        const addPasteRules = getExtensionField(
-          extension,
-          "addPasteRules",
-          context
-        );
-        if (
-          isExtensionRulesEnabled(extension, editor.options.enablePasteRules) &&
-          addPasteRules
-        ) {
-          pasteRules.push(...addPasteRules());
-        }
-        const addProseMirrorPlugins = getExtensionField(
-          extension,
-          "addProseMirrorPlugins",
-          context
-        );
-        if (addProseMirrorPlugins) {
-          const proseMirrorPlugins = addProseMirrorPlugins();
-          plugins.push(...proseMirrorPlugins);
-        }
-        return plugins;
-      })
-      .flat();
-    return [
-      inputRulesPlugin({
+    const allPlugins = extensions.flatMap(extension => {
+      const context = {
+        name: extension.name,
+        options: extension.options,
+        storage: this.editor.extensionStorage[extension.name],
         editor,
-        rules: inputRules,
-      }),
-      ...pasteRulesPlugin({
-        editor,
-        rules: pasteRules,
-      }),
-      ...allPlugins,
-    ];
+        type: getSchemaTypeByName(extension.name, this.schema),
+      };
+      const plugins = [];
+      const addKeyboardShortcuts = getExtensionField(
+        extension,
+        "addKeyboardShortcuts",
+        context
+      );
+      let defaultBindings = {};
+      if (
+        extension.type === "mark" &&
+        getExtensionField(extension, "exitable", context)
+      ) {
+        defaultBindings.ArrowRight = () =>
+          Mark2.handleExit({ editor, mark: extension });
+      }
+      if (addKeyboardShortcuts) {
+        const bindings = Object.fromEntries(
+          Object.entries(addKeyboardShortcuts()).map(([shortcut, method]) => {
+            return [shortcut, () => method({ editor })];
+          })
+        );
+        defaultBindings = { ...defaultBindings, ...bindings };
+      }
+      const keyMapPlugin = keymap(defaultBindings);
+      plugins.push(keyMapPlugin);
+      const addInputRules = getExtensionField(
+        extension,
+        "addInputRules",
+        context
+      );
+      if (
+        isExtensionRulesEnabled(extension, editor.options.enableInputRules) &&
+        addInputRules
+      ) {
+        const rules = addInputRules();
+        if (rules && rules.length) {
+          const inputResult = inputRulesPlugin({
+            editor,
+            rules,
+          });
+          const inputPlugins = Array.isArray(inputResult)
+            ? inputResult
+            : [inputResult];
+          plugins.push(...inputPlugins);
+        }
+      }
+      const addPasteRules = getExtensionField(
+        extension,
+        "addPasteRules",
+        context
+      );
+      if (
+        isExtensionRulesEnabled(extension, editor.options.enablePasteRules) &&
+        addPasteRules
+      ) {
+        const rules = addPasteRules();
+        if (rules && rules.length) {
+          const pasteRules = pasteRulesPlugin({ editor, rules });
+          plugins.push(...pasteRules);
+        }
+      }
+      const addProseMirrorPlugins = getExtensionField(
+        extension,
+        "addProseMirrorPlugins",
+        context
+      );
+      if (addProseMirrorPlugins) {
+        const proseMirrorPlugins = addProseMirrorPlugins();
+        plugins.push(...proseMirrorPlugins);
+      }
+      return plugins;
+    });
+    return allPlugins;
   }
   /**
    * Get all attributes from the extensions.
@@ -17377,7 +17394,6 @@ var insertContentAt =
         ...options,
       };
       let content;
-      const { selection } = editor.state;
       const emitContentError = error => {
         editor.emit("contentError", {
           editor,
@@ -17466,10 +17482,11 @@ var insertContentAt =
         tr2.insertText(newContent, from2, to);
       } else {
         newContent = content;
-        const fromSelectionAtStart = selection.$from.parentOffset === 0;
-        const isTextSelection2 =
-          selection.$from.node().isText || selection.$from.node().isTextblock;
-        const hasContent = selection.$from.node().content.size > 0;
+        const $from = tr2.doc.resolve(from2);
+        const $fromNode = $from.node();
+        const fromSelectionAtStart = $from.parentOffset === 0;
+        const isTextSelection2 = $fromNode.isText || $fromNode.isTextblock;
+        const hasContent = $fromNode.content.size > 0;
         if (fromSelectionAtStart && isTextSelection2 && hasContent) {
           from2 = Math.max(0, from2 - 1);
         }
@@ -17791,9 +17808,11 @@ function canSetMark(state, tr2, newMarkType) {
   }
   if (cursor) {
     const currentMarks = (_a = state.storedMarks) != null ? _a : cursor.marks();
+    const parentAllowsMarkType = cursor.parent.type.allowsMarkType(newMarkType);
     return (
-      !!newMarkType.isInSet(currentMarks) ||
-      !currentMarks.some(mark => mark.type.excludes(newMarkType))
+      parentAllowsMarkType &&
+      (!!newMarkType.isInSet(currentMarks) ||
+        !currentMarks.some(mark => mark.type.excludes(newMarkType)))
     );
   }
   const { ranges } = selection;
@@ -19143,6 +19162,8 @@ var Editor = class extends EventEmitter {
       emitContentError: false,
       onBeforeCreate: () => null,
       onCreate: () => null,
+      onMount: () => null,
+      onUnmount: () => null,
       onUpdate: () => null,
       onSelectionUpdate: () => null,
       onTransaction: () => null,
@@ -19164,6 +19185,8 @@ var Editor = class extends EventEmitter {
     this.createSchema();
     this.on("beforeCreate", this.options.onBeforeCreate);
     this.emit("beforeCreate", { editor: this });
+    this.on("mount", this.options.onMount);
+    this.on("unmount", this.options.onUnmount);
     this.on("contentError", this.options.onContentError);
     this.on("create", this.options.onCreate);
     this.on("update", this.options.onUpdate);
@@ -19200,6 +19223,10 @@ var Editor = class extends EventEmitter {
       );
     }
     this.createView(el);
+    this.emit("mount", { editor: this });
+    if (this.css && !document.head.contains(this.css)) {
+      document.head.appendChild(this.css);
+    }
     window.setTimeout(() => {
       if (this.isDestroyed) {
         return;
@@ -19213,7 +19240,6 @@ var Editor = class extends EventEmitter {
    * Remove the editor from the DOM, but still allow remounting at a different point in time
    */
   unmount() {
-    var _a;
     if (this.editorView) {
       const dom = this.editorView.dom;
       if (dom == null ? void 0 : dom.editor) {
@@ -19223,8 +19249,19 @@ var Editor = class extends EventEmitter {
     }
     this.editorView = null;
     this.isInitialized = false;
-    (_a = this.css) == null ? void 0 : _a.remove();
+    if (this.css) {
+      try {
+        if (typeof this.css.remove === "function") {
+          this.css.remove();
+        } else if (this.css.parentNode) {
+          this.css.parentNode.removeChild(this.css);
+        }
+      } catch (error) {
+        console.warn("Failed to remove CSS element:", error);
+      }
+    }
     this.css = null;
+    this.emit("unmount", { editor: this });
   }
   /**
    * Returns the editor storage.
@@ -19309,7 +19346,7 @@ var Editor = class extends EventEmitter {
           this.editorState = state;
         },
         dispatch: tr2 => {
-          this.editorState = this.state.apply(tr2);
+          this.dispatchTransaction(tr2);
         },
         // Stub some commonly accessed properties to prevent errors
         composing: false,
@@ -19505,12 +19542,13 @@ var Editor = class extends EventEmitter {
       },
       dispatchTransaction: this.dispatchTransaction.bind(this),
       state: this.editorState,
+      markViews: this.extensionManager.markViews,
+      nodeViews: this.extensionManager.nodeViews,
     });
     const newState = this.state.reconfigure({
       plugins: this.extensionManager.plugins,
     });
     this.view.updateState(newState);
-    this.createNodeViews();
     this.prependClass();
     this.injectCSS();
     const dom = this.view.dom;
@@ -19750,6 +19788,7 @@ function markInputRule(config) {
         tr2.removeStoredMark(config.type);
       }
     },
+    undoable: config.undoable,
   });
 }
 function nodeInputRule(config) {
@@ -19781,6 +19820,7 @@ function nodeInputRule(config) {
       }
       tr2.scrollIntoView();
     },
+    undoable: config.undoable,
   });
 }
 function textblockTypeInputRule(config) {
@@ -19801,6 +19841,7 @@ function textblockTypeInputRule(config) {
         .delete(range.from, range.to)
         .setBlockType(range.from, range.from, config.type, attributes);
     },
+    undoable: config.undoable,
   });
 }
 function textInputRule(config) {
@@ -19822,6 +19863,7 @@ function textInputRule(config) {
       }
       state.tr.insertText(insert, start, end);
     },
+    undoable: config.undoable,
   });
 }
 function wrappingInputRule(config) {
@@ -19870,6 +19912,7 @@ function wrappingInputRule(config) {
         tr2.join(range.from - 1);
       }
     },
+    undoable: config.undoable,
   });
 }
 function Fragment6(props) {
@@ -20094,9 +20137,34 @@ var NodeView = class {
       y = handleBox.y - domBox.y + offsetY;
     }
     const clonedNode = this.dom.cloneNode(true);
-    (_g = event.dataTransfer) == null
-      ? void 0
-      : _g.setDragImage(clonedNode, x, y);
+    try {
+      const domBox = this.dom.getBoundingClientRect();
+      clonedNode.style.width = `${Math.round(domBox.width)}px`;
+      clonedNode.style.height = `${Math.round(domBox.height)}px`;
+      clonedNode.style.boxSizing = "border-box";
+      clonedNode.style.pointerEvents = "none";
+    } catch {}
+    let dragImageWrapper = null;
+    try {
+      dragImageWrapper = document.createElement("div");
+      dragImageWrapper.style.position = "absolute";
+      dragImageWrapper.style.top = "-9999px";
+      dragImageWrapper.style.left = "-9999px";
+      dragImageWrapper.style.pointerEvents = "none";
+      dragImageWrapper.appendChild(clonedNode);
+      document.body.appendChild(dragImageWrapper);
+      (_g = event.dataTransfer) == null
+        ? void 0
+        : _g.setDragImage(clonedNode, x, y);
+    } finally {
+      if (dragImageWrapper) {
+        setTimeout(() => {
+          try {
+            dragImageWrapper == null ? void 0 : dragImageWrapper.remove();
+          } catch {}
+        }, 0);
+      }
+    }
     const pos = this.getPos();
     if (typeof pos !== "number") {
       return;
@@ -20804,7 +20872,7 @@ var CodeBlock = Node3.create({
     ];
   },
 });
-var index_default$6 = CodeBlock;
+var index_default$7 = CodeBlock;
 var Document = Node3.create({
   name: "doc",
   topNode: true,
@@ -22873,7 +22941,7 @@ var Link = Mark2.create({
     return plugins;
   },
 });
-var index_default$5 = Link;
+var index_default$6 = Link;
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -25300,7 +25368,7 @@ var StarterKit = Extension.create({
     return extensions;
   },
 });
-var index_default$4 = StarterKit;
+var index_default$5 = StarterKit;
 const sides = ["top", "right", "bottom", "left"];
 const alignments = ["start", "end"];
 const placements = /* @__PURE__ */ sides.reduce(
@@ -25311,6 +25379,7 @@ const placements = /* @__PURE__ */ sides.reduce(
 const min = Math.min;
 const max = Math.max;
 const round = Math.round;
+const floor = Math.floor;
 const createCoords = v => ({
   x: v,
   y: v,
@@ -25581,7 +25650,7 @@ const computePosition$1 = async (reference, floating, config) => {
     middlewareData,
   };
 };
-async function detectOverflow(state, options) {
+async function detectOverflow$1(state, options) {
   var _await$platform$isEle;
   if (options === void 0) {
     options = {};
@@ -25807,7 +25876,7 @@ const autoPlacement$1 = function (options) {
               allowedPlacements
             )
           : allowedPlacements;
-      const overflow = await detectOverflow(state, detectOverflowOptions);
+      const overflow = await detectOverflow$1(state, detectOverflowOptions);
       const currentIndex =
         ((_middlewareData$autoP = middlewareData.autoPlacement) == null
           ? void 0
@@ -25955,7 +26024,7 @@ const flip$1 = function (options) {
         );
       }
       const placements2 = [initialPlacement, ...fallbackPlacements];
-      const overflow = await detectOverflow(state, detectOverflowOptions);
+      const overflow = await detectOverflow$1(state, detectOverflowOptions);
       const overflows = [];
       let overflowsData =
         ((_middlewareData$flip = middlewareData.flip) == null
@@ -26085,7 +26154,7 @@ const hide$1 = function (options) {
         evaluate(options, state);
       switch (strategy) {
         case "referenceHidden": {
-          const overflow = await detectOverflow(state, {
+          const overflow = await detectOverflow$1(state, {
             ...detectOverflowOptions,
             elementContext: "reference",
           });
@@ -26098,7 +26167,7 @@ const hide$1 = function (options) {
           };
         }
         case "escaped": {
-          const overflow = await detectOverflow(state, {
+          const overflow = await detectOverflow$1(state, {
             ...detectOverflowOptions,
             altBoundary: true,
           });
@@ -26351,7 +26420,7 @@ const shift$1 = function (options) {
         x,
         y,
       };
-      const overflow = await detectOverflow(state, detectOverflowOptions);
+      const overflow = await detectOverflow$1(state, detectOverflowOptions);
       const crossAxis = getSideAxis(getSide(placement));
       const mainAxis = getOppositeAxis(crossAxis);
       let mainAxisCoord = coords[mainAxis];
@@ -26389,6 +26458,90 @@ const shift$1 = function (options) {
     },
   };
 };
+const limitShift$1 = function (options) {
+  if (options === void 0) {
+    options = {};
+  }
+  return {
+    options,
+    fn(state) {
+      const { x, y, placement, rects, middlewareData } = state;
+      const {
+        offset: offset2 = 0,
+        mainAxis: checkMainAxis = true,
+        crossAxis: checkCrossAxis = true,
+      } = evaluate(options, state);
+      const coords = {
+        x,
+        y,
+      };
+      const crossAxis = getSideAxis(placement);
+      const mainAxis = getOppositeAxis(crossAxis);
+      let mainAxisCoord = coords[mainAxis];
+      let crossAxisCoord = coords[crossAxis];
+      const rawOffset = evaluate(offset2, state);
+      const computedOffset =
+        typeof rawOffset === "number"
+          ? {
+              mainAxis: rawOffset,
+              crossAxis: 0,
+            }
+          : {
+              mainAxis: 0,
+              crossAxis: 0,
+              ...rawOffset,
+            };
+      if (checkMainAxis) {
+        const len = mainAxis === "y" ? "height" : "width";
+        const limitMin =
+          rects.reference[mainAxis] -
+          rects.floating[len] +
+          computedOffset.mainAxis;
+        const limitMax =
+          rects.reference[mainAxis] +
+          rects.reference[len] -
+          computedOffset.mainAxis;
+        if (mainAxisCoord < limitMin) {
+          mainAxisCoord = limitMin;
+        } else if (mainAxisCoord > limitMax) {
+          mainAxisCoord = limitMax;
+        }
+      }
+      if (checkCrossAxis) {
+        var _middlewareData$offse, _middlewareData$offse2;
+        const len = mainAxis === "y" ? "width" : "height";
+        const isOriginSide = originSides.has(getSide(placement));
+        const limitMin =
+          rects.reference[crossAxis] -
+          rects.floating[len] +
+          (isOriginSide
+            ? ((_middlewareData$offse = middlewareData.offset) == null
+                ? void 0
+                : _middlewareData$offse[crossAxis]) || 0
+            : 0) +
+          (isOriginSide ? 0 : computedOffset.crossAxis);
+        const limitMax =
+          rects.reference[crossAxis] +
+          rects.reference[len] +
+          (isOriginSide
+            ? 0
+            : ((_middlewareData$offse2 = middlewareData.offset) == null
+                ? void 0
+                : _middlewareData$offse2[crossAxis]) || 0) -
+          (isOriginSide ? computedOffset.crossAxis : 0);
+        if (crossAxisCoord < limitMin) {
+          crossAxisCoord = limitMin;
+        } else if (crossAxisCoord > limitMax) {
+          crossAxisCoord = limitMax;
+        }
+      }
+      return {
+        [mainAxis]: mainAxisCoord,
+        [crossAxis]: crossAxisCoord,
+      };
+    },
+  };
+};
 const size$1 = function (options) {
   if (options === void 0) {
     options = {};
@@ -26403,7 +26556,7 @@ const size$1 = function (options) {
         options,
         state
       );
-      const overflow = await detectOverflow(state, detectOverflowOptions);
+      const overflow = await detectOverflow$1(state, detectOverflowOptions);
       const side = getSide(placement);
       const alignment = getAlignment(placement);
       const isYAxis = getSideAxis(placement) === "y";
@@ -26667,6 +26820,9 @@ function getOverflowAncestors(node, list, traverseIframes) {
   if (list === void 0) {
     list = [];
   }
+  if (traverseIframes === void 0) {
+    traverseIframes = true;
+  }
   const scrollableAncestor = getNearestOverflowAncestor(node);
   const isBody =
     scrollableAncestor ===
@@ -26675,17 +26831,17 @@ function getOverflowAncestors(node, list, traverseIframes) {
       : _node$ownerDocument2.body);
   const win = getWindow(scrollableAncestor);
   if (isBody) {
-    getFrameElement(win);
+    const frameElement = getFrameElement(win);
     return list.concat(
       win,
       win.visualViewport || [],
       isOverflowElement(scrollableAncestor) ? scrollableAncestor : [],
-      []
+      frameElement && traverseIframes ? getOverflowAncestors(frameElement) : []
     );
   }
   return list.concat(
     scrollableAncestor,
-    getOverflowAncestors(scrollableAncestor, [])
+    getOverflowAncestors(scrollableAncestor, [], traverseIframes)
   );
 }
 function getFrameElement(win) {
@@ -26836,18 +26992,12 @@ function getWindowScrollBarX(element, rect) {
   }
   return rect.left + leftScroll;
 }
-function getHTMLOffset(documentElement, scroll, ignoreScrollbarX) {
-  if (ignoreScrollbarX === void 0) {
-    ignoreScrollbarX = false;
-  }
+function getHTMLOffset(documentElement, scroll) {
   const htmlRect = documentElement.getBoundingClientRect();
   const x =
     htmlRect.left +
     scroll.scrollLeft -
-    (ignoreScrollbarX
-      ? 0
-      : // RTL <body> scrollbar.
-        getWindowScrollBarX(documentElement, htmlRect));
+    getWindowScrollBarX(documentElement, htmlRect);
   const y = htmlRect.top + scroll.scrollTop;
   return {
     x,
@@ -26885,7 +27035,7 @@ function convertOffsetParentRelativeRectToViewportRelativeRect(_ref) {
   }
   const htmlOffset =
     documentElement && !isOffsetParentAnElement && !isFixed
-      ? getHTMLOffset(documentElement, scroll, true)
+      ? getHTMLOffset(documentElement, scroll)
       : createCoords(0);
   return {
     width: rect.width * scale.x,
@@ -26926,6 +27076,7 @@ function getDocumentRect(element) {
     y,
   };
 }
+const SCROLLBAR_MAX = 25;
 function getViewportRect(element, strategy) {
   const win = getWindow(element);
   const html = getDocumentElement(element);
@@ -26942,6 +27093,25 @@ function getViewportRect(element, strategy) {
       x = visualViewport.offsetLeft;
       y = visualViewport.offsetTop;
     }
+  }
+  const windowScrollbarX = getWindowScrollBarX(html);
+  if (windowScrollbarX <= 0) {
+    const doc2 = html.ownerDocument;
+    const body = doc2.body;
+    const bodyStyles = getComputedStyle(body);
+    const bodyMarginInline =
+      doc2.compatMode === "CSS1Compat"
+        ? parseFloat(bodyStyles.marginLeft) +
+            parseFloat(bodyStyles.marginRight) || 0
+        : 0;
+    const clippingStableScrollbarWidth = Math.abs(
+      html.clientWidth - body.clientWidth - bodyMarginInline
+    );
+    if (clippingStableScrollbarWidth <= SCROLLBAR_MAX) {
+      width -= clippingStableScrollbarWidth;
+    }
+  } else if (windowScrollbarX <= SCROLLBAR_MAX) {
+    width += windowScrollbarX;
   }
   return {
     width,
@@ -27013,7 +27183,7 @@ function getClippingElementAncestors(element, cache) {
   if (cachedResult2) {
     return cachedResult2;
   }
-  let result = getOverflowAncestors(element, []).filter(
+  let result = getOverflowAncestors(element, [], false).filter(
     el => isElement(el) && getNodeName(el) !== "body"
   );
   let currentContainingBlockComputedStyle = null;
@@ -27217,6 +27387,173 @@ const platform = {
   isElement,
   isRTL,
 };
+function rectsAreEqual(a, b) {
+  return (
+    a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height
+  );
+}
+function observeMove(element, onMove) {
+  let io = null;
+  let timeoutId;
+  const root = getDocumentElement(element);
+  function cleanup() {
+    var _io;
+    clearTimeout(timeoutId);
+    (_io = io) == null || _io.disconnect();
+    io = null;
+  }
+  function refresh(skip, threshold) {
+    if (skip === void 0) {
+      skip = false;
+    }
+    if (threshold === void 0) {
+      threshold = 1;
+    }
+    cleanup();
+    const elementRectForRootMargin = element.getBoundingClientRect();
+    const { left, top, width, height } = elementRectForRootMargin;
+    if (!skip) {
+      onMove();
+    }
+    if (!width || !height) {
+      return;
+    }
+    const insetTop = floor(top);
+    const insetRight = floor(root.clientWidth - (left + width));
+    const insetBottom = floor(root.clientHeight - (top + height));
+    const insetLeft = floor(left);
+    const rootMargin =
+      -insetTop +
+      "px " +
+      -insetRight +
+      "px " +
+      -insetBottom +
+      "px " +
+      -insetLeft +
+      "px";
+    const options = {
+      rootMargin,
+      threshold: max(0, min(1, threshold)) || 1,
+    };
+    let isFirstUpdate = true;
+    function handleObserve(entries) {
+      const ratio = entries[0].intersectionRatio;
+      if (ratio !== threshold) {
+        if (!isFirstUpdate) {
+          return refresh();
+        }
+        if (!ratio) {
+          timeoutId = setTimeout(() => {
+            refresh(false, 1e-7);
+          }, 1e3);
+        } else {
+          refresh(false, ratio);
+        }
+      }
+      if (
+        ratio === 1 &&
+        !rectsAreEqual(
+          elementRectForRootMargin,
+          element.getBoundingClientRect()
+        )
+      ) {
+        refresh();
+      }
+      isFirstUpdate = false;
+    }
+    try {
+      io = new IntersectionObserver(handleObserve, {
+        ...options,
+        // Handle <iframe>s
+        root: root.ownerDocument,
+      });
+    } catch (_e) {
+      io = new IntersectionObserver(handleObserve, options);
+    }
+    io.observe(element);
+  }
+  refresh(true);
+  return cleanup;
+}
+function autoUpdate(reference, floating, update, options) {
+  if (options === void 0) {
+    options = {};
+  }
+  const {
+    ancestorScroll = true,
+    ancestorResize = true,
+    elementResize = typeof ResizeObserver === "function",
+    layoutShift = typeof IntersectionObserver === "function",
+    animationFrame = false,
+  } = options;
+  const referenceEl = unwrapElement(reference);
+  const ancestors =
+    ancestorScroll || ancestorResize
+      ? [
+          ...(referenceEl ? getOverflowAncestors(referenceEl) : []),
+          ...getOverflowAncestors(floating),
+        ]
+      : [];
+  ancestors.forEach(ancestor => {
+    ancestorScroll &&
+      ancestor.addEventListener("scroll", update, {
+        passive: true,
+      });
+    ancestorResize && ancestor.addEventListener("resize", update);
+  });
+  const cleanupIo =
+    referenceEl && layoutShift ? observeMove(referenceEl, update) : null;
+  let reobserveFrame = -1;
+  let resizeObserver = null;
+  if (elementResize) {
+    resizeObserver = new ResizeObserver(_ref => {
+      let [firstEntry] = _ref;
+      if (firstEntry && firstEntry.target === referenceEl && resizeObserver) {
+        resizeObserver.unobserve(floating);
+        cancelAnimationFrame(reobserveFrame);
+        reobserveFrame = requestAnimationFrame(() => {
+          var _resizeObserver;
+          (_resizeObserver = resizeObserver) == null ||
+            _resizeObserver.observe(floating);
+        });
+      }
+      update();
+    });
+    if (referenceEl && !animationFrame) {
+      resizeObserver.observe(referenceEl);
+    }
+    resizeObserver.observe(floating);
+  }
+  let frameId;
+  let prevRefRect = animationFrame ? getBoundingClientRect(reference) : null;
+  if (animationFrame) {
+    frameLoop();
+  }
+  function frameLoop() {
+    const nextRefRect = getBoundingClientRect(reference);
+    if (prevRefRect && !rectsAreEqual(prevRefRect, nextRefRect)) {
+      update();
+    }
+    prevRefRect = nextRefRect;
+    frameId = requestAnimationFrame(frameLoop);
+  }
+  update();
+  return () => {
+    var _resizeObserver2;
+    ancestors.forEach(ancestor => {
+      ancestorScroll && ancestor.removeEventListener("scroll", update);
+      ancestorResize && ancestor.removeEventListener("resize", update);
+    });
+    cleanupIo == null || cleanupIo();
+    (_resizeObserver2 = resizeObserver) == null ||
+      _resizeObserver2.disconnect();
+    resizeObserver = null;
+    if (animationFrame) {
+      cancelAnimationFrame(frameId);
+    }
+  };
+}
+const detectOverflow = detectOverflow$1;
 const offset = offset$1;
 const autoPlacement = autoPlacement$1;
 const shift = shift$1;
@@ -27225,6 +27562,7 @@ const size = size$1;
 const hide = hide$1;
 const arrow$1 = arrow$2;
 const inline = inline$1;
+const limitShift = limitShift$1;
 const computePosition = (reference, floating, options) => {
   const cache = /* @__PURE__ */ new Map();
   const mergedOptions = {
@@ -27240,6 +27578,29 @@ const computePosition = (reference, floating, options) => {
     platform: platformWithCache,
   });
 };
+const floatingUi_dom = /* @__PURE__ */ Object.freeze(
+  /* @__PURE__ */ Object.defineProperty(
+    {
+      __proto__: null,
+      arrow: arrow$1,
+      autoPlacement,
+      autoUpdate,
+      computePosition,
+      detectOverflow,
+      flip,
+      getOverflowAncestors,
+      hide,
+      inline,
+      limitShift,
+      offset,
+      platform,
+      shift,
+      size,
+    },
+    Symbol.toStringTag,
+    { value: "Module" }
+  )
+);
 var readFromCache;
 var addToCache;
 if (typeof WeakMap != "undefined") {
@@ -28538,7 +28899,7 @@ var BubbleMenu = Extension.create({
     ];
   },
 });
-var index_default$3 = BubbleMenu;
+var index_default$4 = BubbleMenu;
 var FloatingMenuView = class {
   constructor({ editor, element, view, options, shouldShow }) {
     this.preventHide = false;
@@ -28836,8 +29197,8 @@ var FloatingMenu = Extension.create({
     ];
   },
 });
-var index_default$2 = FloatingMenu;
-var index_default$1 = Placeholder;
+var index_default$3 = FloatingMenu;
+var index_default$2 = Placeholder;
 function getDefaultExportFromCjs(x) {
   return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, "default")
     ? x["default"]
@@ -30634,7 +30995,7 @@ function LowlightPlugin({ name, lowlight, defaultLanguage }) {
   });
   return lowlightPlugin;
 }
-var CodeBlockLowlight = index_default$6.extend({
+var CodeBlockLowlight = index_default$7.extend({
   addOptions() {
     var _a;
     return {
@@ -30659,7 +31020,648 @@ var CodeBlockLowlight = index_default$6.extend({
     ];
   },
 });
-var index_default = CodeBlockLowlight;
+var index_default$1 = CodeBlockLowlight;
+function findSuggestionMatch(config) {
+  var _a;
+  const {
+    char,
+    allowSpaces: allowSpacesOption,
+    allowToIncludeChar,
+    allowedPrefixes,
+    startOfLine,
+    $position,
+  } = config;
+  const allowSpaces = allowSpacesOption && !allowToIncludeChar;
+  const escapedChar = escapeForRegEx(char);
+  const suffix = new RegExp(`\\s${escapedChar}$`);
+  const prefix = startOfLine ? "^" : "";
+  const finalEscapedChar = allowToIncludeChar ? "" : escapedChar;
+  const regexp = allowSpaces
+    ? new RegExp(`${prefix}${escapedChar}.*?(?=\\s${finalEscapedChar}|$)`, "gm")
+    : new RegExp(
+        `${prefix}(?:^)?${escapedChar}[^\\s${finalEscapedChar}]*`,
+        "gm"
+      );
+  const text =
+    ((_a = $position.nodeBefore) == null ? void 0 : _a.isText) &&
+    $position.nodeBefore.text;
+  if (!text) {
+    return null;
+  }
+  const textFrom = $position.pos - text.length;
+  const match = Array.from(text.matchAll(regexp)).pop();
+  if (!match || match.input === void 0 || match.index === void 0) {
+    return null;
+  }
+  const matchPrefix = match.input.slice(
+    Math.max(0, match.index - 1),
+    match.index
+  );
+  const matchPrefixIsAllowed = new RegExp(
+    `^[${allowedPrefixes == null ? void 0 : allowedPrefixes.join("")}\0]?$`
+  ).test(matchPrefix);
+  if (allowedPrefixes !== null && !matchPrefixIsAllowed) {
+    return null;
+  }
+  const from2 = textFrom + match.index;
+  let to = from2 + match[0].length;
+  if (allowSpaces && suffix.test(text.slice(to - 1, to + 1))) {
+    match[0] += " ";
+    to += 1;
+  }
+  if (from2 < $position.pos && to >= $position.pos) {
+    return {
+      range: {
+        from: from2,
+        to,
+      },
+      query: match[0].slice(char.length),
+      text: match[0],
+    };
+  }
+  return null;
+}
+var SuggestionPluginKey = new PluginKey("suggestion");
+function Suggestion({
+  pluginKey = SuggestionPluginKey,
+  editor,
+  char = "@",
+  allowSpaces = false,
+  allowToIncludeChar = false,
+  allowedPrefixes = [" "],
+  startOfLine = false,
+  decorationTag = "span",
+  decorationClass = "suggestion",
+  decorationContent = "",
+  decorationEmptyClass = "is-empty",
+  command: command2 = () => null,
+  items = () => [],
+  render = () => ({}),
+  allow = () => true,
+  findSuggestionMatch: findSuggestionMatch2 = findSuggestionMatch,
+}) {
+  let props;
+  const renderer = render == null ? void 0 : render();
+  const getAnchorClientRect = () => {
+    const pos = editor.state.selection.$anchor.pos;
+    const coords = editor.view.coordsAtPos(pos);
+    const { top, right, bottom, left } = coords;
+    try {
+      return new DOMRect(left, top, right - left, bottom - top);
+    } catch {
+      return null;
+    }
+  };
+  const clientRectFor = (view, decorationNode) => {
+    if (!decorationNode) {
+      return getAnchorClientRect;
+    }
+    return () => {
+      const state = pluginKey.getState(editor.state);
+      const decorationId = state == null ? void 0 : state.decorationId;
+      const currentDecorationNode = view.dom.querySelector(
+        `[data-decoration-id="${decorationId}"]`
+      );
+      return (
+        (currentDecorationNode == null
+          ? void 0
+          : currentDecorationNode.getBoundingClientRect()) || null
+      );
+    };
+  };
+  function dispatchExit(view, pluginKeyRef) {
+    var _a;
+    try {
+      const state = pluginKey.getState(view.state);
+      const decorationNode = (state == null ? void 0 : state.decorationId)
+        ? view.dom.querySelector(`[data-decoration-id="${state.decorationId}"]`)
+        : null;
+      const exitProps = {
+        // @ts-ignore editor is available in closure
+        editor,
+        range: (state == null ? void 0 : state.range) || { from: 0, to: 0 },
+        query: (state == null ? void 0 : state.query) || null,
+        text: (state == null ? void 0 : state.text) || null,
+        items: [],
+        command: commandProps => {
+          return command2({
+            editor,
+            range: (state == null ? void 0 : state.range) || { from: 0, to: 0 },
+            props: commandProps,
+          });
+        },
+        decorationNode,
+        clientRect: clientRectFor(view, decorationNode),
+      };
+      (_a = renderer == null ? void 0 : renderer.onExit) == null
+        ? void 0
+        : _a.call(renderer, exitProps);
+    } catch {}
+    const tr2 = view.state.tr.setMeta(pluginKeyRef, { exit: true });
+    view.dispatch(tr2);
+  }
+  const plugin = new Plugin({
+    key: pluginKey,
+    view() {
+      return {
+        update: async (view, prevState) => {
+          var _a, _b, _c, _d, _e, _f, _g;
+          const prev =
+            (_a = this.key) == null ? void 0 : _a.getState(prevState);
+          const next =
+            (_b = this.key) == null ? void 0 : _b.getState(view.state);
+          const moved =
+            prev.active && next.active && prev.range.from !== next.range.from;
+          const started = !prev.active && next.active;
+          const stopped = prev.active && !next.active;
+          const changed = !started && !stopped && prev.query !== next.query;
+          const handleStart = started || (moved && changed);
+          const handleChange = changed || moved;
+          const handleExit = stopped || (moved && changed);
+          if (!handleStart && !handleChange && !handleExit) {
+            return;
+          }
+          const state = handleExit && !handleStart ? prev : next;
+          const decorationNode = view.dom.querySelector(
+            `[data-decoration-id="${state.decorationId}"]`
+          );
+          props = {
+            editor,
+            range: state.range,
+            query: state.query,
+            text: state.text,
+            items: [],
+            command: commandProps => {
+              return command2({
+                editor,
+                range: state.range,
+                props: commandProps,
+              });
+            },
+            decorationNode,
+            clientRect: clientRectFor(view, decorationNode),
+          };
+          if (handleStart) {
+            (_c = renderer == null ? void 0 : renderer.onBeforeStart) == null
+              ? void 0
+              : _c.call(renderer, props);
+          }
+          if (handleChange) {
+            (_d = renderer == null ? void 0 : renderer.onBeforeUpdate) == null
+              ? void 0
+              : _d.call(renderer, props);
+          }
+          if (handleChange || handleStart) {
+            props.items = await items({
+              editor,
+              query: state.query,
+            });
+          }
+          if (handleExit) {
+            (_e = renderer == null ? void 0 : renderer.onExit) == null
+              ? void 0
+              : _e.call(renderer, props);
+          }
+          if (handleChange) {
+            (_f = renderer == null ? void 0 : renderer.onUpdate) == null
+              ? void 0
+              : _f.call(renderer, props);
+          }
+          if (handleStart) {
+            (_g = renderer == null ? void 0 : renderer.onStart) == null
+              ? void 0
+              : _g.call(renderer, props);
+          }
+        },
+        destroy: () => {
+          var _a;
+          if (!props) {
+            return;
+          }
+          (_a = renderer == null ? void 0 : renderer.onExit) == null
+            ? void 0
+            : _a.call(renderer, props);
+        },
+      };
+    },
+    state: {
+      // Initialize the plugin's internal state.
+      init() {
+        const state = {
+          active: false,
+          range: {
+            from: 0,
+            to: 0,
+          },
+          query: null,
+          text: null,
+          composing: false,
+        };
+        return state;
+      },
+      // Apply changes to the plugin state from a view transaction.
+      apply(transaction, prev, _oldState, state) {
+        const { isEditable } = editor;
+        const { composing } = editor.view;
+        const { selection } = transaction;
+        const { empty: empty2, from: from2 } = selection;
+        const next = { ...prev };
+        const meta = transaction.getMeta(pluginKey);
+        if (meta && meta.exit) {
+          next.active = false;
+          next.decorationId = null;
+          next.range = { from: 0, to: 0 };
+          next.query = null;
+          next.text = null;
+          return next;
+        }
+        next.composing = composing;
+        if (isEditable && (empty2 || editor.view.composing)) {
+          if (
+            (from2 < prev.range.from || from2 > prev.range.to) &&
+            !composing &&
+            !prev.composing
+          ) {
+            next.active = false;
+          }
+          const match = findSuggestionMatch2({
+            char,
+            allowSpaces,
+            allowToIncludeChar,
+            allowedPrefixes,
+            startOfLine,
+            $position: selection.$from,
+          });
+          const decorationId = `id_${Math.floor(Math.random() * 4294967295)}`;
+          if (
+            match &&
+            allow({
+              editor,
+              state,
+              range: match.range,
+              isActive: prev.active,
+            })
+          ) {
+            next.active = true;
+            next.decorationId = prev.decorationId
+              ? prev.decorationId
+              : decorationId;
+            next.range = match.range;
+            next.query = match.query;
+            next.text = match.text;
+          } else {
+            next.active = false;
+          }
+        } else {
+          next.active = false;
+        }
+        if (!next.active) {
+          next.decorationId = null;
+          next.range = { from: 0, to: 0 };
+          next.query = null;
+          next.text = null;
+        }
+        return next;
+      },
+    },
+    props: {
+      // Call the keydown hook if suggestion is active.
+      handleKeyDown(view, event) {
+        var _a, _b, _c, _d;
+        const { active, range } = plugin.getState(view.state);
+        if (!active) {
+          return false;
+        }
+        if (event.key === "Escape" || event.key === "Esc") {
+          const state = plugin.getState(view.state);
+          const cachedNode =
+            (_a = props == null ? void 0 : props.decorationNode) != null
+              ? _a
+              : null;
+          const decorationNode =
+            cachedNode != null
+              ? cachedNode
+              : (state == null ? void 0 : state.decorationId)
+                ? view.dom.querySelector(
+                    `[data-decoration-id="${state.decorationId}"]`
+                  )
+                : null;
+          const handledByKeyDown =
+            ((_b = renderer == null ? void 0 : renderer.onKeyDown) == null
+              ? void 0
+              : _b.call(renderer, { view, event, range: state.range })) ||
+            false;
+          if (handledByKeyDown) {
+            return true;
+          }
+          const exitProps = {
+            editor,
+            range: state.range,
+            query: state.query,
+            text: state.text,
+            items: [],
+            command: commandProps => {
+              return command2({
+                editor,
+                range: state.range,
+                props: commandProps,
+              });
+            },
+            decorationNode,
+            // If we have a cached decoration node, use it for the clientRect
+            // to avoid another DOM lookup. If not, leave clientRect null and
+            // let consumer decide if they want to query.
+            clientRect: decorationNode
+              ? () => {
+                  return decorationNode.getBoundingClientRect() || null;
+                }
+              : null,
+          };
+          (_c = renderer == null ? void 0 : renderer.onExit) == null
+            ? void 0
+            : _c.call(renderer, exitProps);
+          dispatchExit(view, pluginKey);
+          return true;
+        }
+        const handled =
+          ((_d = renderer == null ? void 0 : renderer.onKeyDown) == null
+            ? void 0
+            : _d.call(renderer, { view, event, range })) || false;
+        return handled;
+      },
+      // Setup decorator on the currently active suggestion.
+      decorations(state) {
+        const { active, range, decorationId, query } = plugin.getState(state);
+        if (!active) {
+          return null;
+        }
+        const isEmpty = !(query == null ? void 0 : query.length);
+        const classNames = [decorationClass];
+        if (isEmpty) {
+          classNames.push(decorationEmptyClass);
+        }
+        return DecorationSet.create(state.doc, [
+          Decoration.inline(range.from, range.to, {
+            nodeName: decorationTag,
+            class: classNames.join(" "),
+            "data-decoration-id": decorationId,
+            "data-decoration-content": decorationContent,
+          }),
+        ]);
+      },
+    },
+  });
+  return plugin;
+}
+function getSuggestionOptions({
+  editor: tiptapEditor,
+  overrideSuggestionOptions,
+  extensionName,
+  char = "@",
+}) {
+  const pluginKey = new PluginKey();
+  return {
+    editor: tiptapEditor,
+    char,
+    pluginKey,
+    command: ({ editor, range, props }) => {
+      var _a, _b, _c;
+      const nodeAfter = editor.view.state.selection.$to.nodeAfter;
+      const overrideSpace =
+        (_a = nodeAfter == null ? void 0 : nodeAfter.text) == null
+          ? void 0
+          : _a.startsWith(" ");
+      if (overrideSpace) {
+        range.to += 1;
+      }
+      editor
+        .chain()
+        .focus()
+        .insertContentAt(range, [
+          {
+            type: extensionName,
+            attrs: { ...props, mentionSuggestionChar: char },
+          },
+          {
+            type: "text",
+            text: " ",
+          },
+        ])
+        .run();
+      (_c =
+        (_b = editor.view.dom.ownerDocument.defaultView) == null
+          ? void 0
+          : _b.getSelection()) == null
+        ? void 0
+        : _c.collapseToEnd();
+    },
+    allow: ({ state, range }) => {
+      const $from = state.doc.resolve(range.from);
+      const type = state.schema.nodes[extensionName];
+      const allow = !!$from.parent.type.contentMatch.matchType(type);
+      return allow;
+    },
+    ...overrideSuggestionOptions,
+  };
+}
+function getSuggestions(options) {
+  return (
+    options.options.suggestions.length
+      ? options.options.suggestions
+      : [options.options.suggestion]
+  ).map(suggestion =>
+    getSuggestionOptions({
+      // @ts-ignore `editor` can be `undefined` when converting the document to HTML with the HTML utility
+      editor: options.editor,
+      overrideSuggestionOptions: suggestion,
+      extensionName: options.name,
+      char: suggestion.char,
+    })
+  );
+}
+function getSuggestionFromChar(options, char) {
+  const suggestions = getSuggestions(options);
+  const suggestion = suggestions.find(s => s.char === char);
+  if (suggestion) {
+    return suggestion;
+  }
+  if (suggestions.length) {
+    return suggestions[0];
+  }
+  return null;
+}
+var Mention = Node3.create({
+  name: "mention",
+  priority: 101,
+  addOptions() {
+    return {
+      HTMLAttributes: {},
+      renderText({ node, suggestion }) {
+        var _a, _b;
+        return `${(_a = suggestion == null ? void 0 : suggestion.char) != null ? _a : "@"}${(_b = node.attrs.label) != null ? _b : node.attrs.id}`;
+      },
+      deleteTriggerWithBackspace: false,
+      renderHTML({ options, node, suggestion }) {
+        var _a, _b;
+        return [
+          "span",
+          mergeAttributes(this.HTMLAttributes, options.HTMLAttributes),
+          `${(_a = suggestion == null ? void 0 : suggestion.char) != null ? _a : "@"}${(_b = node.attrs.label) != null ? _b : node.attrs.id}`,
+        ];
+      },
+      suggestions: [],
+      suggestion: {},
+    };
+  },
+  group: "inline",
+  inline: true,
+  selectable: false,
+  atom: true,
+  addAttributes() {
+    return {
+      id: {
+        default: null,
+        parseHTML: element => element.getAttribute("data-id"),
+        renderHTML: attributes => {
+          if (!attributes.id) {
+            return {};
+          }
+          return {
+            "data-id": attributes.id,
+          };
+        },
+      },
+      label: {
+        default: null,
+        parseHTML: element => element.getAttribute("data-label"),
+        renderHTML: attributes => {
+          if (!attributes.label) {
+            return {};
+          }
+          return {
+            "data-label": attributes.label,
+          };
+        },
+      },
+      // When there are multiple types of mentions, this attribute helps distinguish them
+      mentionSuggestionChar: {
+        default: "@",
+        parseHTML: element =>
+          element.getAttribute("data-mention-suggestion-char"),
+        renderHTML: attributes => {
+          return {
+            "data-mention-suggestion-char": attributes.mentionSuggestionChar,
+          };
+        },
+      },
+    };
+  },
+  parseHTML() {
+    return [
+      {
+        tag: `span[data-type="${this.name}"]`,
+      },
+    ];
+  },
+  renderHTML({ node, HTMLAttributes }) {
+    const suggestion = getSuggestionFromChar(
+      this,
+      node.attrs.mentionSuggestionChar
+    );
+    if (this.options.renderLabel !== void 0) {
+      console.warn(
+        "renderLabel is deprecated use renderText and renderHTML instead"
+      );
+      return [
+        "span",
+        mergeAttributes(
+          { "data-type": this.name },
+          this.options.HTMLAttributes,
+          HTMLAttributes
+        ),
+        this.options.renderLabel({
+          options: this.options,
+          node,
+          suggestion,
+        }),
+      ];
+    }
+    const mergedOptions = { ...this.options };
+    mergedOptions.HTMLAttributes = mergeAttributes(
+      { "data-type": this.name },
+      this.options.HTMLAttributes,
+      HTMLAttributes
+    );
+    const html = this.options.renderHTML({
+      options: mergedOptions,
+      node,
+      suggestion,
+    });
+    if (typeof html === "string") {
+      return [
+        "span",
+        mergeAttributes(
+          { "data-type": this.name },
+          this.options.HTMLAttributes,
+          HTMLAttributes
+        ),
+        html,
+      ];
+    }
+    return html;
+  },
+  renderText({ node }) {
+    const args = {
+      options: this.options,
+      node,
+      suggestion: getSuggestionFromChar(this, node.attrs.mentionSuggestionChar),
+    };
+    if (this.options.renderLabel !== void 0) {
+      console.warn(
+        "renderLabel is deprecated use renderText and renderHTML instead"
+      );
+      return this.options.renderLabel(args);
+    }
+    return this.options.renderText(args);
+  },
+  addKeyboardShortcuts() {
+    return {
+      Backspace: () =>
+        this.editor.commands.command(({ tr: tr2, state }) => {
+          let isMention = false;
+          const { selection } = state;
+          const { empty: empty2, anchor } = selection;
+          if (!empty2) {
+            return false;
+          }
+          let mentionNode = new Node$1();
+          let mentionPos = 0;
+          state.doc.nodesBetween(anchor - 1, anchor, (node, pos) => {
+            if (node.type.name === this.name) {
+              isMention = true;
+              mentionNode = node;
+              mentionPos = pos;
+              return false;
+            }
+          });
+          if (isMention) {
+            tr2.insertText(
+              this.options.deleteTriggerWithBackspace
+                ? ""
+                : mentionNode.attrs.mentionSuggestionChar,
+              mentionPos,
+              mentionPos + mentionNode.nodeSize
+            );
+          }
+          return isMention;
+        }),
+    };
+  },
+  addProseMirrorPlugins() {
+    return getSuggestions(this).map(Suggestion);
+  },
+});
+var index_default = Mention;
 const emptyOptions = {};
 const defaultPrefix = "hljs-";
 function createLowlight(grammars) {
@@ -30882,23 +31884,24 @@ class HastEmitter {
   }
 }
 export {
-  index_default$3 as BubbleMenu,
-  index_default as CodeBlockLowlight,
+  index_default$4 as BubbleMenu,
+  index_default$1 as CodeBlockLowlight,
   CommandManager,
   Editor,
   Extension,
-  index_default$2 as FloatingMenu,
+  index_default$3 as FloatingMenu,
   Fragment6 as Fragment,
   InputRule,
-  index_default$5 as Link,
+  index_default$6 as Link,
   Mark2 as Mark,
   MarkView,
+  index_default as Mention,
   Node3 as Node,
   NodePos,
   NodeView,
   PasteRule,
-  index_default$1 as Placeholder,
-  index_default$4 as StarterKit,
+  index_default$2 as Placeholder,
+  index_default$5 as StarterKit,
   Tracker,
   callOrReturn,
   canInsertNode,
@@ -30920,6 +31923,7 @@ export {
   findParentNode,
   findParentNodeClosestToPos,
   flattenExtensions,
+  floatingUi_dom as floatingUI,
   fromString,
   generateHTML,
   generateJSON,

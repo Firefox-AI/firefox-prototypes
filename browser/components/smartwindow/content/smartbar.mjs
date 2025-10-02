@@ -3,7 +3,14 @@ import {
   StarterKit,
   Link,
   Placeholder,
+  Mention,
+  floatingUI,
 } from "chrome://browser/content/smartwindow/tiptap-bundle.js";
+
+import {
+  MentionDropdown,
+  getMentionSuggestions,
+} from "chrome://browser/content/smartwindow/mentions.mjs";
 
 export function attachToElement(element, options = {}) {
   const { onKeyDown, onUpdate, onSuggestionSelect, getQueryTypeIcon } = options;
@@ -56,6 +63,7 @@ export function attachToElement(element, options = {}) {
   const suggestionsEl = createSuggestionsContainer();
   parentNode.appendChild(suggestionsEl);
 
+  let isMentionsOpen = false;
   // Create editor instance
   const editor = new Editor({
     element,
@@ -67,6 +75,49 @@ export function attachToElement(element, options = {}) {
       Placeholder.configure({
         placeholder: "Ask, search, or type a URL...",
         showOnlyWhenEditable: false,
+      }),
+      Mention.configure({
+        HTMLAttributes: {
+          class: "mention",
+        },
+        suggestion: {
+          items: async ({ query }) => {
+            return await getMentionSuggestions(query);
+          },
+
+          render: () => {
+            let dropdown;
+            let currentCommand;
+
+            return {
+              onStart: props => {
+                isMentionsOpen = true;
+                hideSuggestions();
+                dropdown = new MentionDropdown();
+                currentCommand = props.command;
+                dropdown.create(props.items, item => {
+                  currentCommand({ id: item.id, label: item.label });
+                });
+                dropdown.updatePosition(props.clientRect());
+              },
+
+              onUpdate(props) {
+                currentCommand = props.command;
+                dropdown?.update(props.items);
+                dropdown?.updatePosition(props.clientRect());
+              },
+
+              onKeyDown(props) {
+                return dropdown?.handleKeyDown(props.event) || false;
+              },
+
+              onExit() {
+                isMentionsOpen = false;
+                dropdown?.destroy();
+              },
+            };
+          },
+        },
       }),
     ],
     content: "",
@@ -85,7 +136,10 @@ export function attachToElement(element, options = {}) {
       }
     },
     editorProps: {
-      handleKeyDown(view, event) {
+      handleKeyDown(_view, event) {
+        if (isMentionsOpen) {
+          return false;
+        }
         // Call the external key handler if provided
         if (onKeyDown) {
           onKeyDown(event);
@@ -166,7 +220,7 @@ export function attachToElement(element, options = {}) {
     }
 
     // Don't show suggestions if the input is empty
-    if (!editor.getText().trim()) {
+    if (!editor.getText().trim() || isMentionsOpen) {
       return;
     }
 
