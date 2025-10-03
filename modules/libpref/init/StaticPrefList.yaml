@@ -8087,7 +8087,7 @@
 - name: gfx.webrender.precise-radial-gradients
   type: bool
   rust: true
-  value: false
+  value: true
   mirror: once
 
 # Use a more precise method for sampling gradients when using SWGL.
@@ -9375,6 +9375,18 @@
   mirror: always
   do_not_use_directly: true
 
+# Use the JS microtask queue for Promise jobs and other microtasks.
+# DO NOT TURN THIS ON BY DEFAULT WITHOUT THE BUGS BLOCKING
+# BUG 1990841 being fixed (especially Bug 1990842).
+- name: javascript.options.use_js_microtask_queue
+  type: RelaxedAtomicBool
+  value: false
+  # Changing this mid process will break invariants and crash, however
+  # making this mirror: once, and set_spidermonkey_pref: startup is
+  # broken: See Bug 1989094
+  mirror: always
+  set_spidermonkey_pref: startup
+
 # Whether to use the off-thread script compilation and decoding.
 - name: javascript.options.parallel_parsing
   type: bool
@@ -9556,6 +9568,17 @@
   type: int32_t
   value: 20000
   mirror: once
+
+# How many additional attempts to launch the GPU process we try if we fail
+# during process launch, before any configuration is attempted.
+- name: layers.gpu-process.max_launch_attempts
+  type: RelaxedAtomicInt32
+#if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
+  value: 2
+#else
+  value: 0
+#endif
+  mirror: always
 
 # How many unstable GPU process restarts we allow for a given configuration.
 - name: layers.gpu-process.max_restarts
@@ -15123,12 +15146,7 @@
 # Use NSPR for HTTP3 UDP IO
 - name: network.http.http3.use_nspr_for_io
   type: RelaxedAtomicBool
-#ifdef ANDROID
-  # Holding back on Android for now given <https://bugzilla.mozilla.org/show_bug.cgi?id=1987256>.
-  value: @IS_NOT_EARLY_BETA_OR_EARLIER@
-#else
   value: false
-#endif
   mirror: always
   rust: true
 
@@ -15166,6 +15184,11 @@
   # Disable GSO on Windows.
   #
   # See https://bugzilla.mozilla.org/show_bug.cgi?id=1979279 for details.
+  value: 1
+#elif defined(ANDROID)
+  # Disable GSO on Android.
+  #
+  # See <https://bugzilla.mozilla.org/show_bug.cgi?id=1987256> for details.
   value: 1
 #else
   # Current industry standard. Likely worth tuning.
@@ -15686,12 +15709,6 @@
 - name: network.essential_domains_fallback
   type: RelaxedAtomicBool
   value: false
-  mirror: always
-
-# Enable HTTP Compression Dictionary support
-- name: network.http.dictionaries.enable
-  type: RelaxedAtomicBool
-  value: true
   mirror: always
 
 #---------------------------------------------------------------------------

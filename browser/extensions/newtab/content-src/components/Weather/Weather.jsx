@@ -212,17 +212,31 @@ export class _Weather extends React.PureComponent {
   }
 
   handleRejectOptIn = () => {
-    this.props.dispatch(ac.SetPref("weather.optInAccepted", false));
-    this.props.dispatch(ac.SetPref("weather.optInDisplayed", false));
+    batch(() => {
+      this.props.dispatch(ac.SetPref("weather.optInAccepted", false));
+      this.props.dispatch(ac.SetPref("weather.optInDisplayed", false));
+
+      this.props.dispatch(
+        ac.AlsoToMain({
+          type: at.WEATHER_OPT_IN_PROMPT_SELECTION,
+          data: "rejected opt-in",
+        })
+      );
+    });
   };
 
   handleAcceptOptIn = () => {
     batch(() => {
-      this.props.dispatch(ac.SetPref("weather.optInAccepted", true));
-      this.props.dispatch(ac.SetPref("weather.optInDisplayed", false));
       this.props.dispatch(
         ac.AlsoToMain({
           type: at.WEATHER_USER_OPT_IN_LOCATION,
+        })
+      );
+
+      this.props.dispatch(
+        ac.AlsoToMain({
+          type: at.WEATHER_OPT_IN_PROMPT_SELECTION,
+          data: "accepted opt-in",
         })
       );
     });
@@ -297,6 +311,7 @@ export class _Weather extends React.PureComponent {
       ...(Prefs.values["weather.locationSearchEnabled"]
         ? ["ChangeWeatherLocation"]
         : []),
+      ...(Prefs.values["system.showWeatherOptIn"] ? ["DetectLocation"] : []),
       ...(Prefs.values["weather.temperatureUnits"] === "f"
         ? ["ChangeTempUnitCelsius"]
         : ["ChangeTempUnitFahrenheit"]),
@@ -310,6 +325,7 @@ export class _Weather extends React.PureComponent {
       ...(Prefs.values["weather.locationSearchEnabled"]
         ? ["ChangeWeatherLocation"]
         : []),
+      ...(Prefs.values["system.showWeatherOptIn"] ? ["DetectLocation"] : []),
       "HideWeather",
       "OpenLearnMoreURL",
     ];
@@ -359,7 +375,10 @@ export class _Weather extends React.PureComponent {
                     </span>
                   </div>
                   <div className="weatherCityRow">
-                    <span className="weatherCity">New York City</span>
+                    <span
+                      className="weatherCity"
+                      data-l10n-id="newtab-weather-static-city"
+                    ></span>
                   </div>
                 </div>
               </div>
@@ -445,18 +464,18 @@ export class _Weather extends React.PureComponent {
               <dialog open={true}>
                 <span className="weatherOptInImg"></span>
                 <div className="weatherOptInContent">
-                  <h3>Do you want to see the weather for your location?</h3>
+                  <h3 data-l10n-id="newtab-weather-opt-in-see-weather"></h3>
                   <moz-button-group className="button-group">
                     <moz-button
                       size="small"
                       type="default"
-                      label="Not now"
+                      data-l10n-id="newtab-weather-opt-in-not-now"
                       onClick={this.handleRejectOptIn}
                     />
                     <moz-button
                       size="small"
                       type="default"
-                      label="Yes"
+                      data-l10n-id="newtab-weather-opt-in-yes"
                       onClick={this.handleAcceptOptIn}
                     />
                   </moz-button-group>
