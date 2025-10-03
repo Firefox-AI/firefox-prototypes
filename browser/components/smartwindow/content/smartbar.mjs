@@ -4,7 +4,6 @@ import {
   Link,
   Placeholder,
   Mention,
-  floatingUI,
 } from "chrome://browser/content/smartwindow/tiptap-bundle.js";
 
 import {
