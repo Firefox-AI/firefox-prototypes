@@ -114,18 +114,64 @@ export class MentionDropdown {
 }
 
 export async function getMentionSuggestions(query) {
-  const allSuggestions = [
-    { id: "lasagna", label: "Lasagna Recipe" },
-    { id: "redsox", label: "Red Sox" },
-    { id: "hotel", label: "Hotel Tab" },
-  ];
+  const { topChromeWindow } = window.browsingContext;
 
-  if (!query) {
-    return allSuggestions;
+  if (!topChromeWindow?.gBrowser) {
+    return [];
   }
 
-  const lowerQuery = query.toLowerCase();
-  return allSuggestions.filter(item =>
-    item.label.toLowerCase().includes(lowerQuery)
-  );
+  try {
+    const allTabs = Array.from(topChromeWindow.gBrowser.tabs);
+    const suggestions = [];
+
+    for (const tab of allTabs) {
+      const browser = topChromeWindow.gBrowser.getBrowserForTab(tab);
+      const url = browser.currentURI.spec || "";
+
+      // Filter out internal URLs
+      if (
+        url.startsWith("about:") ||
+        url.startsWith("chrome:") ||
+        url.startsWith("moz-extension:") ||
+        url.startsWith("resource:")
+      ) {
+        continue;
+      }
+
+      const tabInfo = {
+        id: tab.linkedPanel,
+        label: tab.label || "Untitled",
+        url,
+        favicon: tab.image || "",
+      };
+
+      suggestions.push(tabInfo);
+    }
+
+    // Sort by last accessed (most recent first)
+    suggestions.sort((a, b) => {
+      const aTab = allTabs.find(t => t.linkedPanel === a.id);
+      const bTab = allTabs.find(t => t.linkedPanel === b.id);
+      const aTime = aTab?.lastAccessed || 0;
+      const bTime = bTab?.lastAccessed || 0;
+      return bTime - aTime;
+    });
+
+    // Filter by query if provided
+    if (query) {
+      const lowerQuery = query.toLowerCase();
+      return suggestions
+        .filter(
+          item =>
+            item.label.toLowerCase().includes(lowerQuery) ||
+            item.url.toLowerCase().includes(lowerQuery)
+        )
+        .slice(0, 10);
+    }
+
+    return suggestions.slice(0, 10);
+  } catch (error) {
+    console.error("Error getting tab suggestions:", error);
+    return [];
+  }
 }
