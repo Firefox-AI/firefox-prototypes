@@ -226,15 +226,27 @@ var SmartWindow = {
   },
 
   updateHamburgerMenuAndModeSwitch() {
-    let item = PanelUI.menuButton.parentElement;
-    let toolbar =
-      this.isSmartWindowActive() &&
-      !Services.prefs.getBoolPref("sidebar.verticalTabs", false)
+    let hamburgerButton = PanelUI.menuButton.parentElement;
+    let usingVerticalTabs = Services.prefs.getBoolPref(
+      "sidebar.verticalTabs",
+      false
+    );
+    let topToolbar = !usingVerticalTabs
+      ? document.getElementById("TabsToolbar")
+      : document.getElementById("nav-bar");
+    let mainToolbar =
+      this.isSmartWindowActive() && !usingVerticalTabs
         ? document.getElementById("TabsToolbar")
         : document.getElementById("nav-bar");
-    let titlebarItems = toolbar.querySelector(".titlebar-buttonbox-container");
-    titlebarItems.before(item);
-    item.after(document.getElementById("smart-window-toggle"));
+    let titlebarItems = mainToolbar.querySelector(
+      ".titlebar-buttonbox-container"
+    );
+    titlebarItems.before(hamburgerButton);
+
+    let smartWindowToggle = document.getElementById("smart-window-toggle");
+    topToolbar
+      .querySelector(".titlebar-buttonbox-container")
+      .before(smartWindowToggle);
   },
 
   navigateNewTabsToSmartWindow() {
