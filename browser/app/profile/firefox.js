@@ -1172,6 +1172,7 @@ pref("browser.smartwindow.enabled", true);
 pref("browser.smartwindow.endpoint", "https://stage.llm-proxy.nonprod.dataservices.mozgcp.net/");
 pref("browser.smartwindow.key", "");
 pref("browser.smartwindow.model", "qwen3-235b-a22b-instruct-2507-maas");
+pref("browser.smartwindow.chatHistory.loglevel", "Warn");
 
 // Scripts & Windows prefs
 pref("dom.disable_open_during_load",              true);

@@ -9,6 +9,7 @@ with Files("**"):
 
 EXTRA_JS_MODULES.smartwindow += [
     "AboutSmartWindow.sys.mjs",
+    "ChatHistory.sys.mjs",
 ]
 
 JAR_MANIFESTS += ["jar.mn"]
