@@ -1733,14 +1733,16 @@ function toOpenWindowByType(inType, uri, features) {
 function OpenBrowserWindow(options = {}) {
   let timerId = Glean.browserTimings.newWindow.start();
 
+  options.openerWindow ??= window;
+
   // If opening a new window, if we're in a smart window and not asked for
   // a private open, make the new window smart, too.
   let canInheritSmartWindow =
-    window.SmartWindow?.isSmartWindowActive() &&
+    options.openerWindow.SmartWindow?.isSmartWindowActive() &&
     !options.private &&
     !Object.hasOwn(options, "smartWindow");
   if (
-    window.gSmartWindowEnabled &&
+    options.openerWindow.gSmartWindowEnabled &&
     (options.smartWindow || canInheritSmartWindow)
   ) {
     options.args ??= Cc["@mozilla.org/array;1"].createInstance(
@@ -1772,10 +1774,7 @@ function OpenBrowserWindow(options = {}) {
     );
   }
 
-  let win = BrowserWindowTracker.openWindow({
-    openerWindow: window,
-    ...options,
-  });
+  let win = BrowserWindowTracker.openWindow(options);
 
   win.addEventListener(
     "MozAfterPaint",
