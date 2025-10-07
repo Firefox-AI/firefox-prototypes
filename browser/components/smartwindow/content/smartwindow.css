@@ -35,7 +35,7 @@ body {
   max-width: 700px;
   margin: 0 auto 20px;
   position: relative; /* Important for absolute positioning of suggestions */
-  background: rgba(255, 255, 255, 0.4);
+  background: white;
   border-radius: 18px;
   border: 1px solid rgba(199, 199, 199, 0.5);
   box-shadow:
@@ -46,10 +46,6 @@ body {
   flex-direction: column;
   gap: 16px;
   backdrop-filter: blur(10px);
-}
-
-.search-box:focus-within {
-  background: white;
 }
 
 #search-input,
