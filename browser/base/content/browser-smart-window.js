@@ -158,7 +158,7 @@ var SmartWindow = {
     );
 
     console.log(
-      "Smart Window mode",
+      "[SmartWindow] reconciling with mode:",
       this.isSmartWindowActive() ? "activated" : "deactivated"
     );
   },
