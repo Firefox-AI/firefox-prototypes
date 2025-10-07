@@ -1,16 +1,44 @@
 import { html, css } from "chrome://global/content/vendor/lit.all.mjs";
 import { createOpenAIEngine } from "./utils.mjs";
 
-// In-memory state tracking
-let isGenerating = false;
-let generationError = null;
-const generatedInsights = new Set(); // Tracks which insights were LLM-generated
+/**
+ * Helper function to get SmartWindow instance
+ */
+function getSmartWindow() {
+  return window.browsingContext?.topChromeWindow?.SmartWindow;
+}
+
+/**
+ * Helper function to get insights data from SmartWindow storage
+ */
+function getInsightsData() {
+  const smartWindow = getSmartWindow();
+  if (!smartWindow) {
+    return DEFAULT_INSIGHTS_DATA;
+  }
+
+  const stored = smartWindow.getInsightsData();
+  // If no data stored yet, initialize with default data
+  if (!stored || Object.keys(stored).length === 0) {
+    smartWindow.setInsightsData({ ...DEFAULT_INSIGHTS_DATA });
+    return smartWindow.getInsightsData();
+  }
+  return stored;
+}
+
+/**
+ * Helper function to get generated insights set from SmartWindow storage
+ */
+function getGeneratedInsights() {
+  const smartWindow = getSmartWindow();
+  return smartWindow?.getGeneratedInsights() || new Set();
+}
 
 /**
  * User insights data organized by category
  * Static data serves as placeholder until user generates insights
  */
-export const INSIGHTS_DATA = {
+const DEFAULT_INSIGHTS_DATA = {
   "Health & Wellness": [
     "mental wellness",
     "Headspace",
@@ -503,7 +531,6 @@ async function generateInsightsWithLLM(profile, source) {
   if (!Array.isArray(json?.categories) || json.categories.length === 0) {
     throw new Error("Failed to generate valid insights");
   }
-  console.log(json);
 
   return json;
 }
@@ -514,6 +541,9 @@ async function generateInsightsWithLLM(profile, source) {
  * @param {object} json - Parsed JSON with categories
  */
 function addInsightsToData(json) {
+  const smartWindow = getSmartWindow();
+  const insightsData = getInsightsData();
+
   for (const category of json.categories) {
     const categoryName = category.name?.trim();
     if (!categoryName) {
@@ -524,18 +554,21 @@ function addInsightsToData(json) {
       ? category.top_user_attributes
       : [];
 
-    if (!INSIGHTS_DATA[categoryName]) {
-      INSIGHTS_DATA[categoryName] = [];
+    if (!insightsData[categoryName]) {
+      insightsData[categoryName] = [];
     }
 
     for (const attr of attributes) {
       const attrStr = String(attr).trim();
-      if (attrStr && !INSIGHTS_DATA[categoryName].includes(attrStr)) {
-        INSIGHTS_DATA[categoryName].push(attrStr);
-        generatedInsights.add(attrStr);
+      if (attrStr && !insightsData[categoryName].includes(attrStr)) {
+        insightsData[categoryName].push(attrStr);
+        smartWindow?.addGeneratedInsight(attrStr);
       }
     }
   }
+
+  // Update the stored data
+  smartWindow?.setInsightsData(insightsData);
 }
 
 /**
@@ -544,12 +577,14 @@ function addInsightsToData(json) {
  * @returns {Promise<void>}
  */
 export async function generateInsightsFromHistory() {
-  if (isGenerating) {
+  const smartWindow = getSmartWindow();
+
+  if (smartWindow?.isGeneratingInsights()) {
     throw new Error("Already generating insights");
   }
 
-  isGenerating = true;
-  generationError = null;
+  smartWindow?.setGeneratingInsights(true);
+  smartWindow?.setInsightsError(null);
 
   try {
     console.log("[Insights] Fetching browsing history...");
@@ -573,10 +608,11 @@ export async function generateInsightsFromHistory() {
     );
   } catch (error) {
     console.error("[Insights] Generation failed:", error);
-    generationError = error.message || String(error);
+    const errorMsg = error.message || String(error);
+    smartWindow?.setInsightsError(errorMsg);
     throw error;
   } finally {
-    isGenerating = false;
+    smartWindow?.setGeneratingInsights(false);
   }
 }
 
@@ -586,12 +622,14 @@ export async function generateInsightsFromHistory() {
  * @returns {Promise<void>}
  */
 export async function generateInsightsFromConversations() {
-  if (isGenerating) {
+  const smartWindow = getSmartWindow();
+
+  if (smartWindow?.isGeneratingInsights()) {
     throw new Error("Already generating insights");
   }
 
-  isGenerating = true;
-  generationError = null;
+  smartWindow?.setGeneratingInsights(true);
+  smartWindow?.setInsightsError(null);
 
   try {
     console.log("[Insights] Fetching conversation history...");
@@ -616,10 +654,11 @@ export async function generateInsightsFromConversations() {
     );
   } catch (error) {
     console.error("[Insights] Generation failed:", error);
-    generationError = error.message || String(error);
+    const errorMsg = error.message || String(error);
+    smartWindow?.setInsightsError(errorMsg);
     throw error;
   } finally {
-    isGenerating = false;
+    smartWindow?.setGeneratingInsights(false);
   }
 }
 
@@ -627,16 +666,22 @@ export async function generateInsightsFromConversations() {
  * Clears only LLM-generated insights, keeping static placeholders
  */
 export function clearGeneratedInsights() {
-  for (const categoryName in INSIGHTS_DATA) {
-    INSIGHTS_DATA[categoryName] = INSIGHTS_DATA[categoryName].filter(
+  const smartWindow = getSmartWindow();
+  const insightsData = getInsightsData();
+  const generatedInsights = getGeneratedInsights();
+
+  for (const categoryName in insightsData) {
+    insightsData[categoryName] = insightsData[categoryName].filter(
       insight => !generatedInsights.has(insight)
     );
     // Remove empty categories
-    if (INSIGHTS_DATA[categoryName].length === 0) {
-      delete INSIGHTS_DATA[categoryName];
+    if (insightsData[categoryName].length === 0) {
+      delete insightsData[categoryName];
     }
   }
-  generatedInsights.clear();
+
+  smartWindow?.clearGeneratedInsights();
+  smartWindow?.setInsightsData(insightsData);
   console.log("[Insights] Cleared generated insights");
 }
 
@@ -644,9 +689,12 @@ export function clearGeneratedInsights() {
  * Gets current generation state
  */
 export function getInsightsState() {
+  const smartWindow = getSmartWindow();
+  const generatedInsights = getGeneratedInsights();
+
   return {
-    isGenerating,
-    error: generationError,
+    isGenerating: smartWindow?.isGeneratingInsights() || false,
+    error: smartWindow?.getInsightsError() || null,
     generatedCount: generatedInsights.size,
   };
 }
@@ -657,6 +705,7 @@ export function getInsightsState() {
  * @param insight
  */
 export function isGeneratedInsight(insight) {
+  const generatedInsights = getGeneratedInsights();
   return generatedInsights.has(insight);
 }
 
@@ -664,6 +713,8 @@ export function isGeneratedInsight(insight) {
  * Builds the system prompt with insights data
  */
 export function buildInsightsSystemPrompt() {
+  const insightsData = getInsightsData();
+
   let systemPrompt = `
 
 When responding, if you use any user insights from the list below to personalize your response (even implicitly), you must reference them by including [[insight: specific term]] inline, directly after the phrase or sentence where the insight is applied. Use specific terms from the list rather than broad categories, and include multiple tags if multiple insights are relevant. This enables better personalization features—do not skip tagging if an insight influences your answer. Only tag insights you actually use; avoid tagging irrelevant ones.
@@ -671,7 +722,7 @@ When responding, if you use any user insights from the list below to personalize
 User Insights List:`;
 
   // Build insights list from data
-  Object.entries(INSIGHTS_DATA).forEach(([category, insights]) => {
+  Object.entries(insightsData).forEach(([category, insights]) => {
     if (insights.length) {
       const insightString = insights.join(", ");
       systemPrompt += `\n- ${category}: ${insightString}.`;
@@ -695,10 +746,14 @@ Examples of Insight Tagging:
  * @param category
  */
 export function deleteInsight(insight, category) {
-  if (INSIGHTS_DATA[category]) {
-    const index = INSIGHTS_DATA[category].indexOf(insight);
+  const smartWindow = getSmartWindow();
+  const insightsData = getInsightsData();
+
+  if (insightsData[category]) {
+    const index = insightsData[category].indexOf(insight);
     if (index > -1) {
-      INSIGHTS_DATA[category].splice(index, 1);
+      insightsData[category].splice(index, 1);
+      smartWindow?.setInsightsData(insightsData);
       return true;
     }
   }
@@ -836,7 +891,7 @@ export function createInsightsOverlay(
           : ""}
 
         <div class="insights-content">
-          ${Object.entries(INSIGHTS_DATA)
+          ${Object.entries(getInsightsData())
             .map(([category, insights]) => {
               const usedCount = insights.filter(insight =>
                 usedInsights.has(insight)
