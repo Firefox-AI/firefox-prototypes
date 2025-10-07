@@ -356,7 +356,10 @@ add_task(async function test_pip_actor_not_chat_sidebar() {
 add_task(
   async function test_chatbot_microphone_access_if_persistent_perm_already_granted_in_tab() {
     await SpecialPowers.pushPrefEnv({
-      set: [["browser.ml.chat.provider", "https://example.org"]],
+      set: [
+        ["media.navigator.streams.fake", true],
+        ["browser.ml.chat.provider", "https://example.org"],
+      ],
     });
 
     await BrowserTestUtils.withNewTab("https://example.org", async browser => {

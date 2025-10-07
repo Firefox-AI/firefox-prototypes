@@ -437,12 +437,7 @@ nsresult nsTextControlFrame::CreateAnonymousContent(
 }
 
 bool nsTextControlFrame::ShouldInitializeEagerly() const {
-  // textareas are eagerly initialized.
-  if (!IsSingleLineTextControl()) {
-    return true;
-  }
-
-  // Also, input elements which have a cached selection should get eager
+  // Input elements which have a cached selection should get eager
   // editor initialization.
   TextControlElement* textControlElement = ControlElement();
   if (textControlElement->HasCachedSelection()) {
@@ -453,21 +448,6 @@ bool nsTextControlFrame::ShouldInitializeEagerly() const {
   if (auto* htmlElement = nsGenericHTMLElement::FromNode(mContent)) {
     if (htmlElement->Spellcheck()) {
       return true;
-    }
-  }
-
-  // If text in the editor is being dragged, we need the editor to create
-  // new source node for the drag session (TextEditor creates the text node
-  // in the anonymous <div> element.
-  if (nsCOMPtr<nsIDragSession> dragSession =
-          nsContentUtils::GetDragSession(PresContext())) {
-    if (dragSession->IsDraggingTextInTextControl()) {
-      nsCOMPtr<nsINode> sourceNode;
-      if (NS_SUCCEEDED(
-              dragSession->GetSourceNode(getter_AddRefs(sourceNode))) &&
-          sourceNode == textControlElement) {
-        return true;
-      }
     }
   }
 
@@ -955,7 +935,9 @@ nsresult nsTextControlFrame::AttributeChanged(int32_t aNameSpaceID,
                                               nsAtom* aAttribute,
                                               AttrModType aModType) {
   if (aAttribute == nsGkAtoms::value && !mEditorHasBeenInitialized) {
-    UpdateValueDisplay(true);
+    if (IsSingleLineTextControl()) {
+      UpdateValueDisplay(true);
+    }
     return NS_OK;
   }
 
@@ -1052,13 +1034,7 @@ void nsTextControlFrame::SetInitialChildList(ChildListID aListID,
   }
 }
 
-nsresult nsTextControlFrame::UpdateValueDisplay(bool aNotify,
-                                                bool aBeforeEditorInit,
-                                                const nsAString* aValue) {
-  if (!IsSingleLineTextControl()) {  // textareas don't use this
-    return NS_OK;
-  }
-
+nsresult nsTextControlFrame::UpdateValueDisplay(bool aNotify) {
   MOZ_ASSERT(mRootNode, "Must have a div content\n");
   MOZ_ASSERT(!mEditorHasBeenInitialized,
              "Do not call this after editor has been initialized");
@@ -1083,12 +1059,7 @@ nsresult nsTextControlFrame::UpdateValueDisplay(bool aNotify,
 
   // Get the current value of the textfield from the content.
   nsAutoString value;
-  if (aValue) {
-    value = *aValue;
-  } else {
-    ControlElement()->GetTextEditorValue(value);
-  }
-
+  ControlElement()->GetTextEditorValue(value);
   return textContent->SetText(value, aNotify);
 }
 

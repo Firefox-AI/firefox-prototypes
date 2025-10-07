@@ -114,6 +114,8 @@ import mozilla.components.concept.base.profiler.Profiler
 import mozilla.components.lib.state.ext.observeAsComposableState
 import mozilla.components.lib.state.ext.observeAsState
 import mozilla.components.support.ktx.android.view.hideKeyboard
+import mozilla.telemetry.glean.private.NoExtras
+import org.mozilla.fenix.GleanMetrics.BookmarksManagement
 import org.mozilla.fenix.R
 import org.mozilla.fenix.bookmarks.BookmarksTestTag.BOOKMARK_TOOLBAR
 import org.mozilla.fenix.bookmarks.BookmarksTestTag.EDIT_BOOKMARK_ITEM_TITLE_TEXT_FIELD
@@ -277,10 +279,14 @@ private fun BookmarksList(
         when (state.bookmarksSnackbarState) {
             BookmarksSnackbarState.None -> return@LaunchedEffect
             is BookmarksSnackbarState.UndoDeletion -> scope.launch {
+                BookmarksManagement.deleteSnackbarShown.record(NoExtras())
                 snackbarHostState.displaySnackbar(
                     message = snackbarMessage,
                     actionLabel = snackbarActionLabel,
-                    onActionPerformed = { store.dispatch(SnackbarAction.Undo) },
+                    onActionPerformed = {
+                        store.dispatch(SnackbarAction.Undo)
+                        BookmarksManagement.deleteSnackbarUndoClicked.record(NoExtras())
+                    },
                     onDismissPerformed = { store.dispatch(SnackbarAction.Dismissed) },
                 )
             }
@@ -912,12 +918,7 @@ private fun SelectFolderScreen(
 
     Scaffold(
         topBar = {
-            SelectFolderTopBar(
-                onBackClick = { store.dispatch(BackClicked) },
-                onNewFolderClick = showNewFolderButton.takeIf { it }?.let {
-                    { store.dispatch(AddFolderClicked) }
-                },
-            )
+            SelectFolderTopBar(store = store)
         },
         containerColor = FirefoxTheme.colors.layer1,
     ) { paddingValues ->
@@ -991,10 +992,10 @@ private fun NewFolderListItem(onClick: () -> Unit) {
 }
 
 @Composable
-private fun SelectFolderTopBar(
-    onBackClick: () -> Unit,
-    onNewFolderClick: (() -> Unit)?,
-) {
+private fun SelectFolderTopBar(store: BookmarksStore) {
+    val onNewFolderClick = store.state.showNewFolderButton.takeIf { it }?.let {
+        { store.dispatch(AddFolderClicked) }
+    }
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(containerColor = FirefoxTheme.colors.layer1),
         title = {
@@ -1005,7 +1006,7 @@ private fun SelectFolderTopBar(
             )
         },
         navigationIcon = {
-            IconButton(onClick = onBackClick) {
+            IconButton(onClick = { store.dispatch(BackClicked) }) {
                 Icon(
                     painter = painterResource(iconsR.drawable.mozac_ic_back_24),
                     contentDescription = stringResource(R.string.bookmark_navigate_back_button_content_description),
@@ -1014,8 +1015,22 @@ private fun SelectFolderTopBar(
             }
         },
         actions = {
+            Box {
+                IconButton(onClick = {
+                    store.dispatch(BookmarksListMenuAction.SortMenu.SortMenuButtonClicked)
+                }) {
+                    Icon(
+                        painter = painterResource(iconsR.drawable.mozac_ic_filter),
+                        contentDescription = stringResource(
+                            R.string.bookmark_sort_menu_content_desc,
+                        ),
+                    )
+                }
+
+                SelectFolderSortOverflowMenu(store = store)
+            }
             if (onNewFolderClick != null) {
-                IconButton(onClick = onNewFolderClick) {
+                IconButton(onClick = { onNewFolderClick }) {
                     Icon(
                         painter = painterResource(iconsR.drawable.mozac_ic_folder_add_24),
                         contentDescription = stringResource(
@@ -1030,6 +1045,47 @@ private fun SelectFolderTopBar(
             top = 0.dp,
             bottom = 0.dp,
         ),
+    )
+}
+
+@Composable
+private fun SelectFolderSortOverflowMenu(store: BookmarksStore) {
+    val showMenu by store.observeAsState(store.state.sortMenuShown) {
+        store.state.sortMenuShown
+    }
+    val sortOrder by store.observeAsState(store.state.sortOrder) { store.state.sortOrder }
+
+    val menuItems = listOf(
+        MenuItem.CheckableItem(
+            text = Text.Resource(R.string.bookmark_sort_menu_custom),
+            isChecked = sortOrder is BookmarksListSortOrder.Positional,
+            onClick = { store.dispatch(SelectFolderAction.SortMenu.CustomSortClicked) },
+        ),
+        MenuItem.CheckableItem(
+            text = Text.Resource(R.string.bookmark_sort_menu_newest),
+            isChecked = sortOrder == BookmarksListSortOrder.Created(ascending = true),
+            onClick = { store.dispatch(SelectFolderAction.SortMenu.NewestClicked) },
+        ),
+        MenuItem.CheckableItem(
+            text = Text.Resource(R.string.bookmark_sort_menu_oldest),
+            isChecked = sortOrder == BookmarksListSortOrder.Created(ascending = false),
+            onClick = { store.dispatch(SelectFolderAction.SortMenu.OldestClicked) },
+        ),
+        MenuItem.CheckableItem(
+            text = Text.Resource(R.string.bookmark_sort_menu_a_to_z),
+            isChecked = sortOrder == BookmarksListSortOrder.Alphabetical(ascending = true),
+            onClick = { store.dispatch(SelectFolderAction.SortMenu.AtoZClicked) },
+        ),
+        MenuItem.CheckableItem(
+            text = Text.Resource(R.string.bookmark_sort_menu_z_to_a),
+            isChecked = sortOrder == BookmarksListSortOrder.Alphabetical(ascending = false),
+            onClick = { store.dispatch(SelectFolderAction.SortMenu.ZtoAClicked) },
+        ),
+    )
+    DropdownMenu(
+        menuItems = menuItems,
+        expanded = showMenu,
+        onDismissRequest = { store.dispatch(SelectFolderAction.SortMenu.SortMenuDismissed) },
     )
 }
 

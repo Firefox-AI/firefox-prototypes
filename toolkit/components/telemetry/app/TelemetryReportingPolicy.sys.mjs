@@ -250,6 +250,8 @@ var TelemetryReportingPolicyImpl = {
   // reporting policy tab / infobar
   _notificationType: null,
 
+  _observerRegistered: false,
+
   get _log() {
     if (!this._logger) {
       this._logger = Log.repository.getLoggerWithMessagePrefix(
@@ -702,6 +704,7 @@ var TelemetryReportingPolicyImpl = {
     this.shutdown();
     this._isFirstRun = undefined;
     this._ensureUserIsNotifiedPromise = undefined;
+    this._nimbusVariables = {};
     return this.setup();
   },
 
@@ -724,7 +727,10 @@ var TelemetryReportingPolicyImpl = {
     Services.prefs.addObserver(TOU_ACCEPTED_VERSION_PREF, this);
 
     // Add the event observers.
-    Services.obs.addObserver(this, "sessionstore-windows-restored");
+    if (!this._observerRegistered) {
+      Services.obs.addObserver(this, "sessionstore-windows-restored");
+      this._observerRegistered = true;
+    }
   },
 
   /**
@@ -742,7 +748,10 @@ var TelemetryReportingPolicyImpl = {
    * Detach the observers that were attached during setup.
    */
   _detachObservers() {
-    Services.obs.removeObserver(this, "sessionstore-windows-restored");
+    if (this._observerRegistered) {
+      Services.obs.removeObserver(this, "sessionstore-windows-restored");
+      this._observerRegistered = false;
+    }
     Services.prefs.removeObserver(TOU_ACCEPTED_DATE_PREF, this);
     Services.prefs.removeObserver(TOU_ACCEPTED_VERSION_PREF, this);
   },
@@ -780,7 +789,9 @@ var TelemetryReportingPolicyImpl = {
     // set.
     const bypassTOUFlow =
       Services.prefs.getBoolPref(TOU_BYPASS_NOTIFICATION_PREF, false) ||
-      !this._nimbusVariables.enabled;
+      (!Services.prefs.getBoolPref("browser.preonboarding.enabled", false) &&
+        this._nimbusVariables?.enabled !== true) ||
+      this._nimbusVariables?.enabled === false;
     const allowInteractionData = Services.prefs.getBoolPref(
       "datareporting.healthreport.uploadEnabled",
       false

@@ -694,9 +694,9 @@ static nscoord OffsetToAlignedStaticPos(
 }
 
 void AbsoluteContainingBlock::ResolveSizeDependentOffsets(
-    nsPresContext* aPresContext, ReflowInput& aKidReflowInput,
+    ReflowInput& aKidReflowInput, const LogicalSize& aLogicalCBSize,
     const LogicalSize& aKidSize, const LogicalMargin& aMargin,
-    LogicalMargin* aOffsets, LogicalSize* aLogicalCBSize) {
+    LogicalMargin& aOffsets) {
   WritingMode wm = aKidReflowInput.GetWritingMode();
   WritingMode outerWM = aKidReflowInput.mParentReflowInput->GetWritingMode();
 
@@ -709,30 +709,23 @@ void AbsoluteContainingBlock::ResolveSizeDependentOffsets(
   // static position in that axis, *and* its static position is determined by
   // the axis-appropriate css-align property (which may require the child's
   // size, e.g. to center it within the parent).
-  if ((NS_AUTOOFFSET == aOffsets->IStart(outerWM)) ||
-      (NS_AUTOOFFSET == aOffsets->BStart(outerWM)) ||
+  if ((NS_AUTOOFFSET == aOffsets.IStart(outerWM)) ||
+      (NS_AUTOOFFSET == aOffsets.BStart(outerWM)) ||
       aKidReflowInput.mFlags.mIOffsetsNeedCSSAlign ||
       aKidReflowInput.mFlags.mBOffsetsNeedCSSAlign) {
-    if (-1 == aLogicalCBSize->ISize(wm)) {
-      // Get the containing block width/height
-      const ReflowInput* parentRI = aKidReflowInput.mParentReflowInput;
-      *aLogicalCBSize = aKidReflowInput.ComputeContainingBlockRectangle(
-          aPresContext, parentRI);
-    }
-
     const LogicalSize logicalCBSizeOuterWM =
-        aLogicalCBSize->ConvertTo(outerWM, wm);
+        aLogicalCBSize.ConvertTo(outerWM, wm);
 
     // placeholderContainer is used in each of the m{I,B}OffsetsNeedCSSAlign
     // clauses. We declare it at this scope so we can avoid having to look
     // it up twice (and only look it up if it's needed).
     nsContainerFrame* placeholderContainer = nullptr;
 
-    if (NS_AUTOOFFSET == aOffsets->IStart(outerWM)) {
-      NS_ASSERTION(NS_AUTOOFFSET != aOffsets->IEnd(outerWM),
+    if (NS_AUTOOFFSET == aOffsets.IStart(outerWM)) {
+      NS_ASSERTION(NS_AUTOOFFSET != aOffsets.IEnd(outerWM),
                    "Can't solve for both start and end");
-      aOffsets->IStart(outerWM) =
-          logicalCBSizeOuterWM.ISize(outerWM) - aOffsets->IEnd(outerWM) -
+      aOffsets.IStart(outerWM) =
+          logicalCBSizeOuterWM.ISize(outerWM) - aOffsets.IEnd(outerWM) -
           aMargin.IStartEnd(outerWM) - aKidSize.ISize(outerWM);
     } else if (aKidReflowInput.mFlags.mIOffsetsNeedCSSAlign) {
       placeholderContainer = GetPlaceholderContainer(aKidReflowInput.mFrame);
@@ -742,15 +735,15 @@ void AbsoluteContainingBlock::ResolveSizeDependentOffsets(
       // Shift IStart from its current position (at start corner of the
       // alignment container) by the returned offset.  And set IEnd to the
       // distance between the kid's end edge to containing block's end edge.
-      aOffsets->IStart(outerWM) += offset;
-      aOffsets->IEnd(outerWM) =
+      aOffsets.IStart(outerWM) += offset;
+      aOffsets.IEnd(outerWM) =
           logicalCBSizeOuterWM.ISize(outerWM) -
-          (aOffsets->IStart(outerWM) + aKidSize.ISize(outerWM));
+          (aOffsets.IStart(outerWM) + aKidSize.ISize(outerWM));
     }
 
-    if (NS_AUTOOFFSET == aOffsets->BStart(outerWM)) {
-      aOffsets->BStart(outerWM) =
-          logicalCBSizeOuterWM.BSize(outerWM) - aOffsets->BEnd(outerWM) -
+    if (NS_AUTOOFFSET == aOffsets.BStart(outerWM)) {
+      aOffsets.BStart(outerWM) =
+          logicalCBSizeOuterWM.BSize(outerWM) - aOffsets.BEnd(outerWM) -
           aMargin.BStartEnd(outerWM) - aKidSize.BSize(outerWM);
     } else if (aKidReflowInput.mFlags.mBOffsetsNeedCSSAlign) {
       if (!placeholderContainer) {
@@ -762,17 +755,17 @@ void AbsoluteContainingBlock::ResolveSizeDependentOffsets(
       // Shift BStart from its current position (at start corner of the
       // alignment container) by the returned offset.  And set BEnd to the
       // distance between the kid's end edge to containing block's end edge.
-      aOffsets->BStart(outerWM) += offset;
-      aOffsets->BEnd(outerWM) =
+      aOffsets.BStart(outerWM) += offset;
+      aOffsets.BEnd(outerWM) =
           logicalCBSizeOuterWM.BSize(outerWM) -
-          (aOffsets->BStart(outerWM) + aKidSize.BSize(outerWM));
+          (aOffsets.BStart(outerWM) + aKidSize.BSize(outerWM));
     }
-    aKidReflowInput.SetComputedLogicalOffsets(outerWM, *aOffsets);
+    aKidReflowInput.SetComputedLogicalOffsets(outerWM, aOffsets);
   }
 }
 
 void AbsoluteContainingBlock::ResolveAutoMarginsAfterLayout(
-    ReflowInput& aKidReflowInput, const LogicalSize* aLogicalCBSize,
+    ReflowInput& aKidReflowInput, const LogicalSize& aLogicalCBSize,
     const LogicalSize& aKidSize, LogicalMargin& aMargin,
     LogicalMargin& aOffsets) {
   MOZ_ASSERT(aKidReflowInput.mFlags.mDeferAutoMarginComputation);
@@ -791,7 +784,7 @@ void AbsoluteContainingBlock::ResolveAutoMarginsAfterLayout(
                           offsetsInWM.BStart(wm) == NS_AUTOOFFSET;
   nscoord availMarginSpace =
       autoOffset ? 0
-                 : aLogicalCBSize->BSize(wm) - kidSizeInWM.BSize(wm) -
+                 : aLogicalCBSize.BSize(wm) - kidSizeInWM.BSize(wm) -
                        offsetsInWM.BStartEnd(wm) - marginInWM.BStartEnd(wm);
 
   const auto& styleMargin = aKidReflowInput.mStyleMargin;
@@ -835,6 +828,25 @@ void AbsoluteContainingBlock::ResolveAutoMarginsAfterLayout(
   }
 }
 
+struct MOZ_STACK_CLASS MOZ_RAII AutoFallbackStyleSetter {
+  AutoFallbackStyleSetter(nsIFrame* aFrame, ComputedStyle* aFallbackStyle)
+      : mFrame(aFrame) {
+    if (aFallbackStyle) {
+      mOldStyle = aFrame->SetComputedStyleWithoutNotification(aFallbackStyle);
+    }
+  }
+
+  ~AutoFallbackStyleSetter() {
+    if (mOldStyle) {
+      mFrame->SetComputedStyleWithoutNotification(std::move(mOldStyle));
+    }
+  }
+
+ private:
+  nsIFrame* const mFrame;
+  RefPtr<ComputedStyle> mOldStyle;
+};
+
 // XXX Optimize the case where it's a resize reflow and the absolutely
 // positioned child has the exact same size and position and skip the
 // reflow...
@@ -872,54 +884,78 @@ void AbsoluteContainingBlock::ReflowAbsoluteFrame(
 #endif  // DEBUG
 
   const bool isGrid = aFlags.contains(AbsPosReflowFlag::IsGridContainerCB);
-  const auto* stylePos = aKidFrame->StylePosition();
   // TODO(bug 1989059): position-try-order.
-  auto fallbacks = stylePos->mPositionTryFallbacks._0.AsSpan();
+  auto fallbacks =
+      aKidFrame->StylePosition()->mPositionTryFallbacks._0.AsSpan();
   Maybe<uint32_t> currentFallbackIndex;
+  const StylePositionTryFallbacksItem* currentFallback = nullptr;
+  RefPtr<ComputedStyle> currentFallbackStyle;
+
+  auto SeekFallbackTo = [&](uint32_t aIndex) -> bool {
+    if (aIndex >= fallbacks.Length()) {
+      return false;
+    }
+    const StylePositionTryFallbacksItem* nextFallback;
+    RefPtr<ComputedStyle> nextFallbackStyle;
+    while (true) {
+      nextFallback = &fallbacks[aIndex];
+      if (nextFallback->IsIdentAndOrTactic()) {
+        auto* ident = nextFallback->AsIdentAndOrTactic().ident.AsAtom();
+        if (!ident->IsEmpty()) {
+          nextFallbackStyle = aPresContext->StyleSet()->ResolvePositionTry(
+              *aKidFrame->GetContent()->AsElement(), *aKidFrame->Style(),
+              ident);
+          if (!nextFallbackStyle) {
+            // No @position-try rule for this name was found, per spec we should
+            // skip it.
+            aIndex++;
+            if (aIndex >= fallbacks.Length()) {
+              return false;
+            }
+          }
+        }
+      }
+      break;
+    }
+    currentFallbackIndex = Some(aIndex);
+    currentFallback = nextFallback;
+    currentFallbackStyle = std::move(nextFallbackStyle);
+    return true;
+  };
+
+  auto TryAdvanceFallback = [&]() -> bool {
+    if (fallbacks.IsEmpty()) {
+      return false;
+    }
+    uint32_t nextFallbackIndex =
+        currentFallbackIndex ? *currentFallbackIndex + 1 : 0;
+    return SeekFallbackTo(nextFallbackIndex);
+  };
+
   // TODO(emilio): Right now fallback only applies to position-area, which only
   // makes a difference with a default anchor... Generalize it?
   if (aAnchorPosReferenceData) {
     bool found = false;
     uint32_t index = aKidFrame->GetProperty(
         nsIFrame::LastSuccessfulPositionFallback(), &found);
-    if (found) {
-      if (index >= fallbacks.Length()) {
-        // This should not happen, because we remove the frame property if the
-        // fallback list changes.
-        MOZ_ASSERT_UNREACHABLE("invalid LastSuccessfulPositionFallback");
-        aKidFrame->RemoveProperty(nsIFrame::LastSuccessfulPositionFallback());
-      } else {
-        currentFallbackIndex.emplace(index);
-      }
+    if (found && !SeekFallbackTo(index)) {
+      aKidFrame->RemoveProperty(nsIFrame::LastSuccessfulPositionFallback());
     }
   }
-  do {
-    const StylePositionTryFallbacksItem* currentFallback = nullptr;
-    RefPtr<ComputedStyle> currentFallbackStyle;
-    if (currentFallbackIndex) {
-      currentFallback = &fallbacks[*currentFallbackIndex];
-    }
 
+  do {
+    AutoFallbackStyleSetter fallback(aKidFrame, currentFallbackStyle);
     const nsRect usedCb = [&] {
       if (isGrid) {
         // TODO(emilio): how does position-area interact with grid?
         return nsGridContainerFrame::GridItemCB(aKidFrame);
       }
 
-      auto positionArea = stylePos->mPositionArea;
+      auto positionArea = aKidFrame->StylePosition()->mPositionArea;
       const StylePositionTryFallbacksTryTactic* tactic = nullptr;
       if (currentFallback) {
         if (currentFallback->IsIdentAndOrTactic()) {
           const auto& item = currentFallback->AsIdentAndOrTactic();
-          if (!item.ident.AsAtom()->IsEmpty()) {
-            currentFallbackStyle = aPresContext->StyleSet()->ResolvePositionTry(
-                *aKidFrame->GetContent()->AsElement(), *aKidFrame->Style(),
-                item.ident.AsAtom());
-            if (currentFallbackStyle) {
-              positionArea =
-                  currentFallbackStyle->StylePosition()->mPositionArea;
-            }
-          }
           tactic = &item.try_tactic;
         } else {
           MOZ_ASSERT(currentFallback->IsPositionArea());
@@ -950,17 +986,32 @@ void AbsoluteContainingBlock::ReflowAbsoluteFrame(
     nscoord availISize = logicalCBSize.ISize(wm);
 
     ReflowInput::InitFlags initFlags;
-    if (aFlags.contains(AbsPosReflowFlag::IsGridContainerCB)) {
-      // When a grid container generates the abs.pos. CB for a *child* then
-      // the static position is determined via CSS Box Alignment within the
-      // abs.pos. CB (a grid area, i.e. a piece of the grid). In this scenario,
-      // due to the multiple coordinate spaces in play, we use a convenience
-      // flag to simply have the child's ReflowInput give it a static position
-      // at its abs.pos. CB origin, and then we'll align & offset it from there.
-      nsIFrame* placeholder = aKidFrame->GetPlaceholderFrame();
-      if (placeholder && placeholder->GetParent() == aDelegatingFrame) {
-        initFlags += ReflowInput::InitFlag::StaticPosIsCBOrigin;
+    const bool staticPosIsCBOrigin = [&] {
+      if (aFlags.contains(AbsPosReflowFlag::IsGridContainerCB)) {
+        // When a grid container generates the abs.pos. CB for a *child* then
+        // the static position is determined via CSS Box Alignment within the
+        // abs.pos. CB (a grid area, i.e. a piece of the grid). In this
+        // scenario, due to the multiple coordinate spaces in play, we use a
+        // convenience flag to simply have the child's ReflowInput give it a
+        // static position at its abs.pos. CB origin, and then we'll align &
+        // offset it from there.
+        nsIFrame* placeholder = aKidFrame->GetPlaceholderFrame();
+        if (placeholder && placeholder->GetParent() == aDelegatingFrame) {
+          return true;
+        }
       }
+      if (aKidFrame->IsMenuPopupFrame()) {
+        // Popups never use their static pos.
+        return true;
+      }
+      // TODO(emilio): Either reparent the top layer placeholder frames to the
+      // viewport, or return true here for top layer frames more generally (not
+      // only menupopups), see https://github.com/w3c/csswg-drafts/issues/8040.
+      return false;
+    }();
+
+    if (staticPosIsCBOrigin) {
+      initFlags += ReflowInput::InitFlag::StaticPosIsCBOrigin;
     }
 
     const bool kidFrameMaySplit =
@@ -1055,11 +1106,11 @@ void AbsoluteContainingBlock::ReflowAbsoluteFrame(
 
       // If we're solving for start in either inline or block direction,
       // then compute it now that we know the dimensions.
-      ResolveSizeDependentOffsets(aPresContext, kidReflowInput, kidSize, margin,
-                                  &offsets, &logicalCBSize);
+      ResolveSizeDependentOffsets(kidReflowInput, logicalCBSize, kidSize,
+                                  margin, offsets);
 
       if (kidReflowInput.mFlags.mDeferAutoMarginComputation) {
-        ResolveAutoMarginsAfterLayout(kidReflowInput, &logicalCBSize, kidSize,
+        ResolveAutoMarginsAfterLayout(kidReflowInput, logicalCBSize, kidSize,
                                       margin, offsets);
       }
 
@@ -1159,21 +1210,18 @@ void AbsoluteContainingBlock::ReflowAbsoluteFrame(
 
     aKidFrame->DidReflow(aPresContext, &kidReflowInput);
 
-    if (fallbacks.IsEmpty() ||
-        (currentFallbackIndex &&
-         *currentFallbackIndex >= fallbacks.Length() - 1) ||
-        (usedCb.Contains(aKidFrame->GetRect()) && aStatus.IsComplete())) {
-      // If there are no further fallbacks, or we don't overflow, we're done.
+    if (usedCb.Contains(aKidFrame->GetRect()) && aStatus.IsComplete()) {
+      // We don't overflow our CB, no further fallback needed.
+      break;
+    }
+
+    if (!TryAdvanceFallback()) {
+      // If there are no further fallbacks, we're done.
       break;
     }
 
     // Try with the next  fallback.
     aKidFrame->AddStateBits(NS_FRAME_IS_DIRTY);
-    if (currentFallbackIndex) {
-      (*currentFallbackIndex)++;
-    } else {
-      currentFallbackIndex.emplace(0);
-    }
     aStatus.Reset();
   } while (true);
 

@@ -68,7 +68,7 @@ const NO_LANGUAGE_URL = _url("translations-tester-no-tag.html");
 const PDF_TEST_PAGE_URL = _url("translations-tester-pdf-file.pdf");
 const SELECT_TEST_PAGE_URL = _url("translations-tester-select.html");
 const TEXT_CLEANING_URL = _url("translations-text-cleaning.html");
-const SPANISH_BENCHMARK_PAGE_URL = _url("translations-bencher-es.html");
+const ENGLISH_BENCHMARK_PAGE_URL = _url("translations-bencher-en.html");
 
 const SPANISH_PAGE_URL_DOT_ORG =
   URL_ORG_PREFIX + DIR_PATH + "translations-tester-es.html";
@@ -1220,7 +1220,7 @@ async function pathExists(path) {
  *
  * @returns {Promise<object>} - An object containing the removeMocks function and remoteClients.
  */
-async function createFileSystemRemoteSettings(languagePairs) {
+async function createFileSystemRemoteSettings(languagePairs, architecture) {
   const { removeMocks, remoteClients } = await createAndMockRemoteSettings({
     languagePairs,
     useMockedTranslator: false,
@@ -1255,12 +1255,14 @@ async function createFileSystemRemoteSettings(languagePairs) {
 
   const download = async record => {
     const recordPath = normalizePathForOS(
-      `${artifactDirectory}/${record.name}.zst`
+      record.name === "bergamot-translator"
+        ? `${artifactDirectory}/${record.name}.zst`
+        : `${artifactDirectory}/${architecture}.${record.name}.zst`
     );
 
     if (!(await pathExists(recordPath))) {
       throw new Error(`
-        The record ${record.name} was not found in ${artifactDirectory} specified by MOZ_FETCHES_DIR.
+        The record ${record.name} was not found in ${artifactDirectory} specified by MOZ_FETCHES_DIR at the expected path: ${recordPath}
         If you are running a Translations end-to-end test locally, you will need to download the required artifacts to MOZ_FETCHES_DIR.
         To configure MOZ_FETCHES_DIR to run Translations end-to-end tests locally, please run toolkit/components/translations/tests/scripts/download-translations-artifacts.py
       `);
@@ -1390,6 +1392,7 @@ async function loadTestPage({
   systemLocales = ["en"],
   appLocales,
   webLanguages,
+  architecture,
   contentEagerMode = false,
   win = window,
 }) {
@@ -1444,7 +1447,7 @@ async function loadTestPage({
     );
 
     const result = endToEndTest
-      ? await createFileSystemRemoteSettings(languagePairs)
+      ? await createFileSystemRemoteSettings(languagePairs, architecture)
       : await createAndMockRemoteSettings({
           languagePairs,
           autoDownloadFromRemoteSettings,

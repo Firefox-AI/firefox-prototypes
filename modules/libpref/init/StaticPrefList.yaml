@@ -5547,6 +5547,17 @@
 #endif
   mirror: always
 
+# Is WebGPU allowed to run in the parent process? This should be false if
+# on a platform that supports the GPU process, else true.
+- name: dom.webgpu.allow-in-parent
+  type: bool
+#if defined(XP_WIN) || defined(ANDROID)
+  value: false
+#else
+  value: true
+#endif
+  mirror: once
+
 # Is support for the Web GPU API enabled on service workers?
 - name: dom.webgpu.service-workers.enabled
   type: RelaxedAtomicBool
@@ -6641,6 +6652,15 @@
   value: false
 #endif
   mirror: always
+
+- name: gfx.canvas.accelerated.allow-in-parent
+  type: bool
+#if defined(XP_WIN) || defined(ANDROID)
+  value: false
+#else
+  value: true
+#endif
+  mirror: once
 
 # Whether to attempt to enable Accelerated Canvas2D regardless of blocklisting.
 - name: gfx.canvas.accelerated.force-enabled
@@ -8094,7 +8114,7 @@
 - name: gfx.webrender.precise-radial-gradients-swgl
   type: bool
   rust: true
-  value: false
+  value: true
   mirror: once
 
 # Use a more precise method for sampling gradients when *not* using SWGL .
@@ -9385,7 +9405,7 @@
   # making this mirror: once, and set_spidermonkey_pref: startup is
   # broken: See Bug 1989094
   mirror: always
-  set_spidermonkey_pref: startup
+  set_spidermonkey_pref: always
 
 # Whether to use the off-thread script compilation and decoding.
 - name: javascript.options.parallel_parsing
@@ -9523,6 +9543,13 @@
 #endif
   mirror: always
 
+# If true, allow the parent process as a fallback for compositing due to an
+# unstable GPU process, otherwise simply crash the parent process.
+- name: layers.gpu-process.allow-fallback-to-parent
+  type: bool
+  value: false
+  mirror: once
+
 - name: layers.gpu-process.allow-software
   type: bool
 #if defined(XP_WIN)
@@ -9602,7 +9629,7 @@
 # restarts.
 - name: layers.gpu-process.stable.min-uptime-ms
   type: RelaxedAtomicInt32
-  value: 4 * 60000
+  value: 30000
   mirror: always
 
 # Note: This pref will only be used if it is less than layers.gpu-process.max_restarts.
@@ -15289,11 +15316,7 @@
 # Has no effect unless security.tls.enable_kyber is true.
 - name: network.http.http3.enable_kyber
   type: RelaxedAtomicBool
-#ifdef ANDROID
-  value: @IS_NIGHTLY_BUILD@
-#else
   value: true
-#endif
   mirror: always
   rust: true
 
@@ -17360,17 +17383,13 @@
 
 - name: security.tls.enable_kyber
   type: RelaxedAtomicBool
-#ifdef ANDROID
-  value: @IS_NIGHTLY_BUILD@
-#else
   value: true
-#endif
   mirror: always
   rust: true
 
 - name: security.tls.client_hello.send_p256_keyshare
   type: RelaxedAtomicBool
-  value: true
+  value: @IS_NOT_NIGHTLY_BUILD@
   mirror: always
   rust: true
 
@@ -19321,6 +19340,16 @@
 - name: widget.windows.mica.toplevel-backdrop
   type: RelaxedAtomicInt32
   value: 0
+  mirror: always
+
+# Whether to use the Windows App SDK to disable the minimize/maximize/close buttons.
+# This should only be disabled if crashes are happening, because it will make
+# double minimize/maximize/close buttons draw. Note that this preference is disregarded
+# when running on Windows 11 H2 or earlier (which includes Windows 10), as we never use
+# the Windows App SDK on those versions.
+- name: widget.windows.windowsappsdk.enabled
+  type: bool
+  value: true
   mirror: always
 #endif
 

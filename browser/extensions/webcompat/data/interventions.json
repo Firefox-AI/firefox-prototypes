@@ -1719,21 +1719,6 @@
       }
     ]
   },
-  "1875540": {
-    "label": "allstate.com",
-    "bugs": {
-      "1875540": {
-        "issue": "unsupported-warning",
-        "matches": ["*://*.allstate.com/*"]
-      }
-    },
-    "interventions": [
-      {
-        "platforms": ["all"],
-        "ua_string": ["Chrome"]
-      }
-    ]
-  },
   "1878024": {
     "label": "g1.globo.com",
     "bugs": {
@@ -5261,6 +5246,24 @@
       }
     ]
   },
+  "1938533": {
+    "label": "chatgpt.com",
+    "bugs": {
+      "1938533": {
+        "issue": "broken-interactive-elements",
+        "matches": ["https://chatgpt.com/*"]
+      }
+    },
+    "interventions": [
+      {
+        "platforms": ["all"],
+        "only_channels": ["nightly"],
+        "content_scripts": {
+          "js": ["bug1938533-chatgpt.com-fix-voice-mode.js"]
+        }
+      }
+    ]
+  },
   "1976402": {
     "label": "dieseldispatch.com",
     "bugs": {
@@ -5453,6 +5456,21 @@
       {
         "platforms": ["all"],
         "ua_string": ["add_Chrome"]
+      }
+    ]
+  },
+  "1991388": {
+    "label": "gismeteo.ru",
+    "bugs": {
+      "1991388": {
+        "issue": "desktop-layout-not-mobile",
+        "matches": ["*://gismeteo.ru/*"]
+      }
+    },
+    "interventions": [
+      {
+        "platforms": ["android"],
+        "ua_string": ["Chrome_with_FxQuantum"]
       }
     ]
   }
