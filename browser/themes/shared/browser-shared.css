@@ -1453,10 +1453,18 @@ browser {
 :root[smart-window] {
   color-scheme: light !important;
   --smart-window-border: #8a61ff;
-  --smart-window-gradient: radial-gradient(at top left, rgba(255, 192, 203, 0.7), transparent 80%),
-    radial-gradient(at bottom left, rgba(173, 216, 230, 0.5), transparent 60%),
-    radial-gradient(at top right, rgba(255, 228, 196, 0.6), transparent 80%),
-    linear-gradient(to bottom right, #fcefff, #fffdf5);
+  --smart-window-gradient: linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.6),
+      rgba(255, 255, 255, 0.4)
+    ),
+    linear-gradient(
+      180deg,
+      #faf7ff 0%,
+      #f3ecff 30%,
+      #e6dcff 65%,
+      #d7caff 100%
+  );
   background: var(--smart-window-gradient) !important;
 
   --toolbar-bgcolor: transparent !important;
