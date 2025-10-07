@@ -17,6 +17,12 @@ var SmartWindow = {
   // Chat message storage by tab ID (no expiration)
   _chatMessagesByTab: new Map(),
 
+  // Insights storage (persists across tabs)
+  _insightsData: {},
+  _generatedInsights: new Set(),
+  _isGeneratingInsights: false,
+  _insightsGenerationError: null,
+
   init() {
     if (this._initialized) {
       return;
@@ -406,6 +412,43 @@ var SmartWindow = {
     this._chatMessagesByTab.clear();
   },
 
+  // Insights management methods
+  getInsightsData() {
+    return this._insightsData;
+  },
+
+  setInsightsData(data) {
+    this._insightsData = data || {};
+  },
+
+  getGeneratedInsights() {
+    return this._generatedInsights;
+  },
+
+  addGeneratedInsight(insight) {
+    this._generatedInsights.add(insight);
+  },
+
+  clearGeneratedInsights() {
+    this._generatedInsights.clear();
+  },
+
+  isGeneratingInsights() {
+    return this._isGeneratingInsights;
+  },
+
+  setGeneratingInsights(value) {
+    this._isGeneratingInsights = value;
+  },
+
+  getInsightsError() {
+    return this._insightsGenerationError;
+  },
+
+  setInsightsError(error) {
+    this._insightsGenerationError = error;
+  },
+
   setupTabAttrObserver() {
     if (gBrowser?.tabContainer) {
       this._tabAttrObserver = event => {
@@ -448,6 +491,12 @@ var SmartWindow = {
 
     // Clean up chat messages
     this._chatMessagesByTab.clear();
+
+    // Clean up insights storage
+    this._insightsData = {};
+    this._generatedInsights.clear();
+    this._isGeneratingInsights = false;
+    this._insightsGenerationError = null;
 
     // Clean up event listeners
     if (gBrowser?.tabContainer && this._tabAttrObserver) {
