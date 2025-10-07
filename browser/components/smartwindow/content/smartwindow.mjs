@@ -640,12 +640,19 @@ class SmartWindowPage {
 
     const isEnabled = this.isSidebarMode || isSmartMode;
 
+    console.log(
+      `[SmartWindow] onDOMReady - isSidebarMode: ${this.isSidebarMode}, isSmartMode: ${isSmartMode}, isEnabled: ${isEnabled}, embedderElement.id: ${embedderElement?.id}`
+    );
+
     if (this.smartbar && isEnabled) {
       this.focusSearchInputWhenReady();
     }
 
     if (this.smartbar) {
       if (!isEnabled) {
+        console.log(
+          "[SmartWindow] Setting smartbar to non-editable during initialization"
+        );
         this.smartbar.setEditable(false);
         if (this.submitButton) {
           this.submitButton.disabled = true;
@@ -994,8 +1001,22 @@ class SmartWindowPage {
       topChromeWindow.addEventListener("SmartWindowModeChanged", event => {
         const isActive = event.detail.active;
 
+        console.log(
+          `[SmartWindow] SmartWindowModeChanged event - isActive: ${isActive}, isSidebarMode: ${this.isSidebarMode}, embedderElement.id: ${embedderElement?.id}`
+        );
+
+        // If we're in sidebar mode, always keep the editor enabled
+        // regardless of the smart window mode state
+        if (this.isSidebarMode) {
+          console.log(
+            "[SmartWindow] Ignoring mode change event because we're in sidebar mode"
+          );
+          return;
+        }
+
         if (!isActive) {
           // Disable editor when switching to classic mode
+          console.log("[SmartWindow] Disabling editor (switching to classic mode)");
           if (this.smartbar) {
             this.smartbar.setEditable(false);
           }
@@ -1008,6 +1029,7 @@ class SmartWindowPage {
           }
         } else if (this.smartbar) {
           // Re-enable editor when switching back to smart mode
+          console.log("[SmartWindow] Enabling editor (switching to smart mode)");
           this.smartbar.setEditable(true);
           const text = this.smartbar.getText();
           this.updateSubmitButton(text);
