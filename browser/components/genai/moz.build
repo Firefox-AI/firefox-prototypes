@@ -16,7 +16,6 @@ EXTRA_JS_MODULES += [
 ]
 
 MOZ_SRC_FILES += [
-    "BoilerplateRemoval.sys.mjs",
     "LinkPreview.sys.mjs",
     "LinkPreviewModel.sys.mjs",
     "PageAssist.sys.mjs",
