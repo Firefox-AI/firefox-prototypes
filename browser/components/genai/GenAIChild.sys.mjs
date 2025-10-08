@@ -4,24 +4,7 @@
 
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
-/**
- * @typedef {object} Lazy
- * @property {typeof console} console
- * @property {typeof import("resource://gre/modules/Readerable.sys.mjs").isProbablyReaderable} isProbablyReaderable
- * @property {typeof import("moz-src:///toolkit/components/reader/ReaderMode.sys.mjs").ReaderMode} ReaderMode
- * @property {typeof import("moz-src:///browser/components/genai/BoilerplateRemoval.sys.mjs").getBoilerplateRemoval} getBoilerplateRemoval
- */
-
-/** @type {Lazy} */
-const lazy = /** @type {any} */ ({});
-
-ChromeUtils.defineLazyGetter(lazy, "console", () => {
-  return console.createInstance({
-    prefix: "[SmartWindow:PageExtractor]",
-    maxLogLevel: "All",
-  });
-});
-
+const lazy = {};
 XPCOMUtils.defineLazyPreferenceGetter(
   lazy,
   "shortcutsDelay",
@@ -30,9 +13,6 @@ XPCOMUtils.defineLazyPreferenceGetter(
 
 ChromeUtils.defineESModuleGetters(lazy, {
   ReaderMode: "moz-src:///toolkit/components/reader/ReaderMode.sys.mjs",
-  getBoilerplateRemoval:
-    "moz-src:///browser/components/genai/BoilerplateRemoval.sys.mjs",
-  isProbablyReaderable: "resource://gre/modules/Readerable.sys.mjs",
 });
 
 // Events to register after shortcuts are shown
@@ -173,9 +153,6 @@ export class GenAIChild extends JSWindowActorChild {
     if (name === "GetReadableText") {
       return await this.getContentText();
     }
-    if (name === "ExtractPageContent") {
-      return this.extractPageContent();
-    }
     return null;
   }
 
@@ -194,47 +171,6 @@ export class GenAIChild extends JSWindowActorChild {
         .trim()
         // Replace duplicate whitespace with either a single newline or space
         .replace(/(\s*\n\s*)|\s{2,}/g, (_, newline) => (newline ? "\n" : " ")),
-    };
-  }
-
-  /**
-   * Get readable article text or whole innerText from the content side.
-   *
-   * @returns {{ text: string, method: string }} text from the page
-   */
-  async extractPageContent() {
-    const win = this.browsingContext?.window;
-    const doc = win?.document;
-
-    if (!doc) {
-      return { text: "", method: "No Page Available" };
-    }
-
-    if (lazy.isProbablyReaderable(doc)) {
-      const article = await lazy.ReaderMode.parseDocument(doc);
-
-      if (article) {
-        const text = article.textContent
-          .trim()
-          // Replace duplicate whitespace with either a single newline or space
-          .replace(/(\s*\n\s*)|\s{2,}/g, (_, newline) =>
-            newline ? "\n" : " "
-          );
-        if (text) {
-          lazy.console.log("Extracted ReaderMode text:");
-          lazy.console.log(text);
-          return { text, method: "Readability" };
-        }
-      }
-    }
-
-    const text = lazy.getBoilerplateRemoval(doc);
-    lazy.console.log("Extracted boilerplate removal text:");
-    lazy.console.log(text);
-
-    return {
-      text,
-      method: "Boilerplate Removal",
     };
   }
 }
