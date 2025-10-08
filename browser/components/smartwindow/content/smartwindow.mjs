@@ -1143,12 +1143,20 @@ class SmartWindowPage {
     await new Promise(resolve => setTimeout(resolve, 1000));
     const selectedBrowser = topChromeWindow.gBrowser.selectedBrowser;
     try {
+      const pageExtractor =
+        await selectedBrowser.browsingContext.currentWindowContext.getActor(
+          "PageExtractor"
+        );
       /** @type {{ text: string, method: string }} */
-      const { text } =
-        await selectedBrowser.browsingContext.currentWindowContext
-          .getActor("GenAI")
-          .sendQuery("ExtractPageContent");
+      let text = await pageExtractor.getReaderModeContent();
 
+      if (!text) {
+        text = await pageExtractor.getText();
+      }
+
+      if (!text) {
+        text = "No page text was present";
+      }
       // Store page text for use in chat system prompt
       this.currentTabPageText = text;
     } catch (error) {
