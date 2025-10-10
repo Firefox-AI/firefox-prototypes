@@ -61,6 +61,25 @@ class ExtractionContext {
   }
 
   /**
+   * Returns true if a condition has been met such that the text
+   * extraction should stop early, otherwise false.
+   *
+   * @returns {boolean}
+   */
+  shouldStopExtraction() {
+    const { sufficientLength } = this.#options;
+
+    if (
+      sufficientLength !== undefined &&
+      this.#textContent.length >= sufficientLength
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * Returns true if this node or its ancestor's text content has
    * already been extracted from the DOM.
    *
@@ -411,6 +430,10 @@ function hasNonWhitespaceTextNodes(node) {
  * @param {ExtractionContext} context
  */
 function subdivideAndExtractText(node, context) {
+  if (context.shouldStopExtraction()) {
+    return;
+  }
+
   switch (determineBlockStatus(node)) {
     case NodeFilter.FILTER_REJECT: {
       // This node is rejected as it shouldn't be used for text extraction.
@@ -450,6 +473,10 @@ function subdivideAndExtractText(node, context) {
  * @param {ExtractionContext} context
  */
 function processSubdivide(node, context) {
+  if (context.shouldStopExtraction()) {
+    return;
+  }
+
   const { ownerDocument } = node;
   if (!ownerDocument) {
     return;
@@ -470,6 +497,9 @@ function processSubdivide(node, context) {
       processSubdivide(shadowRoot, context);
     } else {
       context.maybeAppendTextContent(currentNode);
+    }
+    if (context.shouldStopExtraction()) {
+      return;
     }
   }
 }

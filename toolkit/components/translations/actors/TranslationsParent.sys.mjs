@@ -3560,7 +3560,7 @@ export class TranslationsParent extends JSWindowActorParent {
 
     const startTime = ChromeUtils.now();
 
-    const pageText = await actor.getText();
+    const pageText = await actor.getText({ sufficientLength: 2048 });
     if (this.#isDestroyed) {
       return { language: "", confident: false, languages: [] };
     }
