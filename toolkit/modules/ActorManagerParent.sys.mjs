@@ -594,6 +594,7 @@ let JSWINDOWACTORS = {
       esModuleURI: "resource://gre/actors/TranslationsChild.sys.mjs",
       events: {
         DOMContentLoaded: {},
+        load: { capture: true, createActor: false },
       },
     },
     matches: ["http://*/*", "https://*/*", "file:///*", "moz-extension://*"],

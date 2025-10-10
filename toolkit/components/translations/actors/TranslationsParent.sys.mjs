@@ -85,6 +85,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "resource://gre/modules/translations/LanguageDetector.sys.mjs",
   RemoteSettings: "resource://services-settings/remote-settings.sys.mjs",
   setTimeout: "resource://gre/modules/Timer.sys.mjs",
+  clearTimeout: "resource://gre/modules/Timer.sys.mjs",
   TranslationsTelemetry:
     "chrome://global/content/translations/TranslationsTelemetry.sys.mjs",
   TranslationsUtils:
@@ -466,6 +467,22 @@ export class TranslationsParent extends JSWindowActorParent {
    * @type {number}
    */
   static #DOC_CONFIDENCE_THRESHOLD = 150;
+
+  /**
+   * A timeout id for handling language detection upon page load.
+   *
+   * The timeout id will be assigned upon the DOMContnetLoaded event.
+   *
+   * If the page fully loads before the timeout, then the timeout will
+   * be canceled and language identification will run on the loaded page.
+   *
+   * If the page does not fully load before the timeout, then language
+   * detection will run regardless, so that we can offer translations
+   * within a reasonable time frame.
+   *
+   * @type {number | null}
+   */
+  #handlePageLoadTimeoutId = null;
 
   /**
    * Contains the state that would affect UI. Anytime this state is changed, a dispatch
@@ -1550,58 +1567,90 @@ export class TranslationsParent extends JSWindowActorParent {
     return port2;
   }
 
+  /**
+   * Handles a page being loaded by reacting to the HTML language tag
+   * as well as the detected language tag to make an informed decision
+   * on how to proceed with regard to translations.
+   *
+   * @param {string} htmlLangAttribute
+   */
+  async #handlePageLoad(htmlLangAttribute) {
+    const detectedLanguages = await this.getDetectedLanguages(
+      htmlLangAttribute
+    ).catch(error => {
+      // Detecting the languages can fail if the page gets destroyed before it
+      // can be completed. This runs on every page that doesn't have a lang tag,
+      // so only report the error if you have Translations logging turned on to
+      // avoid console spam.
+      lazy.console.log("Failed to get the detected languages.", error);
+    });
+
+    if (this.#isDestroyed) {
+      return;
+    }
+
+    if (!detectedLanguages) {
+      // The actor was already destroyed, and the detectedLanguages weren't reported
+      // in time.
+      return;
+    }
+
+    this.languageState.detectedLanguages = detectedLanguages;
+
+    if (await this.shouldAutoTranslate(detectedLanguages)) {
+      if (this.#isDestroyed) {
+        return;
+      }
+
+      this.translate(
+        {
+          sourceLanguage: detectedLanguages.docLangTag,
+          targetLanguage: detectedLanguages.userLangTag,
+        },
+        true // reportAsAutoTranslate
+      );
+    } else {
+      if (this.#isDestroyed) {
+        return;
+      }
+
+      this.maybeOfferTranslations(detectedLanguages).catch(error =>
+        lazy.console.error(error)
+      );
+    }
+  }
+
   async receiveMessage({ name, data }) {
     if (this.#isDestroyed) {
       return undefined;
     }
 
     switch (name) {
-      case "Translations:ReportLangTags": {
-        const { htmlLangAttribute, href } = data;
-        const detectedLanguages = await this.getDetectedLanguages(
-          htmlLangAttribute,
-          href
-        ).catch(error => {
-          // Detecting the languages can fail if the page gets destroyed before it
-          // can be completed. This runs on every page that doesn't have a lang tag,
-          // so only report the error if you have Translations logging turned on to
-          // avoid console spam.
-          lazy.console.log("Failed to get the detected languages.", error);
-        });
+      case "Translations:DOMContentLoaded": {
+        const { htmlLangAttribute } = data;
 
-        if (this.#isDestroyed) {
+        // Starting a timeout to run language identification,
+        // in case this page takes a particularly long time to load.
+        this.#handlePageLoadTimeoutId = lazy.setTimeout(() => {
+          this.#handlePageLoadTimeoutId = null;
+          this.#handlePageLoad(htmlLangAttribute);
+        }, 2000);
+
+        return undefined;
+      }
+      case "Translations:Load": {
+        if (this.#handlePageLoadTimeoutId === null) {
+          // Language identification already ran due to the timeout.
           return undefined;
         }
 
-        if (!detectedLanguages) {
-          // The actor was already destroyed, and the detectedLanguages weren't reported
-          // in time.
-          return undefined;
-        }
+        // The page fully loaded before the timeout.
+        lazy.clearTimeout(this.#handlePageLoadTimeoutId);
+        this.#handlePageLoadTimeoutId = null;
 
-        this.languageState.detectedLanguages = detectedLanguages;
+        const { htmlLangAttribute } = data;
+        await this.#handlePageLoad(htmlLangAttribute);
 
-        if (await this.shouldAutoTranslate(detectedLanguages)) {
-          if (this.#isDestroyed) {
-            return undefined;
-          }
-
-          this.translate(
-            {
-              sourceLanguage: detectedLanguages.docLangTag,
-              targetLanguage: detectedLanguages.userLangTag,
-            },
-            true // reportAsAutoTranslate
-          );
-        } else {
-          if (this.#isDestroyed) {
-            return undefined;
-          }
-
-          this.maybeOfferTranslations(detectedLanguages).catch(error =>
-            lazy.console.error(error)
-          );
-        }
         return undefined;
       }
       case "Translations:RequestPort": {
@@ -3726,11 +3775,10 @@ export class TranslationsParent extends JSWindowActorParent {
    * rather than the child to remove the per-content process memory allocation amount.
    *
    * @param {string} [htmlLangAttribute]
-   * @param {string} [href]
    * @returns {Promise<LangTags | null>} - Returns null if the actor was destroyed before
    *   the result could be resolved.
    */
-  async getDetectedLanguages(htmlLangAttribute, href) {
+  async getDetectedLanguages(htmlLangAttribute) {
     if (this.languageState.detectedLanguages) {
       return this.languageState.detectedLanguages;
     }
@@ -3739,14 +3787,16 @@ export class TranslationsParent extends JSWindowActorParent {
       return null;
     }
 
-    if (htmlLangAttribute === undefined) {
-      htmlLangAttribute = await this.queryDocumentElementLang();
-      if (this.#isDestroyed) {
-        return null;
-      }
-    }
+    //if (htmlLangAttribute === undefined) {
+    //  htmlLangAttribute = await this.queryDocumentElementLang();
+    //  if (this.#isDestroyed) {
+    //    return null;
+    //  }
+    //}
 
-    htmlLangAttribute = this.maybeRefineMacroLanguageTag(htmlLangAttribute);
+    if (htmlLangAttribute) {
+      htmlLangAttribute = this.maybeRefineMacroLanguageTag(htmlLangAttribute);
+    }
 
     let languagePairs = await TranslationsParent.getNonPivotLanguagePairs();
     if (this.#isDestroyed) {
@@ -3827,7 +3877,7 @@ export class TranslationsParent extends JSWindowActorParent {
         { innerWindowId: this.innerWindowId },
         message
       );
-      lazy.console.log(message, href);
+      lazy.console.log(message);
 
       const langTag = await TranslationsParent.getTopPreferredSupportedToLang();
       if (this.#isDestroyed) {
@@ -3857,7 +3907,8 @@ export class TranslationsParent extends JSWindowActorParent {
         { innerWindowId: this.innerWindowId },
         message
       );
-      lazy.console.log(message, href);
+      lazy.console.log(message);
+
       // The docLangTag will be set, while the userLangTag will be null.
       return langTags;
     }
