@@ -995,6 +995,11 @@ class SmartWindowPage {
     }
 
     if (topChromeWindow) {
+      document
+        .getElementById("open-smart-window")
+        .addEventListener("click", () => {
+          topChromeWindow.SmartWindow.toggleSmartWindow();
+        });
       topChromeWindow.addEventListener("SmartWindowModeChanged", event => {
         const isActive = event.detail.active;
 
