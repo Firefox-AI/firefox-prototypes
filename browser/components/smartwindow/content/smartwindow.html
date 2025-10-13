@@ -1,5 +1,5 @@
 <!doctype html>
-<html>
+<html class="smart-window">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -32,6 +32,9 @@
         </div>
       </div>
       <div class="smart-window-container">
+        <div id="results-container">
+          <chat-bot id="chat-bot" style="display: none"></chat-bot>
+        </div>
         <div class="search-box">
           <div class="input-container">
             <div id="tiptap-editor" class="tiptap-editor"></div>
@@ -86,9 +89,6 @@
         </div>
         <div class="quick-prompts-container" id="quick-prompts-container">
           <!-- Quick prompts will be dynamically inserted here -->
-        </div>
-        <div id="results-container">
-          <chat-bot id="chat-bot" style="display: none"></chat-bot>
         </div>
         <div class="quick-actions" id="quick-actions">
           <button class="quick-action-button" id="history-button">

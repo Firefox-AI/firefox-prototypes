@@ -24,6 +24,10 @@ body {
   flex-direction: column;
   padding: 140px 20px 20px; /* More top space for better visual balance */
 
+  :root.chat-mode-bottom & {
+    padding: 0;
+  }
+
   @media not -moz-pref("browser.smartwindow.key") {
     display: none !important;
   }
@@ -48,19 +52,13 @@ body {
   backdrop-filter: blur(10px);
 }
 
-#search-input,
 #tiptap-editor {
   width: 100%;
-  padding: 10px;
   font-size: 15px;
   border: none;
   outline: none;
   background: transparent;
   color: #15141a;
-}
-
-#search-input::placeholder {
-  color: rgba(21, 20, 26, 0.69);
 }
 
 /* Smartbar wrapper to take full available space */
@@ -443,7 +441,7 @@ body {
 }
 
 /* Hide quick prompts (not actual suggestions) when not in bottom chat mode and user has typed something */
-.smart-window-container:not(.chat-mode-bottom) .suggestions-container.quick-prompts.user-edited {
+:root:not(.chat-mode-bottom) .smart-window-container .suggestions-container.quick-prompts.user-edited {
   display: none;
 }
 
@@ -495,13 +493,7 @@ body {
 
 /* Responsive design for smaller viewports */
 @media (max-width: 480px) {
-  .search-box {
-    flex-direction: column;
-    gap: 12px;
-  }
-
   .submit-button {
-    width: 100%;
     min-width: auto;
   }
 
@@ -516,42 +508,41 @@ body {
   }
 }
 
-/* Chat mode bottom - fix input at bottom */
-.smart-window-container.chat-mode-bottom {
-  padding: 20px;
-  position: relative;
-}
+:root.chat-mode-bottom {
+  /* Chat mode bottom - fix input at bottom */
+  .smart-window-container {
+    position: relative;
+    padding: 16px 0;
+    box-sizing: border-box;
+    height: 100vh;
+  }
 
-.smart-window-container.chat-mode-bottom #chat-bot {
-  /* Make chat bot scrollable and take remaining space */
-  flex: 1;
-  overflow-y: auto;
-  margin-bottom: 120px; /* Leave space for fixed search box */
-}
+  .smart-window-container #chat-bot {
+    /* Make chat bot scrollable and take remaining space */
+    flex: 1 1 auto;
+    overflow-y: auto;
+  }
 
-.smart-window-container.chat-mode-bottom .search-box {
-  /* Fix search box at the bottom */
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: calc(100% - 40px);
-  max-width: 700px;
-  margin: 0;
-  z-index: 10;
-  backdrop-filter: blur(20px);
-}
+  .smart-window-container .search-box {
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 32px);
+    max-width: 700px;
+    margin: 0;
+    backdrop-filter: blur(20px);
+  }
 
-.smart-window-container.chat-mode-bottom .suggestions-container {
-  /* Position suggestions above the input */
-  border-radius: 12px 12px 0 0; /* Rounded top corners only */
-  bottom: calc(100% - 12px); /* Place above the search box */
-  position: absolute;
-  top: auto; /* Override the default top positioning */
-  left: 0;
-  right: 0;
-  margin: 0;
-  z-index: 10000;
+  .smart-window-container .suggestions-container {
+    /* Position suggestions above the input */
+    border-radius: 12px 12px 0 0; /* Rounded top corners only */
+    bottom: calc(100% - 12px); /* Place above the search box */
+    position: absolute;
+    top: auto; /* Override the default top positioning */
+    left: 0;
+    right: 0;
+    margin: 0;
+    z-index: 10000;
+  }
 }
 
 #chat-bot {
@@ -629,11 +620,11 @@ body {
 }
 
 .sidebar-mode .search-box {
-  order: 2; /* Place after quick prompts */
+  order: 3; /* Place after quick prompts */
 }
 
 .sidebar-mode #results-container {
-  order: 3; /* Place after search box */
+  order: 2; /* Place after search box */
 }
 
 .sidebar-mode .quick-prompt-pill {
@@ -658,42 +649,21 @@ body {
 }
 
 /* Hide quick prompts in fullscreen mode when chat is active */
-.smart-window-container.chat-mode-bottom:not(.sidebar-mode) .quick-prompts-container {
+:root.chat-mode-bottom:not(.sidebar-mode) .smart-window-container .quick-prompts-container {
   display: none;
 }
 
 /* Keep quick prompts visible but with reduced opacity in sidebar mode when chat is active */
-.smart-window-container.sidebar-mode.chat-mode-bottom .quick-prompts-container {
-  opacity: 0.6;
-}
+:root.chat-mode-bottom.sidebar-mode {
+  .smart-window-container .quick-prompts-container {
+    opacity: 0.6;
+  }
 
-/* Sidebar mode with chat-mode-bottom */
-.smart-window-container.sidebar-mode.chat-mode-bottom {
-  padding: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.smart-window-container.sidebar-mode.chat-mode-bottom #chat-bot {
-  flex: 1;
-  overflow-y: auto;
-  margin-bottom: 60px; /* Less space needed in sidebar */
-}
-
-.smart-window-container.sidebar-mode.chat-mode-bottom .search-box {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  transform: none;
-  width: 100%;
-  max-width: none;
-  border-radius: 0;
-  border-left: none;
-  border-right: none;
-  border-bottom: none;
-  backdrop-filter: blur(20px);
+  /* Sidebar mode with chat-mode-bottom */
+  .smart-window-container #chat-bot {
+    flex: 1;
+    overflow-y: auto;
+  }
 }
 
 /* Quick Actions Buttons */
@@ -743,7 +713,7 @@ body {
 }
 
 /* Hide quick actions when chat is active in fullscreen mode */
-.smart-window-container.chat-mode-bottom .quick-actions {
+.chat-mode-bottom .smart-window-container .quick-actions {
   display: none;
 }
 
@@ -752,11 +722,12 @@ body {
   align-items: center;
   display: flex;
   gap: 8px;
-  padding: 0 10px;
-  height: 36px;
+  padding-inline: 10px;
+  padding-block: 4px 0;
   border-top: 1px solid rgba(0, 0, 0, 0.05);
   position: relative;
   justify-content: space-between;
+  flex-wrap: wrap;
 }
 
 /* Tab context left section */
@@ -860,11 +831,7 @@ body {
 }
 
 .add-tabs-icon {
-  width: 36px;
-  height: 36px;
   display: flex;
-  align-items: center;
-  justify-content: center;
   font-size: 20px;
   font-weight: normal;
   color: #15141a;
