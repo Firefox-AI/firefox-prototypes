@@ -639,6 +639,7 @@ class SmartWindowPage {
       topChromeWindow?.document?.documentElement?.hasAttribute("smart-window");
 
     const isEnabled = this.isSidebarMode || isSmartMode;
+    document.documentElement.classList.toggle("smart-window", isEnabled);
 
     console.log(
       `[SmartWindow] onDOMReady - isSidebarMode: ${this.isSidebarMode}, isSmartMode: ${isSmartMode}, isEnabled: ${isEnabled}, embedderElement.id: ${embedderElement?.id}`
@@ -662,8 +663,8 @@ class SmartWindowPage {
 
     // If in sidebar mode, update UI and behavior
     if (this.isSidebarMode) {
-      document.body.classList.add("sidebar-mode");
-      this.setupSidebarUI();
+      document.documentElement.classList.add("sidebar-mode");
+      this.toggleBottomChatMode(true);
     }
 
     this.setupKeyUI();
@@ -818,10 +819,6 @@ class SmartWindowPage {
         ? `${preview} (${pageText.length})`
         : "No text content";
     }
-  }
-
-  setupSidebarUI() {
-    this.moveInputToBottom();
   }
 
   setupSubmitButton() {
@@ -1014,7 +1011,7 @@ class SmartWindowPage {
           return;
         }
 
-        document.documentElement.toggleAttribute("smart-window", isActive);
+        document.documentElement.classList.toggle("smart-window", isActive);
         if (!isActive) {
           // Disable editor when switching to classic mode
           console.log(
@@ -1539,16 +1536,11 @@ class SmartWindowPage {
     this.resultsContainer.textContent = "";
   }
 
-  moveInputToBottom() {
-    document
-      .querySelector(".smart-window-container")
-      ?.classList.add("chat-mode-bottom");
-  }
-
-  restoreInputPosition() {
-    document
-      .querySelector(".smart-window-container")
-      ?.classList.remove("chat-mode-bottom");
+  toggleBottomChatMode(useBottomMode) {
+    document.documentElement?.classList.toggle(
+      "chat-mode-bottom",
+      useBottomMode
+    );
   }
 
   showChatMode() {
@@ -1557,7 +1549,7 @@ class SmartWindowPage {
     existingMessages.forEach(msg => (msg.style.display = "none"));
 
     // Move input box to bottom for chat mode
-    this.moveInputToBottom();
+    this.toggleBottomChatMode(true);
 
     // Show chat bot component
     if (this.chatBot) {
@@ -1575,7 +1567,7 @@ class SmartWindowPage {
 
   hideChatMode() {
     if (!this.isSidebarMode) {
-      this.restoreInputPosition();
+      this.toggleBottomChatMode(false);
     }
 
     // Hide chat bot component
