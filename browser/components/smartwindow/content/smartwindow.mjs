@@ -1008,28 +1008,30 @@ class SmartWindowPage {
         // If we're in sidebar mode, always keep the editor enabled
         // regardless of the smart window mode state
         if (this.isSidebarMode) {
-          console.log(
+          console.trace(
             "[SmartWindow] Ignoring mode change event because we're in sidebar mode"
           );
           return;
         }
 
+        document.documentElement.toggleAttribute("smart-window", isActive);
         if (!isActive) {
           // Disable editor when switching to classic mode
-          console.log("[SmartWindow] Disabling editor (switching to classic mode)");
-          if (this.smartbar) {
-            this.smartbar.setEditable(false);
-          }
+          console.log(
+            "[SmartWindow] Disabling editor (switching to classic mode)"
+          );
+          this.smartbar?.setEditable(false);
+          // Hide suggestions
+          this.smartbar?.hideSuggestions();
+
           if (this.submitButton) {
             this.submitButton.disabled = true;
           }
-          // Hide suggestions
-          if (this.smartbar) {
-            this.smartbar.hideSuggestions();
-          }
         } else if (this.smartbar) {
           // Re-enable editor when switching back to smart mode
-          console.log("[SmartWindow] Enabling editor (switching to smart mode)");
+          console.log(
+            "[SmartWindow] Enabling editor (switching to smart mode)"
+          );
           this.smartbar.setEditable(true);
           const text = this.smartbar.getText();
           this.updateSubmitButton(text);
@@ -1362,6 +1364,8 @@ class SmartWindowPage {
     if (!query.trim()) {
       return;
     }
+
+    document.documentElement.setAttribute("haschat", "true");
 
     const type = await detectQueryType(query);
 

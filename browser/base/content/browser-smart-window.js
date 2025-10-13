@@ -5,6 +5,10 @@
 "use strict";
 
 var SmartWindow = {
+  PAGE_URL: Services.io.newURI(
+    "chrome://browser/content/smartwindow/smartwindow.html"
+  ),
+
   _initialized: false,
   _viewInitialized: false,
   _sidebarVisible: false,
@@ -51,6 +55,10 @@ var SmartWindow = {
       this.isSmartWindowActive() ? "Smart" : "Classic",
       "window initialized"
     );
+  },
+
+  _isSmartPage(browser) {
+    return !!browser?.currentURI?.equalsExceptRef(this.PAGE_URL);
   },
 
   _ensureViewInitialized() {
@@ -122,18 +130,26 @@ var SmartWindow = {
       NewTabPagePreloading.removePreloadedBrowser(window);
     }
 
+    // Store this temporarily as it will change once we toggle the attribute.
+    // We need it to find "old" new tab URLs, as there is no guarantee their
+    // URL is always `about:newtab`.
+    let oldNewTabURL = BROWSER_NEW_TAB_URL;
+
     // Toggle internal state.
     document.documentElement.toggleAttribute("smart-window");
-    this.reconcileUIToSmartWindowState();
+    this.reconcileUIToSmartWindowState(oldNewTabURL);
   },
 
-  reconcileUIToSmartWindowState() {
+  /**
+   *
+   * @param {string} [oldNewTabURL=""]
+   *                 Can be omitted if not switching from classic to smart
+   *                 window mode.
+   */
+  reconcileUIToSmartWindowState(oldNewTabURL = "") {
     if (this.isSmartWindowActive()) {
       // Check if we're on a smart window page
-      const currentURI = gBrowser.selectedBrowser?.currentURI?.spec || "";
-      const isSmartWindowPage = currentURI.includes(
-        "smartwindow/smartwindow.html"
-      );
+      const isSmartWindowPage = this._isSmartPage(gBrowser.selectedBrowser);
 
       // Only show sidebar if NOT on a smart window page
       if (!isSmartWindowPage) {
@@ -144,10 +160,25 @@ var SmartWindow = {
       }
 
       // Navigate all new tab pages to the smart window URL
-      this.navigateNewTabsToSmartWindow();
+      this.navigateNewTabsToSmartWindow(oldNewTabURL);
     } else {
       // Hide the sidebar
       this.hideSidebar();
+
+      // Replace any smart window tabs that don't have chat content.
+      for (let tab of gBrowser.tabs) {
+        let browser = tab.linkedBrowser;
+        if (
+          this._isSmartPage(browser) &&
+          browser.contentDocument && // FIXME: how would we deal with session-restored tabs?
+          !browser.contentDocument.documentElement.hasAttribute("haschat")
+        ) {
+          browser.loadURI(makeURI(BROWSER_NEW_TAB_URL), {
+            triggeringPrincipal:
+              Services.scriptSecurityManager.getSystemPrincipal(),
+          });
+        }
+      }
     }
 
     // Update bookmarks toolbar visibility based on user preference
@@ -255,30 +286,29 @@ var SmartWindow = {
       .before(smartWindowToggle);
   },
 
-  navigateNewTabsToSmartWindow() {
+  navigateNewTabsToSmartWindow(oldNewTabURL) {
     console.log("[Smart Window] Navigating new tabs to smart window URL");
 
     // Iterate through all tabs
     for (let tab of gBrowser.tabs) {
-      if (tab.linkedBrowser && tab.linkedBrowser.currentURI) {
+      if (tab.linkedBrowser?.currentURI) {
         const uri = tab.linkedBrowser.currentURI.spec;
 
         // Check for new tab pages (about:newtab or about:home)
-        if (uri === "about:newtab" || uri === "about:home") {
+        if (
+          uri == oldNewTabURL ||
+          uri === "about:newtab" ||
+          uri === "about:home"
+        ) {
           console.log(
-            `[Smart Window] Converting tab from ${uri} to chrome://browser/content/smartwindow/smartwindow.html`
+            `[Smart Window] Converting tab from ${uri} to ${this.PAGE_URL.spec}`
           );
 
           // Navigate to the smart window chrome URL
-          tab.linkedBrowser.loadURI(
-            Services.io.newURI(
-              "chrome://browser/content/smartwindow/smartwindow.html"
-            ),
-            {
-              triggeringPrincipal:
-                Services.scriptSecurityManager.getSystemPrincipal(),
-            }
-          );
+          tab.linkedBrowser.loadURI(this.PAGE_URL, {
+            triggeringPrincipal:
+              Services.scriptSecurityManager.getSystemPrincipal(),
+          });
         }
       }
     }
