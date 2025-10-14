@@ -43,7 +43,7 @@ body {
   position: relative; /* Important for absolute positioning of suggestions */
   background: white;
   border-radius: 18px;
-  border: 1px solid rgba(199, 199, 199, 0.5);
+  border: 1px solid #EAB2F7;
   box-shadow:
     0 0.25px 0.75px 0 rgba(0, 0, 0, 0.05),
     0 2px 20px 0 rgba(255, 82, 255, 0.15);
@@ -283,16 +283,17 @@ body {
 }
 
 .mention {
-  background-color: #dee2e6;
   border-radius: 0.25rem;
-  color: #495057;
+  border: 1px solid var(--tab-border-color, rgba(0, 0, 0, 0.00));
+  background: rgba(191, 143, 204, 0.10);
+  color: #000000;
   padding: 0.1rem 0.3rem;
 }
 
 .mention-list {
-  background: white;
-  border: 1px solid purple;
-  border-radius: 8px;
+  background: linear-gradient(0deg, rgba(191, 143, 204, 0.05) 0%, rgba(191, 143, 204, 0.05) 100%), #FFF;
+  border: 1px solid #EAB2F7;
+  border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   max-height: 320px;
   max-width: 400px;
@@ -329,7 +330,7 @@ body {
 }
 
 .mention-item.is-selected {
-  background: #e3f2fd;
+  background: rgba(191, 143, 204, 0.10);
 }
 
 .mention-icon {

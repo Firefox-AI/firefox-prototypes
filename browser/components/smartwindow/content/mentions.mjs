@@ -109,12 +109,7 @@ export class MentionDropdown {
     title.className = "mention-title";
     title.textContent = item.label;
 
-    const url = document.createElement("div");
-    url.className = "mention-url";
-    url.textContent = item.url;
-
     textContainer.appendChild(title);
-    textContainer.appendChild(url);
 
     div.appendChild(icon);
     div.appendChild(textContainer);
