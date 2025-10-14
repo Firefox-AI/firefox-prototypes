@@ -92,7 +92,6 @@ export const LinkMenuOptions = {
         format: site.format,
         ...(site.flight_id ? { flight_id: site.flight_id } : {}),
         is_pocket_card: site.type === "CardGrid",
-        is_list_card: site.is_list_card,
         ...(site.section
           ? {
               section: site.section,
@@ -148,7 +147,6 @@ export const LinkMenuOptions = {
         position: pos,
         ...(site.sponsored_tile_id ? { tile_id: site.sponsored_tile_id } : {}),
         is_pocket_card: site.type === "CardGrid",
-        is_list_card: site.is_list_card,
         ...(site.format ? { format: site.format } : {}),
         ...(site.section
           ? {
@@ -336,6 +334,7 @@ export const LinkMenuOptions = {
     action: ac.AlsoToMain({
       type: at.WEATHER_USER_OPT_IN_LOCATION,
     }),
+    userEvent: "WEATHER_DETECT_LOCATION",
   }),
   ChangeWeatherDisplaySimple: () => ({
     id: "newtab-weather-menu-change-weather-display-simple",
@@ -392,29 +391,6 @@ export const LinkMenuOptions = {
     action: ac.OnlyToMain({
       type: at.OPEN_LINK,
       data: { url: site.url },
-    }),
-  }),
-  FakespotDismiss: () => ({
-    id: "newtab-menu-dismiss",
-    action: ac.OnlyToMain({
-      type: at.SET_PREF,
-      data: {
-        name: "discoverystream.contextualContent.fakespot.enabled",
-        value: false,
-      },
-    }),
-    impression: ac.OnlyToMain({
-      type: at.FAKESPOT_DISMISS,
-    }),
-  }),
-  AboutFakespot: site => ({
-    id: "newtab-menu-about-fakespot",
-    action: ac.OnlyToMain({
-      type: at.OPEN_LINK,
-      data: { url: site.url },
-    }),
-    impression: ac.OnlyToMain({
-      type: at.OPEN_ABOUT_FAKESPOT,
     }),
   }),
   SectionBlock: ({

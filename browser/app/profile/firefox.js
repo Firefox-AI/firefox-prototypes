@@ -375,12 +375,6 @@ pref("browser.overlink-delay", 80);
   pref("browser.taskbarTabs.enabled", false);
 #endif
 
-#if defined(MOZ_WIDGET_GTK)
-  pref("browser.theme.native-theme", true);
-#else
-  pref("browser.theme.native-theme", false);
-#endif
-
 // Whether using `ctrl` when hitting return/enter in the URL bar
 // (or clicking 'go') should prefix 'www.' and suffix
 // browser.fixup.alternate.suffix to the URL bar value prior to
@@ -583,9 +577,9 @@ pref("browser.urlbar.quicksuggest.mlEnabled", false);
 // backend.
 pref("browser.urlbar.quicksuggest.mlInitDelaySeconds", 0);
 
-// Which Suggest settings to show in the settings UI. See
-// `QuickSuggest.SETTINGS_UI` for values.
-pref("browser.urlbar.quicksuggest.settingsUi", 0);
+// Which Suggest settings to show in the settings UI, when Suggest is enabled.
+// See `QuickSuggest.SETTINGS_UI` for values.
+pref("browser.urlbar.quicksuggest.settingsUi", 1);
 
 // Whether unit conversion is enabled.
 pref("browser.urlbar.unitConversion.enabled", true);
@@ -785,6 +779,11 @@ pref("browser.urlbar.suggest.yelpRealtime", true);
 // settings.
 pref("browser.urlbar.yelpRealtime.minKeywordLength", 0);
 
+// Timestamp of the time the user last performed a search via the urlbar
+// so that experiments can target users who have / have not performed
+// urlbar searches.
+pref("browser.urlbar.lastUrlbarSearchSeconds", 0);
+
 pref("browser.altClickSave", false);
 
 // Number of milliseconds to wait for the http headers (and thus
@@ -884,7 +883,7 @@ pref("browser.search.suggest.ohttp.enabled", true);
 pref("browser.spin_cursor_while_busy", false);
 
 // Enable display of contextual-password-manager option in browser sidebar
-pref("browser.contextual-password-manager.enabled", false);
+pref("browser.contextual-password-manager.enabled", true);
 
 // Whether the user has opted-in to recommended settings for data features.
 pref("browser.dataFeatureRecommendations.enabled", false);
@@ -1036,12 +1035,7 @@ pref("browser.tabs.hoverPreview.enabled", true);
 pref("browser.tabs.hoverPreview.showThumbnails", true);
 
 pref("browser.tabs.groups.enabled", true);
-
-#ifdef NIGHTLY_BUILD
 pref("browser.tabs.groups.hoverPreview.enabled", true);
-#else
-pref("browser.tabs.groups.hoverPreview.enabled", false);
-#endif
 
 pref("browser.tabs.groups.smart.enabled", true);
 
@@ -1992,11 +1986,6 @@ pref("browser.newtabpage.activity-stream.discoverystream.topicLabels.region-topi
 pref("browser.newtabpage.activity-stream.discoverystream.topicSelection.locale-topics-config", "en-US, en-GB, en-CA");
 pref("browser.newtabpage.activity-stream.discoverystream.topicLabels.locale-topic-label-config", "en-US, en-GB, en-CA");
 
-// List of locales that get contextual content by default
-pref("browser.newtabpage.activity-stream.discoverystream.contextualContent.locale-content-config", "en-US,en-GB,en-CA,de");
-// List of regions that get contextual content by default- TODO: update once development is closer to being finished
-pref("browser.newtabpage.activity-stream.discoverystream.contextualContent.region-content-config", "");
-
 // List of locales that get section layout by default
 pref("browser.newtabpage.activity-stream.discoverystream.sections.locale-content-config", "en-US,en-CA");
 // List of regions that get section layout by default
@@ -2178,6 +2167,7 @@ pref("sidebar.revamp.round-content-area", false);
 pref("sidebar.animation.enabled", true);
 pref("sidebar.animation.duration-ms", 200);
 pref("sidebar.animation.expand-on-hover.duration-ms", 400);
+pref("sidebar.animation.expand-on-hover.delay-duration-ms", 200);
 
 // This pref is used to store user customized tools in the sidebar launcher and shouldn't be changed.
 // See https://firefox-source-docs.mozilla.org/browser/components/sidebar/docs/index.html for ways
@@ -2649,6 +2639,9 @@ pref("browser.tabs.fadeOutExplicitlyUnloadedTabs", true);
 // Whether unloaded tabs (either from session restore or because
 // they are explicitly unloaded) are faded out in the tab bar.
 pref("browser.tabs.fadeOutUnloadedTabs", false);
+
+// Whether tabs can be "split" or displayed side by side at once.
+pref("browser.tabs.splitView.enabled", false);
 
 // If true, unprivileged extensions may use experimental APIs on
 // nightly and developer edition.
@@ -3482,6 +3475,7 @@ pref("browser.contextual-services.contextId.rotation-in-days", 7);
 pref("browser.contextual-services.contextId.rust-component.enabled", true);
 
 // Pref to enable the IP protection feature
+pref("browser.ipProtection.autoStartEnabled", false);
 pref("browser.ipProtection.enabled", false);
 pref("browser.ipProtection.userEnabled", false);
 pref("browser.ipProtection.variant", "");

@@ -1353,7 +1353,6 @@ const nsCString& GfxInfoBase::GetApplicationVersion() {
     // The GPU process doesn't need hardware acceleration and can run on
     // devices that we normally block from not being on our whitelist.
     case nsIGfxInfo::FEATURE_GPU_PROCESS:
-      return kIsAndroid;
     // We can mostly assume that ANGLE will work
     case nsIGfxInfo::FEATURE_DIRECT3D_11_ANGLE:
     // Remote WebGL is needed for Win32k Lockdown, so it should be enabled
@@ -2009,7 +2008,7 @@ GfxInfoBase::ControlGPUProcessForXPCShell(bool aEnable, bool* _retval) {
       gfxConfig::UserForceEnable(gfx::Feature::GPU_PROCESS, "xpcshell-test");
     }
     DebugOnly<nsresult> rv = gpm->EnsureGPUReady();
-    MOZ_ASSERT(rv != NS_ERROR_ILLEGAL_DURING_SHUTDOWN);
+    MOZ_ASSERT(NS_SUCCEEDED(rv));
   } else {
     gfxConfig::UserDisable(gfx::Feature::GPU_PROCESS, "xpcshell-test");
     gpm->KillProcess();

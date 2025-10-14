@@ -59,13 +59,6 @@ XPCOMUtils.defineLazyPreferenceGetter(
 
 XPCOMUtils.defineLazyPreferenceGetter(
   lazy,
-  "STRIP_ON_SHARE_CAN_DISABLE",
-  "privacy.query_stripping.strip_on_share.canDisable",
-  false
-);
-
-XPCOMUtils.defineLazyPreferenceGetter(
-  lazy,
   "PDFJS_ENABLE_COMMENT",
   "pdfjs.enableComment",
   false
@@ -345,7 +338,6 @@ export class nsContextMenu {
     }
 
     this.hasTextFragments = context.hasTextFragments;
-    this.textDirectiveTarget = context.textDirectiveTarget;
     this.textFragmentURL = null;
   } // setContext
 
@@ -480,7 +472,7 @@ export class nsContextMenu {
         this.onEditable ||
         this.browser.currentURI.schemeIs("view-source")
       ) &&
-      this.textDirectiveTarget;
+      (this.hasTextFragments || this.isContentSelected);
     this.showItem("context-copy-link-to-highlight", shouldShow);
     this.showItem("context-copy-clean-link-to-highlight", shouldShow);
 
@@ -506,18 +498,13 @@ export class nsContextMenu {
 
     // enable menu items when a text fragment can be built
     if (this.textFragmentURL) {
-      this.setItemAttr("context-copy-link-to-highlight", "disabled", false);
-
-      // only enables the clean link based on preference and canStripForShare()
-      // this follows the same pattern as https://bugzilla.mozilla.org/show_bug.cgi?id=1895334
-      let canNotStripTextFragmentParams =
-        lazy.STRIP_ON_SHARE_CAN_DISABLE &&
-        !this.#canStripParams(this.getLinkURI(this.textFragmentURL));
-
+      this.setItemAttr("context-copy-link-to-highlight", "disabled", null);
+      let link = this.getLinkURI(this.textFragmentURL);
+      let disabledAttr = this.#canStripParams(link) ? null : true;
       this.setItemAttr(
         "context-copy-clean-link-to-highlight",
         "disabled",
-        canNotStripTextFragmentParams
+        disabledAttr
       );
     }
   }
@@ -1105,10 +1092,8 @@ export class nsContextMenu {
         !this.isSecureAboutPage()
     );
 
-    let canNotStrip =
-      lazy.STRIP_ON_SHARE_CAN_DISABLE && !this.#canStripParams();
-
-    this.setItemAttr("context-stripOnShareLink", "disabled", canNotStrip);
+    let disabledAttr = this.#canStripParams() ? null : true;
+    this.setItemAttr("context-stripOnShareLink", "disabled", disabledAttr);
 
     let copyLinkSeparator = this.document.getElementById(
       "context-sep-copylink"

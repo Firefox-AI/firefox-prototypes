@@ -9,7 +9,6 @@
 #include <algorithm>
 
 #include "mozilla/Assertions.h"
-#include "mozilla/MemoryReporting.h"
 #include "mozilla/ScopeExit.h"
 #include "nsGlobalWindowInner.h"
 
@@ -6770,7 +6769,7 @@ nsresult nsGlobalWindowOuter::OpenInternal(
   // BrowsingContext::RevisePopupAbuseLevel() below.
   RefPtr<nsDocShellLoadState> loadState = aLoadState;
   if (!loadState && aNavigate && uri) {
-    loadState = nsWindowWatcher::CreateLoadState(uri, this);
+    loadState = nsWindowWatcher::CreateLoadState(uri, this, aDoJSFixups);
   }
 
   PopupBlocker::PopupControlState abuseLevel =

@@ -2676,11 +2676,19 @@ class Document : public nsINode,
    * called yet.
    */
   bool IsShowing() const { return mIsShowing; }
+
   /**
    * Return whether the document is currently visible (in the sense of
    * OnPageHide having been called and OnPageShow not yet having been called)
    */
   bool IsVisible() const { return mVisible; }
+
+  /**
+   * Return whether the document has completely finished loading, in the spec
+   * sense. We only store a bool though, whereas spec stores when loading
+   * finished. See https://html.spec.whatwg.org/#completely-loaded-time
+   */
+  bool IsCompletelyLoaded() const { return mIsCompletelyLoaded; }
 
   void SetSuppressedEventListener(EventListener* aListener);
 
@@ -3618,6 +3626,9 @@ class Document : public nsINode,
   }
   void SetPausedByDevTools(bool aValue) { mPausedByDevTools = aValue; }
   bool PausedByDevTools() const { return mPausedByDevTools; }
+
+  void SetForceNonNativeTheme(bool);
+  bool ForceNonNativeTheme() const { return mForceNonNativeTheme; }
 
   already_AddRefed<Promise> BlockParsing(Promise& aPromise,
                                          const BlockParsingOptions& aOptions,
@@ -4839,6 +4850,10 @@ class Document : public nsINode,
   // it's false only when we're in bfcache or unloaded.
   bool mVisible : 1;
 
+  // State for IsCompletelyLoaded. Starts off false and becomes true after
+  // pageshow has fired. Doesn't reset after that.
+  bool mIsCompletelyLoaded : 1;
+
   // True if our content viewer has been removed from the docshell
   // (it may still be displayed, but in zombie state). Form control data
   // has been saved.
@@ -4910,7 +4925,8 @@ class Document : public nsINode,
   // Whether DevTools is pausing the page (in which case we don't really want to
   // stop rendering).
   bool mPausedByDevTools : 1;
-
+  // If true, (-moz-native-theme) media query always evaluates to false.
+  bool mForceNonNativeTheme : 1;
   // Whether the document was created by a srcdoc iframe.
   bool mIsSrcdocDocument : 1;
 

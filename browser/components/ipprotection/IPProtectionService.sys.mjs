@@ -10,7 +10,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   GuardianClient: "resource:///modules/ipprotection/GuardianClient.sys.mjs",
   IPPHelpers: "resource:///modules/ipprotection/IPProtectionHelpers.sys.mjs",
   IPPProxyManager: "resource:///modules/ipprotection/IPPProxyManager.sys.mjs",
-  UIState: "resource://services-sync/UIState.sys.mjs",
+  IPPSignInWatcher: "resource:///modules/ipprotection/IPPSignInWatcher.sys.mjs",
+  IPPStartupCache: "resource:///modules/ipprotection/IPPStartupCache.sys.mjs",
   SpecialMessageActions:
     "resource://messaging-system/lib/SpecialMessageActions.sys.mjs",
   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
@@ -50,6 +51,9 @@ ChromeUtils.defineLazyGetter(lazy, "logConsole", function () {
  *  Proxy is active.
  * @property {string} ERROR
  *  Error
+ *
+ * Note: If you update this list of states, make sure to update the
+ * corresponding documentation in the `docs` folder as well.
  */
 export const IPProtectionStates = Object.freeze({
   UNINITIALIZED: "uninitialized",
@@ -76,7 +80,6 @@ class IPProtectionServiceSingleton extends EventTarget {
 
   errors = [];
   enrolling = null;
-  signedIn = null;
 
   guardian = null;
   proxyManager = null;
@@ -141,11 +144,17 @@ class IPProtectionServiceSingleton extends EventTarget {
     if (this.#state !== IPProtectionStates.UNINITIALIZED) {
       return;
     }
+
     this.proxyManager = new lazy.IPPProxyManager(this.guardian);
+    this.#entitlement = lazy.IPPStartupCache.entitlement;
 
     this.#helpers.forEach(helper => helper.init());
 
     await this.#updateState();
+
+    if (lazy.IPPStartupCache.isStartupCompleted) {
+      this.initOnStartupCompleted();
+    }
   }
 
   /**
@@ -164,11 +173,16 @@ class IPProtectionServiceSingleton extends EventTarget {
     this.#entitlement = null;
     this.errors = [];
     this.enrolling = null;
-    this.signedIn = null;
 
     this.#helpers.forEach(helper => helper.uninit());
 
     this.#setState(IPProtectionStates.UNINITIALIZED);
+  }
+
+  async initOnStartupCompleted() {
+    await Promise.allSettled(
+      this.#helpers.map(helper => helper.initOnStartupCompleted())
+    );
   }
 
   /**
@@ -268,23 +282,13 @@ class IPProtectionServiceSingleton extends EventTarget {
    * Reset the statuses that are set based on a FxA account.
    */
   resetAccount() {
-    this.signedIn = null;
     this.#entitlement = null;
+    lazy.IPPStartupCache.storeEntitlement(null);
+
     if (this.proxyManager?.active) {
       this.stop(false);
     }
     this.proxyManager.reset();
-  }
-
-  /**
-   * Checks if a user has signed in.
-   *
-   * @returns {boolean}
-   */
-  get isSignedIn() {
-    let { status } = lazy.UIState.get();
-    this.signedIn = status == lazy.UIState.STATUS_SIGNED_IN;
-    return this.signedIn;
   }
 
   /**
@@ -331,6 +335,8 @@ class IPProtectionServiceSingleton extends EventTarget {
   async refetchEntitlement() {
     let prevState = this.#state;
     this.#entitlement = null;
+    lazy.IPPStartupCache.storeEntitlement(null);
+
     await this.#updateState();
     // hasUpgraded might not change the state.
     if (prevState === this.#state) {
@@ -397,6 +403,7 @@ class IPProtectionServiceSingleton extends EventTarget {
 
     // Entitlement is set until the user changes or it is cleared to check subscription status.
     this.#entitlement = entitlement;
+    lazy.IPPStartupCache.storeEntitlement(entitlement);
 
     return entitlement;
   }
@@ -433,12 +440,16 @@ class IPProtectionServiceSingleton extends EventTarget {
       return IPProtectionStates.UNINITIALIZED;
     }
 
+    // Maybe we have to use the cached state, because we are not initialized yet.
+    if (!lazy.IPPStartupCache.isStartupCompleted) {
+      return lazy.IPPStartupCache.state;
+    }
+
     // For non authenticated users, we can check if they are eligible (the UI
     // is shown and they have to login) or we don't know yet their current
     // enroll state (no UI is shown).
-    let signedIn = this.isSignedIn;
     let eligible = this.isEligible;
-    if (!signedIn) {
+    if (!lazy.IPPSignInWatcher.isSignedIn) {
       return !eligible
         ? IPProtectionStates.UNAVAILABLE
         : IPProtectionStates.UNAUTHENTICATED;

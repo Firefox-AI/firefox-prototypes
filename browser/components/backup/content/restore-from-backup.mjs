@@ -249,9 +249,24 @@ export default class RestoreFromBackup extends MozLitElement {
                 id="restore-from-backup-no-backup-file-link"
                 slot="support-link"
                 is="moz-support-link"
-                support-page="todo-backup"
+                support-page="firefox-backup"
                 data-l10n-id="restore-from-backup-no-backup-file-link"
               ></a>`
+            : null}
+          ${this.backupServiceState?.backupFileInfo
+            ? html`<p
+                id="restore-from-backup-backup-found-info"
+                data-l10n-id="backup-file-creation-date-and-device"
+                data-l10n-args=${JSON.stringify({
+                  machineName:
+                    this.backupServiceState.backupFileInfo.deviceName ?? "",
+                  date: this.backupServiceState.backupFileInfo.date
+                    ? new Date(
+                        this.backupServiceState.backupFileInfo.date
+                      ).getTime()
+                    : 0,
+                })}
+              ></p>`
             : null}
         </fieldset>
 
@@ -324,7 +339,7 @@ export default class RestoreFromBackup extends MozLitElement {
                 id="backup-incorrect-password-support-link"
                 slot="support-link"
                 is="moz-support-link"
-                support-page="todo-backup"
+                support-page="firefox-backup"
                 data-l10n-name="incorrect-password-support-link"
               ></a>
             </span>
@@ -410,7 +425,7 @@ export default class RestoreFromBackup extends MozLitElement {
           id="restore-from-backup-learn-more-link"
           slot="support-link"
           is="moz-support-link"
-          support-page="todo-backup"
+          support-page="firefox-backup"
           data-l10n-id="restore-from-backup-support-link"
         ></a>
       </moz-message-bar>

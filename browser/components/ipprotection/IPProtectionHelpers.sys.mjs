@@ -2,6 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/**
+ * Note: If you add or modify the list of helpers, make sure to update the
+ * corresponding documentation in the `docs` folder as well.
+ */
+
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -17,8 +22,11 @@ ChromeUtils.defineESModuleGetters(lazy, {
   IPProtectionStates:
     "resource:///modules/ipprotection/IPProtectionService.sys.mjs",
   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
-  UIState: "resource://services-sync/UIState.sys.mjs",
 });
+
+import { IPPAutoStartHelpers } from "resource:///modules/ipprotection/IPPAutoStart.sys.mjs";
+import { IPPSignInWatcher } from "resource:///modules/ipprotection/IPPSignInWatcher.sys.mjs";
+import { IPPStartupCache } from "resource:///modules/ipprotection/IPPStartupCache.sys.mjs";
 
 const VPN_ADDON_ID = "vpn@mozilla.com";
 
@@ -36,6 +44,8 @@ class UIHelper {
       this.handleEvent
     );
   }
+
+  initOnStartupCompleted() {}
 
   uninit() {
     lazy.IPProtectionService.removeEventListener(
@@ -75,6 +85,8 @@ class AccountResetHelper {
     );
   }
 
+  initOnStartupCompleted() {}
+
   uninit() {
     lazy.IPProtectionService.removeEventListener(
       "IPProtectionService:StateChanged",
@@ -100,10 +112,12 @@ class AccountResetHelper {
  * This class removes the UI widget if the VPN add-on is installed.
  */
 class VPNAddonHelper {
+  init() {}
+
   /**
    * Adds an observer to monitor the VPN add-on installation
    */
-  init() {
+  initOnStartupCompleted() {
     this.addonVPNListener = {
       onInstallEnded(_install, addon) {
         if (addon.id === VPN_ADDON_ID && lazy.IPProtectionService.hasUpgraded) {
@@ -129,48 +143,12 @@ class VPNAddonHelper {
 }
 
 /**
- * This class monitors the Sign-In state and triggers the update of the service
- * if needed.
- */
-class SignInStateHelper {
-  /**
-   * Adds an observer for the FxA sign-in state.
-   */
-  init() {
-    this.fxaObserver = {
-      QueryInterface: ChromeUtils.generateQI([
-        Ci.nsIObserver,
-        Ci.nsISupportsWeakReference,
-      ]),
-
-      observe() {
-        let { status } = lazy.UIState.get();
-        let signedIn = status == lazy.UIState.STATUS_SIGNED_IN;
-        if (signedIn !== lazy.IPProtectionService.signedIn) {
-          lazy.IPProtectionService.updateState();
-        }
-      },
-    };
-
-    Services.obs.addObserver(this.fxaObserver, lazy.UIState.ON_UPDATE);
-  }
-
-  /**
-   * Removes the FxA sign-in state observer
-   */
-  uninit() {
-    if (this.fxaObserver) {
-      Services.obs.removeObserver(this.fxaObserver, lazy.UIState.ON_UPDATE);
-      this.fxaObserver = null;
-    }
-  }
-}
-
-/**
  * This class monitors the eligibility flag from Nimbus
  */
 class EligibilityHelper {
-  init() {
+  init() {}
+
+  initOnStartupCompleted() {
     lazy.NimbusFeatures.ipProtection.onUpdate(
       lazy.IPProtectionService.updateState
     );
@@ -183,12 +161,17 @@ class EligibilityHelper {
   }
 }
 
+// The order is important! Eligibility must be the last one because nimbus
+// triggers the callback immdiately, which could compute a new state for all
+// the helpers.
 const IPPHelpers = [
-  new AccountResetHelper(),
-  new EligibilityHelper(),
-  new SignInStateHelper(),
-  new VPNAddonHelper(),
+  IPPStartupCache,
+  IPPSignInWatcher,
   new UIHelper(),
+  new AccountResetHelper(),
+  new VPNAddonHelper(),
+  new EligibilityHelper(),
+  ...IPPAutoStartHelpers,
 ];
 
 export { IPPHelpers };

@@ -824,7 +824,7 @@ static bool RecomputePosition(nsIFrame* aFrame) {
   // Don't process position changes on frames which have views or the ones which
   // have a view somewhere in their descendants, because the corresponding view
   // needs to be repositioned properly as well.
-  if (aFrame->HasView() ||
+  if (aFrame->GetView() ||
       aFrame->HasAnyStateBits(NS_FRAME_HAS_CHILD_WITH_VIEW)) {
     return false;
   }
@@ -985,9 +985,10 @@ static bool RecomputePosition(nsIFrame* aFrame) {
 
   ViewportFrame* viewport = do_QueryFrame(parentFrame);
   nsSize cbSize =
-      viewport ? viewport->AdjustReflowInputAsContainingBlock(parentReflowInput)
-                     .Size()
-               : aFrame->GetContainingBlock()->GetSize();
+      viewport
+          ? viewport->GetContainingBlockAdjustedForScrollbars(parentReflowInput)
+                .Size()
+          : aFrame->GetContainingBlock()->GetSize();
   const nsMargin& parentBorder =
       parentReflowInput.mStyleBorder->GetComputedBorder();
   cbSize -= nsSize(parentBorder.LeftRight(), parentBorder.TopBottom());

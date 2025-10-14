@@ -319,7 +319,7 @@ pref("media.videocontrols.keyboard-tab-to-all-controls", true);
   // 770 = DTLS 1.0, 771 = DTLS 1.2, 772 = DTLS 1.3
   pref("media.peerconnection.dtls.version.min", 771);
   pref("media.peerconnection.dtls.version.max", 772);
-
+  
   pref("media.peerconnection.sctp.default_max_streams", 2048);
 
 #if defined(XP_MACOSX)
@@ -1167,6 +1167,9 @@ pref("network.http.redirection-limit", 20);
 // NOTE: separate values with comma+space (", "): see bug 576033
 pref("network.http.accept-encoding", "gzip, deflate");
 pref("network.http.accept-encoding.secure", "gzip, deflate, br, zstd");
+// dictionary compression is always only for secure connections
+// Added to network.http.accept-encoding.secure
+pref("network.http.accept-encoding.dictionary", "dcb, dcz");
 
 // Prompt for redirects resulting in unsafe HTTP requests
 pref("network.http.prompt-temp-redirect", false);
@@ -3020,6 +3023,12 @@ pref("signon.firefoxRelay.terms_of_service_url", "https://www.mozilla.org/%LOCAL
 pref("signon.firefoxRelay.privacy_policy_url", "https://www.mozilla.org/%LOCALE%/privacy/subscription-services/");
 pref("signon.signupDetection.confidenceThreshold",     "0.75");
 
+#ifdef NIGHTLY_BUILD
+  pref("signon.rustMirror.enabled", true);
+#else
+  pref("signon.rustMirror.enabled", false);
+#endif
+
 // Satchel (Form Manager) prefs
 pref("browser.formfill.debug",            false);
 pref("browser.formfill.enable",           true);
@@ -4116,9 +4125,6 @@ pref("privacy.query_stripping.strip_on_share.enableTestMode", false);
   pref("toolkit.backgroundtasks.tests.geckoPrefsInherited", 17);
   pref("toolkit.backgroundtasks.tests.geckoPrefsOverriden", 18);
 #endif
-
-// To disable the Strip on Share context menu option if nothing can be stripped
-pref("privacy.query_stripping.strip_on_share.canDisable", true);
 
 // Captcha Detection
 pref("captchadetection.loglevel", "Warn");

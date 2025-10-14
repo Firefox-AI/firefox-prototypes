@@ -68,10 +68,10 @@ const SUGGEST_PREFS = Object.freeze({
   },
   "quicksuggest.enabled": {
     defaultValues: {
-      DE: [["de"], true],
-      FR: [["fr"], true],
+      DE: [["de", ...EN_LOCALES], true],
+      FR: [["fr", ...EN_LOCALES], true],
       GB: [EN_LOCALES, true],
-      IT: [["it"], true],
+      IT: [["it", ...EN_LOCALES], true],
       US: [EN_LOCALES, true],
     },
   },
@@ -121,10 +121,10 @@ const SUGGEST_PREFS = Object.freeze({
   },
   "importantDates.featureGate": {
     defaultValues: {
-      DE: [["de"], true],
-      FR: [["fr"], true],
+      DE: [["de", ...EN_LOCALES], true],
+      FR: [["fr", ...EN_LOCALES], true],
       GB: [EN_LOCALES, true],
-      IT: [["it"], true],
+      IT: [["it", ...EN_LOCALES], true],
       US: [EN_LOCALES, true],
     },
   },
@@ -998,22 +998,21 @@ class _QuickSuggest {
     }
   }
 
-  async _test_reinit(testOverrides = null) {
+  async _test_reset(testOverrides = null) {
     if (this.#initStarted) {
       await this.initPromise;
-      this.#initStarted = false;
-      this.#initResolvers = Promise.withResolvers();
     }
 
     if (this.rustBackend) {
-      // Make sure to await any queued ingests before re-initializing. Otherwise
-      // there could be a race between when that ingestion finishes and when the
-      // test finishes and calls `SharedRemoteSettingsService.updateServer()` to
-      // reset the remote settings server.
       await this.rustBackend.ingestPromise;
     }
 
-    await this.init(testOverrides);
+    this.#initDefaultPrefs(testOverrides);
+    this.#updateAll();
+    if (this.rustBackend) {
+      // `#updateAll()` triggers ingest, so wait for it to finish.
+      await this.rustBackend.ingestPromise;
+    }
   }
 
   #initStarted = false;

@@ -2125,25 +2125,19 @@ nsRect nsDisplayList::GetBuildingRect() const {
   return result;
 }
 
-WindowRenderer* nsDisplayListBuilder::GetWidgetWindowRenderer(nsView** aView) {
-  if (aView) {
-    *aView = RootReferenceFrame()->GetView();
-  }
+WindowRenderer* nsDisplayListBuilder::GetWidgetWindowRenderer() {
   if (RootReferenceFrame() !=
       nsLayoutUtils::GetDisplayRootFrame(RootReferenceFrame())) {
     return nullptr;
   }
-  nsIWidget* window = RootReferenceFrame()->GetNearestWidget();
-  if (window) {
+  if (nsIWidget* window = RootReferenceFrame()->GetNearestWidget()) {
     return window->GetWindowRenderer();
   }
   return nullptr;
 }
 
-WebRenderLayerManager* nsDisplayListBuilder::GetWidgetLayerManager(
-    nsView** aView) {
-  WindowRenderer* renderer = GetWidgetWindowRenderer();
-  if (renderer) {
+WebRenderLayerManager* nsDisplayListBuilder::GetWidgetLayerManager() {
+  if (WindowRenderer* renderer = GetWidgetWindowRenderer()) {
     return renderer->AsWebRender();
   }
   return nullptr;
@@ -2197,9 +2191,8 @@ void nsDisplayList::PaintRoot(nsDisplayListBuilder* aBuilder, gfxContext* aCtx,
   WindowRenderer* renderer = nullptr;
   bool widgetTransaction = false;
   bool doBeginTransaction = true;
-  nsView* view = nullptr;
   if (aFlags & PAINT_USE_WIDGET_LAYERS) {
-    renderer = aBuilder->GetWidgetWindowRenderer(&view);
+    renderer = aBuilder->GetWidgetWindowRenderer();
     if (renderer) {
       // The fallback renderer doesn't retain any content, so it's
       // not meaningful to use it when drawing to an external context.
@@ -4116,15 +4109,11 @@ bool nsDisplayOutline::HasRadius() const {
 }
 
 bool nsDisplayOutline::IsInvisibleInRect(const nsRect& aRect) const {
-  const nsStyleOutline* outline = mFrame->StyleOutline();
   nsRect borderBox(ToReferenceFrame(), mFrame->GetSize());
-  if (borderBox.Contains(aRect) && !HasRadius() &&
-      outline->mOutlineOffset.ToCSSPixels() >= 0.0f) {
-    // aRect is entirely inside the border-rect, and the outline isn't rendered
-    // inside the border-rect, so the outline is not visible.
-    return true;
-  }
-  return false;
+  // aRect is entirely inside the border-rect, and the outline isn't rendered
+  // inside the border-rect, so the outline is not visible.
+  return borderBox.Contains(aRect) && !HasRadius() &&
+         mFrame->StyleOutline()->mOutlineOffset >= 0;
 }
 
 void nsDisplayEventReceiver::HitTest(nsDisplayListBuilder* aBuilder,

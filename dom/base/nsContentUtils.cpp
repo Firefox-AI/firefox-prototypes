@@ -95,12 +95,10 @@
 #include "mozilla/Likely.h"
 #include "mozilla/LoadInfo.h"
 #include "mozilla/Logging.h"
-#include "mozilla/MacroForEach.h"
 #include "mozilla/ManualNAC.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/MediaFeatureChange.h"
 #include "mozilla/MouseEvents.h"
-#include "mozilla/NotNull.h"
 #include "mozilla/NullPrincipal.h"
 #include "mozilla/OriginAttributes.h"
 #include "mozilla/Preferences.h"
@@ -7818,16 +7816,10 @@ nsIWidget* nsContentUtils::WidgetForDocument(const Document* aDocument) {
 
 nsIWidget* nsContentUtils::WidgetForContent(const nsIContent* aContent) {
   nsIFrame* frame = aContent->GetPrimaryFrame();
-  if (frame) {
-    frame = nsLayoutUtils::GetDisplayRootFrame(frame);
-
-    nsView* view = frame->GetView();
-    if (view) {
-      return view->GetWidget();
-    }
+  if (!frame) {
+    return nullptr;
   }
-
-  return nullptr;
+  return frame->GetNearestWidget();
 }
 
 WindowRenderer* nsContentUtils::WindowRendererForContent(
@@ -7842,11 +7834,9 @@ WindowRenderer* nsContentUtils::WindowRendererForContent(
 
 WindowRenderer* nsContentUtils::WindowRendererForDocument(
     const Document* aDoc) {
-  nsIWidget* widget = nsContentUtils::WidgetForDocument(aDoc);
-  if (widget) {
+  if (nsIWidget* widget = nsContentUtils::WidgetForDocument(aDoc)) {
     return widget->GetWindowRenderer();
   }
-
   return nullptr;
 }
 
@@ -9432,7 +9422,8 @@ nsIWidget* nsContentUtils::GetWidget(PresShell* aPresShell, nsPoint* aOffset) {
   if (!frame) {
     return nullptr;
   }
-  return frame->GetView()->GetNearestWidget(aOffset);
+  return aOffset ? frame->GetNearestWidget(*aOffset)
+                 : frame->GetNearestWidget();
 }
 
 int16_t nsContentUtils::GetButtonsFlagForButton(int32_t aButton) {
