@@ -62,6 +62,34 @@ export function attachToElement(element, options = {}) {
   const suggestionsEl = createSuggestionsContainer();
   parentNode.appendChild(suggestionsEl);
 
+  const MentionWithIcon = Mention.extend({
+    addAttributes() {
+      return {
+        ...this.parent?.(),
+        icon: {
+          default: null,
+          parseHTML: el => el.getAttribute("data-icon"),
+          renderHTML: attrs => (attrs.icon ? { "data-icon": attrs.icon } : {}),
+        },
+      };
+    },
+
+    renderHTML({ node, HTMLAttributes }) {
+      const attrs = {
+        ...HTMLAttributes,
+        class: `${HTMLAttributes.class ?? ""} mention`.trim(),
+        "data-id": node.attrs.id,
+        "data-icon": node.attrs.icon || "",
+      };
+      return [
+        "span",
+        attrs,
+        ["img", { src: node.attrs.icon || "", alt: "", class: "mention-icon", width: "16", height: "16" }],
+        `@${node.attrs.label ?? node.attrs.id}`,
+      ];
+    },
+  });
+
   let isMentionsOpen = false;
   // Create editor instance
   const editor = new Editor({
@@ -75,7 +103,7 @@ export function attachToElement(element, options = {}) {
         placeholder: "Ask, search, or type a URL...",
         showOnlyWhenEditable: false,
       }),
-      Mention.configure({
+      MentionWithIcon.configure({
         HTMLAttributes: {
           class: "mention",
         },
@@ -95,7 +123,7 @@ export function attachToElement(element, options = {}) {
                 dropdown = new MentionDropdown();
                 currentCommand = props.command;
                 dropdown.create(props.items, item => {
-                  currentCommand({ id: item.id, label: item.label });
+                  currentCommand({ id: item.id, label: item.label, icon: item.icon ?? item.favicon ?? `page-icon:${item.url}` });
                 });
                 dropdown.updatePosition(props.clientRect());
               },
