@@ -997,7 +997,7 @@ class SmartWindowPage {
       this.chatBot.addEventListener("tool-call", e => {
         console.log("[SmartWindow] Tool call event:", e.detail);
         this.toolLog.updatelogState(e.detail);
-      })
+      });
     }
 
     if (topChromeWindow) {

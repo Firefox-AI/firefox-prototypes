@@ -2,7 +2,7 @@ import { html, css } from "chrome://global/content/vendor/lit.all.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
 
 /**
- * A simple chat bot component that interacts with an Ollama model via streaming.
+ * A tool log viewer component that displays a list of tool responses, including message content, date, and result.
  */
 class ToolLog extends MozLitElement {
   static styles = css`
