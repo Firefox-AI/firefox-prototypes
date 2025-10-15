@@ -629,6 +629,7 @@ class SmartWindowPage {
 
     this.resultsContainer = document.getElementById("results-container");
     this.chatBot = document.getElementById("chat-bot");
+    this.toolLog = document.getElementById("tool-log");
     this.quickPromptsContainer = document.getElementById(
       "quick-prompts-container"
     );
@@ -991,6 +992,11 @@ class SmartWindowPage {
         const query = e.detail.query;
         const clickEvent = e.detail.clickEvent;
         this.performNavigation(query, "search", clickEvent);
+      });
+
+      this.chatBot.addEventListener("tool-call", e => {
+        console.log("[SmartWindow] Tool call event:", e.detail);
+        this.toolLog.updatelogState(e.detail);
       });
     }
 

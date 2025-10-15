@@ -174,6 +174,14 @@ class ChatBot extends MozLitElement {
     try {
       // Append chunks as they arrive
       for await (const chunk of stream) {
+        // Specifically handle tool call log messages so it does not end up in the chat bubble
+        if (chunk.type === "tool_call_log") {
+          this.handleLogToolCall({
+            content: chunk.content,
+            result: chunk.result || "no result",
+          });
+          continue;
+        }
         const lastIdx = this.messages.length - 1;
         this.messages[lastIdx].content += chunk;
         this.scrollToBottom();
@@ -328,6 +336,14 @@ When creating search suggestions, incorporate these contextual details to make s
     // Todo - render this as a link to default search provider instead of using a button with events.
     const event = new CustomEvent("search-suggested", {
       detail: { query, clickEvent },
+      bubbles: true,
+    });
+    this.dispatchEvent(event);
+  }
+
+  handleLogToolCall(toolCallData) {
+    const event = new CustomEvent("tool-call", {
+      detail: toolCallData,
       bubbles: true,
     });
     this.dispatchEvent(event);
