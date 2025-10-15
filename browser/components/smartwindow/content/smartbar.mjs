@@ -85,7 +85,7 @@ export function attachToElement(element, options = {}) {
         "span",
         attrs,
         ["img", { src: node.attrs.icon || "", alt: "", class: "mention-icon", width: "16", height: "16" }],
-        `@${node.attrs.label ?? node.attrs.id}`,
+        ["span", { class: "mention-label", title: node.attrs.label }, `@${node.attrs.label}`],
       ];
     },
   });
