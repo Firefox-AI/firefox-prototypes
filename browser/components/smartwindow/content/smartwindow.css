@@ -266,7 +266,8 @@ body {
 }
 
 .submit-button.has-text {
-  background: rgba(180, 99, 190, 0.5);
+  border: var(--border-width, 1px) solid var(--button-border-color-primary, rgba(0, 0, 0, 0.00));
+  background: linear-gradient(260deg, rgba(255, 183, 148, 0.80) -49.13%, rgba(181, 62, 175, 0.80) 63.71%, rgba(131, 62, 181, 0.80) 128.68%);
 }
 
 .submit-button:hover {
@@ -290,7 +291,9 @@ body {
   padding: 0.1rem 0.3rem;
   display: inline-flex;
   align-items: center;
+  vertical-align: middle;
   gap: 4px;
+  max-width: 185px;
 }
 
 .mention-list {
@@ -365,6 +368,14 @@ body {
   color: #999;
   white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mention-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
   text-overflow: ellipsis;
 }
 
