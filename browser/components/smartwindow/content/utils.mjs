@@ -2,6 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+const lazy = {};
+ChromeUtils.defineESModuleGetters(lazy, {
+  BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+});
+
 import { createEngine } from "chrome://global/content/ml/EngineProcess.sys.mjs";
 
 /**
@@ -63,34 +68,165 @@ export async function createOpenAIEngine() {
   }
 }
 
+const SEARCH_OPEN_TABS = "search_open_tabs";
+const TOOLS = [SEARCH_OPEN_TABS];
+
+const toolsConfig = [
+  {
+    type: "function",
+    function: {
+      name: SEARCH_OPEN_TABS,
+      description:
+        "Searches the user's open tabs for tabs that match the given type",
+      parameters: {
+        type: "object",
+        properties: {
+          type: {
+            type: "string",
+            description:
+              "the type of tabs I am looking for ie news, sports, etc",
+          },
+        },
+        required: ["type"],
+      },
+    },
+  },
+];
+
+const search_open_tabs = ({ type }) => {
+  let win = lazy.BrowserWindowTracker.getTopWindow();
+  let gBrowser = win.gBrowser;
+  let tabs = gBrowser.tabs;
+  const tabData = tabs.map(tab => {
+    return {
+      title: tab.label,
+      url: tab.linkedBrowser.currentURI.spec,
+    };
+  });
+
+  return {
+    query: type,
+    allTabs: tabData,
+  };
+};
+
 /**
  * Fetches a response from the OpenAI engine with message history.
  *
  * @param {Array} messages - Array of message objects with role and content
- * @returns {AsyncGenerator<string>} Stream of response chunks
+ * @returns {AsyncGenerator<string>} Stream of response chunks this can be a string or a tool call log object
  */
+
 export async function* fetchWithHistory(messages) {
-  try {
-    const engineInstance = await createOpenAIEngine();
+  const engineInstance = await createOpenAIEngine();
 
-    // Convert messages to OpenAI format
-    const openAIMessages = messages.map(msg => ({
-      role: msg.role.toLowerCase(),
-      content: msg.content,
-    }));
+  // Normalize roles to lowercase and handle system messages
+  let convo = Array.isArray(messages)
+    ? messages.map(msg => ({
+        ...msg,
+        role: msg.role.toLowerCase(), // Convert "System" -> "system"
+      }))
+    : [];
 
-    // Use runWithGenerator to get streaming chunks directly
-    for await (const chunk of engineInstance.runWithGenerator({
-      args: openAIMessages,
+  // Helper to run the model once (streaming) on current convo
+  const streamModelResponse = () =>
+    engineInstance.runWithGenerator({
       streamOptions: { enabled: true },
-    })) {
-      if (chunk.text) {
+      tool_choice: "auto",
+      tools: toolsConfig,
+      args: convo,
+    });
+
+  // Keep calling until the model finishes without requesting tools
+  while (true) {
+    let pendingToolCalls = null;
+
+    // 1) First pass: stream tokens; capture any toolCalls
+    for await (const chunk of streamModelResponse()) {
+      // Stream assistant text to the UI
+      if (chunk?.text) {
         yield chunk.text;
       }
+
+      // Capture tool calls (do not echo raw tool plumbing to the user)
+      if (chunk?.toolCalls?.length) {
+        pendingToolCalls = chunk.toolCalls;
+      }
     }
-  } catch (error) {
-    console.error("ML Engine error:", error);
-    yield `Error: Failed to connect to AI service. Please check browser.smartwindow.* preferences. ${error.message}`;
+
+    // 2) Watch for tool calls; if none, we are done
+    if (!pendingToolCalls || pendingToolCalls.length === 0) {
+      return;
+    }
+
+    // 3) Build the assistant tool_calls message exactly as expected by the API
+    const assistantToolMsg = {
+      role: "assistant",
+      tool_calls: pendingToolCalls.map(toolCall => ({
+        id: toolCall.id,
+        type: "function",
+        function: {
+          name: toolCall.function.name,
+          arguments: toolCall.function.arguments,
+        },
+      })),
+    };
+
+    // 4) Execute each tool locally and create a tool message with the result
+    const toolResultMessages = [];
+    for (const toolCall of pendingToolCalls) {
+      const { id, function: functionSpec } = toolCall;
+      const toolName = functionSpec?.name || "";
+      let toolParams = {};
+
+      try {
+        toolParams = functionSpec?.arguments
+          ? JSON.parse(functionSpec.arguments)
+          : {};
+      } catch {
+        toolResultMessages.push({
+          role: "tool",
+          tool_call_id: id,
+          content: JSON.stringify({ error: "Invalid JSON arguments" }),
+        });
+        continue;
+      }
+
+      let result;
+      try {
+        if (!TOOLS.includes(toolName)) {
+          result = { error: `There is no tool called : ${String(toolName)}` };
+        }
+
+        // Call the appropriate tool by name
+        if (toolName === SEARCH_OPEN_TABS) {
+          // Setting this pattern so that we can pass additional argument like context
+          // into the tool function with the params coming from the model
+          result = search_open_tabs(toolParams);
+        }
+
+        // Create special tool call log message to show in the UI log panel
+        const assistantToolCallLogMsg = {
+          role: "assistant",
+          content: `Tool Call: ${toolName} with parameters: ${JSON.stringify(
+            toolParams
+          )}`,
+          type: "tool_call_log",
+          result,
+        };
+        yield assistantToolCallLogMsg;
+      } catch (e) {
+        result = { error: `Tool execution failed: ${String(e)}` };
+      }
+
+      toolResultMessages.push({
+        role: "tool",
+        tool_call_id: id,
+        content: typeof result === "string" ? result : JSON.stringify(result),
+      });
+    }
+
+    convo = [...convo, assistantToolMsg, ...toolResultMessages];
   }
 }
 
