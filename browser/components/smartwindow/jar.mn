@@ -4,6 +4,7 @@
 
 browser.jar:
     content/browser/smartwindow/chat.mjs                     (content/chat.mjs)
+    content/browser/smartwindow/tool-log.mjs                 (content/tool-log.mjs)
     content/browser/smartwindow/insights.mjs                 (content/insights.mjs)
     content/browser/smartwindow/marked.js                    (vendor/marked.js)
     content/browser/smartwindow/mentions.mjs                 (content/mentions.mjs)
