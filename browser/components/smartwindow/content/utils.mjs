@@ -8,6 +8,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
 });
 
 import { createEngine } from "chrome://global/content/ml/EngineProcess.sys.mjs";
+import { SmartAssistEngine } from "moz-src:///browser/components/genai/SmartAssistEngine.sys.mjs";
 
 /**
  * Detects the type of query based on patterns in the text.
@@ -32,13 +33,7 @@ export async function detectQueryType(query) {
 
   // Use ML model for chat vs search classification
   try {
-    const engine = await createEngine({
-      engineId: "smart-intent",
-      modelId: "mozilla/query-intent-detection",
-      modelRevision: "v0.1.0",
-      taskName: "text-classification",
-    });
-    return (await engine.run({ args: [[query]] }))[0].label.toLowerCase();
+    return await SmartAssistEngine.getPromptIntent(query);
   } catch (error) {
     console.error("Error using intent detection model:", error);
     return "search";
