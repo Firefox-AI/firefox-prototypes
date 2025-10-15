@@ -529,7 +529,7 @@ body {
   /* Chat mode bottom - fix input at bottom */
   .smart-window-container {
     position: relative;
-    padding: 16px 0;
+    padding: 8px 0;
     box-sizing: border-box;
     height: 100vh;
   }
@@ -1138,4 +1138,16 @@ body {
   color: #ff3b30;
   font-size: 14px;
   margin-top: 8px;
+}
+
+.tool-log-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+#tool-log {
+  width: 100%;
+  display: flex;
+  justify-content: center;
 }
