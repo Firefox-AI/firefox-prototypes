@@ -126,43 +126,146 @@ class ChatBot extends MozLitElement {
       flex-shrink: 0;
     }
 
-    .insights-button {
+    .chat-controls {
+      display: flex;
+      gap: 0.5rem;
+      max-height: 18px;
       position: fixed;
-      top: 0;
       right: 0;
+      top: 0;
+      z-index: 100;
+    }
+
+    .control-button {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.375rem;
       padding: 0.5rem 0.75rem;
       background: #0066cc;
       color: white;
       border: none;
-      border-radius: 6px;
+      border-radius: 0;
       font-size: 0.875rem;
       cursor: pointer;
       transition: all 0.2s;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      z-index: 100;
+      margin: 0;
     }
 
-    .insights-button:hover {
+    .control-button:hover {
       background: #0052a3;
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
       transform: translateY(-1px);
     }
 
-    .insights-button svg {
+    .control-button.active {
+      background: #004080;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .control-button svg {
       flex-shrink: 0;
     }
 
-    .insights-count-badge {
-      background: rgba(255, 255, 255, 0.2);
+    .control-label {
+      font-weight: 500;
+    }
+
+    .control-badge {
+      background: rgba(255, 255, 255, 0.25);
       padding: 0.125rem 0.375rem;
       border-radius: 10px;
       font-size: 0.75rem;
       font-weight: 600;
       min-width: 20px;
       text-align: center;
+    }
+
+    .tool-log-panel {
+      position: fixed;
+      top: 4.5rem;
+      right: 1rem;
+      max-width: 400px;
+      width: 90%;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 99;
+      overflow: hidden;
+    }
+
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      background: #f8f9fa;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .log-title {
+      font-weight: 600;
+      font-size: 0.875rem;
+      color: #333;
+    }
+
+    .log-close-btn {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: #666;
+      padding: 0;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      margin: 0;
+    }
+
+    .log-close-btn:hover {
+      background: #e0e0e0;
+    }
+
+    .log-entries {
+      padding: 0.75rem;
+      max-height: 300px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .log-empty {
+      color: #666;
+      font-size: 0.875rem;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .log-entry {
+      background-color: #f5f5f5;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 0.75rem;
+      font-size: 0.875rem;
+    }
+
+    .log-field {
+      margin-bottom: 0.5rem;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .log-field:last-child {
+      margin-bottom: 0;
+    }
+
+    .log-field b {
+      color: #333;
+      font-weight: 600;
     }
 
     ${insightsStyles}
@@ -174,6 +277,8 @@ class ChatBot extends MozLitElement {
       messages: { type: Array },
       marked: { type: Object },
       showInsightsOverlay: { type: Boolean },
+      showLog: { type: Boolean },
+      logState: { type: Array },
     };
   }
 
@@ -187,6 +292,8 @@ class ChatBot extends MozLitElement {
     this.showInsightsOverlay = false; // Track insights overlay visibility
     this.conversationInsights = new Set(); // Track all insights used in conversation
     this._insightsUpdatedHandler = null; // Event listener reference for cleanup
+    this.showLog = false; // Track tool log visibility
+    this.logState = []; // Store tool log entries
   }
 
   connectedCallback() {
@@ -430,6 +537,17 @@ When creating search suggestions, incorporate these contextual details to make s
     }
   }
 
+  toggleLog() {
+    this.showLog = !this.showLog;
+    this.requestUpdate();
+  }
+
+  updateLogState(chatEntry) {
+    const entryWithDate = { ...chatEntry, date: new Date().toLocaleString() };
+    this.logState = [...this.logState, entryWithDate];
+    this.requestUpdate();
+  }
+
   render() {
     // Count total insights for the badge
     const insightsData =
@@ -443,22 +561,40 @@ When creating search suggestions, incorporate these contextual details to make s
     }
 
     return html`
-      <button
-        class="insights-button"
-        @click=${() => this.handleInsightClick()}
-        title="View transparency dashboard"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
-            fill="currentColor"
-          />
-        </svg>
-        Insights
-        ${totalInsights > 0
-          ? html`<span class="insights-count-badge">${totalInsights}</span>`
-          : ""}
-      </button>
+      <div class="chat-controls">
+        <button
+          class="control-button"
+          @click=${() => this.handleInsightClick()}
+          title="View transparency dashboard"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
+              fill="currentColor"
+            />
+          </svg>
+          <span class="control-label">Insights</span>
+          ${totalInsights > 0
+            ? html`<span class="control-badge">${totalInsights}</span>`
+            : ""}
+        </button>
+        <button
+          class="control-button ${this.showLog ? "active" : ""}"
+          @click=${() => this.toggleLog()}
+          title="Toggle tool log"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"
+              fill="currentColor"
+            />
+          </svg>
+          <span class="control-label">Log</span>
+          ${this.logState.length
+            ? html`<span class="control-badge">${this.logState.length}</span>`
+            : ""}
+        </button>
+      </div>
 
       ${this.messages.length
         ? html`
@@ -566,6 +702,35 @@ When creating search suggestions, incorporate these contextual details to make s
             this.conversationInsights,
             this.handleDeleteInsight.bind(this)
           )
+        : ""}
+      ${this.showLog
+        ? html`
+            <div class="tool-log-panel">
+              <div class="log-header">
+                <span class="log-title">Tool Log</span>
+                <button class="log-close-btn" @click=${() => this.toggleLog()}>
+                  ×
+                </button>
+              </div>
+              <div class="log-entries">
+                ${this.logState.length === 0
+                  ? html`<div class="log-empty">No log entries yet</div>`
+                  : this.logState.map(
+                      data => html`
+                        <div class="log-entry">
+                          <div class="log-field">
+                            <b>Message:</b> ${data.content}
+                          </div>
+                          <div class="log-field"><b>Date:</b> ${data.date}</div>
+                          <div class="log-field">
+                            <b>Tool Response:</b> ${JSON.stringify(data.result)}
+                          </div>
+                        </div>
+                      `
+                    )}
+              </div>
+            </div>
+          `
         : ""}
     `;
   }
