@@ -145,6 +145,7 @@ export class PageExtractorChild extends JSWindowActorChild {
     const document = this.manager.contentWindow.document;
 
     if (!document) {
+      lazy.console.log("No document is available.");
       return null;
     }
     /** @type {HTMLElement?} */
@@ -158,10 +159,10 @@ export class PageExtractorChild extends JSWindowActorChild {
       return null;
     }
 
-    if (title) {
-      return `${title}\n\n${content}`.trim();
-    }
-    return content.trim();
+    const results = title ? `${title}\n\n${content}`.trim() : content.trim();
+
+    lazy.console.log("about:reader content", results);
+    return results;
   }
 
   /**
