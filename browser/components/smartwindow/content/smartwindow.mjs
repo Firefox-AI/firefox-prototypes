@@ -520,7 +520,7 @@ class SmartWindowPage {
 
     // Filter out browser internal URLs
     return (
-      !url.startsWith("about:") &&
+      (!url.startsWith("about:") || url.startsWith("about:reader?")) &&
       !url.startsWith("chrome:") &&
       !url.startsWith("moz-extension:") &&
       !url.startsWith("resource:") &&
