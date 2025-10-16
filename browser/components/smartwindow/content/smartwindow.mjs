@@ -629,7 +629,6 @@ class SmartWindowPage {
 
     this.resultsContainer = document.getElementById("results-container");
     this.chatBot = document.getElementById("chat-bot");
-    this.toolLog = document.getElementById("tool-log");
     this.quickPromptsContainer = document.getElementById(
       "quick-prompts-container"
     );
@@ -996,7 +995,10 @@ class SmartWindowPage {
 
       this.chatBot.addEventListener("tool-call", e => {
         console.log("[SmartWindow] Tool call event:", e.detail);
-        this.toolLog.updatelogState(e.detail);
+        // Update the chat bot's internal log state
+        if (this.chatBot.updateLogState) {
+          this.chatBot.updateLogState(e.detail);
+        }
       });
     }
 
