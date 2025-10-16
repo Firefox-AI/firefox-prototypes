@@ -21,9 +21,8 @@ var SmartWindow = {
   // Chat message storage by tab ID (no expiration)
   _chatMessagesByTab: new Map(),
 
-  // Insights storage (persists across tabs)
-  _insightsData: {},
-  _generatedInsights: new Set(),
+  // Insights storage (persists across tabs and sessions via prefs)
+  _insightsData: null,
   _isGeneratingInsights: false,
   _insightsGenerationError: null,
 
@@ -38,6 +37,9 @@ var SmartWindow = {
       console.log("[Smart Window] Feature disabled by pref");
       return;
     }
+
+    // Load insights from prefs
+    this._loadInsightsFromPrefs();
 
     this.initButtons();
     this.setupTabAttrObserver();
@@ -443,24 +445,40 @@ var SmartWindow = {
   },
 
   // Insights management methods
+  _loadInsightsFromPrefs() {
+    try {
+      const insightsJson = Services.prefs.getStringPref(
+        "browser.smartwindow.insights",
+        "{}"
+      );
+      this._insightsData = JSON.parse(insightsJson);
+      console.log("[SmartWindow] Loaded insights from prefs");
+    } catch (e) {
+      console.error("[SmartWindow] Failed to load insights from prefs:", e);
+      this._insightsData = {};
+    }
+  },
+
+  _saveInsightsToPrefs() {
+    try {
+      const insightsJson = JSON.stringify(this._insightsData);
+      Services.prefs.setStringPref(
+        "browser.smartwindow.insights",
+        insightsJson
+      );
+      console.log("[SmartWindow] Saved insights to prefs");
+    } catch (e) {
+      console.error("[SmartWindow] Failed to save insights to prefs:", e);
+    }
+  },
+
   getInsightsData() {
     return this._insightsData;
   },
 
   setInsightsData(data) {
     this._insightsData = data || {};
-  },
-
-  getGeneratedInsights() {
-    return this._generatedInsights;
-  },
-
-  addGeneratedInsight(insight) {
-    this._generatedInsights.add(insight);
-  },
-
-  clearGeneratedInsights() {
-    this._generatedInsights.clear();
+    this._saveInsightsToPrefs();
   },
 
   isGeneratingInsights() {
@@ -522,9 +540,9 @@ var SmartWindow = {
     // Clean up chat messages
     this._chatMessagesByTab.clear();
 
-    // Clean up insights storage
-    this._insightsData = {};
-    this._generatedInsights.clear();
+    // Save insights then clean up insights in-memory storage
+    this._saveInsightsToPrefs();
+    this._insightsData = null;
     this._isGeneratingInsights = false;
     this._insightsGenerationError = null;
 
