@@ -2174,6 +2174,9 @@ class ExternalServices extends BaseExternalServices {
   reportTelemetry(data) {
     FirefoxCom.request("reportTelemetry", data);
   }
+  reportText(data) {
+    FirefoxCom.request("reportText", data);
+  }
   updateEditorStates(data) {
     FirefoxCom.request("updateEditorStates", data);
   }
@@ -5980,6 +5983,59 @@ class PDFFindController {
       entireWord: this.#state?.entireWord ?? null,
       matchesCount: this.#requestMatchesCount(),
       rawQuery: this.#state?.query ?? null
+    });
+  }
+}
+
+class PdfTextExtractor {
+  #pdfDocument;
+  #externalServices;
+  #pendingRequests = new Set();
+
+  constructor(externalServices) {
+    this.#externalServices = externalServices;
+
+    window.addEventListener("requestTextContent", ({ detail }) => {
+      this.extractTextContent(detail.requestId)
+    });
+  }
+
+  setDocument(pdfDocument) {
+    this.#pdfDocument = pdfDocument;
+    if (this.#pendingRequests.size) {
+      for (const pendingRequest of this.#pendingRequests) {
+        this.extractTextContent(pendingRequest);
+      }
+    }
+    this.#pendingRequests = new Set();
+  }
+
+  /**
+   * Builds up all of the text from a PDF.
+   */
+  extractTextContent(requestId) {
+    if (!this.#pdfDocument) {
+      this.pendingReportTextRequests.add(requestId)
+      return;
+    }
+
+    let pageRequests = []
+    for(let i = 0; i < this.#pdfDocument.numPages; i++) {
+      pageRequests.push(this.#pdfDocument.getPage(i+1).then(page => page.getTextContent()));
+    }
+    Promise.all(pageRequests).then(pages => {
+      let text = ''
+      for (const { items } of pages) {
+        for (const item of items) {
+          if (item.str) {
+            if (text) {
+              text += '\n'
+            }
+            text += item.str;
+          }
+        }
+      }
+      this.#externalServices.reportText({text, requestId});
     });
   }
 }
@@ -14631,6 +14687,7 @@ const PDFViewerApplication = {
   pdfPresentationMode: null,
   pdfDocumentProperties: null,
   pdfLinkService: null,
+  pdfTextExtractor: null,
   pdfHistory: null,
   pdfSidebar: null,
   pdfOutlineViewer: null,
@@ -14815,6 +14872,7 @@ const PDFViewerApplication = {
     const overlayManager = this.overlayManager = new OverlayManager();
     const renderingQueue = this.pdfRenderingQueue = new PDFRenderingQueue();
     renderingQueue.onIdle = this._cleanup.bind(this);
+    this.pdfTextExtractor = new PdfTextExtractor(externalServices)
     const linkService = this.pdfLinkService = new PDFLinkService({
       eventBus,
       externalLinkTarget: AppOptions.get("externalLinkTarget"),
@@ -15395,6 +15453,7 @@ const PDFViewerApplication = {
     this.secondaryToolbar?.setPagesCount(pdfDocument.numPages);
     this.pdfLinkService.setDocument(pdfDocument);
     this.pdfDocumentProperties?.setDocument(pdfDocument);
+    this.pdfTextExtractor.setDocument(pdfDocument);
     const pdfViewer = this.pdfViewer;
     pdfViewer.setDocument(pdfDocument);
     const {
