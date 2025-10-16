@@ -147,6 +147,28 @@ class ChatBot extends MozLitElement {
     this.currentPageText = ""; // Store current page text content
     this.showInsightsOverlay = false; // Track insights overlay visibility
     this.conversationInsights = new Set(); // Track all insights used in conversation
+    this._insightsUpdatedHandler = null; // Event listener reference for cleanup
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    // Listen for insights-updated events to re-render the overlay
+    this._insightsUpdatedHandler = () => {
+      this.requestUpdate();
+    };
+    window.addEventListener("insights-updated", this._insightsUpdatedHandler);
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    // Clean up event listener
+    if (this._insightsUpdatedHandler) {
+      window.removeEventListener(
+        "insights-updated",
+        this._insightsUpdatedHandler
+      );
+      this._insightsUpdatedHandler = null;
+    }
   }
 
   async sendPrompt() {
