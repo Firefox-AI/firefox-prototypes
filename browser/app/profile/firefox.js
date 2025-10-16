@@ -1183,6 +1183,7 @@ pref("browser.tabs.allow_transparent_browser", true);
 // Smart window feature
 pref("browser.smartwindow.enabled", true);
 pref("browser.smartwindow.endpoint", "https://stage.llm-proxy.nonprod.dataservices.mozgcp.net/");
+pref("browser.smartwindow.insights", "{}");
 pref("browser.smartwindow.key", "");
 pref("browser.smartwindow.model", "qwen3-235b-a22b-instruct-2507-maas");
 pref("browser.smartwindow.chatHistory.loglevel", "Warn");
