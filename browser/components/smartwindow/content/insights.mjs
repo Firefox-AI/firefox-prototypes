@@ -10,28 +10,16 @@ function getSmartWindow() {
 
 /**
  * Helper function to get insights data from SmartWindow storage
+ * Returns generated insights if available, otherwise returns empty object
  */
 function getInsightsData() {
   const smartWindow = getSmartWindow();
   if (!smartWindow) {
-    return DEFAULT_INSIGHTS_DATA;
+    return {};
   }
 
   const stored = smartWindow.getInsightsData();
-  // If no data stored yet, initialize with default data
-  if (!stored || Object.keys(stored).length === 0) {
-    smartWindow.setInsightsData({ ...DEFAULT_INSIGHTS_DATA });
-    return smartWindow.getInsightsData();
-  }
-  return stored;
-}
-
-/**
- * Helper function to get generated insights set from SmartWindow storage
- */
-function getGeneratedInsights() {
-  const smartWindow = getSmartWindow();
-  return smartWindow?.getGeneratedInsights() || new Set();
+  return stored || {};
 }
 
 /**
@@ -537,6 +525,7 @@ async function generateInsightsWithLLM(profile, source) {
 
 /**
  * Adds generated insights to INSIGHTS_DATA
+ * Generated insights completely replace existing data
  *
  * @param {object} json - Parsed JSON with categories
  */
@@ -562,7 +551,6 @@ function addInsightsToData(json) {
       const attrStr = String(attr).trim();
       if (attrStr && !insightsData[categoryName].includes(attrStr)) {
         insightsData[categoryName].push(attrStr);
-        smartWindow?.addGeneratedInsight(attrStr);
       }
     }
   }
@@ -663,25 +651,11 @@ export async function generateInsightsFromConversations() {
 }
 
 /**
- * Clears only LLM-generated insights, keeping static placeholders
+ * Clears all generated insights
  */
 export function clearGeneratedInsights() {
   const smartWindow = getSmartWindow();
-  const insightsData = getInsightsData();
-  const generatedInsights = getGeneratedInsights();
-
-  for (const categoryName in insightsData) {
-    insightsData[categoryName] = insightsData[categoryName].filter(
-      insight => !generatedInsights.has(insight)
-    );
-    // Remove empty categories
-    if (insightsData[categoryName].length === 0) {
-      delete insightsData[categoryName];
-    }
-  }
-
-  smartWindow?.clearGeneratedInsights();
-  smartWindow?.setInsightsData(insightsData);
+  smartWindow?.setInsightsData({});
   console.log("[Insights] Cleared generated insights");
 }
 
@@ -690,30 +664,67 @@ export function clearGeneratedInsights() {
  */
 export function getInsightsState() {
   const smartWindow = getSmartWindow();
-  const generatedInsights = getGeneratedInsights();
+  const insightsData = getInsightsData();
+
+  // Count total generated insights across all categories
+  let generatedCount = 0;
+  for (const category in insightsData) {
+    if (Array.isArray(insightsData[category])) {
+      generatedCount += insightsData[category].length;
+    }
+  }
 
   return {
     isGenerating: smartWindow?.isGeneratingInsights() || false,
     error: smartWindow?.getInsightsError() || null,
-    generatedCount: generatedInsights.size,
+    generatedCount,
   };
 }
 
 /**
  * Checks if an insight was LLM-generated
+ * An insight is considered generated if it exists in stored data
+ * but not in the default placeholder data
  *
  * @param insight
  */
 export function isGeneratedInsight(insight) {
-  const generatedInsights = getGeneratedInsights();
-  return generatedInsights.has(insight);
+  const insightsData = getInsightsData();
+
+  // Check if insight exists in current data
+  let existsInCurrent = false;
+  for (const category in insightsData) {
+    if (insightsData[category]?.includes(insight)) {
+      existsInCurrent = true;
+      break;
+    }
+  }
+
+  if (!existsInCurrent) {
+    return false;
+  }
+
+  // Check if insight exists in default data
+  for (const category in DEFAULT_INSIGHTS_DATA) {
+    if (DEFAULT_INSIGHTS_DATA[category]?.includes(insight)) {
+      return false; // Not generated, it's from defaults
+    }
+  }
+
+  return true; // Exists in current but not in defaults = generated
 }
 
 /**
  * Builds the system prompt with insights data
+ * Uses generated insights if available, otherwise uses default placeholder data
  */
 export function buildInsightsSystemPrompt() {
   const insightsData = getInsightsData();
+
+  // Use generated insights if available, otherwise fall back to defaults
+  const dataToUse = Object.keys(insightsData).length
+    ? insightsData
+    : DEFAULT_INSIGHTS_DATA;
 
   let systemPrompt = `
 
@@ -722,7 +733,7 @@ When responding, if you use any user insights from the list below to personalize
 User Insights List:`;
 
   // Build insights list from data
-  Object.entries(insightsData).forEach(([category, insights]) => {
+  Object.entries(dataToUse).forEach(([category, insights]) => {
     if (insights.length) {
       const insightString = insights.join(", ");
       systemPrompt += `\n- ${category}: ${insightString}.`;
@@ -813,6 +824,12 @@ export function createInsightsOverlay(
   onDeleteInsight = null
 ) {
   const state = getInsightsState();
+  const insightsData = getInsightsData();
+
+  // Use generated insights if available, otherwise show defaults for UI
+  const dataToDisplay = Object.keys(insightsData).length
+    ? insightsData
+    : DEFAULT_INSIGHTS_DATA;
 
   const handleGenerateHistory = async () => {
     try {
@@ -891,7 +908,7 @@ export function createInsightsOverlay(
           : ""}
 
         <div class="insights-content">
-          ${Object.entries(getInsightsData())
+          ${Object.entries(dataToDisplay)
             .map(([category, insights]) => {
               const usedCount = insights.filter(insight =>
                 usedInsights.has(insight)
