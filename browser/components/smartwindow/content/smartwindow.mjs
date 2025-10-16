@@ -1562,10 +1562,8 @@ class SmartWindowPage {
     // Move input box to bottom for chat mode
     this.toggleBottomChatMode(true);
 
-    // Show chat bot component
-    if (this.chatBot) {
-      this.chatBot.style.display = "block";
-    }
+    // Chat bot component is now always visible (contains the insights button)
+    // No need to toggle display
 
     // Hide suggestions when chat mode is active
     if (this.smartbar) {
@@ -1581,10 +1579,8 @@ class SmartWindowPage {
       this.toggleBottomChatMode(false);
     }
 
-    // Hide chat bot component
-    if (this.chatBot) {
-      this.chatBot.style.display = "none";
-    }
+    // Chat bot component stays visible (for the insights button)
+    // No need to toggle display
 
     // Show any existing messages in results container
     const existingMessages = this.resultsContainer.querySelectorAll(".message");
