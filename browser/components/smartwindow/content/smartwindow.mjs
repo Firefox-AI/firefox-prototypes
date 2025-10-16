@@ -1377,7 +1377,8 @@ class SmartWindowPage {
 
     document.documentElement.setAttribute("haschat", "true");
 
-    const type = await detectQueryType(query);
+    // const type = await detectQueryType(query);
+    const type = "chat";
 
     // Hide suggestions after selection
     if (this.smartbar) {

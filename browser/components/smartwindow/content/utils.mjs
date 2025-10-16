@@ -64,7 +64,8 @@ export async function createOpenAIEngine() {
 }
 
 const SEARCH_OPEN_TABS = "search_open_tabs";
-const TOOLS = [SEARCH_OPEN_TABS];
+const GET_PAGE_CONTENT = "get_page_content";
+const TOOLS = [SEARCH_OPEN_TABS, GET_PAGE_CONTENT];
 
 const toolsConfig = [
   {
@@ -86,6 +87,25 @@ const toolsConfig = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: GET_PAGE_CONTENT,
+      description:
+        "Fetches the page content for a specific tab by URL. Use this when you need to analyze specific page content that was referenced in the user's query.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: {
+            type: "string",
+            description:
+              "The URL of the tab to fetch content from. This should match one of the URLs provided in the tab context.",
+          },
+        },
+        required: ["url"],
+      },
+    },
+  },
 ];
 
 const search_open_tabs = ({ type }) => {
@@ -103,6 +123,114 @@ const search_open_tabs = ({ type }) => {
     query: type,
     allTabs: tabData,
   };
+};
+
+const get_page_content = async ({ url }) => {
+  try {
+    let win = lazy.BrowserWindowTracker.getTopWindow();
+    let gBrowser = win.gBrowser;
+    let tabs = gBrowser.tabs;
+    
+    // Find the tab with the matching URL (try exact match first, then flexible matching)
+    let targetTab = tabs.find(tab => {
+      const tabUrl = tab.linkedBrowser.currentURI.spec;
+      return tabUrl === url;
+    });
+    
+    // If no exact match, try more flexible matching
+    if (!targetTab) {
+      targetTab = tabs.find(tab => {
+        const tabUrl = tab.linkedBrowser.currentURI.spec;
+        // Remove trailing slashes and compare
+        const normalizedTabUrl = tabUrl.replace(/\/$/, '');
+        const normalizedInputUrl = url.replace(/\/$/, '');
+        return normalizedTabUrl === normalizedInputUrl;
+      });
+    }
+    
+    // If still no match, try hostname matching for cases where protocols differ
+    if (!targetTab) {
+      try {
+        const inputHostname = new URL(url).hostname;
+        targetTab = tabs.find(tab => {
+          try {
+            const tabUrl = tab.linkedBrowser.currentURI.spec;
+            const tabHostname = new URL(tabUrl).hostname;
+            return tabHostname === inputHostname;
+          } catch {
+            return false;
+          }
+        });
+      } catch {
+        // Invalid URL, continue with original logic
+      }
+    }
+    
+    if (!targetTab) {
+      return {
+        error: `No tab found with URL: ${url}`,
+        available_urls: tabs.map(tab => tab.linkedBrowser.currentURI.spec)
+      };
+    }
+    
+    // Get the browser for the target tab
+    const selectedBrowser = targetTab.linkedBrowser;
+    
+    // Check if browsing context is available
+    if (!selectedBrowser.browsingContext) {
+      return {
+        error: `Tab browsing context not available for: ${url}`,
+        tab_title: targetTab.label,
+        suggestion: "Tab may not be fully loaded or accessible"
+      };
+    }
+    
+    // Check if current window context is available
+    if (!selectedBrowser.browsingContext.currentWindowContext) {
+      return {
+        error: `Tab window context not available for: ${url}`,
+        tab_title: targetTab.label,
+        suggestion: "Tab may not be active or fully loaded"
+      };
+    }
+    
+    // Extract page content using PageExtractor
+    const pageExtractor = await selectedBrowser.browsingContext.currentWindowContext.getActor("PageExtractor");
+    
+    // Try reader mode content first, then fall back to text content
+    let pageContent = await pageExtractor.getReaderModeContent();
+    if (!pageContent) {
+      pageContent = await pageExtractor.getText();
+    }
+    
+    if (!pageContent) {
+      return {
+        error: `Could not extract content from tab: ${url}`,
+        tab_title: targetTab.label,
+        suggestion: "Page may be empty, loading, or content extraction failed"
+      };
+    }
+    
+    // Truncate content to avoid overly long responses (max 4000 chars)
+    const truncatedContent = pageContent.length > 4000
+      ? pageContent.substring(0, 4000) + "..."
+      : pageContent;
+    
+    return {
+      url,
+      tab_title: targetTab.label,
+      content: truncatedContent,
+      content_length: pageContent.length,
+      truncated: pageContent.length > 4000
+    };
+    
+  } catch (error) {
+    return {
+      error: `Failed to fetch page content: ${error.message}`,
+      url,
+      suggestion: "Try refreshing the tab or ensuring it's fully loaded"
+    };
+  }
 };
 
 /**
@@ -198,6 +326,9 @@ export async function* fetchWithHistory(messages) {
           // Setting this pattern so that we can pass additional argument like context
           // into the tool function with the params coming from the model
           result = search_open_tabs(toolParams);
+        } else if (toolName === GET_PAGE_CONTENT) {
+          // Get page content for the specified URL
+          result = await get_page_content(toolParams);
         }
 
         // Create special tool call log message to show in the UI log panel
