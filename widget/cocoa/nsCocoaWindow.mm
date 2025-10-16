@@ -145,7 +145,7 @@ static void RollUpPopups(nsIRollupListener::AllowAnimations aAllowAnimations =
     pm->RollupTooltips();
   }
 
-  nsIRollupListener* rollupListener = nsBaseWidget::GetActiveRollupListener();
+  nsIRollupListener* rollupListener = nsIWidget::GetActiveRollupListener();
   if (!rollupListener) {
     return;
   }
@@ -311,7 +311,7 @@ void nsCocoaWindow::SetCursor(const Cursor& aCursor) {
     return;  // Don't change the cursor during dragging.
   }
 
-  nsBaseWidget::SetCursor(aCursor);
+  nsIWidget::SetCursor(aCursor);
 
   bool forceUpdate = mUpdateCursor;
   mUpdateCursor = false;
@@ -803,7 +803,7 @@ bool nsCocoaWindow::PaintWindowInDrawTarget(
 
   nsAutoRetainCocoaObject kungFuDeathGrip(mChildView);
   if (GetWindowRenderer()->GetBackendType() == LayersBackend::LAYERS_NONE) {
-    nsBaseWidget::AutoLayerManagerSetup setupLayerManager(this, &targetContext);
+    nsIWidget::AutoLayerManagerSetup setupLayerManager(this, &targetContext);
     return PaintWindow(aRegion);
   }
   return false;
@@ -832,6 +832,9 @@ void nsCocoaWindow::EnsureContentLayerForMainThreadPainting() {
 }
 
 void nsCocoaWindow::PaintWindowInContentLayer() {
+  if (GetClientBounds().IsEmpty()) {
+    return;
+  }
   EnsureContentLayerForMainThreadPainting();
   mPoolHandle->OnBeginFrame();
   RefPtr<DrawTarget> dt = mContentLayer->NextSurfaceAsDrawTarget(
@@ -894,17 +897,12 @@ void nsCocoaWindow::CreateCompositor(int aWidth, int aHeight) {
   // Make sure the gfxPlatform is initialized, which is necessary to create
   // the GPUProcessManager.
   Unused << gfxPlatform::GetPlatform();
-  auto* pm = mozilla::gfx::GPUProcessManager::Get();
   MOZ_ASSERT(
-      pm, "Getting the gfxPlatform should have created the GPUProcessManager.");
-
-  // Ensure the GPU process has had a chance to start. The logic in
-  // GetCompositorWidgetInitData will handle both success and error cases
-  // correctly, so we don't check an error code.
-  pm->EnsureGPUReady();
+      mozilla::gfx::GPUProcessManager::Get(),
+      "Getting the gfxPlatform should have created the GPUProcessManager.");
 
   // Do the rest of the compositor setup.
-  nsBaseWidget::CreateCompositor(aWidth, aHeight);
+  nsIWidget::CreateCompositor(aWidth, aHeight);
 }
 
 void nsCocoaWindow::GetCompositorWidgetInitData(
@@ -992,7 +990,7 @@ void nsCocoaWindow::DestroyCompositor() {
                           &NativeLayerRootRemoteMacParent::Close));
   }
 
-  nsBaseWidget::DestroyCompositor();
+  nsIWidget::DestroyCompositor();
 }
 
 void nsCocoaWindow::NotifyCompositorSessionLost(
@@ -1016,7 +1014,7 @@ void nsCocoaWindow::NotifyCompositorSessionLost(
                    withObject:nil
                    afterDelay:kTriggerPaintDelayAfterGpuProcessCrash];
 
-  nsBaseWidget::NotifyCompositorSessionLost(aSession);
+  nsIWidget::NotifyCompositorSessionLost(aSession);
 }
 
 void nsCocoaWindow::SetCompositorWidgetDelegate(
@@ -1194,7 +1192,7 @@ void nsCocoaWindow::PostRender(WidgetRenderingContext* aContext)
   mCompositingLock.Unlock();
 }
 
-RefPtr<layers::NativeLayerRoot> nsCocoaWindow::GetNativeLayerRoot() {
+layers::NativeLayerRoot* nsCocoaWindow::GetNativeLayerRoot() {
   return mNativeLayerRoot;
 }
 
@@ -1889,7 +1887,7 @@ NSEvent* gLastDragMouseDownEvent = nil;  // [strong]
     return;
   }
 
-  nsIRollupListener* rollupListener = nsBaseWidget::GetActiveRollupListener();
+  nsIRollupListener* rollupListener = nsIWidget::GetActiveRollupListener();
   NS_ENSURE_TRUE_VOID(rollupListener);
   nsCOMPtr<nsIWidget> widget = rollupListener->GetRollupWidget();
   NS_ENSURE_TRUE_VOID(widget);
@@ -1912,7 +1910,7 @@ NSEvent* gLastDragMouseDownEvent = nil;  // [strong]
 
   BOOL consumeEvent = NO;
 
-  nsIRollupListener* rollupListener = nsBaseWidget::GetActiveRollupListener();
+  nsIRollupListener* rollupListener = nsIWidget::GetActiveRollupListener();
   NS_ENSURE_TRUE(rollupListener, false);
 
   BOOL isWheelTypeEvent = [theEvent type] == NSEventTypeScrollWheel ||
@@ -5086,8 +5084,8 @@ void nsCocoaWindow::Destroy() {
     DestroyNativeWindow();
   }
 
-  nsBaseWidget::OnDestroy();
-  nsBaseWidget::Destroy();
+  nsIWidget::OnDestroy();
+  nsIWidget::Destroy();
 }
 
 void* nsCocoaWindow::GetNativeData(uint32_t aDataType) {
@@ -5396,7 +5394,7 @@ bool nsCocoaWindow::ShouldUseOffMainThreadCompositing() {
     // Use main-thread BasicLayerManager for drawing menus.
     return false;
   }
-  return nsBaseWidget::ShouldUseOffMainThreadCompositing();
+  return nsIWidget::ShouldUseOffMainThreadCompositing();
 }
 
 TransparencyMode nsCocoaWindow::GetTransparencyMode() {
@@ -5508,7 +5506,7 @@ void nsCocoaWindow::SetSizeConstraints(const SizeConstraints& aConstraints) {
                                       : nsCocoaUtils::DevPixelsToCocoaPoints(
                                             c.mMaxSize.height, c.mScale.scale)};
   mWindow.maxSize = maxSize;
-  nsBaseWidget::SetSizeConstraints(c);
+  nsIWidget::SetSizeConstraints(c);
 
   NS_OBJC_END_TRY_IGNORE_BLOCK;
 }
@@ -6116,7 +6114,7 @@ void nsCocoaWindow::ProcessTransitions() {
           // show the Dock first, otherwise the newly-created window won't have
           // its minimize button enabled. See bug 526282.
           nsCocoaUtils::HideOSChromeOnScreen(true);
-          nsBaseWidget::InfallibleMakeFullScreen(true);
+          nsIWidget::InfallibleMakeFullScreen(true);
           mSuppressSizeModeEvents = false;
           UpdateFullscreenState(true, false);
         }
@@ -6146,7 +6144,7 @@ void nsCocoaWindow::ProcessTransitions() {
             // show the Dock first, otherwise the newly-created window won't
             // have its minimize button enabled. See bug 526282.
             nsCocoaUtils::HideOSChromeOnScreen(false);
-            nsBaseWidget::InfallibleMakeFullScreen(false);
+            nsIWidget::InfallibleMakeFullScreen(false);
             mSuppressSizeModeEvents = false;
             UpdateFullscreenState(false, false);
           }

@@ -13,7 +13,7 @@
 #include "mozilla/RefPtr.h"
 #include "mozilla/layers/NativeLayerRootRemoteMacChild.h"
 #include "mozilla/layers/NativeLayerRootRemoteMacParent.h"
-#include "nsBaseWidget.h"
+#include "nsIWidget.h"
 #include "nsCocoaUtils.h"
 #include "nsTouchBar.h"
 #include "ViewRegion.h"
@@ -195,10 +195,10 @@ class TextInputHandler;
 - (void)windowMainStateChanged;
 @end
 
-class nsCocoaWindow final : public nsBaseWidget {
+class nsCocoaWindow final : public nsIWidget {
  private:
   friend class nsChildView;
-  typedef nsBaseWidget Inherited;
+  typedef nsIWidget Inherited;
 
  public:
   nsCocoaWindow();
@@ -403,7 +403,7 @@ class nsCocoaWindow final : public nsBaseWidget {
 
   bool PreRender(mozilla::widget::WidgetRenderingContext* aContext) override;
   void PostRender(mozilla::widget::WidgetRenderingContext* aContext) override;
-  RefPtr<mozilla::layers::NativeLayerRoot> GetNativeLayerRoot() override;
+  mozilla::layers::NativeLayerRoot* GetNativeLayerRoot() override;
 
   void UpdateWindowDraggingRegion(
       const LayoutDeviceIntRegion& aRegion) override;

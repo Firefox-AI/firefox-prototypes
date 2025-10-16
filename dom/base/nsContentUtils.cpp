@@ -107,7 +107,6 @@
 #include "mozilla/RangeBoundary.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/Result.h"
-#include "mozilla/ResultExtensions.h"
 #include "mozilla/ScrollContainerFrame.h"
 #include "mozilla/ScrollbarPreferences.h"
 #include "mozilla/ShutdownPhase.h"
@@ -117,6 +116,7 @@
 #include "mozilla/StaticPrefs_dom.h"
 #include "mozilla/extensions/WebExtensionPolicy.h"
 #include "nsIOService.h"
+#include "nsMenuPopupFrame.h"
 #include "nsObjectLoadingContent.h"
 #ifdef FUZZING
 #  include "mozilla/StaticPrefs_fuzzing.h"

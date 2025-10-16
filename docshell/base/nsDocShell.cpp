@@ -33,7 +33,6 @@
 #include "mozilla/MediaFeatureChange.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/PresShell.h"
-#include "mozilla/ResultExtensions.h"
 #include "mozilla/SchedulerGroup.h"
 #include "mozilla/ScopeExit.h"
 #include "mozilla/ScrollContainerFrame.h"
@@ -3959,7 +3958,7 @@ nsresult nsDocShell::ReloadNavigable(
         aNavigationAPIState;
     if (!destinationNavigationAPIState) {
       destinationNavigationAPIState =
-          mActiveEntry ? mActiveEntry->GetNavigationState() : nullptr;
+          mActiveEntry ? mActiveEntry->GetNavigationAPIState() : nullptr;
     }
 
     // 1.4 Let continue be the result of firing a push/replace/reload navigate
@@ -5138,9 +5137,8 @@ nsDocShell::RefreshURI(nsIURI* aURI, nsIPrincipal* aPrincipal,
     nsCOMPtr<nsPIDOMWindowOuter> win = GetWindow();
     NS_ENSURE_TRUE(win, NS_ERROR_FAILURE);
 
-    nsCOMPtr<nsITimer> timer;
-    MOZ_TRY_VAR(timer, NS_NewTimerWithCallback(refreshTimer, aDelay,
-                                               nsITimer::TYPE_ONE_SHOT));
+    nsCOMPtr<nsITimer> timer = MOZ_TRY(
+        NS_NewTimerWithCallback(refreshTimer, aDelay, nsITimer::TYPE_ONE_SHOT));
 
     mRefreshURIList->AppendElement(timer);  // owning timer ref
   }
@@ -8657,6 +8655,8 @@ nsresult nsDocShell::PerformRetargeting(nsDocShellLoadState* aLoadState) {
       loadState->SetPostDataStream(aLoadState->PostDataStream());
       loadState->SetIsFormSubmission(aLoadState->IsFormSubmission());
 
+      loadState->SetNavigationAPIState(aLoadState->GetNavigationAPIState());
+
       rv = win->Open(spec,
                      aLoadState->Target(),  // window name
                      u""_ns,                // Features
@@ -8957,19 +8957,20 @@ nsresult nsDocShell::HandleSameDocumentNavigation(
     return NS_OK;
   }
 
+  // https://html.spec.whatwg.org/#navigate-fragid
+  // Step 2
+  RefPtr<nsIStructuredCloneContainer> destinationNavigationAPIState =
+      mActiveEntry ? mActiveEntry->GetNavigationAPIState() : nullptr;
+  // Step 3
+  if (auto* navigationAPIState = aLoadState->GetNavigationAPIState()) {
+    destinationNavigationAPIState = navigationAPIState;
+  }
+
   if (nsCOMPtr<nsPIDOMWindowInner> window = doc->GetInnerWindow();
       window && !aState.mHistoryNavBetweenSameDoc) {
     // https://html.spec.whatwg.org/#navigate-fragid
     // Step 1
     if (RefPtr<Navigation> navigation = window->Navigation()) {
-      // Step 2
-      RefPtr<nsIStructuredCloneContainer> destinationNavigationAPIState =
-          mActiveEntry ? mActiveEntry->GetNavigationState() : nullptr;
-      // Step 3
-      if (aLoadState->GetNavigationAPIState()) {
-        destinationNavigationAPIState = aLoadState->GetNavigationAPIState();
-      }
-
       AutoJSAPI jsapi;
       if (jsapi.Init(window)) {
         RefPtr<Element> sourceElement = aLoadState->GetSourceElement();
@@ -9316,6 +9317,10 @@ nsresult nsDocShell::HandleSameDocumentNavigation(
       if (scrollRestorationIsManual.isSome()) {
         mActiveEntry->SetScrollRestorationIsManual(
             scrollRestorationIsManual.value());
+      }
+
+      if (destinationNavigationAPIState) {
+        mActiveEntry->SetNavigationAPIState(destinationNavigationAPIState);
       }
 
       if (LOAD_TYPE_HAS_FLAGS(mLoadType, LOAD_FLAGS_REPLACE_HISTORY)) {

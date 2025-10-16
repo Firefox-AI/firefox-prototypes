@@ -7759,11 +7759,26 @@ static void PrintProfilerIntervals_Callback(mozilla::MarkerCategory,
           (TimeStamp::Now() - start).ToMilliseconds(), msg, details);
 }
 
+static void PrintProfilerFlow_Callback(mozilla::MarkerCategory,
+                                       const char* markerName,
+                                       uint64_t flowId) {
+  fprintf(stderr, "PROFILER FLOW: %s (flowId=%" PRIu64 ")\n", markerName,
+          flowId);
+}
+
+static void PrintProfilerTerminatingFlow_Callback(mozilla::MarkerCategory,
+                                                  const char* markerName,
+                                                  uint64_t flowId) {
+  fprintf(stderr, "PROFILER TERMINATING FLOW: %s (flowId=%" PRIu64 ")\n",
+          markerName, flowId);
+}
+
 static bool PrintProfilerEvents(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
   if (cx->runtime()->geckoProfiler().enabled()) {
-    js::RegisterContextProfilingEventMarker(cx, &PrintProfilerEvents_Callback,
-                                            &PrintProfilerIntervals_Callback);
+    js::RegisterContextProfilerMarkers(
+        cx, &PrintProfilerEvents_Callback, &PrintProfilerIntervals_Callback,
+        &PrintProfilerFlow_Callback, &PrintProfilerTerminatingFlow_Callback);
   }
   args.rval().setUndefined();
   return true;
@@ -12821,13 +12836,10 @@ bool InitOptionParser(OptionParser& op) {
                         "Disable Object.groupBy and Map.groupBy") ||
       !op.addBoolOption('\0', "enable-symbols-as-weakmap-keys",
                         "Enable Symbols As WeakMap keys") ||
+      !op.addBoolOption('\0', "no-symbols-as-weakmap-keys",
+                        "Disable Symbols As WeakMap keys") ||
       !op.addBoolOption('\0', "enable-uint8array-base64",
                         "Enable Uint8Array base64/hex methods") ||
-      !op.addBoolOption('\0', "enable-regexp-duplicate-named-groups",
-                        "Enable Duplicate Named Capture Groups") ||
-      !op.addBoolOption('\0', "enable-regexp-modifiers",
-                        "Enable Pattern Modifiers") ||
-      !op.addBoolOption('\0', "enable-regexp-escape", "Enable RegExp.escape") ||
       !op.addBoolOption('\0', "enable-top-level-await",
                         "Enable top-level await") ||
       !op.addStringOption('\0', "shared-memory", "on/off",
@@ -13217,12 +13229,6 @@ bool SetGlobalOptionsPreJSInit(const OptionParser& op) {
   if (op.getBoolOption("enable-shadow-realms")) {
     JS::Prefs::set_experimental_shadow_realms(true);
   }
-  if (op.getBoolOption("enable-regexp-duplicate-named-groups")) {
-    JS::Prefs::setAtStartup_experimental_regexp_duplicate_named_groups(true);
-  }
-  if (op.getBoolOption("enable-regexp-modifiers")) {
-    JS::Prefs::setAtStartup_experimental_regexp_modifiers(true);
-  }
   if (op.getBoolOption("enable-uint8array-base64")) {
     JS::Prefs::setAtStartup_experimental_uint8array_base64(true);
   }
@@ -13235,9 +13241,17 @@ bool SetGlobalOptionsPreJSInit(const OptionParser& op) {
   if (op.getBoolOption("enable-error-iserror")) {
     JS::Prefs::set_experimental_error_iserror(true);
   }
+
+  bool symbolsAsWeakMapKeys = true;
   if (op.getBoolOption("enable-symbols-as-weakmap-keys")) {
-    JS::Prefs::setAtStartup_experimental_symbols_as_weakmap_keys(true);
+    symbolsAsWeakMapKeys = true;
   }
+  if (op.getBoolOption("no-symbols-as-weakmap-keys")) {
+    symbolsAsWeakMapKeys = false;
+  }
+  JS::Prefs::setAtStartup_experimental_symbols_as_weakmap_keys(
+      symbolsAsWeakMapKeys);
+
 #ifdef NIGHTLY_BUILD
   if (op.getBoolOption("enable-async-iterator-helpers")) {
     JS::Prefs::setAtStartup_experimental_async_iterator_helpers(true);
@@ -14137,14 +14151,6 @@ bool SetContextJITOptions(JSContext* cx, const OptionParser& op) {
   }
 #  endif
 #endif
-
-  if (op.getBoolOption("enable-regexp-duplicate-named-groups")) {
-    jit::JitOptions.js_regexp_duplicate_named_groups = true;
-  }
-
-  if (op.getBoolOption("enable-regexp-modifiers")) {
-    jit::JitOptions.js_regexp_modifiers = true;
-  }
 
   return true;
 }

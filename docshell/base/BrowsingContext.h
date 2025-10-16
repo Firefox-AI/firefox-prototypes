@@ -459,7 +459,8 @@ class BrowsingContext : public nsILoadContext, public nsWrapperCache {
   void Navigate(nsIURI* aURI, nsIPrincipal& aSubjectPrincipal, ErrorResult& aRv,
                 NavigationHistoryBehavior aHistoryHandling =
                     NavigationHistoryBehavior::Auto,
-                bool aNeedsCompletelyLoadedDocument = false);
+                bool aNeedsCompletelyLoadedDocument = false,
+                nsIStructuredCloneContainer* aNavigationAPIState = nullptr);
 
   // Removes the root document for this BrowsingContext tree from the BFCache,
   // if it is cached, and returns true if it was.
@@ -1069,6 +1070,7 @@ class BrowsingContext : public nsILoadContext, public nsWrapperCache {
   void ClearCachedValuesOfLocations();
 
   void ConsumeHistoryActivation();
+  void SynchronizeNavigationAPIState(nsIStructuredCloneContainer* aState);
 
  protected:
   virtual ~BrowsingContext();

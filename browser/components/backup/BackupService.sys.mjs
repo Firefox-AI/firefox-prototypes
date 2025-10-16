@@ -1936,6 +1936,7 @@ export class BackupService extends EventTarget {
     );
     supportURI.searchParams.set("utm_medium", "firefox-desktop");
     supportURI.searchParams.set("utm_source", "html-backup");
+    supportURI.searchParams.set("utm_campaign", "fx-backup-restore");
 
     let supportLink = templateDOM.querySelector("#support-link");
     supportLink.href = supportURI.href;
@@ -2989,6 +2990,19 @@ export class BackupService extends EventTarget {
       );
       await IOUtils.writeJSON(postRecoveryPath, postRecovery);
 
+      // In a release scenario, this should always be true
+      // this makes it easier to get around setting up profiles for testing other functionality
+      if (profileSvc.currentProfile) {
+        // if our current profile was default, let's make the new one default
+        if (profileSvc.currentProfile === profileSvc.defaultProfile) {
+          profileSvc.defaultProfile = profile;
+        }
+
+        // let's rename the old profile with a prefix old-[profile_name]
+        profile.name = profileSvc.currentProfile.name;
+        profileSvc.currentProfile.name = `old-${profileSvc.currentProfile.name}`;
+      }
+
       await profileSvc.asyncFlush();
 
       if (shouldLaunch) {
@@ -3142,6 +3156,12 @@ export class BackupService extends EventTarget {
     if (shouldEnableScheduledBackups) {
       // reset the error states when reenabling backup
       Services.prefs.setIntPref(BACKUP_ERROR_CODE_PREF_NAME, ERRORS.NONE);
+    } else {
+      // set user-disabled pref if backup is being disabled
+      Services.prefs.setBoolPref(
+        "browser.backup.scheduled.user-disabled",
+        true
+      );
     }
   }
 

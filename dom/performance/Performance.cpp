@@ -915,7 +915,7 @@ void Performance::InsertUserEntry(PerformanceEntry* aEntry) {
  *
  * Buffer Full Event
  */
-void Performance::BufferEvent() {
+void Performance::ResourceTimingBufferFullEvent() {
   /*
    * While resource timing secondary buffer is not empty,
    * run the following substeps:
@@ -936,7 +936,7 @@ void Performance::BufferEvent() {
      * at the Performance object.
      */
     if (!CanAddResourceTimingEntry()) {
-      DispatchBufferFullEvent();
+      DispatchResourceTimingBufferFullEvent();
     }
 
     /*
@@ -1049,7 +1049,8 @@ void Performance::InsertResourceEntry(PerformanceEntry* aEntry) {
      * Queue a task to run fire a buffer full event.
      */
     NS_DispatchToCurrentThread(NewCancelableRunnableMethod(
-        "Performance::BufferEvent", this, &Performance::BufferEvent));
+        "Performance::ResourceTimingBufferFullEvent", this,
+        &Performance::ResourceTimingBufferFullEvent));
   }
   /*
    * Add new entry to the resource timing secondary buffer.

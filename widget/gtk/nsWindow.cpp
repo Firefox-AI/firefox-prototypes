@@ -48,6 +48,7 @@
 #include "mozilla/layers/WebRenderLayerManager.h"
 #include "mozilla/layers/APZInputBridge.h"
 #include "mozilla/layers/IAPZCTreeManager.h"
+#include "mozilla/widget/WindowOcclusionState.h"
 #include "mozilla/Likely.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/MiscEvents.h"
@@ -645,10 +646,10 @@ void nsWindow::OnDestroy(void) {
   nsCOMPtr<nsIWidget> kungFuDeathGrip = this;
 
   // release references to children, device context, toolkit + app shell
-  nsBaseWidget::OnDestroy();
+  nsIWidget::OnDestroy();
 
   // Remove association between this object and its parent and siblings.
-  nsBaseWidget::Destroy();
+  nsIWidget::Destroy();
 
   NotifyWindowDestroyed();
 }
@@ -692,7 +693,7 @@ void nsWindow::Destroy() {
     }
   }
 
-  nsIRollupListener* rollupListener = nsBaseWidget::GetActiveRollupListener();
+  nsIRollupListener* rollupListener = nsIWidget::GetActiveRollupListener();
   if (rollupListener) {
     nsCOMPtr<nsIWidget> rollupWidget = rollupListener->GetRollupWidget();
     if (static_cast<nsIWidget*>(this) == rollupWidget) {
@@ -778,18 +779,6 @@ DesktopToLayoutDeviceScale nsWindow::GetDesktopToDeviceScale() {
 
   // In Gtk/X11, we manage windows using device pixels.
   return DesktopToLayoutDeviceScale(1.0);
-}
-
-DesktopToLayoutDeviceScale nsWindow::GetDesktopToDeviceScaleByScreen() {
-#ifdef MOZ_WAYLAND
-  if (GdkIsWaylandDisplay()) {
-    // In wayland there's no absolute screen position, so we need to use the
-    // scale factor of our top level, which is what FractionalScaleFactor does,
-    // luckily.
-    return DesktopToLayoutDeviceScale(FractionalScaleFactor());
-  }
-#endif
-  return nsBaseWidget::GetDesktopToDeviceScale();
 }
 
 bool nsWindow::WidgetTypeSupportsAcceleration() {
@@ -943,7 +932,7 @@ void nsWindow::ConstrainSize(int* aWidth, int* aHeight) {
   // need to also constrain inner sizes as inner, rather than outer.
   *aWidth -= mClientMargin.LeftRight();
   *aHeight -= mClientMargin.TopBottom();
-  nsBaseWidget::ConstrainSize(aWidth, aHeight);
+  nsIWidget::ConstrainSize(aWidth, aHeight);
   *aWidth += mClientMargin.LeftRight();
   *aHeight += mClientMargin.TopBottom();
 }
@@ -3874,8 +3863,8 @@ void nsWindow::CreateCompositorVsyncDispatcher() {
   if (!mWaylandVsyncSource) {
     LOG_VSYNC(
         "  mWaylandVsyncSource is missing, create "
-        "nsBaseWidget::CompositorVsyncDispatcher()");
-    nsBaseWidget::CreateCompositorVsyncDispatcher();
+        "nsIWidget::CompositorVsyncDispatcher()");
+    nsIWidget::CreateCompositorVsyncDispatcher();
     return;
   }
   if (!mCompositorVsyncDispatcherLock) {
@@ -6003,7 +5992,7 @@ bool nsWindow::ConfigureX11GLVisual() {
 #endif
 
 nsAutoCString nsWindow::GetFrameTag() const {
-  if (nsIFrame* frame = GetFrame()) {
+  if (nsIFrame* frame = GetPopupFrame()) {
 #ifdef DEBUG_FRAME_DUMP
     return frame->ListTag();
 #else
@@ -8840,7 +8829,7 @@ nsIWidget::WindowRenderer* nsWindow::GetWindowRenderer() {
     return mWindowRenderer;
   }
 
-  return nsBaseWidget::GetWindowRenderer();
+  return nsIWidget::GetWindowRenderer();
 }
 
 void nsWindow::DidGetNonBlankPaint() {
@@ -8862,10 +8851,10 @@ void nsWindow::DidGetNonBlankPaint() {
  * to render into with compositor.
  *
  * SetCompositorWidgetDelegate(delegate) is called from
- * nsBaseWidget::CreateCompositor(), i.e. nsWindow::GetWindowRenderer().
+ * nsIWidget::CreateCompositor(), i.e. nsWindow::GetWindowRenderer().
  *
  * SetCompositorWidgetDelegate(null) is called from
- * nsBaseWidget::DestroyCompositor().
+ * nsIWidget::DestroyCompositor().
  */
 void nsWindow::SetCompositorWidgetDelegate(CompositorWidgetDelegate* delegate) {
   LOG("nsWindow::SetCompositorWidgetDelegate %p mIsMapped %d "
@@ -9741,11 +9730,14 @@ void nsWindow::UpdateMozWindowActive() {
 void nsWindow::ForceTitlebarRedraw() {
   MOZ_ASSERT(mDrawInTitlebar, "We should not redraw invisible titlebar.");
 
-  if (!mWidgetListener || !mWidgetListener->GetPresShell()) {
+  if (!mWidgetListener) {
     return;
   }
-
-  nsIFrame* frame = GetFrame();
+  PresShell* ps = mWidgetListener->GetPresShell();
+  if (!ps) {
+    return;
+  }
+  nsIFrame* frame = ps->GetRootFrame();
   if (!frame) {
     return;
   }
