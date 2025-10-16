@@ -126,6 +126,45 @@ class ChatBot extends MozLitElement {
       flex-shrink: 0;
     }
 
+    .insights-button {
+      position: fixed;
+      top: 0;
+      right: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      background: #0066cc;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      z-index: 100;
+    }
+
+    .insights-button:hover {
+      background: #0052a3;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+      transform: translateY(-1px);
+    }
+
+    .insights-button svg {
+      flex-shrink: 0;
+    }
+
+    .insights-count-badge {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 0.125rem 0.375rem;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      min-width: 20px;
+      text-align: center;
+    }
+
     ${insightsStyles}
   `;
 
@@ -392,12 +431,37 @@ When creating search suggestions, incorporate these contextual details to make s
   }
 
   render() {
+    // Count total insights for the badge
+    const insightsData =
+      window.browsingContext?.topChromeWindow?.SmartWindow?.getInsightsData?.() ||
+      {};
+    let totalInsights = 0;
+    for (const category in insightsData) {
+      if (Array.isArray(insightsData[category])) {
+        totalInsights += insightsData[category].length;
+      }
+    }
+
     return html`
-      ${this.messages.length === 0
-        ? html`<p class="welcome-message">
-            Start the conversation by typing a message.
-          </p>`
-        : html`
+      <button
+        class="insights-button"
+        @click=${() => this.handleInsightClick()}
+        title="View transparency dashboard"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
+            fill="currentColor"
+          />
+        </svg>
+        Insights
+        ${totalInsights > 0
+          ? html`<span class="insights-count-badge">${totalInsights}</span>`
+          : ""}
+      </button>
+
+      ${this.messages.length
+        ? html`
             <div class="chat">
               ${this.messages.map(msg => {
                 const { cleanContent, searchQueries, usedInsights } =
@@ -491,7 +555,8 @@ When creating search suggestions, incorporate these contextual details to make s
                 `;
               })}
             </div>
-          `}
+          `
+        : ""}
 
       <div id="bottom-anchor"></div>
 
