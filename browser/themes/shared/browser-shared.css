@@ -1578,13 +1578,13 @@ browser {
 
 /* Smart Window Right Sidebar Styles */
 .smartwindow-right-sidebar {
-  width: 358px;
+  width: 412px;
   backdrop-filter: blur(24px);
 }
 
 #smartwindow-box {
-  min-width: 300px;
-  max-width: 600px;
+  max-width: 75vw;
+  min-width: 412px;
 }
 
 #smartwindow-header {
