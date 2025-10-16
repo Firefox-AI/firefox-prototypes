@@ -9,6 +9,14 @@
  * @import { PageExtractorChild } from './PageExtractorChild.sys.mjs'
  */
 
+const lazy = {};
+ChromeUtils.defineLazyGetter(lazy, "console", () => {
+  return console.createInstance({
+    prefix: "PageExtractorParent",
+    maxLogLevelPref: "browser.ml.logLevel",
+  });
+});
+
 /**
  * Extract a variety of content from pages for use in a smart window.
  */
@@ -24,6 +32,9 @@ export class PageExtractorParent extends JSWindowActorParent {
    * @returns {Promise<string | null>}
    */
   getReaderModeContent(force = false) {
+    if (this.#isPDF()) {
+      return Promise.resolve(null);
+    }
     return this.sendQuery("PageExtractorParent:GetReaderModeContent", force);
   }
 
@@ -38,6 +49,7 @@ export class PageExtractorParent extends JSWindowActorParent {
    */
   getText(options = {}) {
     if (this.#isPDF()) {
+      lazy.console.log("Getting content from pdf");
       return this.browsingContext.currentWindowGlobal
         .getActor("Pdfjs")
         .getTextContent();
