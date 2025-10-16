@@ -222,7 +222,7 @@ var SmartWindow = {
     if (smartWindowBox) {
       smartWindowBox.hidden = !this._sidebarVisible;
       if (!this._sidebarVisible) {
-        smartWindowBox.style.width = "358px";
+        smartWindowBox.style.width = "412px";
       }
     }
     if (smartWindowSplitter) {
