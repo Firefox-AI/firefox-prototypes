@@ -374,7 +374,24 @@ class ChatBot extends MozLitElement {
     try {
       saved = Services.prefs.getStringPref(PROMPT_PREF, "");
     } catch (e) {}
+
     this.systemPromptDraft = saved !== "" ? saved : null;
+
+    this._prefObserver = {
+    observe: (_subject, topic, data) => {
+      if (topic !== "nsPref:changed" || data !== PROMPT_PREF){
+        return;
+      }
+      let val = "";
+      try {
+        val = Services.prefs.getStringPref(PROMPT_PREF, "");
+      } catch {}
+      this.systemPromptDraft = val !== "" ? val : null;
+      this.saveStatus = "saved";
+      this._lastSavedAt = new Date();
+      this.requestUpdate();
+    },
+  };
   }
 
   connectedCallback() {
@@ -384,6 +401,7 @@ class ChatBot extends MozLitElement {
       this.requestUpdate();
     };
     window.addEventListener("insights-updated", this._insightsUpdatedHandler);
+    Services.prefs.addObserver(PROMPT_PREF, this._prefObserver);
   }
 
   disconnectedCallback() {
@@ -396,6 +414,9 @@ class ChatBot extends MozLitElement {
       );
       this._insightsUpdatedHandler = null;
     }
+    try {
+      Services.prefs.removeObserver(PROMPT_PREF, this._prefObserver);
+    } catch {}
   }
 
   async sendPrompt() {
@@ -412,6 +433,7 @@ class ChatBot extends MozLitElement {
     // Prepare messages with system prompt for the API call
     const messagesForAPI = [...this.messages];
     if (messagesForAPI.length) {
+      // Insert system prompt as the first message
       const systemContent =
         (this.systemPromptDraft && this.systemPromptDraft.trim()) ||
         this.buildSystemPrompt(this.currentTabContext || []);
@@ -467,7 +489,7 @@ class ChatBot extends MozLitElement {
     await this.sendPrompt();
   }
 
-    buildSystemPrompt(tabContext = []) {
+  buildSystemPrompt(tabContext = []) {
     const currentDate = new Date().toLocaleDateString("en-US", {
       weekday: "long",
       year: "numeric",
