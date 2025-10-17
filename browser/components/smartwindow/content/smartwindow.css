@@ -739,9 +739,7 @@ body {
   align-items: center;
   display: flex;
   gap: 8px;
-  padding-inline: 10px;
   padding-block: 4px 0;
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
   position: relative;
   justify-content: space-between;
   flex-wrap: wrap;
@@ -752,7 +750,6 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  opacity: 0.5;
 }
 
 /* Tab context right section */
@@ -826,7 +823,7 @@ body {
 .add-tabs-button {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   cursor: pointer;
   font-size: 13px;
   color: #15141a;
@@ -836,10 +833,16 @@ body {
   border: none;
   background: transparent;
   padding: 0;
+  opacity: 0.5;
+}
+
+.add-tabs-button:hover,
+.add-tabs-button:hover .add-tabs-icon {
+  opacity: 1;
 }
 
 .add-tabs-button:hover .add-tabs-icon {
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.025);
 }
 
 .add-tabs-button.active {
@@ -848,11 +851,7 @@ body {
 }
 
 .add-tabs-icon {
-  display: flex;
-  font-size: 20px;
-  font-weight: normal;
   color: #15141a;
-  opacity: 0.5;
   border-radius: var(--border-radius-circle);
   transition: background 0.2s ease;
 }
