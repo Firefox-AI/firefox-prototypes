@@ -14,6 +14,132 @@ ChromeUtils.defineESModuleGetters(lazy, {
 
 import { detectQueryType } from "./utils.mjs";
 
+// Top US websites for prefix matching navigation suggestions
+const TOP_US_WEBSITES = [
+  "adobe.com",
+  "airbnb.co",
+  "airbnb.com",
+  "airtable.com",
+  "alibaba.com",
+  "amazon.com",
+  "americanexpress.com",
+  "apple.com",
+  "att.com",
+  "bankofamerica.com",
+  "bbc.com",
+  "bestbuy.com",
+  "bing.com",
+  "blogspot.com",
+  "booking.com",
+  "buzzfeed.com",
+  "canva.com",
+  "capitalone.com",
+  "chase.com",
+  "chatgpt.com",
+  "chewy.com",
+  "cnn.com",
+  "coinbase.com",
+  "costco.com",
+  "craigslist.org",
+  "delta.com",
+  "discord.com",
+  "disneyplus.com",
+  "dropbox.com",
+  "duckduckgo.com",
+  "ebay.com",
+  "espn.com",
+  "etsy.com",
+  "expedia.com",
+  "facebook.com",
+  "fidelity.com",
+  "figma.com",
+  "flickr.com",
+  "forbes.com",
+  "ford.com",
+  "fox.com",
+  "github.com",
+  "glassdoor.com",
+  "gmail.com",
+  "godaddy.com",
+  "google.com",
+  "hbomax.com",
+  "homedepot.com",
+  "hotels.com",
+  "hulu.com",
+  "ibm.com",
+  "ikea.com",
+  "imdb.com",
+  "indeed.com",
+  "instagram.com",
+  "intel.com",
+  "kayak.com",
+  "linkedin.com",
+  "lowes.com",
+  "lyft.com",
+  "macys.com",
+  "mailchimp.com",
+  "mapquest.com",
+  "max.com",
+  "medium.com",
+  "microsoft.com",
+  "microsoft365.com",
+  "nbc.com",
+  "netflix.com",
+  "nike.com",
+  "nordstrom.com",
+  "notion.so",
+  "nvidia.com",
+  "nytimes.com",
+  "office.com",
+  "openai.com",
+  "oracle.com",
+  "paramount.com",
+  "paypal.com",
+  "pinterest.com",
+  "quora.com",
+  "reddit.com",
+  "roblox.com",
+  "salesforce.com",
+  "schwab.com",
+  "shopify.com",
+  "slack.com",
+  "snapchat.com",
+  "southwest.com",
+  "spotify.com",
+  "stackoverflow.com",
+  "starbucks.com",
+  "target.com",
+  "telegram.org",
+  "threads.net",
+  "tiktok.com",
+  "trello.com",
+  "tripadvisor.com",
+  "tumblr.com",
+  "twitch.tv",
+  "twitter.com",
+  "uber.com",
+  "united.com",
+  "ups.com",
+  "usatoday.com",
+  "usps.com",
+  "verizon.com",
+  "walmart.com",
+  "washingtonpost.com",
+  "wayfair.com",
+  "weather.com",
+  "webmd.com",
+  "wellsfargo.com",
+  "whatsapp.com",
+  "wikipedia.org",
+  "wsj.com",
+  "x.com",
+  "yahoo.com",
+  "yelp.com",
+  "youtube.com",
+  "zillow.com",
+  "zoom.us",
+];
+
 /**
  * Generates live suggestions for a search query by querying the urlbar
  * providers and processing the results.
@@ -165,6 +291,22 @@ export async function generateLiveSuggestions(query, topChromeWindow) {
             suggestions.push(fallback);
           }
         }
+      }
+    }
+
+    // If no autofill data from urlbar, check TOP_US_WEBSITES for prefix match
+    if (!autofillData) {
+      const lowerQuery = query.toLowerCase().trim();
+      const match = TOP_US_WEBSITES.find(site =>
+        site.toLowerCase().startsWith(lowerQuery)
+      );
+
+      if (match) {
+        autofillData = {
+          value: match,
+          selectionStart: query.length,
+          selectionEnd: match.length,
+        };
       }
     }
 
