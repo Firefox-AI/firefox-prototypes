@@ -712,6 +712,11 @@ body {
   color: rgba(125, 32, 124, 0.8);
 }
 
+.quick-action-button:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 .quick-action-button:hover {
   transform: translateY(-2px);
   color: rgba(125, 32, 124, 1);
