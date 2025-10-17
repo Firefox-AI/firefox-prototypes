@@ -18,6 +18,11 @@ import { SmartAssistEngine } from "moz-src:///browser/components/genai/SmartAssi
  * @returns {Promise<string>} The detected query type: "navigate", "chat", "action", or "search"
  */
 export async function detectQueryType(query) {
+  // temporary heuristic to force a chat, e.g., @mention
+  if (query.indexOf("@") >= 0) {
+    return "chat";
+  }
+
   const trimmedQuery = query.trim().toLowerCase();
 
   // navigate heuristics (protocols or domain without spaces)
@@ -130,24 +135,24 @@ const get_page_content = async ({ url }) => {
     let win = lazy.BrowserWindowTracker.getTopWindow();
     let gBrowser = win.gBrowser;
     let tabs = gBrowser.tabs;
-    
+
     // Find the tab with the matching URL (try exact match first, then flexible matching)
     let targetTab = tabs.find(tab => {
       const tabUrl = tab.linkedBrowser.currentURI.spec;
       return tabUrl === url;
     });
-    
+
     // If no exact match, try more flexible matching
     if (!targetTab) {
       targetTab = tabs.find(tab => {
         const tabUrl = tab.linkedBrowser.currentURI.spec;
         // Remove trailing slashes and compare
-        const normalizedTabUrl = tabUrl.replace(/\/$/, '');
-        const normalizedInputUrl = url.replace(/\/$/, '');
+        const normalizedTabUrl = tabUrl.replace(/\/$/, "");
+        const normalizedInputUrl = url.replace(/\/$/, "");
         return normalizedTabUrl === normalizedInputUrl;
       });
     }
-    
+
     // If still no match, try hostname matching for cases where protocols differ
     if (!targetTab) {
       try {
@@ -165,70 +170,73 @@ const get_page_content = async ({ url }) => {
         // Invalid URL, continue with original logic
       }
     }
-    
+
     if (!targetTab) {
       return {
         error: `No tab found with URL: ${url}`,
-        available_urls: tabs.map(tab => tab.linkedBrowser.currentURI.spec)
+        available_urls: tabs.map(tab => tab.linkedBrowser.currentURI.spec),
       };
     }
-    
+
     // Get the browser for the target tab
     const selectedBrowser = targetTab.linkedBrowser;
-    
+
     // Check if browsing context is available
     if (!selectedBrowser.browsingContext) {
       return {
         error: `Tab browsing context not available for: ${url}`,
         tab_title: targetTab.label,
-        suggestion: "Tab may not be fully loaded or accessible"
+        suggestion: "Tab may not be fully loaded or accessible",
       };
     }
-    
+
     // Check if current window context is available
     if (!selectedBrowser.browsingContext.currentWindowContext) {
       return {
         error: `Tab window context not available for: ${url}`,
         tab_title: targetTab.label,
-        suggestion: "Tab may not be active or fully loaded"
+        suggestion: "Tab may not be active or fully loaded",
       };
     }
-    
+
     // Extract page content using PageExtractor
-    const pageExtractor = await selectedBrowser.browsingContext.currentWindowContext.getActor("PageExtractor");
-    
+    const pageExtractor =
+      await selectedBrowser.browsingContext.currentWindowContext.getActor(
+        "PageExtractor"
+      );
+
     // Try reader mode content first, then fall back to text content
     let pageContent = await pageExtractor.getReaderModeContent();
     if (!pageContent) {
       pageContent = await pageExtractor.getText();
     }
-    
+
     if (!pageContent) {
       return {
         error: `Could not extract content from tab: ${url}`,
         tab_title: targetTab.label,
-        suggestion: "Page may be empty, loading, or content extraction failed"
+        suggestion: "Page may be empty, loading, or content extraction failed",
       };
     }
-    
+
     // Truncate content to avoid overly long responses (max 4000 chars)
-    const truncatedContent = pageContent.length > 4000
-      ? pageContent.substring(0, 4000) + "..."
-      : pageContent;
-    
+    const truncatedContent =
+      pageContent.length > 4000
+        ? pageContent.substring(0, 4000) + "..."
+        : pageContent;
+
     return {
       url,
       tab_title: targetTab.label,
       content: truncatedContent,
       content_length: pageContent.length,
-      truncated: pageContent.length > 4000
+      truncated: pageContent.length > 4000,
     };
-    
   } catch (error) {
     return {
       error: `Failed to fetch page content: ${error.message}`,
       url,
-      suggestion: "Try refreshing the tab or ensuring it's fully loaded"
+      suggestion: "Try refreshing the tab or ensuring it's fully loaded",
     };
   }
 };
