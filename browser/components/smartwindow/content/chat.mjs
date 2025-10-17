@@ -415,36 +415,18 @@ Examples:
 
 Always provide a helpful response first, then include the search suggestion when appropriate.`;
 
-    // Include tab context information
+    // Include tab context information with tab IDs
     const contextTabs = this.currentTabContext || tabContext;
     if (contextTabs && contextTabs.length) {
-      systemPrompt += `\n\nTab Context:`;
+      systemPrompt += `\n\nTab Context (URL to Tab ID mapping):`;
       contextTabs.forEach((tab, index) => {
-        systemPrompt += `\n${index + 1}. "${tab.title}" - ${tab.url}`;
+        systemPrompt += `\n${index + 1}. "${tab.title}" - ${tab.url} (Tab ID: ${tab.id || tab.url})`;
       });
+      
+      systemPrompt += `\n\nYou have access to a tool called 'get_page_content' that can fetch the actual page content for any of these tabs when needed. Use this tool when the user's query would benefit from specific page content analysis.`;
     }
 
-    // Include page content if available (when current tab is in context)
-    if (this.currentPageText && this.currentPageText.trim()) {
-      // Truncate page text to avoid overly long prompts (max 3000 chars)
-      const truncatedText =
-        this.currentPageText.length > 3000
-          ? this.currentPageText.substring(0, 3000) + "..."
-          : this.currentPageText;
-
-      systemPrompt += `\n\nCurrent page content:\n${truncatedText}
-
-Use this page content to provide more contextual and relevant search suggestions. Pay special attention to:
-- Dates, times, or temporal references (e.g., "September 25", "March 10", "this weekend", "next month")
-- Locations, venues, or addresses
-- Specific topics, events, or activities mentioned
-
-When creating search suggestions, incorporate these contextual details to make searches more precise. For example:
-- If page shows "Sep 25" and user asks about hotels → [[search: hotels near fenway park september 25]]
-- If page mentions "conference in Austin March 10-12" and user wants restaurants → [[search: restaurants near austin convention center march 10]]`;
-    }
-
-    console.log("Built system prompt:", systemPrompt);
+    console.warn("Built system prompt:", systemPrompt);
 
     return systemPrompt;
   }
