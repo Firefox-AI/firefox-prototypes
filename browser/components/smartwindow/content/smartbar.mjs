@@ -329,7 +329,41 @@ export function attachToElement(element, options = {}) {
     },
 
     getText() {
-      return editor.getText();
+      // Get the JSON representation to access mention data
+      const json = editor.getJSON();
+      
+      // Helper function to extract text with mention IDs instead of labels
+      function extractTextWithMentionIds(node) {
+        if (node.type === 'text') {
+          return node.text || '';
+        }
+        if (node.type === 'mention') {
+          // Use the ID (URL) instead of the label (title) for mentions
+          return `@${node.attrs.id}`;
+        }
+        if (node.type === 'paragraph' || node.type === 'doc') {
+          // Handle paragraphs and document nodes
+          if (node.content) {
+            return node.content.map(extractTextWithMentionIds).join('');
+          }
+        }
+        if (node.content) {
+          return node.content.map(extractTextWithMentionIds).join('');
+        }
+        return '';
+      }
+      
+      // Extract text from all content nodes
+      if (json.content) {
+        const extractedText = json.content.map(extractTextWithMentionIds).join('');
+        console.warn('[SmartBar] getText() extracted:', extractedText);
+        return extractedText;
+      }
+      
+      // Fallback to default getText if JSON parsing fails
+      const fallbackText = editor.getText();
+      console.warn('[SmartBar] getText() fallback:', fallbackText);
+      return fallbackText;
     },
 
     setContent(content) {
