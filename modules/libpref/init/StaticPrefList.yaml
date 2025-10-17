@@ -3022,12 +3022,6 @@
   value: true
   mirror: always
 
-# Whether to dispatch `beforescriptexecute` and `afterscriptexecute` event.
-- name: dom.events.script_execute.enabled
-  type: bool
-  value: false
-  mirror: always
-
 # Whether to expose test interfaces of various sorts
 - name: dom.expose_test_interfaces
   type: bool
@@ -7977,7 +7971,11 @@
  # Width of WebRender tile size
 - name: gfx.webrender.picture-tile-width
   type: RelaxedAtomicInt32
+#if defined(XP_WIN)
+  value: 512
+#else
   value: 1024
+#endif
   mirror: always
 
  # Width of WebRender tile size
@@ -11090,12 +11088,6 @@
 - name: mathml.mathspace_names.disabled
   type: bool
   value: @IS_EARLY_BETA_OR_EARLIER@
-  mirror: always
-
-# Whether to render all unknown mathml elements as <mrow>
-- name: mathml.unknown_mrow.enabled
-  type: bool
-  value: true
   mirror: always
 
 # Whether to enable character and glyph level mirroring for operators when
@@ -14483,6 +14475,13 @@
   value: true
   mirror: always
 
+# Comma-separated list of domains to skip LNA checks for.
+# Supports suffix wildcard patterns (*.example.com)
+- name: network.lna.skip-domains
+  type: String
+  value: ""
+  mirror: never
+
 # The proxy type. See nsIProtocolProxyService.idl
 #     PROXYCONFIG_DIRECT   = 0
 #     PROXYCONFIG_MANUAL   = 1
@@ -15538,6 +15537,14 @@
 - name: network.cache.persist_permanent_redirects_http
   type: bool
   value: false
+  mirror: always
+
+# The number of milliseconds after which a suspended channel writing
+# to a cache entry will notify all readers waiting for a callback to
+# continue without a cache entry.
+- name: network.cache.suspended_writer_delay_ms
+  type: RelaxedAtomicUint32
+  value: 5000
   mirror: always
 
 # This is used for a temporary workaround for a web-compat issue. If pref is
@@ -18827,6 +18834,15 @@
 - name: widget.window-transforms.disabled
   type: RelaxedAtomicBool
   value: false
+  mirror: always
+
+# When looking for a recent window (for example, when a link is clicked
+# on from an external application), whether to prefer windows on the
+# current virtual desktop (aka workspace). For now this only applies on Windows.
+# See bug 1994825
+- name: widget.prefer_windows_on_current_virtual_desktop
+  type: RelaxedAtomicBool
+  value: true
   mirror: always
 
 #ifdef XP_MACOSX

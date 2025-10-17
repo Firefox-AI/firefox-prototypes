@@ -271,9 +271,9 @@
     <!-- Content description (not visible, for screen readers etc.) for main menu navigation header. -->
     <string name="browser_main_menu_content_description_navigation_header">Navigation</string>
     <!-- Content description (not visible, for screen readers etc.) for main menu help button. -->
-    <string name="browser_main_menu_content_description_help_button">Help</string>
+    <string name="browser_main_menu_content_description_help_button" tools:ignore="UnusedResources" moz:removedIn="146">Help</string>
     <!-- Content description (not visible, for screen readers etc.) for main menu settings button. -->
-    <string name="browser_main_menu_content_description_settings_button">Settings</string>
+    <string name="browser_main_menu_content_description_settings_button" tools:ignore="UnusedResources" moz:removedIn="146">Settings</string>
     <!-- Content description (not visible, for screen readers etc.) for bottom sheet handlebar extensions menu. -->
     <string name="browser_extensions_menu_handlebar_content_description">Close extensions menu sheet</string>
     <!-- Content description (not visible, for screen readers etc.) for bottom sheet handlebar save menu. -->
@@ -730,6 +730,10 @@
     <string name="preferences_app_icon">App icon</string>
     <!-- Preference for showing the tab strip -->
     <string name="preferences_tab_strip">Tab bar display</string>
+    <!-- Preference for gestures based actions -->
+    <string name="preferences_toolbar_shortcut">Toolbar shortcut</string>
+    <!-- Preference for gestures based actions -->
+    <string name="preferences_toolbar_select_shortcut">Select a shortcut</string>
     <!-- Preference for gestures based actions -->
     <string name="preferences_gestures">Gestures</string>
     <!-- Preference for settings related to visual options -->

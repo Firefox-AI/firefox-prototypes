@@ -483,7 +483,8 @@ static void* chunk_alloc_mmap(size_t size, size_t alignment) {
   return ret;
 }
 
-AddressRadixTree<(sizeof(void*) << 3) - LOG2(kChunkSize)> gChunkRTree;
+MOZ_CONSTINIT AddressRadixTree<(sizeof(void*) << 3) - LOG2(kChunkSize)>
+    gChunkRTree;
 
 // Protects chunk-related data structures.
 static Mutex chunks_mtx;
@@ -503,10 +504,6 @@ Atomic<size_t> gRecycledSize;
 void chunks_init() {
   // Initialize chunks data.
   chunks_mtx.Init();
-  MOZ_PUSH_IGNORE_THREAD_SAFETY
-  gChunksBySize.Init();
-  gChunksByAddress.Init();
-  MOZ_POP_THREAD_SAFETY
 }
 
 #ifdef XP_WIN

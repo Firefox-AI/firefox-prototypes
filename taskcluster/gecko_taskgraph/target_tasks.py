@@ -1110,9 +1110,12 @@ def target_tasks_searchfox(full_task_graph, parameters, graph_config):
             insert_index(index_path, os.environ["TASK_ID"], use_proxy=True)
 
     return [
+        "searchfox-linux64-searchfox/opt",
         "searchfox-linux64-searchfox/debug",
         "searchfox-macosx64-searchfox/debug",
+        "searchfox-macosx64-aarch64-searchfox/opt",
         "searchfox-macosx64-aarch64-searchfox/debug",
+        "searchfox-win64-searchfox/opt",
         "searchfox-win64-searchfox/debug",
         "searchfox-android-aarch64-searchfox/debug",
         "searchfox-ios-searchfox/debug",

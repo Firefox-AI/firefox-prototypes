@@ -520,16 +520,13 @@ class nsCocoaWindow final : public nsIWidget {
   void UpdateBounds();
   int32_t GetWorkspaceID();
   void MoveVisibleWindowToWorkspace(int32_t workspaceID);
+  CGFloat ComputeBackingScaleFactor() const;
 
   void DoResize(double aX, double aY, double aWidth, double aHeight,
                 bool aRepaint, bool aConstrainToCurrentScreen);
 
   void UpdateFullscreenState(bool aFullScreen, bool aNativeMode);
   nsresult DoMakeFullScreen(bool aFullScreen, bool aUseSystemTransition);
-
-  already_AddRefed<nsIWidget> AllocateChildPopupWidget() override {
-    return nsIWidget::CreateTopLevelWindow();
-  }
 
   BaseWindow* mWindow;                // our cocoa window [STRONG]
   BaseWindow* mClosedRetainedWindow;  // a second strong reference to our
