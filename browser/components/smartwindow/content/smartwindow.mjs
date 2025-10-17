@@ -34,6 +34,7 @@ class SmartWindowPage {
     this.lastTabInfo = null;
     this.chatBot = null;
     this.modelPicker = null;
+    this.queryTypePicker = null;
 
     this.selectedTabContexts = [];
     this.recentTabs = [];
@@ -72,6 +73,22 @@ class SmartWindowPage {
       default:
         return "Search";
     }
+  }
+
+  async getEffectiveQueryType(query) {
+    // Get user's preference for query type override
+    const userOverride = Services.prefs.getStringPref(
+      "browser.smartwindow.queryType",
+      "auto"
+    );
+
+    // If user chose a specific type, use that (unless it's "auto")
+    if (userOverride !== "auto") {
+      return userOverride;
+    }
+
+    // Otherwise, use the ML detection
+    return await detectQueryType(query);
   }
 
   // AI-powered suggestion generation using tab context with caching
@@ -850,6 +867,29 @@ class SmartWindowPage {
         );
       });
     }
+
+    // Setup query type picker
+    this.queryTypePicker = document.getElementById("query-type-picker");
+    if (this.queryTypePicker) {
+      // Set initial value from pref (default to "auto")
+      this.queryTypePicker.value = Services.prefs.getStringPref(
+        "browser.smartwindow.queryType",
+        "auto"
+      );
+
+      // Update pref when query type changes
+      this.queryTypePicker.addEventListener("change", () => {
+        Services.prefs.setStringPref(
+          "browser.smartwindow.queryType",
+          this.queryTypePicker.value
+        );
+        // Update button immediately if there's text
+        const text = this.smartbar ? this.smartbar.getText() : "";
+        if (text.trim()) {
+          this.updateSubmitButton(text);
+        }
+      });
+    }
   }
 
   async updateSubmitButton(query) {
@@ -859,7 +899,7 @@ class SmartWindowPage {
 
     if (query.trim()) {
       // When there's text, show the appropriate action label
-      const type = await detectQueryType(query);
+      const type = await this.getEffectiveQueryType(query);
       const label = this.getQueryTypeLabel(type);
       this.buttonText.textContent = label;
       this.submitButton.classList.add("has-text");
@@ -1283,7 +1323,7 @@ class SmartWindowPage {
         // Process search results through detectQueryType to determine final type
         const resultsToProcess = searchResults.slice(0, 6);
         for (const result of resultsToProcess) {
-          const detectedType = await detectQueryType(result.text);
+          const detectedType = await this.getEffectiveQueryType(result.text);
           suggestions.push({
             text: result.text,
             type: detectedType,
@@ -1311,7 +1351,7 @@ class SmartWindowPage {
 
       // If we don't have enough suggestions, add some fallbacks
       if (suggestions.length < 4) {
-        const queryType = await detectQueryType(query);
+        const queryType = await this.getEffectiveQueryType(query);
 
         // Add the query itself if not already present
         if (!suggestions.some(s => s.text === query)) {
@@ -1346,7 +1386,7 @@ class SmartWindowPage {
 
       // Fall back to simple suggestions on error
       const suggestions = [];
-      const type = await detectQueryType(query);
+      const type = await this.getEffectiveQueryType(query);
 
       suggestions.push(
         { text: query, type },
@@ -1367,7 +1407,7 @@ class SmartWindowPage {
 
     document.documentElement.setAttribute("haschat", "true");
 
-    const type = await detectQueryType(query);
+    const type = await this.getEffectiveQueryType(query);
 
     // Hide suggestions after selection
     if (this.smartbar) {
