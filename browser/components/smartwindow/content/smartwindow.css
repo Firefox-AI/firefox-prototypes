@@ -241,6 +241,25 @@ body {
   }
 }
 
+/* Query type picker styles */
+.query-type-picker {
+  background: transparent;
+  border: 0;
+  color: #15141a;
+  cursor: pointer;
+  font-size: 13px;
+  margin-right: var(--space-small);
+  min-height: 32px;
+  opacity: 0.5;
+  padding: var(--space-xsmall) var(--space-medium);
+  text-align: end;
+  transition: all 0.2s ease;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
 /* Submit button styles */
 .submit-button {
   padding: var(--space-xsmall) var(--space-large);
