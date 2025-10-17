@@ -184,7 +184,8 @@ class ChatBot extends MozLitElement {
       text-align: center;
     }
 
-    .tool-log-panel, .prompt-panel {
+    .tool-log-panel,
+    .prompt-panel {
       position: fixed;
       top: 4.5rem;
       right: 1rem;
@@ -332,9 +333,12 @@ class ChatBot extends MozLitElement {
       height: 6px;
       border-radius: 50%;
     }
-    .save-dot.saving { background: #d39e00; }
-    .save-dot.saved  { background: #2ea44f; }
-
+    .save-dot.saving {
+      background: #d39e00;
+    }
+    .save-dot.saved {
+      background: #2ea44f;
+    }
 
     ${insightsStyles}
   `;
@@ -369,7 +373,7 @@ class ChatBot extends MozLitElement {
     this.saveStatus = "idle";
     this._saveTimer = null;
     this._lastSavedAt = null;
-    
+
     let saved = "";
     try {
       saved = Services.prefs.getStringPref(PROMPT_PREF, "");
@@ -378,20 +382,20 @@ class ChatBot extends MozLitElement {
     this.systemPromptDraft = saved !== "" ? saved : null;
 
     this._prefObserver = {
-    observe: (_subject, topic, data) => {
-      if (topic !== "nsPref:changed" || data !== PROMPT_PREF){
-        return;
-      }
-      let val = "";
-      try {
-        val = Services.prefs.getStringPref(PROMPT_PREF, "");
-      } catch {}
-      this.systemPromptDraft = val !== "" ? val : null;
-      this.saveStatus = "saved";
-      this._lastSavedAt = new Date();
-      this.requestUpdate();
-    },
-  };
+      observe: (_subject, topic, data) => {
+        if (topic !== "nsPref:changed" || data !== PROMPT_PREF) {
+          return;
+        }
+        let val = "";
+        try {
+          val = Services.prefs.getStringPref(PROMPT_PREF, "");
+        } catch {}
+        this.systemPromptDraft = val !== "" ? val : null;
+        this.saveStatus = "saved";
+        this._lastSavedAt = new Date();
+        this.requestUpdate();
+      },
+    };
   }
 
   connectedCallback() {
@@ -651,37 +655,40 @@ Today's date: ${currentDate}`;
     if (text.trim() && text !== defaultPrompt) {
       Services.prefs.setStringPref(PROMPT_PREF, text);
     } else {
-      try { Services.prefs.clearUserPref(PROMPT_PREF); } catch {}
+      try {
+        Services.prefs.clearUserPref(PROMPT_PREF);
+      } catch {}
     }
   }
 
   handlePromptInput(e) {
-  const text = e.target.value;
-  this.systemPromptDraft = text;
+    const text = e.target.value;
+    this.systemPromptDraft = text;
 
-  this.saveStatus = "saving";
-  clearTimeout(this._saveTimer);
+    this.saveStatus = "saving";
+    clearTimeout(this._saveTimer);
 
-  const defaultPrompt = this.buildSystemPrompt(this.currentTabContext || []);
+    const defaultPrompt = this.buildSystemPrompt(this.currentTabContext || []);
 
-  this._saveTimer = setTimeout(() => {
-    try {
-      this._commitPromptToPrefs(text, defaultPrompt);
-      this.saveStatus = "saved";
-      this._lastSavedAt = new Date();
-    } catch (err) {
-      console.error("Failed to save prompt override:", err);
-      this.saveStatus = "error";
-    }
-    this.requestUpdate();
-  }, 400);
-}
-
+    this._saveTimer = setTimeout(() => {
+      try {
+        this._commitPromptToPrefs(text, defaultPrompt);
+        this.saveStatus = "saved";
+        this._lastSavedAt = new Date();
+      } catch (err) {
+        console.error("Failed to save prompt override:", err);
+        this.saveStatus = "error";
+      }
+      this.requestUpdate();
+    }, 400);
+  }
 
   resetPromptToDefault() {
-   try { Services.prefs.clearUserPref(PROMPT_PREF); } catch {}
-   this.systemPromptDraft = null;
-   this.requestUpdate();
+    try {
+      Services.prefs.clearUserPref(PROMPT_PREF);
+    } catch {}
+    this.systemPromptDraft = null;
+    this.requestUpdate();
   }
 
   updateLogState(chatEntry) {
@@ -706,7 +713,7 @@ Today's date: ${currentDate}`;
     const promptText = this.systemPromptDraft ?? defaultPrompt;
 
     const dotClass =
-      ({ saving: "saving", error: "error" }[this.saveStatus]) || "saved";
+      { saving: "saving", error: "error" }[this.saveStatus] || "saved";
 
     let saveLabel = "Auto-saved";
     if (this.saveStatus === "saving") {
@@ -726,8 +733,19 @@ Today's date: ${currentDate}`;
           @click=${() => this.togglePrompt()}
           title="Toggle system prompt"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M4 6h16M4 12h16M4 18h10"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
           </svg>
           <span class="control-label">Prompt</span>
         </button>
@@ -901,13 +919,15 @@ Today's date: ${currentDate}`;
             </div>
           `
         : ""}
-
       ${this.showPrompt
         ? html`
             <div class="prompt-panel">
               <div class="log-header">
                 <span class="log-title">System Prompt</span>
-                <button class="log-close-btn" @click=${() => this.togglePrompt()}>
+                <button
+                  class="log-close-btn"
+                  @click=${() => this.togglePrompt()}
+                >
                   ×
                 </button>
               </div>
@@ -920,14 +940,17 @@ Today's date: ${currentDate}`;
                 ></textarea>
 
                 <div class="prompt-actions">
-                <span class="save-status" aria-live="polite">
-                  <span class="save-dot ${dotClass}"></span>
-                  ${saveLabel}
-                </span>
-                <button @click=${() => this.resetPromptToDefault()} title="Rebuild from default">
-                  Restore default
-                </button>
-              </div>
+                  <span class="save-status" aria-live="polite">
+                    <span class="save-dot ${dotClass}"></span>
+                    ${saveLabel}
+                  </span>
+                  <button
+                    @click=${() => this.resetPromptToDefault()}
+                    title="Rebuild from default"
+                  >
+                    Restore default
+                  </button>
+                </div>
               </div>
             </div>
           `
