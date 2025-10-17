@@ -20,13 +20,13 @@ import { detectQueryType } from "./utils.mjs";
  *
  * @param {string} query - The search query to generate suggestions for
  * @param {Window} topChromeWindow - The top chrome window reference
- * @returns {Promise<Array<{text: string, type: string}>>} Array of suggestion objects
+ * @returns {Promise<{suggestions: Array<{text: string, type: string}>, autofillData: object|null}>} Object containing suggestions array and autofill data
  */
 export async function generateLiveSuggestions(query, topChromeWindow) {
   try {
     const context = new lazy.UrlbarQueryContext({
       searchString: query.trim(),
-      allowAutofill: false,
+      allowAutofill: true,
       isPrivate: false,
       maxResults: 20,
       userContextId: 0,
@@ -46,6 +46,9 @@ export async function generateLiveSuggestions(query, topChromeWindow) {
     // Process the results similar to api.ts getUrlbarSuggestions
     const suggestions = [];
 
+    // Check for autofill data in the context
+    let autofillData = null;
+
     // Convert Firefox urlbar results to our suggestion format
     const urlbarSuggestions = [];
     for (const result of context.results) {
@@ -57,6 +60,10 @@ export async function generateLiveSuggestions(query, topChromeWindow) {
         icon: "",
         description: "",
       };
+
+      if (!autofillData && result.autofill) {
+        autofillData = result.autofill;
+      }
 
       // Map Firefox result types to our suggestion types (based on api.ts)
       switch (result.type) {
@@ -160,7 +167,10 @@ export async function generateLiveSuggestions(query, topChromeWindow) {
       }
     }
 
-    return suggestions.slice(0, 10);
+    return {
+      suggestions: suggestions.slice(0, 10),
+      autofillData,
+    };
   } catch (error) {
     console.error("Error getting live suggestions:", error);
 
@@ -174,6 +184,9 @@ export async function generateLiveSuggestions(query, topChromeWindow) {
       { text: "github.com", type: "navigate" }
     );
 
-    return suggestions;
+    return {
+      suggestions,
+      autofillData: null,
+    };
   }
 }

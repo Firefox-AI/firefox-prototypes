@@ -22,6 +22,7 @@ export function attachToElement(element, options = {}) {
   let currentSuggestions = [];
   let selectedSuggestionIndex = -1;
   let suggestionsContainer = null;
+  let suppressUpdateCallback = false;
 
   // Get existing mention IDs from the content
   function getExistingMentionIds(json) {
@@ -212,7 +213,8 @@ export function attachToElement(element, options = {}) {
       ) {
         hideSuggestions();
       }
-      if (onUpdate) {
+      // Only call external onUpdate if not suppressed (e.g., during autofill)
+      if (onUpdate && !suppressUpdateCallback) {
         onUpdate(text);
       }
     },
@@ -354,7 +356,7 @@ export function attachToElement(element, options = {}) {
     suggestions,
     title = "Suggestions:",
     isQuickPrompts = false,
-    query = "",
+    query = ""
   ) {
     if (!suggestionsContainer) {
       return;
@@ -397,7 +399,10 @@ export function attachToElement(element, options = {}) {
 
     suggestions.forEach((suggestion, index) => {
       const suggestionWithQuery = { ...suggestion, query };
-      const suggestionButton = createSuggestionButton(suggestionWithQuery, index);
+      const suggestionButton = createSuggestionButton(
+        suggestionWithQuery,
+        index
+      );
       suggestionsList.appendChild(suggestionButton);
     });
   }
@@ -447,6 +452,43 @@ export function attachToElement(element, options = {}) {
     // Helper functions
     focus() {
       editor.commands.focus("end");
+    },
+
+    setAutofill(autofillData) {
+      if (!autofillData || !autofillData.value) {
+        return;
+      }
+
+      // Get current text to check if user has typed more since autofill was requested
+      const currentText = editor.getText();
+
+      // Extract the expected prefix (what user had typed when autofill was requested)
+      const expectedPrefix = autofillData.value.substring(
+        0,
+        autofillData.selectionStart
+      );
+
+      // Only apply autofill if current text is still the expected prefix
+      // This prevents losing user input if they typed quickly before autofill kicked in
+      if (currentText != expectedPrefix) {
+        return;
+      }
+
+      // Suppress update callback during autofill to prevent re-triggering suggestions
+      suppressUpdateCallback = true;
+
+      // Set the autofilled text
+      editor.commands.setContent(autofillData.value);
+
+      // Select the autofilled portion (from selectionStart to selectionEnd)
+      // Tiptap uses 1-based position counting, and we need to account for the paragraph wrapper
+      const from = autofillData.selectionStart + 1; // +1 for paragraph node
+      const to = autofillData.selectionEnd + 1; // +1 for paragraph node
+
+      editor.commands.setTextSelection({ from, to });
+
+      // Re-enable update callback
+      suppressUpdateCallback = false;
     },
 
     getText() {

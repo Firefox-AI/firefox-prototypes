@@ -1371,9 +1371,17 @@ class SmartWindowPage {
   }
 
   async generateLiveSuggestions(query) {
-    const suggestions = await generateLiveSuggestions(query, topChromeWindow);
+    const { suggestions, autofillData } = await generateLiveSuggestions(
+      query,
+      topChromeWindow
+    );
     if (this.smartbar) {
       this.smartbar.showSuggestions(suggestions, "Suggestions:");
+
+      // Apply autofill if available
+      if (autofillData) {
+        this.smartbar.setAutofill(autofillData);
+      }
     }
   }
 
