@@ -100,7 +100,7 @@ export function attachToElement(element, options = {}) {
         openOnClick: false,
       }),
       Placeholder.configure({
-        placeholder: "Ask, search, or type a URL...",
+        placeholder: "Ask, search, or type a URL",
         showOnlyWhenEditable: false,
       }),
       MentionWithIcon.configure({
