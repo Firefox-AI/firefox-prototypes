@@ -10,6 +10,7 @@ browser.jar:
     content/browser/smartwindow/marked.js                    (vendor/marked.js)
     content/browser/smartwindow/mentions.mjs                 (content/mentions.mjs)
     content/browser/smartwindow/smartbar.mjs                 (content/smartbar.mjs)
+    content/browser/smartwindow/suggestions.mjs              (content/suggestions.mjs)
     content/browser/smartwindow/tiptap-bundle.js             (vendor/tiptap-bundle.js)
     content/browser/smartwindow/smartwindow.css              (content/smartwindow.css)
     content/browser/smartwindow/smartwindow.html             (content/smartwindow.html)
