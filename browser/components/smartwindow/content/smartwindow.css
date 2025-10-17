@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
- @import url("chrome://global/skin/design-system/tokens-brand.css");
+@import url("chrome://global/skin/design-system/tokens-brand.css");
 
 * {
   margin: 0;
@@ -43,14 +43,14 @@ body {
   position: relative; /* Important for absolute positioning of suggestions */
   background: white;
   border-radius: 18px;
-  border: 1px solid #EAB2F7;
+  border: 1px solid #eab2f7;
   box-shadow:
     0 0.25px 0.75px 0 rgba(0, 0, 0, 0.05),
     0 2px 20px 0 rgba(255, 82, 255, 0.15);
   padding: 14px 17px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-large);
   backdrop-filter: blur(10px);
 }
 
@@ -115,7 +115,7 @@ body {
 
 .result-item {
   padding: 10px;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-small);
   background: rgba(255, 255, 255, 0.6);
   border-radius: 6px;
   cursor: pointer;
@@ -144,7 +144,7 @@ body {
 .status-bar {
   background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.9));
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-  padding: 12px 20px;
+  padding: var(--space-medium) 20px;
   margin-bottom: 80px;
   backdrop-filter: blur(10px);
 }
@@ -152,7 +152,7 @@ body {
 .status-content {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-medium);
 }
 
 .status-favicon {
@@ -179,7 +179,7 @@ body {
 .status-url {
   font-size: 12px;
   color: #666;
-  margin-top: 2px;
+  margin-top: var(--space-xxsmall);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -225,10 +225,10 @@ body {
   color: #15141a;
   cursor: pointer;
   font-size: 13px;
-  margin-right: 8px;
+  margin-right: var(--space-small);
   min-height: 32px;
   opacity: 0.5;
-  padding: 4px 12px;
+  padding: var(--space-xsmall) var(--space-medium);
   text-align: end;
   transition: all 0.2s ease;
 
@@ -243,7 +243,7 @@ body {
 
 /* Submit button styles */
 .submit-button {
-  padding: 4px 16px;
+  padding: var(--space-xsmall) var(--space-large);
   min-height: 32px;
   min-width: 50px;
   border: none;
@@ -266,8 +266,8 @@ body {
 }
 
 .submit-button.has-text {
-  border: var(--border-width, 1px) solid var(--button-border-color-primary, rgba(0, 0, 0, 0.00));
-  background: linear-gradient(260deg, rgba(255, 183, 148, 0.80) -49.13%, rgba(181, 62, 175, 0.80) 63.71%, rgba(131, 62, 181, 0.80) 128.68%);
+  border: var(--border-width, 1px) solid var(--button-border-color-primary, rgba(0, 0, 0, 0));
+  background: linear-gradient(260deg, rgba(255, 183, 148, 0.8) -49.13%, rgba(181, 62, 175, 0.8) 63.71%, rgba(131, 62, 181, 0.8) 128.68%);
 }
 
 .submit-button:hover {
@@ -285,36 +285,36 @@ body {
 
 .mention {
   border-radius: 0.25rem;
-  border: 1px solid var(--tab-border-color, rgba(0, 0, 0, 0.00));
-  background: rgba(191, 143, 204, 0.10);
+  border: 1px solid var(--tab-border-color, rgba(0, 0, 0, 0));
+  background: rgba(191, 143, 204, 0.1);
   color: #000000;
   padding: 0.1rem 0.3rem;
   display: inline-flex;
   align-items: center;
   vertical-align: middle;
-  gap: 4px;
+  gap: var(--space-xsmall);
   max-width: 185px;
 }
 
 .mention-list {
-  background: linear-gradient(0deg, rgba(191, 143, 204, 0.05) 0%, rgba(191, 143, 204, 0.05) 100%), #FFF;
-  border: 1px solid #EAB2F7;
+  background: linear-gradient(0deg, rgba(191, 143, 204, 0.05) 0%, rgba(191, 143, 204, 0.05) 100%), #fff;
+  border: 1px solid #eab2f7;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   max-height: 320px;
   max-width: 400px;
   overflow-y: auto;
-  padding: 8px;
+  padding: var(--space-small);
   z-index: 1000;
 }
 
 .mention-section-header {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: var(--font-weight-bold);
   color: #666;
   text-transform: uppercase;
-  padding: 8px 12px 4px;
-  margin-top: 4px;
+  padding: var(--space-small) var(--space-medium) var(--space-xsmall);
+  margin-top: var(--space-xsmall);
 }
 
 .mention-section-header:first-child {
@@ -324,8 +324,8 @@ body {
 .mention-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
+  gap: var(--space-medium);
+  padding: var(--space-small) var(--space-medium);
   cursor: pointer;
   border-radius: 6px;
   transition: background-color 0.1s ease;
@@ -336,14 +336,14 @@ body {
 }
 
 .mention-item.is-selected {
-  background: rgba(191, 143, 204, 0.10);
+  background: rgba(191, 143, 204, 0.1);
 }
 
 .mention-icon {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
-  border-radius: 2px;
+  border-radius: var(--border-radius-xsmall);
 }
 
 .mention-text {
@@ -351,7 +351,7 @@ body {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-xxsmall);
 }
 
 .mention-title {
@@ -382,7 +382,7 @@ body {
 /* Suggestions container */
 .suggestions-container {
   position: absolute;
-  top: calc(100% - 12px);
+  top: calc(100% - var(--space-medium));
   left: 0;
   right: 0;
   width: 100%;
@@ -390,7 +390,7 @@ body {
   background: rgba(255, 255, 255, 0.95);
   outline: 1px solid rgba(199, 199, 199, 0.5);
   border-radius: 0 0 12px 12px;
-  padding: 12px;
+  padding: var(--space-medium);
   backdrop-filter: blur(10px);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   z-index: 10000; /* High z-index to appear above everything */
@@ -400,9 +400,9 @@ body {
   display: none;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-small);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: var(--font-weight-bold);
   color: #666;
   text-transform: uppercase;
 }
@@ -414,15 +414,15 @@ body {
 .suggestions-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-xsmall);
 }
 
 /* Suggestion button styles */
 .suggestion-button {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
+  gap: var(--space-medium);
+  padding: 10px var(--space-medium);
   border: 0;
   border-radius: var(--border-radius-medium);
   background: transparent;
@@ -470,7 +470,7 @@ body {
 /* Sidebar mode adjustments */
 .sidebar-mode .suggestions-container {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + var(--space-xsmall));
   left: 0;
   right: 0;
   background: rgba(255, 255, 255, 0.95);
@@ -485,7 +485,7 @@ body {
 }
 
 .sidebar-mode .suggestion-button {
-  padding: 8px 10px;
+  padding: var(--space-small) 10px;
   font-size: 12px;
 }
 
@@ -520,7 +520,7 @@ body {
   }
 
   .suggestion-button {
-    padding: 12px;
+    padding: var(--space-medium);
     font-size: 14px;
   }
 }
@@ -529,7 +529,7 @@ body {
   /* Chat mode bottom - fix input at bottom */
   .smart-window-container {
     position: relative;
-    padding: 8px 0;
+    padding: var(--space-small) 0;
     box-sizing: border-box;
     height: 100vh;
   }
@@ -552,7 +552,7 @@ body {
   .smart-window-container .suggestions-container {
     /* Position suggestions above the input */
     border-radius: 12px 12px 0 0; /* Rounded top corners only */
-    bottom: calc(100% - 12px); /* Place above the search box */
+    bottom: calc(100% - var(--space-medium)); /* Place above the search box */
     position: absolute;
     top: auto; /* Override the default top positioning */
     left: 0;
@@ -574,7 +574,7 @@ body {
   display: flex;
   flex-wrap: nowrap;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-small);
   transition: opacity 0.2s ease;
   position: relative;
   z-index: 1; /* Lower than suggestions dropdown */
@@ -584,7 +584,7 @@ body {
 .quick-prompt-pill {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-small);
   padding: 14px 17px;
   height: 48px;
   background: rgba(191, 143, 204, 0.2);
@@ -629,10 +629,10 @@ body {
 
 /* Position quick prompts differently in sidebar */
 .sidebar-mode .quick-prompts-container {
-  margin: 12px auto 10px;
+  margin: var(--space-medium) auto 10px;
   max-width: 100%;
-  padding: 0 16px;
-  gap: 8px;
+  padding: 0 var(--space-large);
+  gap: var(--space-small);
   order: 1; /* Place at top in sidebar */
 }
 
@@ -645,12 +645,12 @@ body {
 }
 
 .sidebar-mode .quick-prompt-pill {
-  padding: 4px 10px;
+  padding: var(--space-xsmall) 10px;
   height: 32px;
   font-size: 13px;
   flex: 1;
   min-width: 0;
-  gap: 4px;
+  gap: var(--space-xsmall);
 }
 
 .sidebar-mode .quick-prompt-pill .quick-prompt-emoji {
@@ -703,11 +703,11 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-small);
   background: none;
   border: none;
   cursor: pointer;
-  padding: 8px;
+  padding: var(--space-small);
   transition: all 0.2s ease;
   color: rgba(125, 32, 124, 0.8);
 }
@@ -743,8 +743,8 @@ body {
 .tab-context-bar {
   align-items: center;
   display: flex;
-  gap: 8px;
-  padding-block: 4px 0;
+  gap: var(--space-small);
+  padding-block: var(--space-xsmall) 0;
   position: relative;
   justify-content: space-between;
   flex-wrap: wrap;
@@ -754,22 +754,22 @@ body {
 .tab-context-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-small);
 }
 
 /* Tab context right section */
 .tab-context-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-medium);
 }
 
 /* Current Tab Button */
 .current-tab-button {
   display: none; /* Hidden by default like in Figma */
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
+  gap: var(--space-small);
+  padding: 6px var(--space-small);
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 6px;
@@ -813,7 +813,7 @@ body {
   cursor: pointer;
   font-size: 16px;
   line-height: 1;
-  padding: 2px;
+  padding: var(--space-xxsmall);
   margin: -2px;
   border-radius: 3px;
   transition: all 0.2s ease;
@@ -828,7 +828,7 @@ body {
 .add-tabs-button {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-xsmall);
   cursor: pointer;
   font-size: 13px;
   color: #15141a;
@@ -901,25 +901,25 @@ body {
 }
 
 .favicon-stack .stacked-favicon:nth-child(2) {
-  left: 8px;
+  left: var(--space-small);
   z-index: 2;
 }
 
 .favicon-stack .stacked-favicon:nth-child(3) {
-  left: 16px;
+  left: var(--space-large);
   z-index: 1;
 }
 
 .tab-count {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: var(--font-weight-bold);
   color: #007aff;
 }
 
 /* Tab Dropdown */
 .tab-dropdown {
   position: absolute;
-  bottom: calc(100% + 8px);
+  bottom: calc(100% + var(--space-small));
   left: 0;
   right: 0;
   background: rgba(255, 255, 255, 0.95);
@@ -933,9 +933,9 @@ body {
 }
 
 .dropdown-header {
-  padding: 12px 16px 8px;
+  padding: var(--space-medium) var(--space-large) var(--space-small);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: var(--font-weight-bold);
   color: #666;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   background: rgba(248, 248, 248, 0.8);
@@ -943,15 +943,15 @@ body {
 
 .dropdown-list {
   overflow-y: auto;
-  padding: 8px;
+  padding: var(--space-small);
   /* max-height will be calculated based on dropdown height */
 }
 
 .dropdown-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
+  gap: var(--space-medium);
+  padding: var(--space-small) var(--space-medium);
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.2s ease;
@@ -985,7 +985,7 @@ body {
   content: "✓";
   position: absolute;
   top: -2px;
-  left: 2px;
+  left: var(--space-xxsmall);
   color: white;
   font-size: 12px;
   font-weight: bold;
@@ -1039,7 +1039,7 @@ body {
     --button-border-radius: var(--border-radius-circle);
     --button-padding: 17px 14px;
     --button-border: 1px solid rgba(125, 32, 124, 0.15);
-    --button-background-color: rgba(191, 143, 204, 0.20);
+    --button-background-color: rgba(191, 143, 204, 0.2);
     --button-text-color: black;
     font-size: 15px;
   }
@@ -1075,14 +1075,14 @@ body {
 
 .key-setup-content h2 {
   color: #15141a;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-medium);
   font-size: 24px;
-  font-weight: 600;
+  font-weight: var(--font-weight-bold);
 }
 
 .key-setup-content p {
   color: rgba(21, 20, 26, 0.8);
-  margin-bottom: 24px;
+  margin-bottom: var(--space-xlarge);
   font-size: 15px;
   line-height: 1.4;
 }
@@ -1090,13 +1090,13 @@ body {
 .key-input-container {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: var(--space-medium);
+  margin-bottom: var(--space-large);
 }
 
 .key-input {
   flex: 1;
-  padding: 12px 16px;
+  padding: var(--space-medium) var(--space-large);
   font-size: 15px;
   border: 1px solid rgba(199, 199, 199, 0.5);
   border-radius: var(--border-radius-medium);
@@ -1117,7 +1117,7 @@ body {
 }
 
 .key-submit-button {
-  padding: 12px 20px;
+  padding: var(--space-medium) 20px;
   background: #007aff;
   color: white;
   border: none;
@@ -1141,7 +1141,7 @@ body {
 .key-error {
   color: #ff3b30;
   font-size: 14px;
-  margin-top: 8px;
+  margin-top: var(--space-small);
 }
 
 .tool-log-wrapper {
