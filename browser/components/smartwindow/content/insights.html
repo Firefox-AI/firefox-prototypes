@@ -1,0 +1,25 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src resource: chrome: moz-src:; object-src 'none'; img-src data: chrome:; style-src 'unsafe-inline' chrome:;" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Insights</title>
+    <link rel="stylesheet" href="chrome://browser/content/smartwindow/smartwindow.css" />
+    <script type="module" src="chrome://browser/content/smartwindow/insights.mjs"></script>
+</head>
+
+<body>
+    <main id="pages" role="application" data-l10n-id="insights-page-label">
+        <div id="overlay-root"></div>
+    </main>
+
+</body>
+
+</html>
