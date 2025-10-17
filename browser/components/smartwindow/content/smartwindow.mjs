@@ -358,7 +358,7 @@ class SmartWindowPage {
       // State 1: No additional tabs
       addTabsIcon.style.display = "inline";
       addTabsText.style.display = "inline";
-      addTabsText.textContent = "add tabs";
+      addTabsText.textContent = "Add tabs";
       overlappingFavicons.style.display = "none";
     } else {
       // State 2/3: Show overlapping favicons
