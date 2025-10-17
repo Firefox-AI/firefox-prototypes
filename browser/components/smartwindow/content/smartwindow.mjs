@@ -39,6 +39,7 @@ class SmartWindowPage {
     this.recentTabs = [];
     this.tabContextElements = {};
     this.currentTabPageText = "";
+    this.quickActionButtons = {};
 
     this.init();
   }
@@ -671,6 +672,7 @@ class SmartWindowPage {
     this.setupEventListeners();
 
     this.initializeTabContextUI();
+    this.initializeQuickActionButtons();
 
     this.initializeTabInfo();
     if (isSmartMode) {
@@ -1595,6 +1597,27 @@ class SmartWindowPage {
         this.smartbar.hideSuggestions();
       }
     }
+  }
+
+  setupQuickActionEventListeners() {
+    this.quickActionButtons.history?.addEventListener("click", e => {
+      e.stopPropagation();
+
+      const viewHandler = topChromeWindow?.FirefoxViewHandler
+      if (viewHandler) {
+        viewHandler.openTab("history");
+      } else {
+        console.warn("[SmartWindow] FirefoxViewHandler is not available.");
+      }
+    });
+  }
+
+  initializeQuickActionButtons() {
+    this.quickActionButtons = {
+      history: document.getElementById("history-button"),
+    };
+
+    this.setupQuickActionEventListeners();
   }
 }
 
