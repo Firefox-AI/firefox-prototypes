@@ -566,28 +566,16 @@ class SmartWindowPage {
     }
   }
 
-  // Load chat messages for the current context (prioritize current tab)
+  // Load chat messages for the current context
   loadChatMessagesForCurrentContext() {
     if (this.chatBot) {
       let savedMessages = [];
 
-      // Try to load from current tab first
+      // Try to load from current tab
       if (this.lastTabInfo && this.isCurrentTabInContext()) {
         savedMessages = topChromeWindow.SmartWindow.getChatMessages(
           this.lastTabInfo.tabId
         );
-      }
-
-      // If no messages from current tab, try other tabs in context
-      if (savedMessages.length === 0) {
-        for (const tab of this.selectedTabContexts) {
-          savedMessages = topChromeWindow.SmartWindow.getChatMessages(
-            tab.tabId
-          );
-          if (savedMessages.length) {
-            break;
-          }
-        }
       }
 
       if (savedMessages.length) {
