@@ -1591,7 +1591,7 @@ class SmartWindowPage {
     this.quickActionButtons.history?.addEventListener("click", e => {
       e.stopPropagation();
 
-      const viewHandler = topChromeWindow?.FirefoxViewHandler
+      const viewHandler = topChromeWindow?.FirefoxViewHandler;
       if (viewHandler) {
         viewHandler.openTab("history");
       } else {
