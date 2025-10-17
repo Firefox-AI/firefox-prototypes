@@ -2,6 +2,7 @@ import {
   html,
   css,
   unsafeHTML,
+  live,
 } from "chrome://global/content/vendor/lit.all.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
 import { fetchWithHistory } from "chrome://browser/content/smartwindow/utils.mjs";
@@ -13,6 +14,8 @@ import {
   insightsStyles,
   deleteInsight,
 } from "chrome://browser/content/smartwindow/insights.mjs";
+
+const PROMPT_PREF = "browser.smartwindow.systemPromptOverride";
 
 /**
  * A simple chat bot component that interacts with an Ollama model via streaming.
@@ -181,7 +184,8 @@ class ChatBot extends MozLitElement {
       text-align: center;
     }
 
-    .tool-log-panel {
+    .tool-log-panel,
+    .prompt-panel {
       position: fixed;
       top: 4.5rem;
       right: 1rem;
@@ -268,6 +272,74 @@ class ChatBot extends MozLitElement {
       font-weight: 600;
     }
 
+    .prompt-body {
+      padding: 0.75rem;
+      overflow-y: auto;
+      background: #fff;
+    }
+
+    .prompt-editor {
+      width: 100%;
+      min-height: 300px;
+      padding: 0.5rem;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12.5px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      box-sizing: border-box;
+      background: #fafafa;
+    }
+
+    .prompt-actions {
+      margin-top: 0.5rem;
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
+
+    .prompt-actions button {
+      margin: 0;
+      background: #e9ecef;
+      color: #111;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      padding: 0.35rem 0.6rem;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .prompt-actions button:hover {
+      background: #dde3e8;
+    }
+
+    .save-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 12px;
+      color: #555;
+      padding: 0.15rem 0.4rem;
+      border: 1px solid #e0e0e0;
+      border-radius: 999px;
+      background: #f8f9fa;
+    }
+    .save-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+    .save-dot.saving {
+      background: #d39e00;
+    }
+    .save-dot.saved {
+      background: #2ea44f;
+    }
+
     ${insightsStyles}
   `;
 
@@ -279,6 +351,9 @@ class ChatBot extends MozLitElement {
       showInsightsOverlay: { type: Boolean },
       showLog: { type: Boolean },
       logState: { type: Array },
+      showPrompt: { type: Boolean },
+      systemPromptDraft: { type: String },
+      saveStatus: { type: String },
     };
   }
 
@@ -294,6 +369,33 @@ class ChatBot extends MozLitElement {
     this._insightsUpdatedHandler = null; // Event listener reference for cleanup
     this.showLog = false; // Track tool log visibility
     this.logState = []; // Store tool log entries
+    this.showPrompt = false;
+    this.saveStatus = "idle";
+    this._saveTimer = null;
+    this._lastSavedAt = null;
+
+    let saved = "";
+    try {
+      saved = Services.prefs.getStringPref(PROMPT_PREF, "");
+    } catch (e) {}
+
+    this.systemPromptDraft = saved !== "" ? saved : null;
+
+    this._prefObserver = {
+      observe: (_subject, topic, data) => {
+        if (topic !== "nsPref:changed" || data !== PROMPT_PREF) {
+          return;
+        }
+        let val = "";
+        try {
+          val = Services.prefs.getStringPref(PROMPT_PREF, "");
+        } catch {}
+        this.systemPromptDraft = val !== "" ? val : null;
+        this.saveStatus = "saved";
+        this._lastSavedAt = new Date();
+        this.requestUpdate();
+      },
+    };
   }
 
   connectedCallback() {
@@ -303,6 +405,7 @@ class ChatBot extends MozLitElement {
       this.requestUpdate();
     };
     window.addEventListener("insights-updated", this._insightsUpdatedHandler);
+    Services.prefs.addObserver(PROMPT_PREF, this._prefObserver);
   }
 
   disconnectedCallback() {
@@ -315,6 +418,9 @@ class ChatBot extends MozLitElement {
       );
       this._insightsUpdatedHandler = null;
     }
+    try {
+      Services.prefs.removeObserver(PROMPT_PREF, this._prefObserver);
+    } catch {}
   }
 
   async sendPrompt() {
@@ -332,9 +438,12 @@ class ChatBot extends MozLitElement {
     const messagesForAPI = [...this.messages];
     if (messagesForAPI.length) {
       // Insert system prompt as the first message
+      const systemContent =
+        (this.systemPromptDraft && this.systemPromptDraft.trim()) ||
+        this.buildSystemPrompt(this.currentTabContext || []);
       messagesForAPI.unshift({
         role: "System",
-        content: this.buildSystemPrompt(this.currentTabContext || []),
+        content: systemContent,
       });
     }
 
@@ -537,6 +646,51 @@ Today's date: ${currentDate}`;
     this.requestUpdate();
   }
 
+  togglePrompt() {
+    this.showPrompt = !this.showPrompt;
+    this.requestUpdate();
+  }
+
+  _commitPromptToPrefs(text, defaultPrompt) {
+    if (text.trim() && text !== defaultPrompt) {
+      Services.prefs.setStringPref(PROMPT_PREF, text);
+    } else {
+      try {
+        Services.prefs.clearUserPref(PROMPT_PREF);
+      } catch {}
+    }
+  }
+
+  handlePromptInput(e) {
+    const text = e.target.value;
+    this.systemPromptDraft = text;
+
+    this.saveStatus = "saving";
+    clearTimeout(this._saveTimer);
+
+    const defaultPrompt = this.buildSystemPrompt(this.currentTabContext || []);
+
+    this._saveTimer = setTimeout(() => {
+      try {
+        this._commitPromptToPrefs(text, defaultPrompt);
+        this.saveStatus = "saved";
+        this._lastSavedAt = new Date();
+      } catch (err) {
+        console.error("Failed to save prompt override:", err);
+        this.saveStatus = "error";
+      }
+      this.requestUpdate();
+    }, 400);
+  }
+
+  resetPromptToDefault() {
+    try {
+      Services.prefs.clearUserPref(PROMPT_PREF);
+    } catch {}
+    this.systemPromptDraft = null;
+    this.requestUpdate();
+  }
+
   updateLogState(chatEntry) {
     const entryWithDate = { ...chatEntry, date: new Date().toLocaleString() };
     this.logState = [...this.logState, entryWithDate];
@@ -555,8 +709,46 @@ Today's date: ${currentDate}`;
       }
     }
 
+    const defaultPrompt = this.buildSystemPrompt(this.currentTabContext || []);
+    const promptText = this.systemPromptDraft ?? defaultPrompt;
+
+    const dotClass =
+      { saving: "saving", error: "error" }[this.saveStatus] || "saved";
+
+    let saveLabel = "Auto-saved";
+    if (this.saveStatus === "saving") {
+      saveLabel = "Saving…";
+    } else if (this.saveStatus === "saved") {
+      saveLabel = this._lastSavedAt
+        ? `Saved ${this._lastSavedAt.toLocaleTimeString()}`
+        : "Saved";
+    } else if (this.saveStatus === "error") {
+      saveLabel = "Save failed";
+    }
+
     return html`
       <div class="chat-controls">
+        <button
+          class="control-button ${this.showPrompt ? "active" : ""}"
+          @click=${() => this.togglePrompt()}
+          title="Toggle system prompt"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M4 6h16M4 12h16M4 18h10"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+          <span class="control-label">Prompt</span>
+        </button>
         <button
           class="control-button"
           @click=${() => this.handleInsightClick()}
@@ -723,6 +915,42 @@ Today's date: ${currentDate}`;
                         </div>
                       `
                     )}
+              </div>
+            </div>
+          `
+        : ""}
+      ${this.showPrompt
+        ? html`
+            <div class="prompt-panel">
+              <div class="log-header">
+                <span class="log-title">System Prompt</span>
+                <button
+                  class="log-close-btn"
+                  @click=${() => this.togglePrompt()}
+                >
+                  ×
+                </button>
+              </div>
+              <div class="prompt-body">
+                <textarea
+                  class="prompt-editor"
+                  .value=${live(promptText)}
+                  @input=${e => this.handlePromptInput(e)}
+                  aria-label="System prompt editor"
+                ></textarea>
+
+                <div class="prompt-actions">
+                  <span class="save-status" aria-live="polite">
+                    <span class="save-dot ${dotClass}"></span>
+                    ${saveLabel}
+                  </span>
+                  <button
+                    @click=${() => this.resetPromptToDefault()}
+                    title="Rebuild from default"
+                  >
+                    Restore default
+                  </button>
+                </div>
               </div>
             </div>
           `
