@@ -141,6 +141,10 @@ class ChatBot extends MozLitElement {
       right: 0;
       top: 0;
       z-index: 100;
+
+      @media not -moz-pref("browser.smartwindow.developer") {
+        display: none;
+      }
     }
 
     .control-button {
