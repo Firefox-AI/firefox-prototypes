@@ -26,18 +26,42 @@ function getInsightsData() {
   return stored || {};
 }
 
-
 export const CATEGORIES = [
-  "Arts & Entertainment","Autos & Vehicles","Beauty & Fitness","Books & Literature",
-  "Business & Industrial","Computers & Electronics","Finance","Food & Drink","Games",
-  "Hobbies & Leisure","Home & Garden","Internet & Telecom","Jobs & Education",
-  "Law & Government","News","Online Communities","People & Society","Pets & Animals",
-  "Real Estate","Reference","Science","Shopping","Sports","Travel & Transportation",
+  "Arts & Entertainment",
+  "Autos & Vehicles",
+  "Beauty & Fitness",
+  "Books & Literature",
+  "Business & Industrial",
+  "Computers & Electronics",
+  "Finance",
+  "Food & Drink",
+  "Games",
+  "Hobbies & Leisure",
+  "Home & Garden",
+  "Internet & Telecom",
+  "Jobs & Education",
+  "Law & Government",
+  "News",
+  "Online Communities",
+  "People & Society",
+  "Pets & Animals",
+  "Real Estate",
+  "Reference",
+  "Science",
+  "Shopping",
+  "Sports",
+  "Travel & Transportation",
 ];
 
 export const INTENTS = [
-  "Research / Learn","Compare / Evaluate","Plan / Organize","Buy / Acquire",
-  "Create / Produce","Communicate / Share","Monitor / Track","Entertain / Relax",
+  "Research / Learn",
+  "Compare / Evaluate",
+  "Plan / Organize",
+  "Buy / Acquire",
+  "Create / Produce",
+  "Communicate / Share",
+  "Monitor / Track",
+  "Entertain / Relax",
   "Resume / Revisit",
 ];
 
@@ -213,7 +237,7 @@ async function getRecentHistory(opts = {}) {
         });
       }
     }
-    
+
     return items;
   } catch (error) {
     console.error("Failed to fetch history:", error);
@@ -387,7 +411,13 @@ const LIVE_INSIGHTS_SCHEMA = {
   items: {
     type: "object",
     additionalProperties: false,
-    required: ["category", "intent", "insight_summary", "insight_short", "score"],
+    required: [
+      "category",
+      "intent",
+      "insight_summary",
+      "insight_short",
+      "score",
+    ],
     properties: {
       category: { type: ["string", "null"], enum: [...CATEGORIES, null] },
       intent: { type: ["string", "null"], enum: [...INTENTS, null] },
@@ -413,13 +443,16 @@ function extractJSON(text) {
   }
 }
 
-
 /**
  * Builds user prompt for live insights generation (ARRAY of insights)
+ *
  * @param {{profile_records: any[], related_insights: string[]}} params
  * @returns {string}
  */
-export function buildLiveInsightPrompt({ profile_records = [], related_insights = [] } = {}) {
+export function buildLiveInsightPrompt({
+  profile_records = [],
+  related_insights = [],
+} = {}) {
   const profile_snip = JSON.stringify(profile_records, null, 2);
   const insights_hint = JSON.stringify(related_insights, null, 2);
   const categoriesList = JSON.stringify(CATEGORIES);
@@ -492,8 +525,8 @@ async function generateInsightsWithLLM(profile, source) {
     source === "history"
       ? (profile?.profile_summarized ?? profile ?? [])
       : Array.isArray(profile)
-      ? profile
-      : [];
+        ? profile
+        : [];
 
   // TODO: pass your own shortlist if you maintain one
   const prompt = buildLiveInsightPrompt({
@@ -504,7 +537,10 @@ async function generateInsightsWithLLM(profile, source) {
   const engine = await createOpenAIEngine();
   const response = await engine.run({
     args: [
-      { role: "system", content: "You are a precise data analyst. Return ONLY valid JSON." },
+      {
+        role: "system",
+        content: "You are a precise data analyst. Return ONLY valid JSON.",
+      },
       { role: "user", content: prompt },
     ],
     responseFormat: { type: "json_schema", schema: LIVE_INSIGHTS_SCHEMA },
@@ -514,7 +550,9 @@ async function generateInsightsWithLLM(profile, source) {
   let list = extractJSON(rawContent);
   if (!Array.isArray(list)) {
     // Sometimes models wrap with an object; try to unwrap common patterns
-    if (list && Array.isArray(list.items)) list = list.items;
+    if (list && Array.isArray(list.items)) {
+      list = list.items;
+    }
   }
 
   if (!Array.isArray(list) || list.length === 0) {
@@ -539,12 +577,15 @@ function addInsightsToData(payload) {
   const items = Array.isArray(payload) ? payload : [payload];
 
   // ensure new by-short index exists
-  if (!insightsData.insightsDataByShort || typeof insightsData.insightsDataByShort !== "object") {
+  if (
+    !insightsData.insightsDataByShort ||
+    typeof insightsData.insightsDataByShort !== "object"
+  ) {
     insightsData.insightsDataByShort = {};
   }
 
-  let addedCount = 0;          // legacy category -> label additions
-  let upsertedByShort = 0;     // new by-short upserts
+  let addedCount = 0; // legacy category -> label additions
+  let upsertedByShort = 0; // new by-short upserts
 
   for (const obj of items) {
     const category = (obj?.category ?? "").trim();
@@ -624,8 +665,9 @@ export async function generateInsightsFromHistory() {
     const list = await generateInsightsWithLLM(profile, "history");
 
     const { addedCount } = addInsightsToData(list);
-    console.log(`[Insights] Added ${addedCount}/${list.length} insights from history`);
-
+    console.log(
+      `[Insights] Added ${addedCount}/${list.length} insights from history`
+    );
   } catch (error) {
     console.error("[Insights] Generation failed:", error);
     const errorMsg = error.message || String(error);
@@ -667,8 +709,9 @@ export async function generateInsightsFromConversations() {
     console.log("[Insights] Generating insights with LLM...");
     const list = await generateInsightsWithLLM(chatHistory, "conversation");
     const { addedCount } = addInsightsToData(list);
-    console.log(`[Insights] Added ${addedCount}/${list.length} insights from conversations`);
-
+    console.log(
+      `[Insights] Added ${addedCount}/${list.length} insights from conversations`
+    );
   } catch (error) {
     console.error("[Insights] Generation failed:", error);
     const errorMsg = error.message || String(error);
@@ -903,66 +946,94 @@ export function createInsightsOverlay(
 
         <div class="insights-content">
           ${(() => {
-          // Only keep keys whose value is an ARRAY (i.e., categories).
-          // we switched from categories to insights as below
-          // categories -> insights
-          // category -> insight_short
-          // insights -> insight_summary
-          const insights = Object.entries(dataToDisplay)
-            .filter(([, value]) => Array.isArray(value))
-            .map(([insight_short, insight_summary]) => {
-              const usedCount = insight_summary.reduce(
-                (acc, it) => acc + (usedInsights.has(it) ? 1 : 0),
-                0
-              );
-              return { insight_short, insight_summary, usedCount };
-            })
-            .filter(({ insight_summary }) => insight_summary.length > 0)
-            .sort((a, b) => {
-              if (a.usedCount !== b.usedCount) return b.usedCount - a.usedCount;
-              return a.insight_short.localeCompare(b.insight_short);
-            });
+            // Only keep keys whose value is an ARRAY (i.e., categories).
+            // we switched from categories to insights as below
+            // categories -> insights
+            // category -> insight_short
+            // insights -> insight_summary
+            const insights = Object.entries(dataToDisplay)
+              .filter(([, value]) => Array.isArray(value))
+              .map(([insight_short, insight_summary]) => {
+                const usedCount = insight_summary.reduce(
+                  (acc, it) => acc + (usedInsights.has(it) ? 1 : 0),
+                  0
+                );
+                return { insight_short, insight_summary, usedCount };
+              })
+              .filter(({ insight_summary }) => !!insight_summary.length)
+              .sort((a, b) => {
+                if (a.usedCount !== b.usedCount) {
+                  return b.usedCount - a.usedCount;
+                }
+                return a.insight_short.localeCompare(b.insight_short);
+              });
 
-          return insights.map(
-            ({ insight_short, insight_summary }) => html`
-              <div class="insight-category">
-                <h4>${insight_short}</h4>
-                <div class="insight-items">
-                  ${insight_summary.map(insight => {
-                    const isUsed = usedInsights.has(insight);
-                    return html`
-                      <span
-                        class="insight-item ${isUsed ? "used" : ""}"
-                        title=${isUsed ? "Used in this conversation" : ""}
-                      >
-                        <span class="insight-text">${insight}</span>
-                        ${onDeleteInsight
-                          ? html`
-                              <button
-                                class="delete-insight-btn"
-                                @click=${e => {
-                                  e.stopPropagation();
-                                  onDeleteInsight(insight, insight_short);
-                                }}
-                                title="Delete this insight"
-                              >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                                  <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"
-                                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                  <line x1="10" y1="11" x2="10" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                  <line x1="14" y1="11" x2="14" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                </svg>
-                              </button>
-                            `
-                          : ""}
-                      </span>
-                    `;
-                  })}
+            return insights.map(
+              ({ insight_short, insight_summary }) => html`
+                <div class="insight-category">
+                  <h4>${insight_short}</h4>
+                  <div class="insight-items">
+                    ${insight_summary.map(insight => {
+                      const isUsed = usedInsights.has(insight);
+                      return html`
+                        <span
+                          class="insight-item ${isUsed ? "used" : ""}"
+                          title=${isUsed ? "Used in this conversation" : ""}
+                        >
+                          <span class="insight-text">${insight}</span>
+                          ${onDeleteInsight
+                            ? html`
+                                <button
+                                  class="delete-insight-btn"
+                                  @click=${e => {
+                                    e.stopPropagation();
+                                    onDeleteInsight(insight, insight_short);
+                                  }}
+                                  title="Delete this insight"
+                                >
+                                  <svg
+                                    width="12"
+                                    height="12"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                  >
+                                    <path
+                                      d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"
+                                      stroke="currentColor"
+                                      stroke-width="2"
+                                      stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                    />
+                                    <line
+                                      x1="10"
+                                      y1="11"
+                                      x2="10"
+                                      y2="17"
+                                      stroke="currentColor"
+                                      stroke-width="2"
+                                      stroke-linecap="round"
+                                    />
+                                    <line
+                                      x1="14"
+                                      y1="11"
+                                      x2="14"
+                                      y2="17"
+                                      stroke="currentColor"
+                                      stroke-width="2"
+                                      stroke-linecap="round"
+                                    />
+                                  </svg>
+                                </button>
+                              `
+                            : ""}
+                        </span>
+                      `;
+                    })}
+                  </div>
                 </div>
-              </div>
-            `
-          );
-        })()}
+              `
+            );
+          })()}
         </div>
       </div>
     </div>
