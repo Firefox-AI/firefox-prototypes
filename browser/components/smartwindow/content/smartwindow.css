@@ -236,6 +236,10 @@ body {
     display: none;
   }
 
+  @media not -moz-pref("browser.smartwindow.developer") {
+    display: none;
+  }
+
   &:hover {
     opacity: 1;
   }
