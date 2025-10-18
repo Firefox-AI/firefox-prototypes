@@ -1181,6 +1181,7 @@ pref("browser.bookmarks.defaultLocation", "toolbar");
 pref("browser.tabs.allow_transparent_browser", true);
 
 // Smart window feature
+pref("browser.smartwindow.developer", false);
 pref("browser.smartwindow.enabled", true);
 pref("browser.smartwindow.endpoint", "https://stage.llm-proxy.nonprod.dataservices.mozgcp.net/");
 pref("browser.smartwindow.insights", "{}");
