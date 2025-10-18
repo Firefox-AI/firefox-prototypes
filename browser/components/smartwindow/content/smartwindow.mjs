@@ -1638,11 +1638,26 @@ class SmartWindowPage {
         console.warn("[SmartWindow] FirefoxViewHandler is not available.");
       }
     });
+
+    this.quickActionButtons.developer?.addEventListener("click", e => {
+      e.stopPropagation();
+
+      // Toggle the developer pref
+      const currentValue = Services.prefs.getBoolPref(
+        "browser.smartwindow.developer",
+        false
+      );
+      Services.prefs.setBoolPref(
+        "browser.smartwindow.developer",
+        !currentValue
+      );
+    });
   }
 
   initializeQuickActionButtons() {
     this.quickActionButtons = {
       history: document.getElementById("history-button"),
+      developer: document.getElementById("developer-button"),
     };
 
     this.setupQuickActionEventListeners();
