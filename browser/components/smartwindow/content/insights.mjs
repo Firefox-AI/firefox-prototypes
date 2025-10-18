@@ -26,6 +26,45 @@ function getInsightsData() {
   return stored || {};
 }
 
+export const CATEGORIES = [
+  "Arts & Entertainment",
+  "Autos & Vehicles",
+  "Beauty & Fitness",
+  "Books & Literature",
+  "Business & Industrial",
+  "Computers & Electronics",
+  "Finance",
+  "Food & Drink",
+  "Games",
+  "Hobbies & Leisure",
+  "Home & Garden",
+  "Internet & Telecom",
+  "Jobs & Education",
+  "Law & Government",
+  "News",
+  "Online Communities",
+  "People & Society",
+  "Pets & Animals",
+  "Real Estate",
+  "Reference",
+  "Science",
+  "Shopping",
+  "Sports",
+  "Travel & Transportation",
+];
+
+export const INTENTS = [
+  "Research / Learn",
+  "Compare / Evaluate",
+  "Plan / Organize",
+  "Buy / Acquire",
+  "Create / Produce",
+  "Communicate / Share",
+  "Monitor / Track",
+  "Entertain / Relax",
+  "Resume / Revisit",
+];
+
 /**
  * User insights data organized by category
  * Static data serves as placeholder until user generates insights
@@ -191,7 +230,6 @@ async function getRecentHistory(opts = {}) {
         items.push({
           url: entry.url ?? "",
           title: entry.title ?? "",
-          domain: getDomain(entry.url),
           visit_time: entry.date
             ? entry.date.toISOString()
             : new Date(timestamp).toISOString(),
@@ -204,19 +242,6 @@ async function getRecentHistory(opts = {}) {
   } catch (error) {
     console.error("Failed to fetch history:", error);
     return [];
-  }
-}
-
-/**
- * Extracts domain from URL
- *
- * @param url
- */
-function getDomain(url) {
-  try {
-    return new URL(url ?? "").hostname;
-  } catch {
-    return "";
   }
 }
 
@@ -242,15 +267,15 @@ function addWeights(rows, halfLifeDays = 14) {
 
 /**
  * Generates profile summary for LLM input
- * Groups by URL/title/domain and calculates average weighted visits
+ * Groups by URL/title and calculates average weighted visits
  *
  * @param rows
  */
 function generateProfileInputs(rows) {
-  // Group by URL+title+domain
+  // Group by URL+title
   const acc = new Map();
   for (const r of rows) {
-    const key = `${r.url}\u0001${r.title}\u0001${r.domain}`;
+    const key = `${r.url}\u0001${r.title}`;
     const cur = acc.get(key);
     if (cur) {
       cur.sum += r.weighted_visits;
@@ -259,7 +284,6 @@ function generateProfileInputs(rows) {
       acc.set(key, {
         url: r.url,
         title: r.title,
-        domain: r.domain,
         sum: r.weighted_visits,
         n: 1,
       });
@@ -270,7 +294,6 @@ function generateProfileInputs(rows) {
     .map(v => ({
       url: v.url,
       title: v.title,
-      domain: v.domain,
       weighted_visits: Math.round((v.sum / v.n) * 1000) / 1000,
     }))
     .sort((a, b) => b.weighted_visits - a.weighted_visits);
@@ -381,84 +404,29 @@ async function getUserChats(opts = {}) {
 // LLM Prompt & Schema Definitions
 // ============================================================================
 
-/**
- * System message for insights generation
- */
-const INSIGHTS_SYSTEM_MSG = `You are a precise data analyst.
-Return ONLY a single JSON object that matches the schema.
-Do NOT use object keys as category names; each category MUST be an object with a "name" string.
-Example:
-{"categories":[{"name":"Sports","top_user_attributes":["Cleats", "Sportscheck", "Adidas", "soccer", "shoesize 6"], "scores":[5, 2, 3, 5, 3]}]}`;
-
-/**
- * JSON schema for insights response
- */
-const INSIGHTS_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    categories: {
-      type: "array",
-      minItems: 3,
-      maxItems: 8,
-      items: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          name: { type: "string" },
-          top_user_attributes: {
-            type: "array",
-            maxItems: 12,
-            items: { type: "string" },
-          },
-          scores: { type: "array", maxItems: 12, items: { type: "number" } },
-        },
-        required: ["name", "top_user_attributes", "scores"],
-      },
+const LIVE_INSIGHTS_SCHEMA = {
+  type: "array",
+  minItems: 1,
+  maxItems: 5,
+  items: {
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "category",
+      "intent",
+      "insight_summary",
+      "insight_short",
+      "score",
+    ],
+    properties: {
+      category: { type: ["string", "null"], enum: [...CATEGORIES, null] },
+      intent: { type: ["string", "null"], enum: [...INTENTS, null] },
+      insight_summary: { type: ["string", "null"] },
+      insight_short: { type: ["string", "null"] },
+      score: { type: "integer", minimum: 1, maximum: 5 },
     },
   },
-  required: ["categories"],
 };
-
-/**
- * Builds user prompt for insights generation
- *
- * @param {object} profile - Profile data from history or chats
- * @param {string} source - 'history' or 'conversation'
- * @returns {string} The formatted prompt
- */
-function buildInsightsPrompt(profile, source = "history") {
-  const sourceNoun = source === "history" ? "browsing" : source;
-  return [
-    "### Task",
-    `Summarize ${sourceNoun} interests into high-quality categories and attributes using ONLY the provided profile. Do not invent facts or rely on outside knowledge.`,
-    "",
-    "### Category rules",
-    "- Name must be a concise, human-readable topic (1–4 words).",
-    "- Do not create sensitive categories (e.g., health, politics, personal identifiers).",
-    "- Do not miss genuine categories excluding the sensitive categories",
-    "",
-    "### Attribute rules",
-    `- Each attribute must be a meaningful entity, brand, product type, or preference phrase clearly supported by the ${sourceNoun} evidence.`,
-    "- Attributes must be between 1 and 2 words, and cannot be generic stopwords (the, and, shop, search, etc.).",
-    "- Avoid single letters, random tokens, or vague terms such as 'Baby', 'Babies', 'The', 'Sale'.",
-    "- Normalize duplicates: treat singular/plural/case variants as the same attribute and keep only the best phrasing.",
-    "- Limit to at most 10 attributes per category, ordered by relevance and diversify the attributes.",
-    "- Never emit PII, IDs, or gibberish strings; skip anything that cannot be safely anonymized.",
-    "",
-    "### Scoring rules",
-    "- Provide a parallel `scores` array with values in [1,2,3,4,5].",
-    "- Scores must align with the attributes list (same order and length).",
-    "- Use higher scores when there is strong, repeated evidence in the profile.",
-    "",
-    "### Output format",
-    "- Return ONLY JSON matching the supplied schema.",
-    "- Exclude attributes or categories that cannot be justified from the profile.",
-    "",
-    "### Input profile:",
-    JSON.stringify(profile, null, 2),
-  ].join("\n");
-}
 
 /**
  * Extracts JSON from LLM response (handles code blocks)
@@ -475,6 +443,72 @@ function extractJSON(text) {
   }
 }
 
+/**
+ * Builds user prompt for live insights generation (ARRAY of insights)
+ *
+ * @param {{profile_records: any[], related_insights: string[]}} params
+ * @returns {string}
+ */
+export function buildLiveInsightPrompt({
+  profile_records = [],
+  related_insights = [],
+} = {}) {
+  const profile_snip = JSON.stringify(profile_records, null, 2);
+  const insights_hint = JSON.stringify(related_insights, null, 2);
+  const categoriesList = JSON.stringify(CATEGORIES);
+  const intentsList = JSON.stringify(INTENTS);
+
+  return `
+You are a JSON generator. Use ONLY the provided user profile records and past insights.
+
+## Inputs
+- profile_records: ${profile_snip}
+- related_insights: ${insights_hint}
+
+## Category rules
+Choose ONLY one from this list; if none fits, use null:
+${categoriesList}
+
+## Intent rules
+Choose ONLY one from this list; if none fits, use null:
+${intentsList}
+
+## Insight rules (write 1 short, specific sentence)
+- Style = <who/what + action + constraint>, 4–10 words, no trailing period.
+- Must include at least 1 concrete entity (brand/site/product/event) OR a clear constraint (price, time, size, color).
+- Vary verbs; avoid repetitive "buys/watches" when not aligned with intent.
+- No vague phrasing like "various", "often".
+- No duplicate of any item in related_insights (normalize case + remove punctuation before comparing).
+- If no safe, specific insight is supported by Inputs, set "insight_summary": null.
+- Examples of good form:
+    - “Prefers LLBean & Nordstrom formalwear collections”
+    - “Compares white jeans under $80 at Target”
+    - “Streams new-release movies via Fandango”
+    - “Cooks Mediterranean seafood from TasteAtlas recipes”
+    - “Tracks minimalist fashion drops at Uniqlo”
+
+## Short badge rules (insight_short)
+- Exactly TWO words, Title Case, no punctuation or emojis.
+- Summarize the essence of the insight_summary.
+- Prefer <Brand + Item> or <Theme + Item> or <Constraint + Item>.
+- Examples mapping:
+    - “Prefers LLBean & Nordstrom formalwear collections” → “Formalwear Brands”
+    - “Compares white jeans under $80 at Target” → “White Jeans”
+    - “Streams new-release movies via Fandango” → “Movie Streaming”
+    - “Cooks Mediterranean seafood from TasteAtlas recipes” → “Mediterranean Recipes”
+    - “Tracks minimalist fashion drops at Uniqlo” → “Minimalist Fashion”
+
+Return ONLY a JSON array (length 1–5) of objects, no prose, no code fences. Each object must have:
+{
+  "category": "<one of the categories or null>",
+  "intent": "<one of the intents or null>",
+  "insight_summary": "<4–10 words, crisp and specific or null>",
+  "insight_short": "<TwoWords TitleCase or null>",
+  "score": <integer 1-5>
+}
+`.trim();
+}
+
 // ============================================================================
 // Main Insights Generation Functions
 // ============================================================================
@@ -487,80 +521,117 @@ function extractJSON(text) {
  * @returns {Promise<object>} Parsed JSON response with categories
  */
 async function generateInsightsWithLLM(profile, source) {
-  const prompt = buildInsightsPrompt(profile, source);
-  const engine = await createOpenAIEngine();
+  const profile_records =
+    source === "history"
+      ? (profile?.profile_summarized ?? profile ?? [])
+      : Array.isArray(profile)
+        ? profile
+        : [];
 
+  // TODO: pass your own shortlist if you maintain one
+  const prompt = buildLiveInsightPrompt({
+    profile_records,
+    related_insights: [],
+  });
+
+  const engine = await createOpenAIEngine();
   const response = await engine.run({
     args: [
-      { role: "system", content: INSIGHTS_SYSTEM_MSG },
+      {
+        role: "system",
+        content: "You are a precise data analyst. Return ONLY valid JSON.",
+      },
       { role: "user", content: prompt },
     ],
-    responseFormat: { type: "json_object", schema: INSIGHTS_SCHEMA },
+    responseFormat: { type: "json_schema", schema: LIVE_INSIGHTS_SCHEMA },
   });
 
   const rawContent = response?.finalOutput ?? "";
-  let json = extractJSON(rawContent);
-
-  // Retry if collapsed into one category
-  if (!Array.isArray(json?.categories) || json.categories.length < 1) {
-    console.log("[Insights] Retrying due to insufficient categories...");
-    const retryResponse = await engine.run({
-      args: [
-        { role: "system", content: INSIGHTS_SYSTEM_MSG },
-        { role: "user", content: prompt },
-        {
-          role: "user",
-          content:
-            "The previous attempt merged everything into one category. Now produce 3–8 distinct categories, strictly following the schema.",
-        },
-      ],
-      responseFormat: { type: "json_object", schema: INSIGHTS_SCHEMA },
-    });
-    const retryContent = retryResponse?.finalOutput ?? "";
-    json = extractJSON(retryContent);
+  let list = extractJSON(rawContent);
+  if (!Array.isArray(list)) {
+    // Sometimes models wrap with an object; try to unwrap common patterns
+    if (list && Array.isArray(list.items)) {
+      list = list.items;
+    }
   }
 
-  if (!Array.isArray(json?.categories) || json.categories.length === 0) {
-    throw new Error("Failed to generate valid insights");
+  if (!Array.isArray(list) || list.length === 0) {
+    throw new Error("Failed to generate valid insight list");
   }
 
-  return json;
+  return list; // array of insights
 }
 
 /**
- * Adds generated insights to INSIGHTS_DATA
- * Generated insights completely replace existing data
+ * Adds generated insights to storage.
+ * - New: writes to `insightsDataByShort[insight_short] = { insight_summary, intent, category, score }`
+ * - Legacy: also appends `insight_short` under its category array (unchanged behavior)
  *
- * @param {object} json - Parsed JSON with categories
+ * @param {object|object[]} payload Array of insight objects or a single object
+ * @returns {{ addedCount: number, upsertedByShort: number }}
  */
-function addInsightsToData(json) {
+function addInsightsToData(payload) {
   const smartWindow = getSmartWindow();
   const insightsData = getInsightsData();
 
-  for (const category of json.categories) {
-    const categoryName = category.name?.trim();
-    if (!categoryName) {
-      continue;
+  const items = Array.isArray(payload) ? payload : [payload];
+
+  // ensure new by-short index exists
+  if (
+    !insightsData.insightsDataByShort ||
+    typeof insightsData.insightsDataByShort !== "object"
+  ) {
+    insightsData.insightsDataByShort = {};
+  }
+
+  let addedCount = 0; // legacy category -> label additions
+  let upsertedByShort = 0; // new by-short upserts
+
+  for (const obj of items) {
+    const category = (obj?.category ?? "").trim();
+    const short = (obj?.insight_short ?? "").trim();
+    const summary = (obj?.insight_summary ?? "").trim();
+    const intent = (obj?.intent ?? "").trim();
+    const score = Number.isFinite(obj?.score) ? Number(obj.score) : null;
+
+    // ---- New storage (keyed by insight_short) ----
+    if (short) {
+      const prev = insightsData.insightsDataByShort[short];
+      // Upsert if new or summary changed (or we have better metadata)
+      if (
+        !prev ||
+        (summary && summary !== prev.insight_summary) ||
+        (category && category !== prev.category) ||
+        (intent && intent !== prev.intent) ||
+        (Number.isFinite(score) && score !== prev.score)
+      ) {
+        insightsData.insightsDataByShort[short] = {
+          insight_short: short,
+          insight_summary: summary || prev?.insight_summary || "",
+          category: category || prev?.category || "",
+          intent: intent || prev?.intent || "",
+          score: Number.isFinite(score) ? score : (prev?.score ?? null),
+        };
+        upsertedByShort += 1;
+      }
     }
 
-    const attributes = Array.isArray(category.top_user_attributes)
-      ? category.top_user_attributes
-      : [];
-
-    if (!insightsData[categoryName]) {
-      insightsData[categoryName] = [];
-    }
-
-    for (const attr of attributes) {
-      const attrStr = String(attr).trim();
-      if (attrStr && !insightsData[categoryName].includes(attrStr)) {
-        insightsData[categoryName].push(attrStr);
+    // ---- Legacy storage (category -> labels array) ----
+    // Keep existing UI working by storing the short tag under the category.
+    // Falls back to summary if short is missing.
+    const label = summary;
+    if (short) {
+      if (!insightsData[short]) {
+        insightsData[short] = [];
+      }
+      if (!insightsData[short].includes(label)) {
+        insightsData[short].push(label);
       }
     }
   }
 
-  // Update the stored data
   smartWindow?.setInsightsData(insightsData);
+  return { addedCount, upsertedByShort };
 }
 
 /**
@@ -591,12 +662,11 @@ export async function generateInsightsFromHistory() {
     const profile = generateProfileInputs(rows);
 
     console.log("[Insights] Generating insights with LLM...");
-    const json = await generateInsightsWithLLM(profile, "history");
+    const list = await generateInsightsWithLLM(profile, "history");
 
-    addInsightsToData(json);
-
+    const { addedCount } = addInsightsToData(list);
     console.log(
-      `[Insights] Successfully generated insights for ${json.categories.length} categories`
+      `[Insights] Added ${addedCount}/${list.length} insights from history`
     );
   } catch (error) {
     console.error("[Insights] Generation failed:", error);
@@ -637,12 +707,10 @@ export async function generateInsightsFromConversations() {
 
     console.log(`[Insights] Found ${chatHistory.length} conversations`);
     console.log("[Insights] Generating insights with LLM...");
-    const json = await generateInsightsWithLLM(chatHistory, "conversation");
-
-    addInsightsToData(json);
-
+    const list = await generateInsightsWithLLM(chatHistory, "conversation");
+    const { addedCount } = addInsightsToData(list);
     console.log(
-      `[Insights] Successfully generated insights for ${json.categories.length} categories`
+      `[Insights] Added ${addedCount}/${list.length} insights from conversations`
     );
   } catch (error) {
     console.error("[Insights] Generation failed:", error);
@@ -691,6 +759,10 @@ export function getInsightsState() {
  */
 export function buildInsightsSystemPrompt() {
   const insightsData = getInsightsData();
+
+  // Safe fallback if DEFAULT_INSIGHTS_DATA is commented out
+  const defaultFallback =
+    typeof DEFAULT_INSIGHTS_DATA !== "undefined" ? DEFAULT_INSIGHTS_DATA : {};
 
   // Use generated insights if available, otherwise fall back to defaults
   const dataToUse = Object.keys(insightsData).length
@@ -873,27 +945,35 @@ export function createInsightsOverlay(
           : ""}
 
         <div class="insights-content">
-          ${Object.entries(dataToDisplay)
-            .map(([category, insights]) => {
-              const usedCount = insights.filter(insight =>
-                usedInsights.has(insight)
-              ).length;
-              return { category, insights, usedCount };
-            })
-            .filter(({ insights }) => !!insights.length)
-            .sort((a, b) => {
-              // Sort by used count (descending), then alphabetically
-              if (a.usedCount !== b.usedCount) {
-                return b.usedCount - a.usedCount;
-              }
-              return a.category.localeCompare(b.category);
-            })
-            .map(
-              ({ category, insights }) => html`
+          ${(() => {
+            // Only keep keys whose value is an ARRAY (i.e., categories).
+            // we switched from categories to insights as below
+            // categories -> insights
+            // category -> insight_short
+            // insights -> insight_summary
+            const insights = Object.entries(dataToDisplay)
+              .filter(([, value]) => Array.isArray(value))
+              .map(([insight_short, insight_summary]) => {
+                const usedCount = insight_summary.reduce(
+                  (acc, it) => acc + (usedInsights.has(it) ? 1 : 0),
+                  0
+                );
+                return { insight_short, insight_summary, usedCount };
+              })
+              .filter(({ insight_summary }) => !!insight_summary.length)
+              .sort((a, b) => {
+                if (a.usedCount !== b.usedCount) {
+                  return b.usedCount - a.usedCount;
+                }
+                return a.insight_short.localeCompare(b.insight_short);
+              });
+
+            return insights.map(
+              ({ insight_short, insight_summary }) => html`
                 <div class="insight-category">
-                  <h4>${category}</h4>
+                  <h4>${insight_short}</h4>
                   <div class="insight-items">
-                    ${insights.map(insight => {
+                    ${insight_summary.map(insight => {
                       const isUsed = usedInsights.has(insight);
                       return html`
                         <span
@@ -907,7 +987,7 @@ export function createInsightsOverlay(
                                   class="delete-insight-btn"
                                   @click=${e => {
                                     e.stopPropagation();
-                                    onDeleteInsight(insight, category);
+                                    onDeleteInsight(insight, insight_short);
                                   }}
                                   title="Delete this insight"
                                 >
@@ -952,7 +1032,8 @@ export function createInsightsOverlay(
                   </div>
                 </div>
               `
-            )}
+            );
+          })()}
         </div>
       </div>
     </div>
