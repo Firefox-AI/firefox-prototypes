@@ -5,6 +5,7 @@
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+  PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
 });
 
 import { createEngine } from "chrome://global/content/ml/EngineProcess.sys.mjs";
@@ -65,7 +66,9 @@ export async function createOpenAIEngine() {
 
 const SEARCH_OPEN_TABS = "search_open_tabs";
 const GET_PAGE_CONTENT = "get_page_content";
-const TOOLS = [SEARCH_OPEN_TABS, GET_PAGE_CONTENT];
+const SEARCH_HISTORY = "search_history";
+
+const TOOLS = [SEARCH_OPEN_TABS, GET_PAGE_CONTENT, SEARCH_HISTORY];
 
 const toolsConfig = [
   {
@@ -106,7 +109,79 @@ const toolsConfig = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: SEARCH_HISTORY,
+      description:
+        "Returns the most relevant history items related to search term with each containing url, title, visited time and a description of the page if available.",
+      parameters: {
+        type: "object",
+        properties: {
+          search_term: {
+            type: "string",
+            description: "The term to use to search for relevant history.",
+          },
+        },
+        required: ["search_term"],
+      },
+    },
+  },
 ];
+
+const search_browser_history = async ({ type }) => {
+  let root;
+  let openedRoot = false;
+
+  try {
+    const limit = 100;
+    const currentHistory = lazy.PlacesUtils.history;
+    const query = currentHistory.getNewQuery();
+    const opts = currentHistory.getNewQueryOptions();
+
+    opts.resultType = Ci.nsINavHistoryQueryOptions.RESULTS_AS_URI;
+    opts.sortingMode = Ci.nsINavHistoryQueryOptions.SORT_BY_DATE_DESCENDING;
+    opts.maxResults = limit;
+    opts.excludeQueries = false;
+
+    const result = currentHistory.executeQuery(query, opts);
+    root = result.root;
+
+    if (!root.containerOpen) {
+      root.containerOpen = true;
+      openedRoot = true;
+    }
+
+    const rows = [];
+
+    for (let i = 0; i < root.childCount; i++) {
+      const node = root.getChild(i);
+      rows.push({
+        url: node.uri,
+        title: node.title || "",
+        lastVisit: lazy.PlacesUtils.toDate(node.time),
+        frecency: node.frecency,
+        guid: node.bookmarkGuid || null,
+      });
+    }
+
+    return {
+      query: type,
+      results: rows,
+    };
+  } catch (error) {
+    console.error("Error searching browser history:", error);
+    return {
+      query: type,
+      results: [],
+      error: "There was an error retrieving the browser history",
+    };
+  } finally {
+    if (root && openedRoot) {
+      root.containerOpen = false;
+    }
+  }
+};
 
 const search_open_tabs = ({ type }) => {
   let win = lazy.BrowserWindowTracker.getTopWindow();
@@ -324,14 +399,16 @@ export async function* fetchWithHistory(messages) {
           result = { error: `There is no tool called : ${String(toolName)}` };
         }
 
-        // Call the appropriate tool by name
-        if (toolName === SEARCH_OPEN_TABS) {
-          // Setting this pattern so that we can pass additional argument like context
-          // into the tool function with the params coming from the model
-          result = search_open_tabs(toolParams);
-        } else if (toolName === GET_PAGE_CONTENT) {
-          // Get page content for the specified URL
-          result = await get_page_content(toolParams);
+        switch (toolName) {
+          case SEARCH_OPEN_TABS:
+            result = search_open_tabs(toolParams);
+            break;
+          case GET_PAGE_CONTENT:
+            result = await get_page_content(toolParams);
+            break;
+          case SEARCH_HISTORY:
+            result = await search_browser_history(toolParams);
+            break;
         }
 
         // Create special tool call log message to show in the UI log panel
