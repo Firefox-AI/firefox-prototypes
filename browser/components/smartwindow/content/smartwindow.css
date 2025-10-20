@@ -595,7 +595,7 @@ body {
   max-width: 700px;
   margin: 20px auto;
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   justify-content: center;
   gap: var(--space-small);
   transition: opacity 0.2s ease;
@@ -609,7 +609,7 @@ body {
   align-items: center;
   gap: var(--space-small);
   padding: 14px 17px;
-  height: 48px;
+  min-height: 48px;
   background: rgba(191, 143, 204, 0.2);
   mix-blend-mode: multiply;
   border: 1px solid rgba(125, 32, 124, 0.15);
@@ -621,10 +621,7 @@ body {
   transition: all 0.2s ease;
   font-size: 13px;
   color: #15141a;
-  white-space: nowrap;
-  flex: 0 1 auto; /* Allow shrinking but not growing */
-  min-width: 0; /* Allow flex items to shrink below content size */
-  max-width: calc(50% - 4px); /* Ensure 2 pills don't exceed container */
+  flex: 0 0 auto; /* Don't grow or shrink, size based on content */
 }
 
 .quick-prompt-pill:hover {
@@ -642,12 +639,10 @@ body {
 
 .quick-prompt-text {
   font-size: 13px;
-  line-height: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
   flex: 1 1 auto;
-  min-width: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Position quick prompts differently in sidebar */
@@ -663,17 +658,14 @@ body {
   order: 3; /* Place after quick prompts */
 }
 
-.sidebar-mode #results-container {
-  order: 2; /* Place after search box */
-}
-
 .sidebar-mode .quick-prompt-pill {
   padding: var(--space-xsmall) 10px;
-  height: 32px;
+  /* height: 32px; */
   font-size: 13px;
-  flex: 1;
+  /* flex: 1; */
   min-width: 0;
   gap: var(--space-xsmall);
+  max-width: 100%;
 }
 
 .sidebar-mode .quick-prompt-pill .quick-prompt-emoji {
@@ -683,9 +675,8 @@ body {
 
 .sidebar-mode .quick-prompt-text {
   font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Hide quick prompts in fullscreen mode when chat is active */
