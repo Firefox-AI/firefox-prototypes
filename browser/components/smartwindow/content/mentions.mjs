@@ -55,6 +55,15 @@ export class MentionDropdown {
 
     let itemIndex = 0;
 
+    // Show empty state
+    if (this.items.length === 0) {
+      const emptyState = document.createElement("div");
+      emptyState.className = "mention-section-header";
+      emptyState.textContent = "No tabs or pages found";
+      this.element.appendChild(emptyState);
+      return;
+    }
+
     // Render tabs section
     if (tabs.length) {
       const tabHeader = document.createElement("div");
