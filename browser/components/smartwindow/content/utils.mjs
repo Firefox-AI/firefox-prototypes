@@ -10,6 +10,10 @@ ChromeUtils.defineESModuleGetters(lazy, {
 import { createEngine } from "chrome://global/content/ml/EngineProcess.sys.mjs";
 import { SmartAssistEngine } from "moz-src:///browser/components/genai/SmartAssistEngine.sys.mjs";
 
+const { ChatHistoryMessage } = ChromeUtils.importESModule(
+  "resource:///modules/smartWindow/ChatHistory.sys.mjs"
+);
+
 /**
  * Detects the type of query based on patterns in the text.
  * Uses navigate heuristics for URLs/domains, then ML model for chat/search classification.
@@ -241,6 +245,7 @@ const get_page_content = async ({ url }) => {
  *
  * @param {Array} messages - Array of message objects with role and content
  * @returns {AsyncGenerator<string>} Stream of response chunks this can be a string or a tool call log object
+ * @yields {string}
  */
 
 export async function* fetchWithHistory(messages) {
@@ -250,7 +255,7 @@ export async function* fetchWithHistory(messages) {
   let convo = Array.isArray(messages)
     ? messages.map(msg => ({
         ...msg,
-        role: msg.role.toLowerCase(), // Convert "System" -> "system"
+        role: ChatHistoryMessage.getRoleLabel(msg.role).toLowerCase(), // Convert "System" -> "system"
       }))
     : [];
 
@@ -391,11 +396,12 @@ export async function sendPrompt(content, previousMessages = []) {
  */
 export async function generateSmartQuickPrompts(contextTabs = []) {
   try {
-    console.log(
-      "Generating smart quick prompts with AI...",
-      contextTabs,
-      Error().stack
-    );
+    // console.log(
+    //   "Generating smart quick prompts with AI...",
+    //   contextTabs,
+    //   Error().stack
+    // );
+
     // Build context from tabs
     let tabContext = "";
     if (contextTabs.length === 0) {
