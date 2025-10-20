@@ -480,6 +480,25 @@ body {
   white-space: nowrap;
 }
 
+.suggestion-text-container mark,
+.suggestion-text mark {
+  background: none;
+  font-weight: var(--font-weight-bold);
+}
+
+
+.suggestion-url::before {
+  content: "—";
+  color: #333;
+  padding: 0 var(--space-xsmall);
+}
+
+.suggestion-url,
+.suggestion-url mark {
+  color: #0066cc;
+  font-size: 12px;
+}
+
 /* Hide quick prompts (not actual suggestions) when not in bottom chat mode and user has typed something */
 :root:not(.chat-mode-bottom) .smart-window-container .suggestions-container.quick-prompts.user-edited {
   display: none;
