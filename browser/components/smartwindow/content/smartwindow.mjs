@@ -87,6 +87,11 @@ class SmartWindowPage {
       return userOverride;
     }
 
+    // If query contains @mention use type "chat" (only when pref is "auto")
+    if (this.smartbar && this.smartbar.hasExistingMentions()) {
+      return "chat";
+    }
+
     // Otherwise, use the ML detection
     return await detectQueryType(query);
   }
