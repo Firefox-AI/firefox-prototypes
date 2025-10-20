@@ -1330,6 +1330,7 @@ class SmartWindowPage {
         for (const result of resultsToProcess) {
           const detectedType = await this.getEffectiveQueryType(result.text);
           suggestions.push({
+            title: result.title,
             text: result.text,
             type: detectedType,
           });
@@ -1341,6 +1342,7 @@ class SmartWindowPage {
         s => s.type === "navigate"
       );
       const navigateSuggestions = navigateResults.slice(0, 2).map(s => ({
+        title: s.title,
         text: s.text,
         type: s.type,
       }));
@@ -1349,6 +1351,7 @@ class SmartWindowPage {
       // Add action results as-is
       const actionResults = urlbarSuggestions.filter(s => s.type === "action");
       const actionSuggestions = actionResults.slice(0, 2).map(s => ({
+        title: s.title,
         text: s.text,
         type: s.type,
       }));
@@ -1384,7 +1387,12 @@ class SmartWindowPage {
       }
 
       if (this.smartbar) {
-        this.smartbar.showSuggestions(suggestions.slice(0, 10), "Suggestions:");
+        this.smartbar.showSuggestions(
+          suggestions.slice(0, 10),
+          "Suggestions:",
+          false,
+          query,
+        );
       }
     } catch (error) {
       console.error("Error getting live suggestions:", error);
@@ -1400,7 +1408,12 @@ class SmartWindowPage {
       );
 
       if (this.smartbar) {
-        this.smartbar.showSuggestions(suggestions, "Suggestions:");
+        this.smartbar.showSuggestions(
+          suggestions,
+          "Suggestions:",
+          false,
+          query,
+        );
       }
     }
   }

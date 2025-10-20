@@ -243,6 +243,34 @@ export function attachToElement(element, options = {}) {
     },
   });
 
+  function highlightQueryMatches(element, query) {
+    if (!query || !element.textContent) {
+      return;
+    }
+
+    const text = element.textContent;
+    // Split query into words and escape special chars
+    const words = query
+      .split(/\s+/)
+      .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+
+    if (words.length === 0) {
+      return;
+    }
+
+    // Highlight matched words
+    const regex = new RegExp(`(${words.join("|")})`, "gi");
+
+    // Split and rebuild nodes
+    element.textContent = "";
+    for (const part of text.split(regex)) {
+      const node = regex.test(part)
+        ? Object.assign(document.createElement("mark"), { textContent: part })
+        : document.createTextNode(part);
+      element.appendChild(node);
+    }
+  }
+
   // Suggestion management functions
   function createSuggestionButton(suggestion, index) {
     const button = document.createElement("button");
@@ -255,12 +283,43 @@ export function attachToElement(element, options = {}) {
       ? getQueryTypeIcon(suggestion.type)
       : "🔍";
 
-    const text = document.createElement("span");
-    text.className = "suggestion-text";
-    text.textContent = suggestion.text;
+    const textContainer = document.createElement("div");
+    textContainer.className = "suggestion-text-container";
+
+    // For matches of type navigate: Show title and URL
+    if (suggestion.type === "navigate" && suggestion.title) {
+      const title = document.createElement("span");
+      title.className = "suggestion-title";
+      title.textContent = suggestion.title;
+
+      const url = document.createElement("span");
+      url.className = "suggestion-url";
+      url.textContent = suggestion.text || suggestion.url;
+
+      // Highlight matches if query is provided
+      if (suggestion.query) {
+        highlightQueryMatches(title, suggestion.query);
+        highlightQueryMatches(url, suggestion.query);
+      }
+
+      textContainer.appendChild(title);
+      textContainer.appendChild(url);
+    } else {
+      // For other suggestion types: Use the original text
+      const text = document.createElement("span");
+      text.className = "suggestion-text";
+      text.textContent = suggestion.text;
+
+      // Highlight matches if query is provided
+      if (suggestion.query) {
+        highlightQueryMatches(text, suggestion.query);
+      }
+
+      textContainer.appendChild(text);
+    }
 
     button.appendChild(icon);
-    button.appendChild(text);
+    button.appendChild(textContainer);
 
     // Add event listeners
     button.addEventListener("mouseenter", () => {
@@ -294,7 +353,8 @@ export function attachToElement(element, options = {}) {
   function showSuggestions(
     suggestions,
     title = "Suggestions:",
-    isQuickPrompts = false
+    isQuickPrompts = false,
+    query = "",
   ) {
     if (!suggestionsContainer) {
       return;
@@ -336,7 +396,8 @@ export function attachToElement(element, options = {}) {
     suggestionsList.innerHTML = "";
 
     suggestions.forEach((suggestion, index) => {
-      const suggestionButton = createSuggestionButton(suggestion, index);
+      const suggestionWithQuery = { ...suggestion, query };
+      const suggestionButton = createSuggestionButton(suggestionWithQuery, index);
       suggestionsList.appendChild(suggestionButton);
     });
   }
