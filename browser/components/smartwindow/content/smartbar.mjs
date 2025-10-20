@@ -23,6 +23,25 @@ export function attachToElement(element, options = {}) {
   let selectedSuggestionIndex = -1;
   let suggestionsContainer = null;
 
+  // Check for existing mentions in the content
+  function hasExistingMentions(json) {
+    if (!json?.content) {
+      return false;
+    };
+
+    function isMentionNode(node) {
+      if (node?.type === "mention") {
+        return true;
+      }
+      if (node?.content) {
+        return node.content.some(isMentionNode);
+      }
+      return false;
+    }
+
+    return json.content.some(isMentionNode);
+  }
+
   // Create suggestions container
   function createSuggestionsContainer() {
     suggestionsContainer = document.createElement("div");
@@ -171,11 +190,13 @@ export function attachToElement(element, options = {}) {
     content: "",
     onUpdate: ({ editor: editorInstance }) => {
       const text = editorInstance.getText();
-      // Hide suggestions if input is empty
+
+      // Hide suggestions if input is empty or if mentions already exist
       if (
         !text.trim() &&
         suggestionsContainer &&
-        !suggestionsContainer.classList.contains("hidden")
+        !suggestionsContainer.classList.contains("hidden") ||
+        hasExistingMentions(editorInstance.getJSON())
       ) {
         hideSuggestions();
       }
@@ -267,8 +288,14 @@ export function attachToElement(element, options = {}) {
       return;
     }
 
-    // Don't show suggestions if the input is empty
+    // Don’t show suggestions if the input is empty
     if (!editor.getText().trim() || isMentionsOpen) {
+      return;
+    }
+
+    // Don’t show suggestions if there are existing mentions
+    const json = editor.getJSON();
+    if (hasExistingMentions(json)) {
       return;
     }
 
