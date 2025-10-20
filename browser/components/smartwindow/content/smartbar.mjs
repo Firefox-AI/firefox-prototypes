@@ -23,23 +23,29 @@ export function attachToElement(element, options = {}) {
   let selectedSuggestionIndex = -1;
   let suggestionsContainer = null;
 
-  // Check for existing mentions in the content
-  function hasExistingMentions(json) {
+  // Get existing mention IDs from the content
+  function getExistingMentionIds(json) {
+    const mentionIds = [];
     if (!json?.content) {
-      return false;
-    };
-
-    function isMentionNode(node) {
-      if (node?.type === "mention") {
-        return true;
-      }
-      if (node?.content) {
-        return node.content.some(isMentionNode);
-      }
-      return false;
+      return mentionIds;
     }
 
-    return json.content.some(isMentionNode);
+    function extractMentionIds(node) {
+      if (node?.type === "mention" && node.attrs?.id) {
+        mentionIds.push(node.attrs.id);
+      }
+      if (node?.content) {
+        node.content.forEach(extractMentionIds);
+      }
+    }
+
+    json.content.forEach(extractMentionIds);
+    return mentionIds;
+  }
+
+  // Check for existing mentions in the content
+  function hasExistingMentions(json) {
+    return getExistingMentionIds(json)?.length > 0;
   }
 
   // Create suggestions container
@@ -145,7 +151,13 @@ export function attachToElement(element, options = {}) {
         },
         suggestion: {
           items: async ({ query }) => {
-            return await getMentionSuggestions(query);
+            const allSuggestions = await getMentionSuggestions(query);
+            const existingMentionIds = getExistingMentionIds(editor.getJSON());
+
+            // Filter out already mentioned tabs
+            return allSuggestions.filter(
+              suggestion => !existingMentionIds.includes(suggestion.id)
+            );
           },
 
           render: () => {
@@ -193,9 +205,9 @@ export function attachToElement(element, options = {}) {
 
       // Hide suggestions if input is empty or if mentions already exist
       if (
-        !text.trim() &&
-        suggestionsContainer &&
-        !suggestionsContainer.classList.contains("hidden") ||
+        (!text.trim() &&
+          suggestionsContainer &&
+          !suggestionsContainer.classList.contains("hidden")) ||
         hasExistingMentions(editorInstance.getJSON())
       ) {
         hideSuggestions();
