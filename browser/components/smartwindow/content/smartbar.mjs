@@ -451,6 +451,10 @@ export function attachToElement(element, options = {}) {
       }
     },
 
+    hasExistingMentions() {
+      return hasExistingMentions(editor.getJSON());
+    },
+
     showSuggestions,
     hideSuggestions,
     navigateSuggestions,
