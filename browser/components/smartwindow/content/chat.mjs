@@ -344,16 +344,44 @@ class ChatBot extends MozLitElement {
       border-radius: 999px;
       background: #f8f9fa;
     }
+
     .save-dot {
       width: 6px;
       height: 6px;
       border-radius: 50%;
     }
+
     .save-dot.saving {
       background: #d39e00;
     }
+
     .save-dot.saved {
       background: #2ea44f;
+    }
+
+    .mention {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      max-width: 185px;
+      vertical-align: middle;
+      border: 1px solid var(--tab-border-color, rgba(0, 0, 0, 0));
+      background: rgba(191, 143, 204, 0.1);
+    }
+
+    .mention .mention-icon {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 16px;
+      display: block;
+    }
+
+    .mention .mention-label {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
     }
 
     ${insightsStyles}
@@ -397,6 +425,7 @@ class ChatBot extends MozLitElement {
     this.saveStatus = "idle";
     this._saveTimer = null;
     this._lastSavedAt = null;
+    this._lastUserHTML = null;
 
     // TODO: Figure out what/where to get this info from, if necessary
     this.#conversation = new ChatHistoryConversation({
@@ -461,7 +490,7 @@ class ChatBot extends MozLitElement {
     }
 
     // Add the user message
-    this.#conversation.addUserMessage(this.prompt);
+    this.#conversation.addUserMessage({ content: this.prompt, displayHTML: this._lastUserHTML });
     // Prepare an empty assistant message for streaming
     this.#conversation.addAssistantMessage("");
     this.requestUpdate();
@@ -532,12 +561,16 @@ class ChatBot extends MozLitElement {
       this.#conversation = conversation;
     }
 
+    const { text, html: displayHTML } =
+      typeof _prompt === "string" ? { text: _prompt } : _prompt;
+
     // Store tab context and page text for use in system prompt
     this.currentTabContext = tabContext || [];
     this.currentPageText = currentPageText || "";
 
-    // Keep the user prompt clean - context will be included in system prompt
-    this.prompt = _prompt;
+    // Plain text goes to the model; rich HTML is stashed for UI rendering.
+    this.prompt = text ?? "";
+    this._lastUserHTML = displayHTML || null;
     await this.sendPrompt();
   }
 
@@ -844,6 +877,11 @@ Today's date: ${currentDate}`;
                         usedInsights: [],
                       };
 
+                const bodyHTML =
+                  msg.role === "User" && msg.displayHTML
+                    ? unsafeHTML(msg.displayHTML)
+                    : unsafeHTML(this.marked(cleanContent));
+
                 return html`
                   <div
                     class="message ${msg.role === ChatHistory.MESSAGE_ROLE.USER
@@ -868,7 +906,7 @@ Today's date: ${currentDate}`;
                           </div>
                         `
                       : ""}
-                    <div>${unsafeHTML(this.marked(cleanContent))}</div>
+                    <div class="message-body">${bodyHTML}</div>
                     ${searchQueries.length
                       ? html`
                           <div class="search-suggestions">
