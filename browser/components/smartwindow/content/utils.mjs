@@ -18,11 +18,6 @@ import { SmartAssistEngine } from "moz-src:///browser/components/genai/SmartAssi
  * @returns {Promise<string>} The detected query type: "navigate", "chat", "action", or "search"
  */
 export async function detectQueryType(query) {
-  // temporary heuristic to force a chat, e.g., @mention
-  if (query.indexOf("@") >= 0) {
-    return "chat";
-  }
-
   const trimmedQuery = query.trim().toLowerCase();
 
   // navigate heuristics (protocols or domain without spaces)
