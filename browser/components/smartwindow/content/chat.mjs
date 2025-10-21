@@ -22,7 +22,7 @@ import {
 const PROMPT_PREF = "browser.smartwindow.systemPromptOverride";
 const { ChatHistory, ChatHistoryConversation, ChatHistoryMessage } =
   ChromeUtils.importESModule(
-    "resource:///modules/smartWindow/ChatHistory.sys.mjs"
+    "resource:///modules/smartwindow/ChatHistory.sys.mjs"
   );
 /**
  * A simple chat bot component that interacts with an Ollama model via streaming.

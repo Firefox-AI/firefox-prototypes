@@ -12,7 +12,7 @@ const lazy = {};
  *
  * @example
  * let { ChatHistory, ChatHistoryConversation, ChatHistoryMessage } =
- *   ChromeUtils.importESModule("resource:///modules/smartWindow/ChatHistory.sys.mjs");
+ *   ChromeUtils.importESModule("resource:///modules/smartwindow/ChatHistory.sys.mjs");
  * const chatHistory = new ChatHistory();
  * const conversation = new ChatHistoryConversation({
  *   title: "title",
