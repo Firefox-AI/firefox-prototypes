@@ -12,15 +12,37 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs",
 });
 
+// const { Ci } = ChromeUtils.importESModule(
+//   "resource://gre/modules/Services.sys.mjs"
+// );
+
 import { detectQueryType, generateSmartQuickPrompts } from "./utils.mjs";
 import { attachToElement } from "chrome://browser/content/smartwindow/smartbar.mjs";
 
+const { ChatHistory, ChatHistoryConversation } = ChromeUtils.importESModule(
+  "resource:///modules/smartWindow/ChatHistory.sys.mjs"
+);
+
 const { embedderElement, topChromeWindow } = window.browsingContext;
+const gBrowser = topChromeWindow.gBrowser;
 
 /**
  *
  */
 class SmartWindowPage {
+  /**
+   * @type {import("../ChatHistory.sys.mjs").ChatHistory}
+   */
+  #chatHistory;
+  /**
+   * @type {import("../ChatHistory.sys.mjs").ChatHistory}
+   */
+  #conversation;
+  /**
+   * @type {Map<string, ChatHistoryConversation>}
+   */
+  #tabConversations;
+
   constructor() {
     this.searchInput = null;
     this.smartbar = null;
@@ -28,7 +50,7 @@ class SmartWindowPage {
     this.submitButton = null;
     this.quickPromptsContainer = null;
     this.isSidebarMode = false;
-    this.messages = [];
+    // this.messages = [];
     this.userHasEditedQuery = false;
     this.suggestionDebounceTimer = null;
     this.lastTabInfo = null;
@@ -41,6 +63,16 @@ class SmartWindowPage {
     this.tabContextElements = {};
     this.currentTabPageText = "";
     this.quickActionButtons = {};
+
+    this.#chatHistory = new ChatHistory();
+
+    this.#conversation = new ChatHistoryConversation({
+      title: "",
+      description: "",
+      pageUrl: "",
+      pageMeta: "",
+    });
+    this.#tabConversations = new Map();
 
     this.init();
   }
@@ -259,12 +291,15 @@ class SmartWindowPage {
     });
 
     // Remove current tab button
-    this.tabContextElements.removeCurrentTab.addEventListener("click", e => {
-      e.stopPropagation();
-      if (this.lastTabInfo) {
-        this.removeTabFromContext(this.lastTabInfo.tabId);
+    this.tabContextElements.removeCurrentTab.addEventListener(
+      "click",
+      async e => {
+        e.stopPropagation();
+        if (this.lastTabInfo) {
+          this.removeTabFromContext(this.lastTabInfo.tabId);
+        }
       }
-    });
+    );
 
     // Add tabs button
     this.tabContextElements.addTabsButton.addEventListener("click", e => {
@@ -316,27 +351,27 @@ class SmartWindowPage {
     }
   }
 
-  addTabToContext(tabInfo) {
+  async addTabToContext(tabInfo) {
     // Check if tab is already in context
     const exists = this.selectedTabContexts.some(
       tab => tab.tabId === tabInfo.tabId
     );
     if (!exists) {
       // Save chat messages for the old context
-      this.saveChatMessagesForCurrentContext();
+      await this.saveChatMessagesForCurrentContext();
 
       this.selectedTabContexts.push(tabInfo);
       this.updateTabContextUI();
       this.updateQuickPromptsWithContext();
 
       // Load chat messages for the new context
-      this.loadChatMessagesForCurrentContext();
+      await this.loadChatMessagesForCurrentContext();
     }
   }
 
-  removeTabFromContext(tabId) {
+  async removeTabFromContext(tabId) {
     // Save chat messages for the old context
-    this.saveChatMessagesForCurrentContext();
+    await this.saveChatMessagesForCurrentContext();
 
     this.selectedTabContexts = this.selectedTabContexts.filter(
       tab => tab.tabId !== tabId
@@ -345,7 +380,7 @@ class SmartWindowPage {
     this.updateQuickPromptsWithContext();
 
     // Load chat messages for the new context
-    this.loadChatMessagesForCurrentContext();
+    await this.loadChatMessagesForCurrentContext();
   }
 
   updateTabContextUI() {
@@ -500,15 +535,15 @@ class SmartWindowPage {
     item.appendChild(textContainer);
 
     // Add click handler
-    item.addEventListener("click", () => {
+    item.addEventListener("click", async () => {
       const isCurrentlySelected = checkbox.classList.contains("checked");
 
       // Treat all tabs the same way
       if (isCurrentlySelected) {
-        this.removeTabFromContext(tabInfo.tabId);
+        await this.removeTabFromContext(tabInfo.tabId);
         checkbox.classList.remove("checked");
       } else {
-        this.addTabToContext(tabInfo);
+        await this.addTabToContext(tabInfo);
         checkbox.classList.add("checked");
       }
     });
@@ -560,9 +595,15 @@ class SmartWindowPage {
   }
 
   // Reset context to current tab (if eligible)
-  resetContextToCurrentTab() {
+  async resetContextToCurrentTab() {
     // Save chat messages for the old context before changing
-    this.saveChatMessagesForCurrentContext();
+    try {
+      await this.saveChatMessagesForCurrentContext();
+    } catch (error) {
+      console.error(
+        `[ERROR] resetContextToCurrentTab(): Could not save chat messages for current context: ${error}`
+      );
+    }
 
     if (this.lastTabInfo && this.isTabEligibleForContext(this.lastTabInfo)) {
       this.selectedTabContexts = [this.lastTabInfo];
@@ -572,58 +613,129 @@ class SmartWindowPage {
     this.updateTabContextUI();
 
     // Load chat messages for the new context
-    this.loadChatMessagesForCurrentContext();
+    try {
+      await this.loadChatMessagesForCurrentContext();
+    } catch (error) {
+      console.error(
+        `[ERROR] resetContextToCurrentTab(): Could not load chat messages for current context: ${error}`
+      );
+    }
   }
 
   // Save chat messages to all tabs in current context
-  saveChatMessagesForCurrentContext() {
+  async saveChatMessagesForCurrentContext() {
     if (this.chatBot && this.chatBot.messages && this.chatBot.messages.length) {
-      // Save to all tabs in current context
+      // Save messages to a conversation for each tab's URL
       for (const tab of this.selectedTabContexts) {
-        topChromeWindow.SmartWindow.setChatMessages(
-          tab.tabId,
-          this.chatBot.messages
-        );
+        const tabConversation =
+          this.#tabConversations.get(tab.url) ??
+          new ChatHistoryConversation({
+            title: "",
+            description: "",
+            pageUrl: new URL(tab.url),
+            pageMeta: "",
+          });
+
+        tabConversation.messages = this.#conversation.messages;
+
+        this.#tabConversations.set(tab.url, tabConversation);
+
+        try {
+          await this.#chatHistory.updateConversation(tabConversation);
+        } catch (error) {
+          console.error("Error saving the conversation:", tabConversation);
+        }
       }
     }
   }
 
-  // Load chat messages for the current context
-  loadChatMessagesForCurrentContext() {
-    if (this.chatBot) {
-      let savedMessages = [];
+  // Helper to get the most recent conversation with messages for a given URL
+  async #getMostRecentConversationWithMessages(url) {
+    const conversations = await this.#chatHistory.findConversationsByURL(
+      new URL(url)
+    );
 
-      // Try to load from current tab
-      if (this.lastTabInfo && this.isCurrentTabInContext()) {
-        savedMessages = topChromeWindow.SmartWindow.getChatMessages(
-          this.lastTabInfo.tabId
-        );
-      }
+    // Filter to only conversations with messages, then sort by updatedDate
+    const conversationsWithMessages = conversations
+      .filter(convo => convo.messages && !!convo.messages.length)
+      .sort((a, b) => {
+        const dateA = a.updatedDate ? new Date(a.updatedDate) : new Date(0);
+        const dateB = b.updatedDate ? new Date(b.updatedDate) : new Date(0);
+        return dateB - dateA; // Most recent first
+      });
 
-      if (savedMessages.length) {
-        // Restore saved messages and show chat mode
-        this.chatBot.messages = [...savedMessages];
-        this.chatBot.requestUpdate();
-        this.showChatMode();
-        // Scroll to bottom after messages are loaded
-        setTimeout(() => this.chatBot.scrollToBottom(), 0);
-      } else {
-        this.chatBot.messages = [];
-        this.chatBot.requestUpdate();
-        this.hideChatMode();
-      }
-    }
+    return conversationsWithMessages[0] || null;
   }
 
-  init() {
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", () => this.onDOMReady());
+  // Load chat messages for the current context (prioritize current tab)
+  async loadChatMessagesForCurrentContext() {
+    let conversation = null;
+    if (!this.chatBot) {
+      return;
+    }
+
+    let savedMessages = [];
+
+    // Try to load from current tab first
+    if (this.lastTabInfo && this.isCurrentTabInContext()) {
+      conversation = await this.#getMostRecentConversationWithMessages(
+        this.lastTabInfo.url
+      );
+
+      if (conversation && conversation.messages) {
+        savedMessages.push(...conversation.messages);
+      }
+    }
+
+    // If no messages from current tab, try other tabs in context
+    if (savedMessages.length === 0) {
+      for (const tab of this.selectedTabContexts) {
+        conversation = await this.#getMostRecentConversationWithMessages(
+          tab.url
+        );
+
+        if (conversation && conversation.messages) {
+          savedMessages.push(...conversation.messages);
+          break;
+        }
+      }
+    }
+
+    if (savedMessages.length) {
+      // Restore saved messages and show chat mode
+      this.chatBot.messages = [...savedMessages];
+      this.chatBot.requestUpdate();
+      this.showChatMode();
+      // Scroll to bottom after messages are loaded
+      setTimeout(() => this.chatBot.scrollToBottom(), 0);
     } else {
-      this.onDOMReady();
+      // NOTE: This breaks the chat it can't ask if the messages gets blanked
+      // console.log("setting blank messages");
+      //
+      // this.chatBot.messages = [];
+      // this.chatBot.requestUpdate();
+      // this.hideChatMode();
+    }
+
+    // Replace an empty conversation with the conversation that was loaded from SQLite
+    if (conversation && conversation.messages.length) {
+      this.#conversation = conversation;
+      this.#tabConversations.set(this.lastTabInfo.url, this.#conversation);
     }
   }
 
-  onDOMReady() {
+  async init() {
+    if (document.readyState === "loading") {
+      document.addEventListener(
+        "DOMContentLoaded",
+        async () => await this.onDOMReady()
+      );
+    } else {
+      await this.onDOMReady();
+    }
+  }
+
+  async onDOMReady() {
     this.isSidebarMode = embedderElement.id == "smartwindow-browser";
 
     const editorDiv = document.getElementById("tiptap-editor");
@@ -652,19 +764,12 @@ class SmartWindowPage {
     const isEnabled = this.isSidebarMode || isSmartMode;
     document.documentElement.classList.toggle("smart-window", isEnabled);
 
-    console.log(
-      `[SmartWindow] onDOMReady - isSidebarMode: ${this.isSidebarMode}, isSmartMode: ${isSmartMode}, isEnabled: ${isEnabled}, embedderElement.id: ${embedderElement?.id}`
-    );
-
     if (this.smartbar && isEnabled) {
       this.focusSearchInputWhenReady();
     }
 
     if (this.smartbar) {
       if (!isEnabled) {
-        console.log(
-          "[SmartWindow] Setting smartbar to non-editable during initialization"
-        );
         this.smartbar.setEditable(false);
         if (this.submitButton) {
           this.submitButton.disabled = true;
@@ -684,7 +789,7 @@ class SmartWindowPage {
     this.initializeTabContextUI();
     this.initializeQuickActionButtons();
 
-    this.initializeTabInfo();
+    await this.initializeTabInfo();
     if (isSmartMode) {
       // Don't await to avoid blocking initialization
       this.showQuickPrompts().catch(console.error);
@@ -740,7 +845,7 @@ class SmartWindowPage {
     document.addEventListener("visibilitychange", focusWhenVisible);
   }
 
-  initializeTabInfo() {
+  async initializeTabInfo() {
     const selectedTab = topChromeWindow.gBrowser.selectedTab;
     const selectedBrowser = topChromeWindow.gBrowser.selectedBrowser;
 
@@ -751,7 +856,16 @@ class SmartWindowPage {
       tabId: selectedTab.linkedPanel, // Use linkedPanel as unique tab identifier
     };
 
-    this.resetContextToCurrentTab();
+    // console.log("Set lastTabInfo to:", this.lastTabInfo);
+
+    try {
+      await this.resetContextToCurrentTab();
+    } catch (error) {
+      console.error(
+        "[ERROR] initializeTabInfo(): Could not load messages for current tab"
+      );
+    }
+
     if (this.isSidebarMode) {
       this.updateTabStatus(this.lastTabInfo);
     }
@@ -1046,10 +1160,6 @@ class SmartWindowPage {
       topChromeWindow.addEventListener("SmartWindowModeChanged", event => {
         const isActive = event.detail.active;
 
-        console.log(
-          `[SmartWindow] SmartWindowModeChanged event - isActive: ${isActive}, isSidebarMode: ${this.isSidebarMode}, embedderElement.id: ${embedderElement?.id}`
-        );
-
         // If we're in sidebar mode, always keep the editor enabled
         // regardless of the smart window mode state
         if (this.isSidebarMode) {
@@ -1086,6 +1196,34 @@ class SmartWindowPage {
           }
         }
       });
+    }
+
+    window.addEventListener("SmartWindowVisibilityChanged", _event => {
+      // TODO: The smart window opened or closed, maybe we need to do some kind of UI update
+      // event.detail.visible
+    });
+
+    if (gBrowser?.tabContainer) {
+      const tabListener = {
+        onStateChange: (browser, webProgress, request, stateFlags) => {
+          if (
+            webProgress.isTopLevel &&
+            stateFlags & Ci.nsIWebProgressListener.STATE_STOP &&
+            stateFlags & Ci.nsIWebProgressListener.STATE_IS_WINDOW
+          ) {
+            const newLocation = browser.currentURI.spec;
+            if (!this.isTabEligibleForContext(this.lastTabInfo)) {
+              this.#conversation.pageUrl = newLocation;
+
+              this.initializeTabInfo().then(() => {
+                this.loadChatMessagesForCurrentContext();
+              });
+            }
+          }
+        },
+      };
+
+      gBrowser.addTabsProgressListener(tabListener);
     }
   }
 
@@ -1174,7 +1312,7 @@ class SmartWindowPage {
 
     if (!isAboutBlank) {
       // Reset tab context to current tab when switching (handles chat persistence)
-      this.resetContextToCurrentTab();
+      await this.resetContextToCurrentTab();
 
       // Update tab context UI with new current tab info
       this.updateTabContextUI();
@@ -1391,7 +1529,7 @@ class SmartWindowPage {
           suggestions.slice(0, 10),
           "Suggestions:",
           false,
-          query,
+          query
         );
       }
     } catch (error) {
@@ -1412,7 +1550,7 @@ class SmartWindowPage {
           suggestions,
           "Suggestions:",
           false,
-          query,
+          query
         );
       }
     }
@@ -1436,22 +1574,33 @@ class SmartWindowPage {
     if (type === "chat") {
       // Show chat component and submit the prompt with tab context
       this.showChatMode();
+
+      // Make sure the tab info is updated
+      if (this.#conversation.pageUrl === "") {
+        await this.initializeTabInfo();
+      }
+
       if (this.chatBot) {
         const contextTabs = this.getAllContextTabs();
         // Pass page text if current tab is in context
         const includePageText = this.isCurrentTabInContext();
-        this.chatBot.submitPrompt(
+
+        await this.chatBot.submitPrompt(
+          this.#conversation,
           query,
           contextTabs,
           includePageText ? this.currentTabPageText : ""
         );
+
+        await this.saveChatMessagesForCurrentContext();
       }
       // For chat on smart window page (not sidebar), don't open sidebar
       // The sidebar logic is handled by performNavigation for search/navigate types
     } else if (type === "action") {
       if (this.isSidebarMode) {
+        // NOTE: Can we remove this isSidebarMode? ask @mardak
         // Handle actions in sidebar
-        this.handleAction(query);
+        // this.handleAction(query);
       } else {
         // In full page mode, convert actions to search
         this.hideChatMode();
@@ -1461,7 +1610,8 @@ class SmartWindowPage {
       // For navigate and search, hide chat mode and show regular messages
       this.hideChatMode();
       if (this.isSidebarMode) {
-        this.addMessage(`Navigating: ${query}`, "user");
+        // NOTE: does this still exist? ask @mardak
+        // this.addMessage(`Navigating: ${query}`, "user");
       }
       this.performNavigation(query, type);
 
@@ -1494,10 +1644,11 @@ class SmartWindowPage {
   performNavigation(query, type, clickEvent = null) {
     // Save chat messages for current tab before navigating
     if (this.chatBot && this.chatBot.messages && this.chatBot.messages.length) {
-      topChromeWindow.SmartWindow.setChatMessages(
-        topChromeWindow.gBrowser.selectedTab.linkedPanel,
-        this.chatBot.messages
-      );
+      // topChromeWindow.SmartWindow.setChatMessages(
+      //   topChromeWindow.gBrowser.selectedTab.linkedPanel,
+      //   this.chatBot.messages
+      // );
+      this.#chatHistory.updateConversation(this.#conversation);
     }
 
     let url = query;
@@ -1531,49 +1682,6 @@ class SmartWindowPage {
           Services.scriptSecurityManager.getSystemPrincipal(),
       });
     }
-  }
-
-  handleAction(action) {
-    const actionLower = action.toLowerCase();
-
-    // Hide chat mode for actions and show regular messages
-    this.hideChatMode();
-
-    if (actionLower.includes("tab next") || actionLower.includes("tab")) {
-      // Handle tab switching action
-      this.addMessage(`Action: ${action}`, "user");
-      this.addMessage(
-        "Tab switching is not available in sidebar mode.",
-        "assistant"
-      );
-    } else if (actionLower.startsWith("find ")) {
-      const searchTerm = action.slice(5).trim();
-      this.addMessage(`Searching for: ${searchTerm}`, "user");
-      this.addMessage(
-        `Find functionality for "${searchTerm}" would be implemented here.`,
-        "assistant"
-      );
-    } else {
-      this.addMessage(`Action: ${action}`, "user");
-      this.addMessage(`Action "${action}" is not yet supported.`, "assistant");
-    }
-
-    if (this.smartbar) {
-      this.smartbar.clear();
-    }
-    this.updateSubmitButton("");
-  }
-
-  addMessage(text, sender) {
-    const messageDiv = document.createElement("div");
-    messageDiv.className = `message message-${sender}`;
-    messageDiv.textContent = text;
-    this.resultsContainer.appendChild(messageDiv);
-
-    this.resultsContainer.scrollTop = this.resultsContainer.scrollHeight;
-
-    // Store message
-    this.messages.push({ text, sender, timestamp: Date.now() });
   }
 
   displayResults(results) {

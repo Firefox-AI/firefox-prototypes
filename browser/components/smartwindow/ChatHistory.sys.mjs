@@ -85,7 +85,36 @@ const DB_FILE_NAME = "chat-history.sqlite";
 const PREF_BRANCH = "browser.smartWindow.chatHistory";
 
 /**
+ * @typedef MessageRole
+ * @property {number} USER - Role for user messages
+ * @property {number} ASSISTANT - Role for assistant messages
+ * @property {number} SYSTEM - Role for system messages
+ * @property {number} TOOL - Role for tool messages
+ */
+const MESSAGE_ROLE = Object.freeze({
+  USER: 0,
+  ASSISTANT: 1,
+  SYSTEM: 2,
+  TOOL: 3,
+});
+
+/**
+ * @typedef ConversationStatus
+ * @property {number} ACTIVE - An active conversation
+ * @property {number} ARCHIVE - An archived conversation
+ * @property {number} DELETED - A deleted conversation
+ */
+const CONVERSATION_STATUS = Object.freeze({
+  ACTIVE: 0,
+  ARCHIVED: 1,
+  DELETED: 2,
+});
+
+/**
  * Class to manage the chat history database.
+ *
+ * @typedef {object} ChatHistory
+ * @property {Promise} promiseConn - Promise for the db connection
  */
 export class ChatHistory {
   #asyncShutdownBlocker;
@@ -100,20 +129,11 @@ export class ChatHistory {
   }
 
   static get CONVERSATION_STATUS() {
-    return Object.freeze({
-      ACTIVE: 0,
-      ARCHIVED: 1,
-      DELETED: 2,
-    });
+    return CONVERSATION_STATUS;
   }
 
   static get MESSAGE_ROLE() {
-    return Object.freeze({
-      USER: 0,
-      ASSISTANT: 1,
-      SYSTEM: 2,
-      TOOL: 3,
-    });
+    return MESSAGE_ROLE;
   }
 
   get CURRENT_SCHEMA_VERSION() {
@@ -560,6 +580,7 @@ export class ChatHistory {
       `,
       { page_url: pageUrl.href }
     );
+
     if (!rows.length) {
       return [];
     }
@@ -570,7 +591,7 @@ export class ChatHistory {
       `
         SELECT
           message_id, created_date, parent_message_id, revision_root_message_id,
-          ordinal, is_active_branch, role, model_id,
+          ordinal, is_active_branch, role, model_id, conv_id,
           json(params_jsonb) As params, content, json(usage_jsonb) AS usage
           FROM message
           WHERE conv_id IN(${new Array(conversations.length).fill("?").join(",")})
@@ -578,12 +599,14 @@ export class ChatHistory {
       `,
       conversations.map(c => c.id)
     );
+
     let messages = parseMessageRows(rows);
+
     // TODO: retrieve TTL content.
     for (let conversation of conversations) {
-      conversation.messages = messages.filter(
-        m => m.conv_id == conversation.id
-      );
+      conversation.messages = messages.filter(m => {
+        return m.conv_id == conversation.id;
+      });
     }
     return conversations;
   }
@@ -659,6 +682,43 @@ export class ChatHistoryConversation {
       .shift()?.id;
   }
 
+  /**
+   * @param {ConversationRole} role - The type of conversation message
+   * @param {string} content - The conversation message contents
+   */
+  addMessage(role, content) {
+    let parentMessageId = null;
+    if (this?.messages?.length) {
+      const lastMessageIndex = this.messages.length - 1;
+      parentMessageId = this.messages[lastMessageIndex].id;
+    }
+
+    const ordinal = this?.messages?.length ? this.messages.length + 1 : 1;
+
+    const newMessage = new ChatHistoryMessage({
+      parentMessageId,
+      content,
+      ordinal,
+      role,
+    });
+
+    this.messages.push(newMessage);
+  }
+
+  /**
+   * @param {string} content - The user message content
+   */
+  addUserMessage(content) {
+    this.addMessage(ChatHistory.MESSAGE_ROLE.USER, content);
+  }
+
+  /**
+   * @param {string} content - The assistant message content
+   */
+  addAssistantMessage(content) {
+    this.addMessage(ChatHistory.MESSAGE_ROLE.ASSISTANT, content);
+  }
+
   set messages(value) {
     this.#messages = value;
     this.updateActiveBranchTipMessageId();
@@ -684,6 +744,7 @@ export class ChatHistoryMessage {
   params;
   usage;
   content;
+  conv_id;
 
   /**
    * @param {object} param
@@ -698,6 +759,7 @@ export class ChatHistoryMessage {
    * @param {object} [param.params]
    * @param {object} [param.usage]
    * @param {string} param.content
+   * @param {string} param.conv_id
    */
   constructor({
     id = ChatHistory.makeGuid(),
@@ -711,6 +773,7 @@ export class ChatHistoryMessage {
     params = null,
     usage = null,
     content,
+    conv_id = null,
   }) {
     this.id = id;
     this.createdDate = createdDate;
@@ -723,6 +786,25 @@ export class ChatHistoryMessage {
     this.params = params;
     this.usage = usage;
     this.content = content;
+    this.conv_id = conv_id;
+  }
+
+  static getRoleLabel(role) {
+    switch (role) {
+      case ChatHistory.MESSAGE_ROLE.USER:
+        return "User";
+
+      case ChatHistory.MESSAGE_ROLE.ASSISTANT:
+        return "Assistant";
+
+      case ChatHistory.MESSAGE_ROLE.SYSTEM:
+        return "System";
+
+      case ChatHistory.MESSAGE_ROLE.TOOL:
+        return "Tool";
+    }
+
+    return "";
   }
 }
 
@@ -851,6 +933,7 @@ function parseMessageRows(rows) {
       params: parseJSONOrNull(row.getResultByName("params")),
       usage: parseJSONOrNull(row.getResultByName("usage")),
       content: row.getResultByName("content"),
+      conv_id: row.getResultByName("conv_id"),
     });
   });
 }
