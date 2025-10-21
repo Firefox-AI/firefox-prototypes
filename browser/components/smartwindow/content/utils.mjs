@@ -11,7 +11,7 @@ import { createEngine } from "chrome://global/content/ml/EngineProcess.sys.mjs";
 import { SmartAssistEngine } from "moz-src:///browser/components/genai/SmartAssistEngine.sys.mjs";
 
 const { ChatHistoryMessage } = ChromeUtils.importESModule(
-  "resource:///modules/smartWindow/ChatHistory.sys.mjs"
+  "resource:///modules/smartwindow/ChatHistory.sys.mjs"
 );
 
 /**

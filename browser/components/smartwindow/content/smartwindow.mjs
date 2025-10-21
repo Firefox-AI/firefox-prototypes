@@ -7,7 +7,7 @@ import { attachToElement } from "chrome://browser/content/smartwindow/smartbar.m
 import { generateLiveSuggestions } from "./suggestions.mjs";
 
 const { ChatHistory, ChatHistoryConversation } = ChromeUtils.importESModule(
-  "resource:///modules/smartWindow/ChatHistory.sys.mjs"
+  "resource:///modules/smartwindow/ChatHistory.sys.mjs"
 );
 
 const { embedderElement, topChromeWindow } = window.browsingContext;
