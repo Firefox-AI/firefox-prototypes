@@ -903,7 +903,9 @@ export function createInsightsOverlay(
   };
 
   return html`
-    <style>${insightsStyles?.cssText ?? ""}</style>
+    <style>
+      ${insightsStyles?.cssText ?? ""}
+    </style>
     <div class="insights-overlay" @click=${onClose}>
       <div class="insights-modal" @click=${e => e.stopPropagation()}>
         <div class="insights-header">
@@ -1323,7 +1325,9 @@ insightsStyles = css`
  */
 function autoRenderOverlayForAboutInsights() {
   // Only activate when the document is about:insights
-  const isAboutInsights = (document.documentURI || "").startsWith("about:insights");
+  const isAboutInsights =
+    (document.documentURI || "").startsWith("about:insights") ||
+    (document.documentURI || "").endsWith("insights.html");
   if (!isAboutInsights) {
     return;
   }
@@ -1344,7 +1348,11 @@ function autoRenderOverlayForAboutInsights() {
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", autoRenderOverlayForAboutInsights, { once: true });
+  document.addEventListener(
+    "DOMContentLoaded",
+    autoRenderOverlayForAboutInsights,
+    { once: true }
+  );
 } else {
   autoRenderOverlayForAboutInsights();
 }
