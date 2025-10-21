@@ -1765,6 +1765,13 @@ class SmartWindowPage {
       }
     });
 
+    this.quickActionButtons.insights?.addEventListener("click", e => {
+      e.stopPropagation();
+
+      document.location.href =
+        "chrome://browser/content/smartwindow/insights.html";
+    });
+
     this.quickActionButtons.developer?.addEventListener("click", e => {
       e.stopPropagation();
 
@@ -1783,6 +1790,7 @@ class SmartWindowPage {
   initializeQuickActionButtons() {
     this.quickActionButtons = {
       history: document.getElementById("history-button"),
+      insights: document.getElementById("insights-button"),
       developer: document.getElementById("developer-button"),
     };
 

@@ -2,8 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { html, css } from "chrome://global/content/vendor/lit.all.mjs";
+import { html, css, render } from "chrome://global/content/vendor/lit.all.mjs";
 import { createOpenAIEngine } from "./utils.mjs";
+
+/**
+ * CSS styles for insights functionality
+ */
+export let insightsStyles;
 
 /**
  * Helper function to get SmartWindow instance
@@ -1065,6 +1070,9 @@ export function createInsightsOverlay(
   };
 
   return html`
+    <style>
+      ${insightsStyles?.cssText ?? ""}
+    </style>
     <div class="insights-overlay" @click=${onClose}>
       <div class="insights-modal" @click=${e => e.stopPropagation()}>
         <div class="insights-header">
@@ -1207,10 +1215,8 @@ export function createInsightsOverlay(
   `;
 }
 
-/**
- * CSS styles for insights functionality
- */
-export const insightsStyles = css`
+// Define insightsStyles
+insightsStyles = css`
   .insight-tag {
     font-size: 0.75rem;
     background: #e8f4fd;
@@ -1479,3 +1485,41 @@ export const insightsStyles = css`
     font-weight: 500;
   }
 `;
+
+/**
+ * Auto-render overlay when loaded as about:insights.
+ * Renders into a #overlay-root element (creates it if missing).
+ */
+function autoRenderOverlayForAboutInsights() {
+  // Only activate when the document is about:insights
+  const isAboutInsights =
+    (document.documentURI || "").startsWith("about:insights") ||
+    (document.documentURI || "").endsWith("insights.html");
+  if (!isAboutInsights) {
+    return;
+  }
+
+  const ensureOverlayRoot = () => {
+    let root = document.getElementById("overlay-root");
+    if (!root) {
+      root = document.createElement("div");
+      root.id = "overlay-root";
+      document.body.appendChild(root);
+    }
+    return root;
+  };
+
+  const root = ensureOverlayRoot();
+  const onClose = () => render(null, root);
+  render(createInsightsOverlay(onClose), root);
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener(
+    "DOMContentLoaded",
+    autoRenderOverlayForAboutInsights,
+    { once: true }
+  );
+} else {
+  autoRenderOverlayForAboutInsights();
+}
