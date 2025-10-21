@@ -65,6 +65,15 @@ export const INTENTS = [
   "Resume / Revisit",
 ];
 
+// Higher is better: user > chat > search > history
+const SOURCE_PRIORITY = {
+  user: 4,
+  chat: 3,
+  conversation: 3, // in case chat rows use "conversation"
+  search: 2,
+  history: 1,
+};
+
 /**
  * User insights data organized by category
  * Static data serves as placeholder until user generates insights
@@ -197,94 +206,229 @@ const DEFAULT_INSIGHTS_DATA = {
   ],
 };
 
-// ============================================================================
-// History Analysis Functions
-// ============================================================================
-
 /**
- * Fetches recent browsing history
+ * Fetch recent browsing history from Places (SQL), aggregate by URL,
+ * tag "search" vs "history", and filter low-visit URLs.
  *
- * @param {object} opts - Options for history query
- * @param {number} opts.days - Number of days to look back (default: 60)
- * @param {number} opts.maxResults - Maximum results (default: 500)
- * @returns {Promise<Array>} Array of history items with weights
+ * @param {object} opts
+ * @param {number} [opts.days=60]          How far back to look
+ * @param {number} [opts.maxResults=500]   Max rows to return (after sort)
+ * @param {number} [opts.minVisits=2]      Keep URLs with >= this many visits
+ * @returns {Promise<Array<{url:string,title:string,domain:string,visit_time:string,visit_count:number,source:'history'|'search'}>>}
  */
 async function getRecentHistory(opts = {}) {
   const days = opts.days ?? 60;
   const maxResults = opts.maxResults ?? 500;
+  const minVisits = opts.minVisits ?? 3;
+
+  const { PlacesUtils } = ChromeUtils.importESModule(
+    "resource://gre/modules/PlacesUtils.sys.mjs"
+  );
+
+  // Places stores visit_date in microseconds since epoch.
+  const cutoffMicros = Math.max(0, (Date.now() - days * 86400000) * 1000);
+
+  const isSearchVisit = urlStr => {
+    try {
+      const u = new URL(urlStr);
+      const h = u.hostname || "";
+      const p = u.pathname || "";
+      const q = u.search || "";
+
+      const isSE =
+        /(^|\.)(google|bing|duckduckgo|search\.brave|yahoo|startpage|ecosia|baidu|yandex)\./i.test(
+          h
+        );
+      const looksLikeSearch =
+        /search|results|query/i.test(p) || /[?&](q|query|p)=/i.test(q);
+
+      return isSE || looksLikeSearch;
+    } catch {
+      return false;
+    }
+  };
+
+  const getDomain = urlStr => {
+    try {
+      return new URL(urlStr ?? "").hostname;
+    } catch {
+      return "";
+    }
+  };
+
+  // We:
+  // 1) pull the last N days of visits,
+  // 2) group by place (URL) to get count + last visit time,
+  // 3) sort by last visit desc and cap with :maxResults (SQL-side),
+  // 4) compute source by URL heuristic (JS-side).
+  const SQL = `
+    WITH recent AS (
+      SELECT
+        p.id            AS place_id,
+        p.url           AS url,
+        p.title         AS title,
+        MAX(v.visit_date) AS last_visit,
+        COUNT(*)        AS visit_count
+      FROM moz_places p
+      JOIN moz_historyvisits v ON v.place_id = p.id
+      WHERE v.visit_date >= :cutoff
+      GROUP BY p.id
+      ORDER BY last_visit DESC
+      LIMIT :limit
+    )
+    SELECT
+      r.url      AS url,
+      r.title    AS title,
+      r.last_visit AS last_visit,
+      r.visit_count AS visit_count
+    FROM recent r
+    -- (domain will be parsed in JS for consistency)
+  `;
 
   try {
-    const PlacesQuery = ChromeUtils.importESModule(
-      "resource://gre/modules/PlacesQuery.sys.mjs"
-    ).PlacesQuery;
-    const query = new PlacesQuery();
-    const historyMap = await query.getHistory({
-      daysOld: days,
-      limit: maxResults,
-    });
-
-    // Flatten the map structure into an array of items
-    const items = [];
-    for (const [timestamp, entries] of historyMap.entries()) {
-      for (const entry of entries) {
-        items.push({
-          url: entry.url ?? "",
-          title: entry.title ?? "",
-          visit_time: entry.date
-            ? entry.date.toISOString()
-            : new Date(timestamp).toISOString(),
-          visit_count: 1, // Each entry represents one visit
+    const rows = await PlacesUtils.withConnectionWrapper(
+      "smartwindow-getRecentHistory",
+      async db => {
+        const stmt = await db.execute(SQL, {
+          cutoff: cutoffMicros,
+          limit: maxResults,
         });
-      }
-    }
 
-    return items;
+        const out = [];
+        for (const row of stmt) {
+          const url = row.getResultByName("url");
+          const title = row.getResultByName("title") || "";
+          const lastVisitMicros = row.getResultByName("last_visit") || 0;
+          const visitCount = row.getResultByName("visit_count") || 0;
+
+          out.push({
+            url,
+            title,
+            domain: getDomain(url),
+            visit_time: new Date(
+              Math.floor(lastVisitMicros / 1000)
+            ).toISOString(),
+            visit_count: visitCount,
+            source: isSearchVisit(url) ? "search" : "history",
+          });
+        }
+        return out;
+      }
+    );
+
+    // console.debug(`rows = ${JSON.stringify(rows)}`);
+    // Filter by minVisits (keep URLs visited >= minVisits)
+    const filtered = rows.filter(r => r.visit_count >= minVisits);
+
+    // Already sorted by last visit desc from SQL, but ensure:
+    filtered.sort((a, b) => (a.visit_time < b.visit_time ? 1 : -1));
+    // console.debug(`filtered = ${JSON.stringify(filtered)}`);
+    return filtered;
   } catch (error) {
-    console.error("Failed to fetch history:", error);
+    console.error("Failed to fetch Places history via SQL:", error);
     return [];
   }
 }
 
 /**
- * Applies half-life decay weighting to history items based on recency
+ * Applies half-life decay weighting + source priority.
  *
- * @param {Array} rows - History items
- * @param {number} halfLifeDays - Half-life in days (default: 14)
- * @returns {Array} History items with weight_score and weighted_visits
+ * @param {Array<{visit_time:string, visit_count:number, source?:string}>} rows
+ * @param {number} [halfLifeDays=14]
+ * @returns {Array}
  */
 function addWeights(rows, halfLifeDays = 14) {
-  const now = new Date();
-  return rows.map(r => {
-    const visitTime = new Date(r.visit_time);
-    const ageMs = Math.max(0, now.getTime() - visitTime.getTime());
-    const ageDays = ageMs / 86400000;
-    const weight_score = Math.pow(0.5, ageDays / halfLifeDays);
-    const weighted_visits =
-      Math.round(weight_score * (r.visit_count || 1) * 1000) / 1000;
-    return { ...r, weight_score, weighted_visits };
+  const nowMs = Date.now();
+
+  return rows.map(row => {
+    const visitMs = new Date(row.visit_time).getTime() || 0;
+    const ageDays = Math.max(0, (nowMs - visitMs) / 86400000);
+
+    // Recency via half-life
+    const recency_weight = Math.pow(0.5, ageDays / halfLifeDays);
+
+    // Source priority (default history=1)
+    const source_weight =
+      SOURCE_PRIORITY[(row.source || "").toLowerCase()] ?? 1;
+
+    // Soft visit-count factor: log-scaled and capped
+    //  - 1 visit -> ~1.0
+    //  - 3 visits -> ~1.4
+    //  - 10 visits -> ~1.7
+    //  - 100+ visits -> cap at ~2.0
+    const rawCount = Math.max(1, Number(row.visit_count) || 1);
+    const count_weight = Math.min(2.0, 1 + 0.4 * Math.log1p(rawCount));
+
+    const weight_score = source_weight * recency_weight;
+    const weighted_visits = Number((weight_score * count_weight).toFixed(3));
+
+    return {
+      ...row,
+      recency_weight,
+      source_weight,
+      count_weight,
+      weight_score, // source * recency
+      weighted_visits, // final score (for ranking)
+    };
   });
 }
 
 /**
- * Generates profile summary for LLM input
- * Groups by URL/title and calculates average weighted visits
+ * Sort: source tier → weighted_visits → recency → most recent
  *
- * @param rows
+ * @param {{source?: string, weighted_visits?: number, recency_weight?: number, visit_time?: string}} a
+ * @param {{source?: string, weighted_visits?: number, recency_weight?: number, visit_time?: string}} b
+ * @returns {number}
+ */
+function sortBySignal(a, b) {
+  const sa = SOURCE_PRIORITY[(a.source || "").toLowerCase()] ?? 1;
+  const sb = SOURCE_PRIORITY[(b.source || "").toLowerCase()] ?? 1;
+
+  if (sb !== sa) {
+    return sb - sa;
+  } // source first
+  if (b.weighted_visits !== a.weighted_visits) {
+    return b.weighted_visits - a.weighted_visits;
+  } // overall score
+  if (b.recency_weight !== a.recency_weight) {
+    return b.recency_weight - a.recency_weight;
+  } // tie-break
+  return a.visit_time < b.visit_time ? 1 : -1; // newest last
+}
+
+/**
+ * Generates profile summary for LLM input.
+ * Groups by URL/title and calculates average weighted visits.
+ *
+ * @param {Array<{
+ *   url: string,
+ *   title: string,
+ *   domain?: string,
+ *   visit_time?: string,
+ *   visit_count?: number,
+ *   source?: string,
+ *   recency_weight?: number,
+ *   source_weight?: number,
+ *   count_weight?: number,
+ *   weight_score?: number,
+ *   weighted_visits?: number
+ * }>} rows
+ * @returns {{ profile_summarized: Array<{url:string, title:string, weighted_visits:number}>, search_texts: Record<string, number> }}
  */
 function generateProfileInputs(rows) {
   // Group by URL+title
   const acc = new Map();
-  for (const r of rows) {
-    const key = `${r.url}\u0001${r.title}`;
+  for (const row of rows) {
+    const key = `${row.url}\u0001${row.title}`;
     const cur = acc.get(key);
     if (cur) {
-      cur.sum += r.weighted_visits;
+      cur.sum += row.weighted_visits;
       cur.n += 1;
     } else {
       acc.set(key, {
-        url: r.url,
-        title: r.title,
-        sum: r.weighted_visits,
+        url: row.url,
+        title: row.title,
+        sum: row.weighted_visits,
         n: 1,
       });
     }
@@ -300,12 +444,12 @@ function generateProfileInputs(rows) {
 
   // Extract search texts (titles with "search" in URL)
   const search_texts = {};
-  for (const r of rows.filter(r => /search/i.test(r.url))) {
-    const key = r.title || "(untitled)";
+  for (const searchRow of rows.filter(x => /search/i.test(x.url))) {
+    const key = searchRow.title || "(untitled)";
     if (!search_texts[key]) {
       search_texts[key] = 0;
     }
-    search_texts[key] += r.weighted_visits;
+    search_texts[key] += searchRow.weighted_visits;
   }
 
   return { profile_summarized, search_texts };
@@ -431,7 +575,8 @@ const LIVE_INSIGHTS_SCHEMA = {
 /**
  * Extracts JSON from LLM response (handles code blocks)
  *
- * @param text
+ * @param {string} text
+ * @returns {any}
  */
 function extractJSON(text) {
   const m = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
@@ -477,6 +622,9 @@ ${intentsList}
 - Style = <who/what + action + constraint>, 4–10 words, no trailing period.
 - Must include at least 1 concrete entity (brand/site/product/event) OR a clear constraint (price, time, size, color).
 - Vary verbs; avoid repetitive "buys/watches" when not aligned with intent.
+- Dont include person name unless they are popular to avoid any PII.
+- Dont generate insight from just odd one visit.
+- The insights are generated based on a pattern of visits.
 - No vague phrasing like "various", "often".
 - No duplicate of any item in related_insights (normalize case + remove punctuation before comparing).
 - If no safe, specific insight is supported by Inputs, set "insight_summary": null.
@@ -498,7 +646,18 @@ ${intentsList}
     - “Cooks Mediterranean seafood from TasteAtlas recipes” → “Mediterranean Recipes”
     - “Tracks minimalist fashion drops at Uniqlo” → “Minimalist Fashion”
 
-Return ONLY a JSON array (length 1–5) of objects, no prose, no code fences. Each object must have:
+## Scoring priorities (important)
+- Base "score" on both *strength* and *recency* of evidence.
+- Boost if evidence comes from higher-priority sources:
+  user (highest) > chat/conversation > search > history (lowest).
+- Penalize insights supported only by stale, low-frequency history.
+- A recent history signal can reach 1; consistent multi-source evidence can be 1-2.
+- A recent search signal can reach 2; consistent multi-source evidence can be 2-3.
+- A single recent chat signal can reach 4; 
+- A single recent user signal can reach 5;
+- Do not assign 5 unless the pattern is strong and recent.
+
+Return ONLY a JSON array (length 1–10) of objects, no prose, no code fences. Each object must have:
 {
   "category": "<one of the categories or null>",
   "intent": "<one of the intents or null>",
@@ -521,15 +680,20 @@ Return ONLY a JSON array (length 1–5) of objects, no prose, no code fences. Ea
  * @returns {Promise<object>} Parsed JSON response with categories
  */
 async function generateInsightsWithLLM(profile, source) {
-  const profile_records =
-    source === "history"
-      ? (profile?.profile_summarized ?? profile ?? [])
-      : Array.isArray(profile)
-        ? profile
-        : [];
+  // const profile_records =
+  //   source === "history"
+  //     ? (profile?.profile_summarized ?? profile ?? [])
+  //     : Array.isArray(profile)
+  //       ? profile
+  //       : [];
+  let profile_records = [];
+  if (source === "history") {
+    profile_records = profile?.profile_summarized ?? profile ?? [];
+  } else if (Array.isArray(profile)) {
+    profile_records = profile;
+  }
 
-  // TODO: pass your own shortlist if you maintain one
-  const prompt = buildLiveInsightPrompt({
+  const promptText = buildLiveInsightPrompt({
     profile_records,
     related_insights: [],
   });
@@ -541,7 +705,7 @@ async function generateInsightsWithLLM(profile, source) {
         role: "system",
         content: "You are a precise data analyst. Return ONLY valid JSON.",
       },
-      { role: "user", content: prompt },
+      { role: "user", content: promptText },
     ],
     responseFormat: { type: "json_schema", schema: LIVE_INSIGHTS_SCHEMA },
   });
@@ -658,9 +822,12 @@ export async function generateInsightsFromHistory() {
     }
 
     console.log(`[Insights] Found ${baseRows.length} history items`);
-    const rows = addWeights(baseRows, 14);
+    const rows = addWeights(baseRows, 14).sort(sortBySignal);
+    // console.debug(`rows after sortBySignal = ${JSON.stringify(rows)}`);
+
     const profile = generateProfileInputs(rows);
 
+    // console.debug(`profile = ${JSON.stringify(profile)}`);
     console.log("[Insights] Generating insights with LLM...");
     const list = await generateInsightsWithLLM(profile, "history");
 
@@ -705,9 +872,11 @@ export async function generateInsightsFromConversations() {
       throw new Error("No conversation history found");
     }
 
+    // console.debug(`chatHistory = ${JSON.stringify(chatHistory)}`);
     console.log(`[Insights] Found ${chatHistory.length} conversations`);
     console.log("[Insights] Generating insights with LLM...");
     const list = await generateInsightsWithLLM(chatHistory, "conversation");
+    // console.debug(`list = ${JSON.stringify(list)}`);
     const { addedCount } = addInsightsToData(list);
     console.log(
       `[Insights] Added ${addedCount}/${list.length} insights from conversations`
@@ -760,10 +929,6 @@ export function getInsightsState() {
 export function buildInsightsSystemPrompt() {
   const insightsData = getInsightsData();
 
-  // Safe fallback if DEFAULT_INSIGHTS_DATA is commented out
-  const defaultFallback =
-    typeof DEFAULT_INSIGHTS_DATA !== "undefined" ? DEFAULT_INSIGHTS_DATA : {};
-
   // Use generated insights if available, otherwise fall back to defaults
   const dataToUse = Object.keys(insightsData).length
     ? insightsData
@@ -793,10 +958,11 @@ Examples of Insight Tagging:
 }
 
 /**
- * Deletes an insight from the INSIGHTS_DATA object
+ * Deletes an insight from storage
  *
- * @param insight
- * @param category
+ * @param {string} insight
+ * @param {string} category
+ * @returns {boolean}
  */
 export function deleteInsight(insight, category) {
   const smartWindow = getSmartWindow();
@@ -814,9 +980,10 @@ export function deleteInsight(insight, category) {
 }
 
 /**
- * Detects insight tokens in content
+ * Detects [[insight: ...]] tokens in content
  *
- * @param content
+ * @param {string} content
+ * @returns {Array<{fullMatch:string, insight:string, startIndex:number, endIndex:number}>}
  */
 export function detectInsightTokens(content) {
   const insightRegex = /\[\[insight:\s*([^\]]+)\]\]/gi;
@@ -838,8 +1005,8 @@ export function detectInsightTokens(content) {
 /**
  * Creates a clickable insight token element
  *
- * @param insight
- * @param onInsightClick
+ * @param {string} insight
+ * @param {(insight:string)=>void} onInsightClick
  */
 export function createClickableInsightToken(insight, onInsightClick) {
   return html`
@@ -856,9 +1023,9 @@ export function createClickableInsightToken(insight, onInsightClick) {
 /**
  * Creates the insights overlay component
  *
- * @param onClose
- * @param usedInsights
- * @param onDeleteInsight
+ * @param {() => void} onClose
+ * @param {Set<string>} usedInsights
+ * @param {(insight:string, category:string) => void|null} onDeleteInsight
  */
 export function createInsightsOverlay(
   onClose,
