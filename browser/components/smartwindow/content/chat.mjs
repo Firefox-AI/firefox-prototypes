@@ -20,11 +20,19 @@ import {
 } from "chrome://browser/content/smartwindow/insights.mjs";
 
 const PROMPT_PREF = "browser.smartwindow.systemPromptOverride";
-
+const { ChatHistory, ChatHistoryConversation, ChatHistoryMessage } =
+  ChromeUtils.importESModule(
+    "resource:///modules/smartWindow/ChatHistory.sys.mjs"
+  );
 /**
  * A simple chat bot component that interacts with an Ollama model via streaming.
  */
 class ChatBot extends MozLitElement {
+  /**
+   * @type {null | import("../ChatHistory.sys.mjs").ChatHistoryConversation}
+   */
+  #conversation;
+
   static styles = css`
     :host {
       display: block;
@@ -365,10 +373,18 @@ class ChatBot extends MozLitElement {
     };
   }
 
+  get messages() {
+    return this.#conversation.messages;
+  }
+
+  set messages(new_messages) {
+    this.#conversation.messages = new_messages;
+  }
+
   constructor() {
     super();
     this.prompt = "";
-    this.messages = [];
+    // this.messages = [];
     this.marked = window.marked.marked; // Use the global marked instance for markdown rendering
     this.currentTabContext = []; // Store current tab context
     this.currentPageText = ""; // Store current page text content
@@ -381,6 +397,14 @@ class ChatBot extends MozLitElement {
     this.saveStatus = "idle";
     this._saveTimer = null;
     this._lastSavedAt = null;
+
+    // TODO: Figure out what/where to get this info from, if necessary
+    this.#conversation = new ChatHistoryConversation({
+      title: "",
+      description: "",
+      pageUrl: "",
+      pageMeta: "",
+    });
 
     let saved = "";
     try {
@@ -437,13 +461,13 @@ class ChatBot extends MozLitElement {
     }
 
     // Add the user message
-    this.messages.push({ role: "User", content: this.prompt });
+    this.#conversation.addUserMessage(this.prompt);
     // Prepare an empty assistant message for streaming
-    this.messages.push({ role: "Assistant", content: "" });
+    this.#conversation.addAssistantMessage("");
     this.requestUpdate();
 
     // Prepare messages with system prompt for the API call
-    const messagesForAPI = [...this.messages];
+    const messagesForAPI = [...this.#conversation.messages];
     if (messagesForAPI.length) {
       // Insert system prompt as the first message
       const systemContent =
@@ -467,16 +491,17 @@ class ChatBot extends MozLitElement {
           });
           continue;
         }
-        const lastIdx = this.messages.length - 1;
-        this.messages[lastIdx].content += chunk;
+        const lastIdx = this.#conversation.messages.length - 1;
+        this.#conversation.messages[lastIdx].content += chunk;
         this.scrollToBottom();
         this.requestUpdate();
       }
     } catch (err) {
       console.error("Streaming error:", err);
       // Optionally show an error in the assistant bubble
-      const lastIdx = this.messages.length - 1;
-      this.messages[lastIdx].content += "\n[Error streaming response]";
+      const lastIdx = this.#conversation.messages.length - 1;
+      this.#conversation.messages[lastIdx].content +=
+        "\n[Error streaming response]";
       this.requestUpdate();
     }
 
@@ -491,7 +516,22 @@ class ChatBot extends MozLitElement {
     }
   }
 
-  async submitPrompt(_prompt, tabContext = [], currentPageText = "") {
+  /**
+   * @param {import('../ChatHistory.sys.mjs').ChatHistoryConversation} conversation - The ChatHistoryConversation to submit a prompt for
+   * @param {string} _prompt - The new prompt for this conversation
+   * @param {TabInfo[]} [tabContext=[]] - Array of TabInfo objects providing tab context
+   * @param {string} [currentPageText=""] - Text of the current page in scope
+   */
+  async submitPrompt(
+    conversation,
+    _prompt,
+    tabContext = [],
+    currentPageText = ""
+  ) {
+    if (!this.#conversation || this.#conversation.id !== conversation.id) {
+      this.#conversation = conversation;
+    }
+
     // Store tab context and page text for use in system prompt
     this.currentTabContext = tabContext || [];
     this.currentPageText = currentPageText || "";
@@ -791,12 +831,12 @@ Today's date: ${currentDate}`;
         </button>
       </div>
 
-      ${this.messages.length
+      ${this.#conversation.messages.length !== 0
         ? html`
             <div class="chat">
-              ${this.messages.map(msg => {
+              ${this.#conversation.messages.map(msg => {
                 const { cleanContent, searchQueries, usedInsights } =
-                  msg.role === "Assistant"
+                  msg.role === ChatHistory.MESSAGE_ROLE.ASSISTANT
                     ? this.parseContentWithTokens(msg.content)
                     : {
                         cleanContent: msg.content,
@@ -806,11 +846,13 @@ Today's date: ${currentDate}`;
 
                 return html`
                   <div
-                    class="message ${msg.role === "User"
+                    class="message ${msg.role === ChatHistory.MESSAGE_ROLE.USER
                       ? "user"
                       : "assistant"}"
                   >
-                    <div class="message-title">${msg.role}</div>
+                    <div class="message-title">
+                      ${ChatHistoryMessage.getRoleLabel(msg.role)}
+                    </div>
                     ${usedInsights.length
                       ? html`
                           <div class="used-insights">
@@ -863,7 +905,7 @@ Today's date: ${currentDate}`;
                           </div>
                         `
                       : ""}
-                    ${msg.role === "Assistant"
+                    ${msg.role === ChatHistory.MESSAGE_ROLE.ASSISTANT
                       ? html`<div class="actions-wrapper">
                           <svg
                             width="24"
