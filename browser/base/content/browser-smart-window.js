@@ -240,6 +240,12 @@ var SmartWindow = {
       this._sidebarVisible ? "shown" : "hidden"
     );
 
+    window.dispatchEvent(
+      new CustomEvent("SmartWindowVisibilityChanged", {
+        detail: { visible: this._sidebarVisible },
+      })
+    );
+
     // Focus smartbar when sidebar becomes visible
     if (this._sidebarVisible) {
       this._focusSidebarSmartbar();
