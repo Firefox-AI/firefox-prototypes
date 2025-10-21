@@ -461,10 +461,8 @@ class ChatBot extends MozLitElement {
     }
 
     // Add the user message
-    // this.messages.push({ role: "User", content: this.prompt });
     this.#conversation.addUserMessage(this.prompt);
     // Prepare an empty assistant message for streaming
-    // this.messages.push({ role: "Assistant", content: "" });
     this.#conversation.addAssistantMessage("");
     this.requestUpdate();
 
@@ -833,7 +831,7 @@ Today's date: ${currentDate}`;
         </button>
       </div>
 
-      ${this.#conversation.messages.length === 0
+      ${this.#conversation.messages.length !== 0
         ? html`
             <div class="chat">
               ${this.#conversation.messages.map(msg => {
