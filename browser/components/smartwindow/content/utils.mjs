@@ -114,13 +114,14 @@ const toolsConfig = [
     function: {
       name: SEARCH_HISTORY,
       description:
-        "Returns the most relevant history items related to search term with each containing url, title, visited time and a description of the page if available.",
+        "Search browser history for pages related to a specific topic or keyword. Returns the most relevant history entries with URL, title, and visit time.",
       parameters: {
         type: "object",
         properties: {
           search_term: {
             type: "string",
-            description: "The term to use to search for relevant history.",
+            description:
+              "Keywords to search for in page titles and URLs (e.g., 'javascript tutorial', 'github', 'news')",
           },
         },
         required: ["search_term"],
@@ -129,20 +130,24 @@ const toolsConfig = [
   },
 ];
 
-const search_browser_history = async ({ type }) => {
+const search_browser_history = async ({ search_term, limit = 100 }) => {
   let root;
   let openedRoot = false;
 
   try {
-    const limit = 100;
     const currentHistory = lazy.PlacesUtils.history;
     const query = currentHistory.getNewQuery();
     const opts = currentHistory.getNewQueryOptions();
 
+    // Use Places' built-in text filtering
+    query.searchTerms = search_term;
+
+    // Simple URI results, ranked by frecency
     opts.resultType = Ci.nsINavHistoryQueryOptions.RESULTS_AS_URI;
-    opts.sortingMode = Ci.nsINavHistoryQueryOptions.SORT_BY_DATE_DESCENDING;
-    opts.maxResults = limit;
-    opts.excludeQueries = false;
+    opts.sortingMode = Ci.nsINavHistoryQueryOptions.SORT_BY_FRECENCY_DESCENDING;
+    opts.maxResults = limit; // no extra fetch since we're not re-ranking
+    opts.excludeQueries = false; // keep as in your original; flip to true if you want to hide place: items
+    opts.queryType = Ci.nsINavHistoryQueryOptions.QUERY_TYPE_HISTORY;
 
     const result = currentHistory.executeQuery(query, opts);
     root = result.root;
@@ -153,28 +158,29 @@ const search_browser_history = async ({ type }) => {
     }
 
     const rows = [];
-
-    for (let i = 0; i < root.childCount; i++) {
+    for (let i = 0; i < root.childCount && rows.length < limit; i++) {
       const node = root.getChild(i);
       rows.push({
         url: node.uri,
-        title: node.title || "",
-        lastVisit: lazy.PlacesUtils.toDate(node.time),
+        title: node.title || node.uri,
+        lastVisit: lazy.PlacesUtils.toDate(node.time).toISOString(),
+        visitCount: node.accessCount || 0,
         frecency: node.frecency,
-        guid: node.bookmarkGuid || null,
       });
     }
 
     return {
-      query: type,
+      search_term,
+      count: rows.length,
       results: rows,
     };
   } catch (error) {
     console.error("Error searching browser history:", error);
     return {
-      query: type,
+      search_term,
+      count: 0,
       results: [],
-      error: "There was an error retrieving the browser history",
+      error: error.message || "Failed to search browser history",
     };
   } finally {
     if (root && openedRoot) {
