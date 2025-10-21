@@ -649,6 +649,24 @@ class SmartWindowPage {
     }
   }
 
+  // Helper to get the most recent conversation with messages for a given URL
+  async #getMostRecentConversationWithMessages(url) {
+    const conversations = await this.#chatHistory.findConversationsByURL(
+      new URL(url)
+    );
+
+    // Filter to only conversations with messages, then sort by updatedDate
+    const conversationsWithMessages = conversations
+      .filter(convo => convo.messages && !!convo.messages.length)
+      .sort((a, b) => {
+        const dateA = a.updatedDate ? new Date(a.updatedDate) : new Date(0);
+        const dateB = b.updatedDate ? new Date(b.updatedDate) : new Date(0);
+        return dateB - dateA; // Most recent first
+      });
+
+    return conversationsWithMessages[0] || null;
+  }
+
   // Load chat messages for the current context (prioritize current tab)
   async loadChatMessagesForCurrentContext() {
     let conversation = null;
@@ -660,18 +678,9 @@ class SmartWindowPage {
 
     // Try to load from current tab first
     if (this.lastTabInfo && this.isCurrentTabInContext()) {
-      const currentConvo = await this.#chatHistory.findConversationsByURL(
-        new URL(this.lastTabInfo.url)
+      conversation = await this.#getMostRecentConversationWithMessages(
+        this.lastTabInfo.url
       );
-
-      conversation =
-        currentConvo[0] ||
-        new ChatHistoryConversation({
-          title: "Defaulted Message",
-          description: "",
-          pageUrl: new URL(this.lastTabInfo.url),
-          pageMeta: "",
-        });
 
       if (conversation && conversation.messages) {
         savedMessages.push(...conversation.messages);
@@ -681,24 +690,12 @@ class SmartWindowPage {
     // If no messages from current tab, try other tabs in context
     if (savedMessages.length === 0) {
       for (const tab of this.selectedTabContexts) {
-        const convo = await this.#chatHistory.findConversationsByURL(
-          new URL(tab.url)
+        conversation = await this.#getMostRecentConversationWithMessages(
+          tab.url
         );
-
-        conversation =
-          convo[0] ||
-          new ChatHistoryConversation({
-            title: "",
-            description: "",
-            pageUrl: new URL(tab.url),
-            pageMeta: "",
-          });
 
         if (conversation && conversation.messages) {
           savedMessages.push(...conversation.messages);
-        }
-
-        if (savedMessages.length) {
           break;
         }
       }
