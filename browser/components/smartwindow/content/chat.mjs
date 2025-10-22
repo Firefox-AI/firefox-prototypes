@@ -626,6 +626,13 @@ Examples of when to suggest searches:
 - User asks for local information or businesses near a location
 - User wants to compare options or find reviews
 
+When using the SEARCH_HISTORY tool:
+- Always provide a specific search_term parameter with relevant keywords
+- The search_term should be a string containing keywords related to what you're looking for
+- Results will be sorted by relevance to your search term
+- Each result includes: url, title, lastVisit (ISO timestamp), visitCount, and relevanceScore
+- Higher relevanceScore indicates better match to your search
+
 IMPORTANT: When the page content contains dates, times, or temporal information, incorporate these details into your search suggestions to make them more specific and relevant.
 
 Examples:

@@ -5,6 +5,7 @@
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+  PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
 });
 
 import { createEngine } from "chrome://global/content/ml/EngineProcess.sys.mjs";
@@ -69,7 +70,9 @@ export async function createOpenAIEngine() {
 
 const SEARCH_OPEN_TABS = "search_open_tabs";
 const GET_PAGE_CONTENT = "get_page_content";
-const TOOLS = [SEARCH_OPEN_TABS, GET_PAGE_CONTENT];
+const SEARCH_HISTORY = "search_history";
+
+const TOOLS = [SEARCH_OPEN_TABS, GET_PAGE_CONTENT, SEARCH_HISTORY];
 
 const toolsConfig = [
   {
@@ -110,7 +113,85 @@ const toolsConfig = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: SEARCH_HISTORY,
+      description:
+        "Search browser history for pages related to a specific topic or keyword. Returns the most relevant history entries with URL, title, and visit time.",
+      parameters: {
+        type: "object",
+        properties: {
+          search_term: {
+            type: "string",
+            description:
+              "Keywords to search for in page titles and URLs (e.g., 'javascript tutorial', 'github', 'news')",
+          },
+        },
+        required: ["search_term"],
+      },
+    },
+  },
 ];
+
+const search_browser_history = async ({ search_term, limit = 100 }) => {
+  let root;
+  let openedRoot = false;
+
+  try {
+    const currentHistory = lazy.PlacesUtils.history;
+    const query = currentHistory.getNewQuery();
+    const opts = currentHistory.getNewQueryOptions();
+
+    // Use Places' built-in text filtering
+    query.searchTerms = search_term;
+
+    // Simple URI results, ranked by frecency
+    opts.resultType = Ci.nsINavHistoryQueryOptions.RESULTS_AS_URI;
+    opts.sortingMode = Ci.nsINavHistoryQueryOptions.SORT_BY_FRECENCY_DESCENDING;
+    opts.maxResults = limit; // no extra fetch since we're not re-ranking
+    opts.excludeQueries = false; // keep as in your original; flip to true if you want to hide place: items
+    opts.queryType = Ci.nsINavHistoryQueryOptions.QUERY_TYPE_HISTORY;
+
+    const result = currentHistory.executeQuery(query, opts);
+    root = result.root;
+
+    if (!root.containerOpen) {
+      root.containerOpen = true;
+      openedRoot = true;
+    }
+
+    const rows = [];
+    for (let i = 0; i < root.childCount && rows.length < limit; i++) {
+      const node = root.getChild(i);
+      rows.push({
+        url: node.uri,
+        title: node.title || node.uri,
+        lastVisit: lazy.PlacesUtils.toDate(node.time).toISOString(),
+        visitCount: node.accessCount || 0,
+        frecency: node.frecency,
+      });
+    }
+
+    return {
+      search_term,
+      count: rows.length,
+      results: rows,
+    };
+  } catch (error) {
+    console.error("Error searching browser history:", error);
+    return {
+      search_term,
+      count: 0,
+      results: [],
+      error: error.message || "Failed to search browser history",
+    };
+  } finally {
+    if (root && openedRoot) {
+      root.containerOpen = false;
+    }
+  }
+};
 
 const search_open_tabs = ({ type }) => {
   let win = lazy.BrowserWindowTracker.getTopWindow();
@@ -329,14 +410,16 @@ export async function* fetchWithHistory(messages) {
           result = { error: `There is no tool called : ${String(toolName)}` };
         }
 
-        // Call the appropriate tool by name
-        if (toolName === SEARCH_OPEN_TABS) {
-          // Setting this pattern so that we can pass additional argument like context
-          // into the tool function with the params coming from the model
-          result = search_open_tabs(toolParams);
-        } else if (toolName === GET_PAGE_CONTENT) {
-          // Get page content for the specified URL
-          result = await get_page_content(toolParams);
+        switch (toolName) {
+          case SEARCH_OPEN_TABS:
+            result = search_open_tabs(toolParams);
+            break;
+          case GET_PAGE_CONTENT:
+            result = await get_page_content(toolParams);
+            break;
+          case SEARCH_HISTORY:
+            result = await search_browser_history(toolParams);
+            break;
         }
 
         // Create special tool call log message to show in the UI log panel
