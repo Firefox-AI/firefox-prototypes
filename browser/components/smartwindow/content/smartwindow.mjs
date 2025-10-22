@@ -1376,7 +1376,12 @@ class SmartWindowPage {
       topChromeWindow
     );
     if (this.smartbar) {
-      this.smartbar.showSuggestions(suggestions, "Suggestions:");
+      this.smartbar.showSuggestions(
+        suggestions,
+        "Suggestions:",
+        false,
+        query,
+      );
 
       // Apply autofill if available
       if (autofillData) {
