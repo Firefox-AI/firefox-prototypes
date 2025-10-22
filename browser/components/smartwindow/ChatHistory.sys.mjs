@@ -501,27 +501,14 @@ export class ChatHistory {
       `,
       { conv_id: conversationId }
     );
+
     if (!rows.length) {
       return null;
     }
 
     let conversation = parseConversationRow(rows[0]);
 
-    rows = await this.#conn.executeCached(
-      `
-        SELECT
-          message_id, created_date, parent_message_id, revision_root_message_id,
-          ordinal, is_active_branch, role, model_id,
-          json(params_jsonb) As params, content, json(usage_jsonb) AS usage
-          FROM message
-          WHERE conv_id = :conv_id
-          ORDER BY ordinal ASC
-      `,
-      { conv_id: conversationId }
-    );
-    conversation.messages = parseMessageRows(rows);
-    // TODO: retrieve TTL content.
-    return conversation;
+    return (await this.getMessagesForConversations([conversation]))[0];
   }
 
   async findConversationsByDate(startDate, endDate) {
@@ -541,29 +528,10 @@ export class ChatHistory {
     if (!rows.length) {
       return [];
     }
-    let conversations = rows.map(parseConversationRow);
 
-    // Find all the messages for all the conversations.
-    rows = await this.#conn.executeCached(
-      `
-        SELECT
-          message_id, created_date, parent_message_id, revision_root_message_id,
-          ordinal, is_active_branch, role, model_id,
-          json(params_jsonb) As params, content, json(usage_jsonb) AS usage
-          FROM message
-          WHERE conv_id IN(${new Array(conversations.length).fill("?").join(",")})
-          ORDER BY ordinal ASC
-      `,
-      conversations.map(c => c.id)
-    );
-    let messages = parseMessageRows(rows);
-    // TODO: retrieve TTL content.
-    for (let conversation of conversations) {
-      conversation.messages = messages.filter(
-        m => m.conv_id == conversation.id
-      );
-    }
-    return conversations;
+    const conversations = rows.map(parseConversationRow);
+
+    return await this.getMessagesForConversations(conversations);
   }
 
   async findConversationsByURL(pageUrl) {
@@ -584,10 +552,14 @@ export class ChatHistory {
     if (!rows.length) {
       return [];
     }
-    let conversations = rows.map(parseConversationRow);
+    const conversations = rows.map(parseConversationRow);
 
+    return await this.getMessagesForConversations(conversations);
+  }
+
+  async getMessagesForConversations(conversations) {
     // Find all the messages for all the conversations.
-    rows = await this.#conn.executeCached(
+    const rows = await this.#conn.executeCached(
       `
         SELECT
           message_id, created_date, parent_message_id, revision_root_message_id,
@@ -608,6 +580,7 @@ export class ChatHistory {
         return m.conv_id == conversation.id;
       });
     }
+
     return conversations;
   }
 
