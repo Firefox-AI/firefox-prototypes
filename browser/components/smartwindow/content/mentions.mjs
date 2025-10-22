@@ -148,6 +148,24 @@ export class MentionDropdown {
     floatingUI
       .computePosition(virtualEl, this.element, {
         placement: "bottom-start",
+        middleware: [
+          floatingUI.flip({
+            fallbackPlacements: ["top-start", "bottom-end", "top-end"],
+          }),
+          floatingUI.shift({
+            padding: 4,
+            crossAxis: false,
+          }),
+          floatingUI.size({
+            apply({ availableWidth, availableHeight, elements }) {
+              Object.assign(elements.floating.style, {
+                maxWidth: `${Math.min(400, availableWidth)}px`,
+                maxHeight: `${Math.min(320, availableHeight)}px`,
+                overflowY: availableHeight < elements.floating.scrollHeight ? "auto" : "visible",
+              });
+            },
+          }),
+        ],
       })
       .then(({ x, y }) => {
         Object.assign(this.element.style, {
