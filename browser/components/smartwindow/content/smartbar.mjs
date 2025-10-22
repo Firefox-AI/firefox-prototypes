@@ -302,9 +302,16 @@ export function attachToElement(element, options = {}) {
 
     const icon = document.createElement("span");
     icon.className = "suggestion-icon";
-    icon.textContent = getQueryTypeIcon
-      ? getQueryTypeIcon(suggestion.type)
-      : "🔍";
+    if (suggestion.icon) {
+      const imgElement = document.createElement("img");
+      imgElement.src = suggestion.icon;
+      imgElement.alt = "";
+      icon.appendChild(imgElement);
+    } else {
+      icon.textContent = getQueryTypeIcon
+        ? getQueryTypeIcon(suggestion.type)
+        : "🔍";
+    }
 
     const textContainer = document.createElement("div");
     textContainer.className = "suggestion-text-container";

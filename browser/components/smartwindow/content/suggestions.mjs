@@ -240,7 +240,9 @@ export async function generateLiveSuggestions(query, topChromeWindow) {
       for (const result of resultsToProcess) {
         const detectedType = await detectQueryType(result.text);
         suggestions.push({
+          title: result.title,
           text: result.text,
+          icon: result.icon,
           type: detectedType,
         });
       }
@@ -251,7 +253,9 @@ export async function generateLiveSuggestions(query, topChromeWindow) {
       s => s.type === "navigate"
     );
     const navigateSuggestions = navigateResults.slice(0, 2).map(s => ({
+      title: s.title,
       text: s.text,
+      icon: s.icon,
       type: s.type,
     }));
     suggestions.push(...navigateSuggestions);
@@ -259,7 +263,9 @@ export async function generateLiveSuggestions(query, topChromeWindow) {
     // Add action results as-is
     const actionResults = urlbarSuggestions.filter(s => s.type === "action");
     const actionSuggestions = actionResults.slice(0, 2).map(s => ({
+      title: s.title,
       text: s.text,
+      icon: s.icon,
       type: s.type,
     }));
     suggestions.push(...actionSuggestions);
