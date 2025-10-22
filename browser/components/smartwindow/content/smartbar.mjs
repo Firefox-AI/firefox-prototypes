@@ -96,6 +96,9 @@ export function attachToElement(element, options = {}) {
     addAttributes() {
       return {
         ...this.parent?.(),
+        label: {
+          default: null,
+        },
         icon: {
           default: null,
           parseHTML: el => el.getAttribute("data-icon"),
@@ -105,11 +108,13 @@ export function attachToElement(element, options = {}) {
     },
 
     renderHTML({ node, HTMLAttributes }) {
+      const { id, label, icon } = node.attrs;
+      const iconSrc = icon || (id ? `page-icon:${id}` : "");
       const attrs = {
         ...HTMLAttributes,
         class: `${HTMLAttributes.class ?? ""} mention`.trim(),
-        "data-id": node.attrs.id,
-        "data-icon": node.attrs.icon || "",
+        "data-id": id,
+        "data-icon": icon || "",
       };
       return [
         "span",
@@ -117,7 +122,7 @@ export function attachToElement(element, options = {}) {
         [
           "img",
           {
-            src: node.attrs.icon || "",
+            src: iconSrc,
             alt: "",
             class: "mention-icon",
             width: "16",
@@ -126,10 +131,15 @@ export function attachToElement(element, options = {}) {
         ],
         [
           "span",
-          { class: "mention-label", title: node.attrs.label },
-          `@${node.attrs.label}`,
+          { class: "mention-label", title: label || id },
+          `@${label || id}`,
         ],
       ];
+    },
+
+    renderText({ node }) {
+      const { id, label } = node.attrs;
+      return `@${label || id}`;
     },
   });
 
@@ -160,7 +170,18 @@ export function attachToElement(element, options = {}) {
               suggestion => !existingMentionIds.includes(suggestion.id)
             );
           },
-
+          // Replace @-query with mention(id/label/icon) + trailing space so caret exits the chip
+          command: ({ range, props }) => {
+            const { id, label, favicon } = props;
+            editor
+              .chain()
+              .focus()
+              .insertContentAt(range, [
+                { type: "mention", attrs: { id, label, icon: favicon } },
+                { type: "text", text: " " },
+              ])
+              .run();
+          },
           render: () => {
             let dropdown;
             let currentCommand;
@@ -502,7 +523,7 @@ export function attachToElement(element, options = {}) {
         }
         if (node.type === "mention") {
           // Use the ID (URL) instead of the label (title) for mentions
-          return `@${node.attrs.id}`;
+          return `@${node.attrs.label || node.attrs.id || ""}`;
         }
         if (node.type === "paragraph" || node.type === "doc") {
           // Handle paragraphs and document nodes
@@ -529,6 +550,10 @@ export function attachToElement(element, options = {}) {
       const fallbackText = editor.getText();
       console.warn("[SmartBar] getText() fallback:", fallbackText);
       return fallbackText;
+    },
+
+    getHTML() {
+      return editor.getHTML();
     },
 
     setContent(content) {

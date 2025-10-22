@@ -344,16 +344,44 @@ class ChatBot extends MozLitElement {
       border-radius: 999px;
       background: #f8f9fa;
     }
+
     .save-dot {
       width: 6px;
       height: 6px;
       border-radius: 50%;
     }
+
     .save-dot.saving {
       background: #d39e00;
     }
+
     .save-dot.saved {
       background: #2ea44f;
+    }
+
+    .mention {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      max-width: 185px;
+      vertical-align: middle;
+      border: 1px solid var(--tab-border-color, rgba(0, 0, 0, 0));
+      background: rgba(191, 143, 204, 0.1);
+    }
+
+    .mention .mention-icon {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 16px;
+      display: block;
+    }
+
+    .mention .mention-label {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
     }
 
     ${insightsStyles}
@@ -397,6 +425,8 @@ class ChatBot extends MozLitElement {
     this.saveStatus = "idle";
     this._saveTimer = null;
     this._lastSavedAt = null;
+    this._lastUserHTML = null;
+    this._uiMeta = new Map();
 
     // TODO: Figure out what/where to get this info from, if necessary
     this.#conversation = new ChatHistoryConversation({
@@ -430,6 +460,11 @@ class ChatBot extends MozLitElement {
     };
   }
 
+  clearUIMeta() {
+    this._uiMeta.clear();
+    this._lastUserHTML = null;
+  }
+
   connectedCallback() {
     super.connectedCallback();
     // Listen for insights-updated events to re-render the overlay
@@ -442,6 +477,7 @@ class ChatBot extends MozLitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
+    this.clearUIMeta();
     // Clean up event listener
     if (this._insightsUpdatedHandler) {
       window.removeEventListener(
@@ -460,14 +496,28 @@ class ChatBot extends MozLitElement {
       return;
     }
 
-    // Add the user message
+    // Conversation holds string-only {role, content}; keep render-only data in _uiMeta so it never reaches the backend.
+    const before = this.#conversation.messages.length;
     this.#conversation.addUserMessage(this.prompt);
+    const msgsAfter = this.#conversation.messages;
+    const userMsg = msgsAfter[before];
+    const userKey = (userMsg && (userMsg.id ?? userMsg.messageId)) ?? before;
+
+    // Stash the rich HTML for rendering only
+    if (this._lastUserHTML) {
+      const meta = { displayHTML: this._lastUserHTML };
+      this._uiMeta.set(userKey, meta);
+      this._uiMeta.set(before, meta);
+      this._lastUserHTML = null;
+    }
+
     // Prepare an empty assistant message for streaming
     this.#conversation.addAssistantMessage("");
     this.requestUpdate();
 
     // Prepare messages with system prompt for the API call
-    const messagesForAPI = [...this.#conversation.messages];
+    const messagesForAPI = this.#conversation.messages.map(m => ({ role: m.role, content: m.content, }));
+
     if (messagesForAPI.length) {
       // Insert system prompt as the first message
       const systemContent =
@@ -532,12 +582,16 @@ class ChatBot extends MozLitElement {
       this.#conversation = conversation;
     }
 
+    const { text, html: displayHTML } =
+      typeof _prompt === "string" ? { text: _prompt } : _prompt;
+
     // Store tab context and page text for use in system prompt
     this.currentTabContext = tabContext || [];
     this.currentPageText = currentPageText || "";
 
-    // Keep the user prompt clean - context will be included in system prompt
-    this.prompt = _prompt;
+    // Plain text goes to the model; rich HTML is stashed for UI rendering.
+    this.prompt = text ?? "";
+    this._lastUserHTML = displayHTML || null;
     await this.sendPrompt();
   }
 
@@ -834,7 +888,7 @@ Today's date: ${currentDate}`;
       ${this.#conversation.messages.length !== 0
         ? html`
             <div class="chat">
-              ${this.#conversation.messages.map(msg => {
+              ${this.#conversation.messages.map((msg, i) => {
                 const { cleanContent, searchQueries, usedInsights } =
                   msg.role === ChatHistory.MESSAGE_ROLE.ASSISTANT
                     ? this.parseContentWithTokens(msg.content)
@@ -843,7 +897,17 @@ Today's date: ${currentDate}`;
                         searchQueries: [],
                         usedInsights: [],
                       };
+                
 
+                // render HTML when available, otherwise fallback to markdown.
+                const key = msg.id ?? msg.messageId ?? i;
+                const meta = this._uiMeta.get(key);
+
+                const bodyHTML =
+                  msg.role === ChatHistory.MESSAGE_ROLE.USER && meta?.displayHTML
+                    ? unsafeHTML(meta.displayHTML)
+                    : unsafeHTML(this.marked(cleanContent));
+                  
                 return html`
                   <div
                     class="message ${msg.role === ChatHistory.MESSAGE_ROLE.USER
@@ -868,7 +932,7 @@ Today's date: ${currentDate}`;
                           </div>
                         `
                       : ""}
-                    <div>${unsafeHTML(this.marked(cleanContent))}</div>
+                    <div class="message-body">${bodyHTML}</div>
                     ${searchQueries.length
                       ? html`
                           <div class="search-suggestions">

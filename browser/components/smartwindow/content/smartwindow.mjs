@@ -1414,9 +1414,14 @@ class SmartWindowPage {
         // Pass page text if current tab is in context
         const includePageText = this.isCurrentTabInContext();
 
+        const textFromBar = this.smartbar?.getText?.() || "";
+        const htmlFromBar = this.smartbar?.getHTML?.() || null;
+        const text = textFromBar || (typeof query === "string" ? query : "");
+        const html = htmlFromBar;
+
         await this.chatBot.submitPrompt(
           this.#conversation,
-          query,
+          { text, html },
           contextTabs,
           includePageText ? this.currentTabPageText : ""
         );
