@@ -5,6 +5,10 @@
 import { html, css, render } from "chrome://global/content/vendor/lit.all.mjs";
 import { createOpenAIEngine } from "./utils.mjs";
 
+const { ChatHistory, ChatHistoryMessage } = ChromeUtils.importESModule(
+  "resource:///modules/smartwindow/ChatHistory.sys.mjs"
+);
+
 /**
  * CSS styles for insights functionality
  */
@@ -464,6 +468,24 @@ function generateProfileInputs(rows) {
 // Chat Analysis Functions
 // ============================================================================
 
+async function getChatHistoryAsMap(days) {
+  const chatHistory = new ChatHistory();
+  const endDate = Date.now();
+  const timeWindowInMs = days * 24 * 60 * 60 * 1000;
+  const startDate = endDate - timeWindowInMs;
+
+  const conversations = await chatHistory.findConversationsByDate(
+    startDate,
+    endDate
+  );
+
+  return conversations.reduce((mapping, conversation) => {
+    mapping.set(conversation.pageUrl, conversation.messages);
+
+    return mapping;
+  }, new Map());
+}
+
 /**
  * Extracts user chat messages from Smart Window storage
  *
@@ -481,40 +503,45 @@ async function getUserChats(opts = {}) {
   const nowMs = Date.now();
 
   try {
-    // Get chat history from browser-smart-window.js
-    // Format: Map(tabId -> [{role, content, ts}])
-    const chatHistory =
-      window.browsingContext?.topChromeWindow?.SmartWindow
-        ?._chatMessagesByTab || new Map();
+    // Get chat history from ChatHistory.sys.mjs as Map
+    // from getChatHistoryAsMap(days)
+    //
+    // Format: Map(pageUrl -> [ChatHistoryMessage]) (browser/components/smartwindow/ChatHistory.sys.mjs)
+    //
+
+    const messagesMap = await getChatHistoryAsMap(days);
 
     const agg = new Map();
 
-    for (const [tabId, msgs] of chatHistory.entries()) {
+    for (const [pageUrl, msgs] of messagesMap.entries()) {
       if (!Array.isArray(msgs)) {
         continue;
       }
 
       for (const m of msgs) {
-        if (m?.role.toLowerCase() !== "user") {
+        const msgRole = ChatHistoryMessage.getRoleLabel(m?.role ?? "");
+        if (msgRole.toLowerCase() !== "user") {
           continue;
         }
+
         if (typeof m.content !== "string") {
           continue;
         }
+
         const content = m.content.trim();
         if (!content) {
           continue;
         }
 
-        const ts = Number(m.ts ?? 0);
+        const ts = Number(m.createdDate ?? 0);
         if (ts && ts < startTime) {
           continue;
         }
 
-        if (!agg.has(tabId)) {
-          agg.set(tabId, { messages: [], lastTs: 0 });
+        if (!agg.has(pageUrl)) {
+          agg.set(pageUrl, { messages: [], lastTs: 0 });
         }
-        const bucket = agg.get(tabId);
+        const bucket = agg.get(pageUrl);
 
         if (!bucket.messages.includes(content)) {
           bucket.messages.push(content);
