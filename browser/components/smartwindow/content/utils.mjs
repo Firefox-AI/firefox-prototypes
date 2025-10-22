@@ -583,21 +583,6 @@ function generateFallbackPrompts(contextTabs = []) {
       { text: `research across ${contextTabs.length} tabs`, type: "search" },
       { text: `summarize content from selected tabs`, type: "chat" }
     );
-  } else {
-    // Single tab context
-    const tabTitle = contextTabs[0]?.title || "";
-    const titleWords = tabTitle
-      .split(/\s+/)
-      .filter(word => word.length > 2)
-      .slice(0, 3);
-    const topic = titleWords.join(" ") || "this";
-
-    suggestions.push(
-      { text: `What is ${topic} about?`, type: "chat" },
-      { text: `How does ${topic} work?`, type: "chat" },
-      { text: `${topic} guide`, type: "search" },
-      { text: `${topic} tutorial`, type: "search" }
-    );
   }
 
   // Add domain suggestions from context tabs

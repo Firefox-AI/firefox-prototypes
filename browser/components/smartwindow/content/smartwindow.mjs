@@ -194,25 +194,6 @@ class SmartWindowPage {
         { text: `research across ${contextTabs.length} tabs`, type: "search" },
         { text: `summarize content from selected tabs`, type: "chat" }
       );
-    } else {
-      // Single tab context (original logic)
-      const titleWords = (tabTitle || contextTabs[0]?.title || "")
-        .split(/\s+/)
-        .filter(word => word.length > 2)
-        .slice(0, 3);
-      const topic = titleWords.join(" ") || "this";
-
-      // 2 chat prompts
-      suggestions.push(
-        { text: `What is ${topic} about?`, type: "chat" },
-        { text: `How does ${topic} work?`, type: "chat" }
-      );
-
-      // 2 search queries
-      suggestions.push(
-        { text: `${topic} guide`, type: "search" },
-        { text: `${topic} tutorial`, type: "search" }
-      );
     }
 
     // Add domain suggestions from context tabs
