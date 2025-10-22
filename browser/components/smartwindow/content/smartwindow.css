@@ -485,6 +485,13 @@ body {
   width: 20px;
   text-align: center;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.suggestion-icon img {
+  width: 100%;
 }
 
 .suggestion-text-container {
