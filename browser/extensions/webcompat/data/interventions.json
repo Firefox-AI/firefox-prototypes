@@ -514,6 +514,23 @@
       }
     ]
   },
+  "1729435": {
+    "label": "milkbarstore.com",
+    "bugs": {
+      "1729435": {
+        "issue": "broken-interactive-elements",
+        "matches": ["*://milkbarstore.com/*"]
+      }
+    },
+    "interventions": [
+      {
+        "platforms": ["all"],
+        "content_scripts": {
+          "css": ["1729435_milkbarstore.com-fix-cart-quantity-counts.css"]
+        }
+      }
+    ]
+  },
   "1739489": {
     "label": "Sites using draft.js",
     "bugs": {
@@ -2011,6 +2028,21 @@
       }
     ]
   },
+  "1898898": {
+    "label": "app.libry.jp",
+    "bugs": {
+      "1898898": {
+        "issue": "firefox-blocked-completely",
+        "matches": ["*://app.libry.jp/*"]
+      }
+    },
+    "interventions": [
+      {
+        "platforms": ["all"],
+        "ua_string": ["add_Chrome"]
+      }
+    ]
+  },
   "1898904": {
     "label": "indigo.shireburn.com",
     "bugs": {
@@ -3169,6 +3201,51 @@
           "all_frames": true,
           "js": ["bug1902419-www.jamsune.com-prevent-unsupported-alert.js"]
         }
+      }
+    ]
+  },
+  "1902450": {
+    "label": "hilokal.com",
+    "bugs": {
+      "1902450": {
+        "issue": "firefox-blocked-completely",
+        "matches": ["*://www.hilokal.com/*"]
+      }
+    },
+    "interventions": [
+      {
+        "platforms": ["desktop"],
+        "ua_string": ["add_Chrome"]
+      }
+    ]
+  },
+  "1902454": {
+    "label": "onvideo.kuaishou.com",
+    "bugs": {
+      "1902454": {
+        "issue": "firefox-blocked-completely",
+        "matches": ["*://onvideo.kuaishou.com/*"]
+      }
+    },
+    "interventions": [
+      {
+        "platforms": ["desktop"],
+        "ua_string": ["add_Chrome"]
+      }
+    ]
+  },
+  "1902457": {
+    "label": "www.vpropel.in",
+    "bugs": {
+      "1902457": {
+        "issue": "firefox-blocked-completely",
+        "matches": ["*://www.vpropel.in/*"]
+      }
+    },
+    "interventions": [
+      {
+        "platforms": ["all"],
+        "ua_string": ["add_Chrome"]
       }
     ]
   },
@@ -4390,6 +4467,21 @@
       }
     ]
   },
+  "1949152": {
+    "label": "gatufotogruppen.com",
+    "bugs": {
+      "1949152": {
+        "issue": "firefox-blocked-completely",
+        "matches": ["*://www.gatufotogruppen.se/*"]
+      }
+    },
+    "interventions": [
+      {
+        "platforms": ["all"],
+        "ua_string": ["Chrome_with_FxQuantum"]
+      }
+    ]
+  },
   "1949466": {
     "label": "lapalabradeldia.com",
     "bugs": {
@@ -4998,6 +5090,25 @@
         "content_scripts": {
           "css": [
             "bug1969245-www.wills-vegan-store.com-unhide-product-images.css"
+          ]
+        }
+      }
+    ]
+  },
+  "1970810": {
+    "label": "camper-van-week-end.fr",
+    "bugs": {
+      "1970810": {
+        "issue": "page-fails-to-load",
+        "matches": ["*://www.camper-van-week-end.fr/*"]
+      }
+    },
+    "interventions": [
+      {
+        "platforms": ["linux"],
+        "content_scripts": {
+          "js": [
+            "bug1970810-www.camper-van-week-end.fr-appVersion-linux-fix.js"
           ]
         }
       }

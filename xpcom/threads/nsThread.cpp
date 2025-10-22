@@ -41,7 +41,6 @@
 #include "mozilla/ChaosMode.h"
 #include "mozilla/glean/XpcomMetrics.h"
 #include "mozilla/TimeStamp.h"
-#include "mozilla/Unused.h"
 #include "mozilla/dom/DocGroup.h"
 #include "mozilla/dom/ScriptSettings.h"
 #include "nsThreadSyncDispatch.h"
@@ -338,6 +337,11 @@ void nsThread::ThreadFunc(void* aArg) {
 
   self->InitCommon();
 
+#ifdef XP_MACOSX
+  // Use "User Initiated" as the default quality of service.
+  pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0);
+#endif
+
   // Inform the ThreadManager
   nsThreadManager::get().RegisterCurrentThread(*self);
 
@@ -619,7 +623,7 @@ nsresult nsThread::Init(const nsACString& aName) {
     }
 
     // The created thread now owns initData, so release our ownership of it.
-    Unused << initData.release();
+    (void)initData.release();
 
     // The thread has successfully started, so we can mark it as requiring
     // shutdown & add it to the thread list.

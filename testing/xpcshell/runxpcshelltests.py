@@ -54,7 +54,7 @@ try:
 except ImportError:
     build = None
 
-HARNESS_TIMEOUT = 5 * 60
+HARNESS_TIMEOUT = 30
 TBPL_RETRY = 4  # defined in mozharness
 
 # benchmarking on tbpl revealed that this works best for now
@@ -366,8 +366,16 @@ class XPCShellTestThread(Thread):
         On a remote system, this is more complex and we need to overload this function.
         """
         quiet = self.crashAsPass or self.retry
+        # For selftests, set dump_save_path to prevent crash dumps from being saved
+        # (they intentionally crash and the dumps aren't useful artifacts)
+        dump_save_path = "" if self.selfTest else None
         return mozcrash.log_crashes(
-            self.log, dump_directory, symbols_path, test=test_name, quiet=quiet
+            self.log,
+            dump_directory,
+            symbols_path,
+            test=test_name,
+            quiet=quiet,
+            dump_save_path=dump_save_path,
         )
 
     def logCommand(self, name, completeCmd, testdir):
@@ -1961,6 +1969,14 @@ class XPCShellTests:
             JSDebuggerInfo = namedtuple("JSDebuggerInfo", ["port"])
             self.jsDebuggerInfo = JSDebuggerInfo(port=options["jsDebuggerPort"])
 
+        # Apply timeout factor
+        timeout_factor = options.get("timeoutFactor", 1.0)
+        self.harness_timeout = int(HARNESS_TIMEOUT * timeout_factor)
+        self.log.info(
+            f"Using harness timeout of {self.harness_timeout}s "
+            f"(base={HARNESS_TIMEOUT}s, factor={timeout_factor})"
+        )
+
         self.app_binary = options.get("app_binary")
         self.xpcshell = options.get("xpcshell")
         self.http3ServerPath = options.get("http3server")
@@ -2177,6 +2193,10 @@ class XPCShellTests:
             "repeat": self.repeat,
             "profiler": self.profiler,
         }
+
+        # Only set retry if explicitly provided (avoid overriding default behavior)
+        if options.get("retry") is not None:
+            kwargs["retry"] = options.get("retry")
 
         if self.sequential:
             # Allow user to kill hung xpcshell subprocess with SIGINT

@@ -963,7 +963,7 @@ void EventSourceImpl::SetupHttpChannel() {
             ("SetupHttpChannel. rv=%x (%s)", uint32_t(rv), eventId.get()));
   }
 #endif
-  Unused << rv;
+  (void)rv;
 }
 
 nsresult EventSourceImpl::SetupReferrerInfo(
@@ -1192,7 +1192,13 @@ void EventSourceImpl::ReestablishConnection() {
     return;
   }
 
-  rv = GetEventSource()->CheckCurrentGlobalCorrectness();
+  RefPtr<EventSource> source = GetEventSource();
+  if (!source) {
+    NS_WARNING("Event source is null");
+    return;
+  }
+
+  rv = source->CheckCurrentGlobalCorrectness();
   if (NS_FAILED(rv)) {
     return;
   }
@@ -1201,7 +1207,7 @@ void EventSourceImpl::ReestablishConnection() {
   ResetDecoder();
   // We can't hold the mutex while dispatching the event because the mutex is
   // not reentrant, and content might call back into our code.
-  rv = GetEventSource()->CreateAndDispatchSimpleEvent(u"error"_ns);
+  rv = source->CreateAndDispatchSimpleEvent(u"error"_ns);
   if (NS_FAILED(rv)) {
     NS_WARNING("Failed to dispatch the error event!!!");
     return;

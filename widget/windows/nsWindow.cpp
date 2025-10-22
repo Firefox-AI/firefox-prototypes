@@ -1081,11 +1081,7 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
       mIsCloaked = mozilla::IsCloaked(mWnd);
       mFrameState->ConsumePreXULSkeletonState(WasPreXULSkeletonUIMaximized());
 
-      // FIXME(emilio): This looks wrong, mBounds and mLastPaintBounds
-      // are LayoutDevice coords...
-      auto scale = GetDesktopToDeviceScale();
-      mBounds = mLastPaintBounds = LayoutDeviceIntRect::FromUnknownRect(
-          DesktopIntRect::Round(GetBounds() / scale).ToUnknownRect());
+      mBounds = mLastPaintBounds = GetBounds();
 
       // Reset the WNDPROC for this window and its whole class, as we had
       // to use our own WNDPROC when creating the the skeleton UI window.
@@ -1168,14 +1164,14 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
       nsAutoString aumid;
       // Make sure we're using the correct AUMID so that taskbar
       // grouping works properly
-      Unused << NS_WARN_IF(!mozilla::widget::WinTaskbar::GenerateAppUserModelID(
+      (void)NS_WARN_IF(!mozilla::widget::WinTaskbar::GenerateAppUserModelID(
           aumid, usePrivateAumid));
       if (!usePrivateAumid && widget::WinUtils::HasPackageIdentity()) {
         // On MSIX we should always have a provided process AUMID
         // that we can explicitly assign to a regular window.
         UINT32 maxLength = MAX_PATH;
         aumid.SetLength(maxLength);
-        Unused << NS_WARN_IF(
+        (void)NS_WARN_IF(
             GetCurrentApplicationUserModelId(&maxLength, aumid.get()));
       }
       if (!FAILED(InitPropVariantFromString(aumid.get(), &pv))) {
@@ -1775,7 +1771,7 @@ void nsWindow::Show(bool aState) {
               ::ShowWindow(mWnd, SW_SHOWNOACTIVATE);
               // Don't flicker the window if we're restoring session
               if (!sIsRestoringSession) {
-                Unused << GetAttention(2);
+                (void)GetAttention(2);
               }
             }
             break;
@@ -4822,7 +4818,7 @@ bool nsWindow::ProcessMessageInternal(UINT msg, WPARAM& wParam, LPARAM& lParam,
 
     case MOZ_WM_STARTA11Y:
 #if defined(ACCESSIBILITY)
-      Unused << GetAccessible();
+      (void)GetAccessible();
       result = true;
 #else
       result = false;
@@ -6482,8 +6478,9 @@ void nsWindow::OnWindowPosChanged(WINDOWPOS* wp) {
         NS_DispatchToMainThread(NS_NewRunnableFunction(
             "EnforceAspectRatio", [self, this, newWidth]() -> void {
               if (mWnd) {
-                // FIXME: This seems wrong? newWidth is LayoutDevicePixel
-                Resize(DesktopSize(newWidth, newWidth / mAspectRatio), true);
+                Resize(LayoutDeviceSize(newWidth, newWidth / mAspectRatio) /
+                           GetDesktopToDeviceScale(),
+                       true);
               }
             }));
       }
@@ -7046,9 +7043,8 @@ void nsWindow::OnDPIChanged(int32_t x, int32_t y, int32_t width,
       }
     }
 
-    // FIXME(emilio): This looks wrong, x / y / width / height are
-    // LayoutDevice coords...
-    Resize(DesktopRect(x, y, width, height), true);
+    Resize(LayoutDeviceIntRect(x, y, width, height) / GetDesktopToDeviceScale(),
+           true);
   }
   UpdateNonClientMargins();
   ChangedDPI();
