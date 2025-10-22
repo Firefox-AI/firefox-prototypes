@@ -419,7 +419,7 @@ export function attachToElement(element, options = {}) {
     suggestionsList.innerHTML = "";
 
     suggestions.forEach((suggestion, index) => {
-      const suggestionWithQuery = { ...suggestion, query };
+      const suggestionWithQuery = { ...suggestion, query: query.trim() };
       const suggestionButton = createSuggestionButton(
         suggestionWithQuery,
         index
