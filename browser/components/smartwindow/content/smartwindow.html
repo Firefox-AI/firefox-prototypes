@@ -59,6 +59,29 @@
                   ×
                 </button>
               </div>
+              <label class="toggle-insights">
+                <input id="toggle-insights" type="checkbox" />
+                Signals
+              </label>
+              <span class="pickers-container">
+                <select class="model-picker" id="model-picker">
+                  <option value="qwen3-235b-a22b-instruct-2507-maas">qwen</option>
+                  <option value="gpt-4o">gpt-4o</option>
+                  <option value="gpt-5-mini">gpt-5-mini</option>
+                  <option value="gpt-5">gpt-5</option>
+                  <option value="gpt-3.5-turbo">gpt-3.5</option>
+                  <option value="mistral-small-2503">mistral</option>
+                </select>
+                <select class="query-type-picker" id="query-type-picker">
+                  <option value="auto">Auto</option>
+                  <option value="chat">Chat</option>
+                  <option value="search">Search</option>
+                  <option value="navigate">Navigate</option>
+                  <option value="action">Action</option>
+                </select>
+              </span>
+            </div>
+            <div class="tab-context-right">
               <div class="add-tabs-button" id="add-tabs-button">
                 <svg
                   class="add-tabs-icon"
@@ -82,27 +105,6 @@
                   <span class="tab-count">0 tabs</span>
                 </div>
               </div>
-            </div>
-            <div class="tab-context-right">
-              <label class="toggle-insights">
-                <input id="toggle-insights" type="checkbox" />
-                Signals
-              </label>
-              <select class="model-picker" id="model-picker">
-                <option value="qwen3-235b-a22b-instruct-2507-maas">qwen</option>
-                <option value="gpt-4o">gpt-4o</option>
-                <option value="gpt-5-mini">gpt-5-mini</option>
-                <option value="gpt-5">gpt-5</option>
-                <option value="gpt-3.5-turbo">gpt-3.5</option>
-                <option value="mistral-small-2503">mistral</option>
-              </select>
-              <select class="query-type-picker" id="query-type-picker">
-                <option value="auto">Auto</option>
-                <option value="chat">Chat</option>
-                <option value="search">Search</option>
-                <option value="navigate">Navigate</option>
-                <option value="action">Action</option>
-              </select>
               <button class="submit-button" id="submit-button">
                 <span class="button-text">→</span>
               </button>
