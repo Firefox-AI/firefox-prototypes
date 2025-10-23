@@ -26,6 +26,7 @@
 #include "mozilla/dom/ContentParent.h"
 #include "mozilla/dom/FormData.h"
 #include "mozilla/dom/LoadURIOptionsBinding.h"
+#include "mozilla/dom/Navigation.h"
 #include "mozilla/dom/NavigationUtils.h"
 #include "mozilla/dom/nsHTTPSOnlyUtils.h"
 #include "mozilla/StaticPrefs_browser.h"
@@ -65,6 +66,7 @@ nsDocShellLoadState::nsDocShellLoadState(
   mLoadReplace = aLoadState.LoadReplace();
   mInheritPrincipal = aLoadState.InheritPrincipal();
   mPrincipalIsExplicit = aLoadState.PrincipalIsExplicit();
+  mNotifiedBeforeUnloadListeners = aLoadState.NotifiedBeforeUnloadListeners();
   mForceAllowDataURI = aLoadState.ForceAllowDataURI();
   mIsExemptFromHTTPSFirstMode = aLoadState.IsExemptFromHTTPSFirstMode();
   mOriginalFrameSrc = aLoadState.OriginalFrameSrc();
@@ -1394,6 +1396,7 @@ DocShellLoadStateInit nsDocShellLoadState::Serialize(
   loadState.LoadReplace() = mLoadReplace;
   loadState.InheritPrincipal() = mInheritPrincipal;
   loadState.PrincipalIsExplicit() = mPrincipalIsExplicit;
+  loadState.NotifiedBeforeUnloadListeners() = mNotifiedBeforeUnloadListeners;
   loadState.ForceAllowDataURI() = mForceAllowDataURI;
   loadState.IsExemptFromHTTPSFirstMode() = mIsExemptFromHTTPSFirstMode;
   loadState.OriginalFrameSrc() = mOriginalFrameSrc;
@@ -1491,6 +1494,16 @@ void nsDocShellLoadState::SetNavigationAPIState(
     nsIStructuredCloneContainer* aNavigationAPIState) {
   mNavigationAPIState =
       static_cast<nsStructuredCloneContainer*>(aNavigationAPIState);
+}
+
+NavigationAPIMethodTracker* nsDocShellLoadState::GetNavigationAPIMethodTracker()
+    const {
+  return mNavigationAPIMethodTracker;
+}
+
+void nsDocShellLoadState::SetNavigationAPIMethodTracker(
+    NavigationAPIMethodTracker* aTracker) {
+  mNavigationAPIMethodTracker = aTracker;
 }
 
 NavigationType nsDocShellLoadState::GetNavigationType() const {
