@@ -513,7 +513,6 @@ body {
   font-weight: var(--font-weight-bold);
 }
 
-
 .suggestion-url::before {
   content: "—";
   color: #333;
@@ -1220,4 +1219,13 @@ body {
   width: 100%;
   display: flex;
   justify-content: center;
+}
+
+.toggle-insights {
+  font-size: 14px;
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  cursor: pointer;
+  color: #666;
 }
