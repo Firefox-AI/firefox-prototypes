@@ -1614,10 +1614,10 @@ browser {
 
 /* Splitter styling to match the left sidebar */
 #smartwindow-splitter {
-  width: 5px;
-  margin-inline-end: -5px;
+  width: 15px;
+  margin-inline-end: -15px;
   border: 0;
-  min-width: 5px;
+  min-width: 15px;
   background-color: transparent;
   position: relative;
   z-index: 10;
