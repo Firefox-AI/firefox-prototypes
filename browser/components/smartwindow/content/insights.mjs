@@ -456,7 +456,6 @@ async function getUserChats(opts = {}) {
 const LIVE_INSIGHTS_SCHEMA = {
   type: "array",
   minItems: 1,
-  maxItems: 5,
   items: {
     type: "object",
     additionalProperties: false,
@@ -464,14 +463,12 @@ const LIVE_INSIGHTS_SCHEMA = {
       "category",
       "intent",
       "insight_summary",
-      "insight_short",
       "score",
     ],
     properties: {
       category: { type: ["string", "null"], enum: [...CATEGORIES, null] },
       intent: { type: ["string", "null"], enum: [...INTENTS, null] },
       insight_summary: { type: ["string", "null"] },
-      insight_short: { type: ["string", "null"] },
       score: { type: "integer", minimum: 1, maximum: 5 },
     },
   },
@@ -540,17 +537,6 @@ ${intentsList}
     - “Cooks Mediterranean seafood from TasteAtlas recipes”
     - “Tracks minimalist fashion drops at Uniqlo”
 
-## Short badge rules (insight_short)
-- Exactly TWO words, Title Case, no punctuation or emojis.
-- Summarize the essence of the insight_summary.
-- Prefer <Brand + Item> or <Theme + Item> or <Constraint + Item>.
-- Examples mapping:
-    - “Prefers LLBean & Nordstrom formalwear collections” → “Formalwear Brands”
-    - “Compares white jeans under $80 at Target” → “White Jeans”
-    - “Streams new-release movies via Fandango” → “Movie Streaming”
-    - “Cooks Mediterranean seafood from TasteAtlas recipes” → “Mediterranean Recipes”
-    - “Tracks minimalist fashion drops at Uniqlo” → “Minimalist Fashion”
-
 ## Scoring priorities (important)
 - Base "score" on both *strength* and *recency* of evidence.
 - Boost if evidence comes from higher-priority sources:
@@ -562,12 +548,11 @@ ${intentsList}
 - A single recent user signal can reach 5;
 - Do not assign 5 unless the pattern is strong and recent.
 
-Return ONLY a JSON array (length 1–10) of objects, no prose, no code fences. Each object must have:
+Return ONLY a JSON array of objects, no prose, no code fences. Each object must have:
 {
   "category": "<one of the categories or null>",
   "intent": "<one of the intents or null>",
   "insight_summary": "<4–10 words, crisp and specific or null>",
-  "insight_short": "<TwoWords TitleCase or null>",
   "score": <integer 1-5>
 }
 `.trim();
@@ -633,11 +618,11 @@ async function generateInsightsWithLLM(profile, source) {
 
 /**
  * Adds generated insights to storage.
- * - New: writes to `insightsDataByShort[insight_short] = { insight_summary, intent, category, score }`
- * - Legacy: also appends `insight_short` under its category array (unchanged behavior)
+ * - New: writes to `insightsDataByCategory[category] = { insight_summary, intent, category, score }`
+ * - Legacy: also appends `category` under its category array (unchanged behavior)
  *
  * @param {object|object[]} payload Array of insight objects or a single object
- * @returns {{ addedCount: number, upsertedByShort: number }}
+ * @returns {{ addedCount: number, upsertedByCategory: number }}
  */
 function addInsightsToData(payload) {
   const smartWindow = getSmartWindow();
@@ -645,62 +630,57 @@ function addInsightsToData(payload) {
 
   const items = Array.isArray(payload) ? payload : [payload];
 
-  // ensure new by-short index exists
+  // ensure new by-category index exists
   if (
-    !insightsData.insightsDataByShort ||
-    typeof insightsData.insightsDataByShort !== "object"
+    !insightsData.insightsDataByCategory ||
+    typeof insightsData.insightsDataByCategory !== "object"
   ) {
-    insightsData.insightsDataByShort = {};
+    insightsData.insightsDataByCategory = {};
   }
 
   let addedCount = 0; // legacy category -> label additions
-  let upsertedByShort = 0; // new by-short upserts
+  let upsertedByCategory = 0; // new by-short upserts
 
   for (const obj of items) {
     const category = (obj?.category ?? "").trim();
-    const short = (obj?.insight_short ?? "").trim();
     const summary = (obj?.insight_summary ?? "").trim();
     const intent = (obj?.intent ?? "").trim();
     const score = Number.isFinite(obj?.score) ? Number(obj.score) : null;
 
-    // ---- New storage (keyed by insight_short) ----
-    if (short) {
-      const prev = insightsData.insightsDataByShort[short];
+    if (category) {
+      const prev = insightsData.insightsDataByCategory[category];
       // Upsert if new or summary changed (or we have better metadata)
       if (
         !prev ||
         (summary && summary !== prev.insight_summary) ||
-        (category && category !== prev.category) ||
         (intent && intent !== prev.intent) ||
         (Number.isFinite(score) && score !== prev.score)
       ) {
-        insightsData.insightsDataByShort[short] = {
-          insight_short: short,
+        insightsData.insightsDataByCategory[category] = {
           insight_summary: summary || prev?.insight_summary || "",
           category: category || prev?.category || "",
           intent: intent || prev?.intent || "",
           score: Number.isFinite(score) ? score : (prev?.score ?? null),
         };
-        upsertedByShort += 1;
+        upsertedByCategory += 1;
       }
     }
 
     // ---- Legacy storage (category -> labels array) ----
-    // Keep existing UI working by storing the short tag under the category.
-    // Falls back to summary if short is missing.
+    // Falls back to summary if category is missing.
     const label = summary;
-    if (short) {
-      if (!insightsData[short]) {
-        insightsData[short] = [];
+    if (category) {
+      if (!insightsData[category]) {
+        insightsData[category] = [];
       }
-      if (!insightsData[short].includes(label)) {
-        insightsData[short].push(label);
+      if (!insightsData[category].includes(label)) {
+        insightsData[category].push(label);
       }
     }
   }
 
   smartWindow?.setInsightsData(insightsData);
-  return { addedCount, upsertedByShort };
+  return { addedCount, upsertedByCategory };
 }
 
 /**
@@ -732,7 +712,6 @@ export async function generateInsightsFromHistory() {
 
     const profile = generateProfileInputs(rows);
 
-    // console.debug(`profile = ${JSON.stringify(profile)}`);
     console.log("[Insights] Generating insights with LLM...");
     const list = await generateInsightsWithLLM(profile, "history");
 
@@ -781,7 +760,7 @@ export async function generateInsightsFromConversations() {
     console.log(`[Insights] Found ${chatHistory.length} conversations`);
     console.log("[Insights] Generating insights with LLM...");
     const list = await generateInsightsWithLLM(chatHistory, "conversation");
-    // console.debug(`list = ${JSON.stringify(list)}`);
+
     const { addedCount } = addInsightsToData(list);
     console.log(
       `[Insights] Added ${addedCount}/${list.length} insights from conversations`
@@ -1070,25 +1049,25 @@ export function createInsightsOverlay(
             // insights -> insight_summary
             const insights = Object.entries(dataToDisplay)
               .filter(([, value]) => Array.isArray(value))
-              .map(([insight_short, insight_summary]) => {
+              .map(([category, insight_summary]) => {
                 const usedCount = insight_summary.reduce(
                   (acc, it) => acc + (usedInsights.has(it) ? 1 : 0),
                   0
                 );
-                return { insight_short, insight_summary, usedCount };
+                return { category, insight_summary, usedCount };
               })
               .filter(({ insight_summary }) => !!insight_summary.length)
               .sort((a, b) => {
                 if (a.usedCount !== b.usedCount) {
                   return b.usedCount - a.usedCount;
                 }
-                return a.insight_short.localeCompare(b.insight_short);
+                return a.category.localeCompare(b.category);
               });
 
             return insights.map(
-              ({ insight_short, insight_summary }) => html`
+              ({ category, insight_summary }) => html`
                 <div class="insight-category">
-                  <h4>${insight_short}</h4>
+                  <h4>${category}</h4>
                   <div class="insight-items">
                     ${insight_summary.map(insight => {
                       const isUsed = usedInsights.has(insight);
@@ -1104,7 +1083,7 @@ export function createInsightsOverlay(
                                   class="delete-insight-btn"
                                   @click=${e => {
                                     e.stopPropagation();
-                                    onDeleteInsight(insight, insight_short);
+                                    onDeleteInsight(insight, category);
                                   }}
                                   title="Delete this insight"
                                 >
