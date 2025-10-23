@@ -518,7 +518,11 @@ class ChatBot extends MozLitElement {
     this.requestUpdate();
 
     // Prepare messages with system prompt for the API call
-    const messagesForAPI = this.#conversation.messages.map(m => ({ role: m.role, content: m.content, }));
+    const messagesForAPI = this.#conversation.messages.map(m => ({
+      role: m.role,
+      content: m.content,
+    }));
+
     if (messagesForAPI.length) {
       // Insert system prompt as the first message
       const shouldGenerateTitle = this.conversationTitle === "";
@@ -626,6 +630,10 @@ class ChatBot extends MozLitElement {
   }
 
   buildSystemPrompt(tabContext = [], includeTitleGeneration = false) {
+    const useInsights = Services.prefs.getBoolPref(
+      "browser.smartwindow.useInsights",
+      true
+    );
     const currentDate = new Date().toLocaleDateString("en-US", {
       weekday: "long",
       year: "numeric",
@@ -670,8 +678,12 @@ Examples:
 
 Always provide a helpful response first, then include the search suggestion when appropriate.
 
-# Insights and Personalization Rules
-${buildInsightsSystemPrompt()}`;
+${
+  useInsights
+    ? `# Insights and Personalization Rules
+${buildInsightsSystemPrompt()}`
+    : ""
+}`;
 
     if (includeTitleGeneration) {
       systemPrompt += `\n\n# Title Generation Rules
@@ -942,17 +954,17 @@ Today's date: ${currentDate}`;
                         searchQueries: [],
                         usedInsights: [],
                       };
-                
 
                 // render HTML when available, otherwise fallback to markdown.
                 const key = msg.id ?? msg.messageId ?? i;
                 const meta = this._uiMeta.get(key);
 
                 const bodyHTML =
-                  msg.role === ChatHistory.MESSAGE_ROLE.USER && meta?.displayHTML
+                  msg.role === ChatHistory.MESSAGE_ROLE.USER &&
+                  meta?.displayHTML
                     ? unsafeHTML(meta.displayHTML)
                     : unsafeHTML(this.marked(cleanContent));
-                  
+
                 return html`
                   <div
                     class="message ${msg.role === ChatHistory.MESSAGE_ROLE.USER
