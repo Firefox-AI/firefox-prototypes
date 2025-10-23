@@ -32,3 +32,6 @@ menu-file-new-smart-window =
 toolbar-button-assistant =
     .label = Ask
     .tooltiptext = Toggle Assistant
+
+smart-window-toggleview-dev-onboarding =
+    .label = Dev: Onboarding
