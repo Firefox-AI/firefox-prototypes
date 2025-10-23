@@ -1325,15 +1325,15 @@ class SmartWindowPage {
     const textFromBar = this.smartbar?.getText?.() || "";
     const htmlFromBar = this.smartbar?.getHTML?.() || null;
 
+    document.documentElement.setAttribute("haschat", "true");
+
+    const type = await this.getEffectiveQueryType(query);
+
     // Hide suggestions after selection
     if (this.smartbar) {
       this.smartbar.clear();
       this.smartbar.hideSuggestions();
     }
-
-    document.documentElement.setAttribute("haschat", "true");
-
-    const type = await this.getEffectiveQueryType(query);
 
     // Handle chat queries with chatbot component in different modes
     if (type === "chat") {
