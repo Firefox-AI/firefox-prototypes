@@ -8,7 +8,6 @@ const { XPCOMUtils } = ChromeUtils.importESModule(
   "resource://gre/modules/XPCOMUtils.sys.mjs"
 );
 
-
 ChromeUtils.defineESModuleGetters(lazy, {
   AboutWelcomeParent: "resource:///actors/AboutWelcomeParent.sys.mjs",
 });
@@ -33,7 +32,7 @@ XPCOMUtils.defineLazyPreferenceGetter(
           title: {
             fontWeight: 600,
             fontSize: "55px",
-            "letterSpacing": "revert",
+            letterSpacing: "revert",
             raw: "Meet Smart Window a new way to browse",
           },
           title_style: "fancy shine",
@@ -42,7 +41,7 @@ XPCOMUtils.defineLazyPreferenceGetter(
             fontWeight: 400,
             raw: "Get answers when you need them. Keep your tabs tiday. Enjoy suggestions that feel made just for you. And because this is Firefox, your privacy always comes first.",
           },
-          
+
           cta_paragraph: {
             text: {
               string_id: "genai-welcome-onboarding-tos",
@@ -107,11 +106,17 @@ function addStylesheet(href) {
 
 /**
  * Render content based on about:welcome multistage template.
+ *
+ * @param ready
  */
 function renderMultistage(ready) {
   const AWParent = new lazy.AboutWelcomeParent();
   const receive = name => data =>
-    AWParent.onContentMessage(`AWPage:${name}`, data, topChromeWindow.gBrowser.selectedBrowser);
+    AWParent.onContentMessage(
+      `AWPage:${name}`,
+      data,
+      topChromeWindow.gBrowser.selectedBrowser
+    );
 
   // Expose top level functions expected by the bundle.
   window.AWGetFeatureConfig = () => JSON.parse(lazy.onboardingConfig);
@@ -120,14 +125,12 @@ function renderMultistage(ready) {
   window.AWSelectTheme = data => receive("SELECT_THEME")(data?.toUpperCase());
   window.AWSendEventTelemetry = receive("TELEMETRY_EVENT");
 
-
   window.AWSendToDeviceEmailsSupported = receive(
     "SEND_TO_DEVICE_EMAILS_SUPPORTED"
   );
   window.AWAddScreenImpression = receive("ADD_SCREEN_IMPRESSION");
   window.AWSendToParent = (name, data) => receive(name)(data);
-  window.AWFinish = () => {
-  };
+  window.AWFinish = () => {};
   window.AWWaitForMigrationClose = receive("WAIT_FOR_MIGRATION_CLOSE");
   window.AWEvaluateScreenTargeting = receive("EVALUATE_SCREEN_TARGETING");
   window.AWEvaluateAttributeTargeting = receive("EVALUATE_ATTRIBUTE_TARGETING");
@@ -139,15 +142,22 @@ function renderMultistage(ready) {
   document.body.id = "multi-stage-message-root";
   // This value is reported as the "page" in telemetry
   document.body.dataset.page = "smart-window-welcome";
-  const bundleScript = document.head.appendChild(document.createElement("script"));
-  bundleScript.src = "chrome://browser/content/aboutwelcome/aboutwelcome.bundle.js";
+  const bundleScript = document.head.appendChild(
+    document.createElement("script")
+  );
+  bundleScript.src =
+    "chrome://browser/content/aboutwelcome/aboutwelcome.bundle.js";
 
   ready();
 }
 
 // Initialize when DOM is ready
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => renderMultistage(() => { }), { once: true });
+  document.addEventListener(
+    "DOMContentLoaded",
+    () => renderMultistage(() => {}),
+    { once: true }
+  );
 } else {
-  renderMultistage(() => { });
+  renderMultistage(() => {});
 }
