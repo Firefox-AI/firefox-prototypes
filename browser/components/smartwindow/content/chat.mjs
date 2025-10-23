@@ -586,6 +586,17 @@ class ChatBot extends MozLitElement {
       const lastIdx = this.#conversation.messages.length - 1;
       this.#conversation.messages[lastIdx].content +=
         "\n[Error streaming response]";
+      
+      // Add error details to tool log
+      this.updateLogState({
+        content: "Streaming Error",
+        result: {
+          error: true,
+          message: err.message || "Unknown streaming error",
+          stack: err.stack || "No stack trace available"
+        }
+      });
+      
       this.requestUpdate();
     }
 
