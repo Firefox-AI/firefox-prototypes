@@ -95,6 +95,11 @@ class SmartWindowPage {
   }
 
   async getEffectiveQueryType(query) {
+    // If query contains @mention use type "chat"
+    if (this.smartbar && this.smartbar.hasExistingMentions()) {
+      return "chat";
+    }
+
     // Get user's preference for query type override
     const userOverride = Services.prefs.getStringPref(
       "browser.smartwindow.queryType",
@@ -104,11 +109,6 @@ class SmartWindowPage {
     // If user chose a specific type, use that (unless it's "auto")
     if (userOverride !== "auto") {
       return userOverride;
-    }
-
-    // If query contains @mention use type "chat" (only when pref is "auto")
-    if (this.smartbar && this.smartbar.hasExistingMentions()) {
-      return "chat";
     }
 
     // Otherwise, use the ML detection
