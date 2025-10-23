@@ -80,14 +80,14 @@ const toolsConfig = [
     function: {
       name: SEARCH_OPEN_TABS,
       description:
-        "Searches the user's open tabs for tabs that match the given type",
+        "Search through the user's currently open browser tabs to find tabs related to a specific topic, category, or content type. This is useful when the user wants to find tabs about a particular subject they have open. Returns a list of all open tabs with their titles and URLs, along with the search query for context.",
       parameters: {
         type: "object",
         properties: {
           type: {
             type: "string",
             description:
-              "the type of tabs I am looking for ie news, sports, etc",
+              "The category, topic, or type of content to search for in open tabs. Examples: 'news', 'documentation', 'shopping', 'social media', 'work', 'entertainment', 'programming', 'research'. Be specific but broad enough to match relevant tabs.",
           },
         },
         required: ["type"],
@@ -99,14 +99,14 @@ const toolsConfig = [
     function: {
       name: GET_PAGE_CONTENT,
       description:
-        "Fetches the page content for a specific tab by URL. Use this when you need to analyze specific page content that was referenced in the user's query.",
+        "Retrieve the text content from a specific browser tab by its URL. Use this when you need to read, analyze, or reference the actual content of a webpage that the user has mentioned or that appears in their open tabs. The content is cleaned and structured for easy analysis.",
       parameters: {
         type: "object",
         properties: {
           url: {
             type: "string",
             description:
-              "The URL of the tab to fetch content from. This should match one of the URLs provided in the tab context.",
+              "The complete URL of the tab to fetch content from. This must exactly match a URL from the user's open tabs. Use the full URL including protocol (http/https). Example: 'https://www.example.com/article'",
           },
         },
         required: ["url"],
@@ -118,14 +118,14 @@ const toolsConfig = [
     function: {
       name: SEARCH_HISTORY,
       description:
-        "Search browser history for pages related to a specific topic or keyword. Returns the most relevant history entries with URL, title, and visit time.",
+        "Search the user's browser history to find previously visited pages related to specific keywords or topics. This helps find relevant pages the user has visited before, even if they're not currently open. Returns pages ranked by relevance and visit frequency.",
       parameters: {
         type: "object",
         properties: {
           search_term: {
             type: "string",
             description:
-              "Keywords to search for in page titles and URLs (e.g., 'javascript tutorial', 'github', 'news')",
+              "Keywords or phrases to search for in page titles and URLs from browser history. Use specific terms that are likely to appear in page titles. Examples: 'python tutorial', 'react documentation', 'news climate change', 'github repository'",
           },
         },
         required: ["search_term"],
@@ -134,7 +134,7 @@ const toolsConfig = [
   },
 ];
 
-const search_browser_history = async ({ search_term, limit = 100 }) => {
+const search_browser_history = async ({ search_term, limit = 10 }) => {
   let root;
   let openedRoot = false;
 
@@ -149,8 +149,8 @@ const search_browser_history = async ({ search_term, limit = 100 }) => {
     // Simple URI results, ranked by frecency
     opts.resultType = Ci.nsINavHistoryQueryOptions.RESULTS_AS_URI;
     opts.sortingMode = Ci.nsINavHistoryQueryOptions.SORT_BY_FRECENCY_DESCENDING;
-    opts.maxResults = limit; // no extra fetch since we're not re-ranking
-    opts.excludeQueries = false; // keep as in your original; flip to true if you want to hide place: items
+    opts.maxResults = limit;
+    opts.excludeQueries = false;
     opts.queryType = Ci.nsINavHistoryQueryOptions.QUERY_TYPE_HISTORY;
 
     const result = currentHistory.executeQuery(query, opts);
@@ -164,28 +164,33 @@ const search_browser_history = async ({ search_term, limit = 100 }) => {
     const rows = [];
     for (let i = 0; i < root.childCount && rows.length < limit; i++) {
       const node = root.getChild(i);
+      const lastVisit = lazy.PlacesUtils.toDate(node.time);
+      const visitDate = lastVisit.toLocaleDateString();
       rows.push({
-        url: node.uri,
         title: node.title || node.uri,
-        lastVisit: lazy.PlacesUtils.toDate(node.time).toISOString(),
+        url: node.uri,
+        visitDate,
         visitCount: node.accessCount || 0,
-        frecency: node.frecency,
       });
     }
 
-    return {
-      search_term,
-      count: rows.length,
-      results: rows,
-    };
+    if (rows.length === 0) {
+      return `No browser history found for "${search_term}".`;
+    }
+
+    const historyList = rows
+      .map(
+        (item, index) =>
+          `${index + 1}. "${item.title}" at ${item.url} (visited ${item.visitCount} times, last on ${item.visitDate})`
+      )
+      .join("\n");
+
+    return `Found ${rows.length} history entries for "${search_term}":
+
+${historyList}`;
   } catch (error) {
     console.error("Error searching browser history:", error);
-    return {
-      search_term,
-      count: 0,
-      results: [],
-      error: error.message || "Failed to search browser history",
-    };
+    return `Error searching browser history for "${search_term}": ${error.message}`;
   } finally {
     if (root && openedRoot) {
       root.containerOpen = false;
@@ -194,20 +199,25 @@ const search_browser_history = async ({ search_term, limit = 100 }) => {
 };
 
 const search_open_tabs = ({ type }) => {
+  console.log("Searching open tabs for type:", type);
   let win = lazy.BrowserWindowTracker.getTopWindow();
   let gBrowser = win.gBrowser;
   let tabs = gBrowser.tabs;
-  const tabData = tabs.map(tab => {
-    return {
-      title: tab.label,
-      url: tab.linkedBrowser.currentURI.spec,
-    };
-  });
 
-  return {
-    query: type,
-    allTabs: tabData,
-  };
+  if (tabs.length === 0) {
+    return `No open tabs found.`;
+  }
+
+  const tabList = tabs
+    .map(
+      (tab, index) =>
+        `${index + 1}. "${tab.label}" at ${tab.linkedBrowser.currentURI.spec}`
+    )
+    .join("\n");
+
+  return `Found ${tabs.length} open tabs (searching for ${type}):
+
+${tabList}`;
 };
 
 const get_page_content = async ({ url }) => {
@@ -252,31 +262,19 @@ const get_page_content = async ({ url }) => {
     }
 
     if (!targetTab) {
-      return {
-        error: `No tab found with URL: ${url}`,
-        available_urls: tabs.map(tab => tab.linkedBrowser.currentURI.spec),
-      };
+      const availableUrls = tabs
+        .slice(0, 3)
+        .map(tab => `"${tab.label}" at ${tab.linkedBrowser.currentURI.spec}`)
+        .join(", ");
+      return `No tab found with URL: ${url}. Available tabs include: ${availableUrls}`;
     }
 
     // Get the browser for the target tab
     const selectedBrowser = targetTab.linkedBrowser;
 
     // Check if browsing context is available
-    if (!selectedBrowser.browsingContext) {
-      return {
-        error: `Tab browsing context not available for: ${url}`,
-        tab_title: targetTab.label,
-        suggestion: "Tab may not be fully loaded or accessible",
-      };
-    }
-
-    // Check if current window context is available
-    if (!selectedBrowser.browsingContext.currentWindowContext) {
-      return {
-        error: `Tab window context not available for: ${url}`,
-        tab_title: targetTab.label,
-        suggestion: "Tab may not be active or fully loaded",
-      };
+    if (!selectedBrowser.browsingContext?.currentWindowContext) {
+      return `Cannot access content from "${targetTab.label}" at ${url}. The tab may still be loading or is not accessible.`;
     }
 
     // Extract page content using PageExtractor
@@ -292,32 +290,31 @@ const get_page_content = async ({ url }) => {
     }
 
     if (!pageContent) {
-      return {
-        error: `Could not extract content from tab: ${url}`,
-        tab_title: targetTab.label,
-        suggestion: "Page may be empty, loading, or content extraction failed",
-      };
+      return `No readable content found on "${targetTab.label}" at ${url}. The page may be empty or contain mostly media content.`;
     }
 
-    // Truncate content to avoid overly long responses (max 4000 chars)
-    const truncatedContent =
-      pageContent.length > 4000
-        ? pageContent.substring(0, 4000) + "..."
-        : pageContent;
+    // Clean and truncate content for better LLM consumption
+    let cleanContent = pageContent
+      .replace(/\s+/g, " ") // Normalize whitespace
+      .replace(/\n\s*\n/g, "\n") // Clean up line breaks
+      .trim();
 
-    return {
-      url,
-      tab_title: targetTab.label,
-      content: truncatedContent,
-      content_length: pageContent.length,
-      truncated: pageContent.length > 4000,
-    };
+    // Limit content length but be more generous for LLM processing
+    if (cleanContent.length > 2000) {
+      // Try to cut at a sentence boundary
+      const truncatePoint = cleanContent.lastIndexOf(".", 2000);
+      if (truncatePoint > 1500) {
+        cleanContent = cleanContent.substring(0, truncatePoint + 1);
+      } else {
+        cleanContent = cleanContent.substring(0, 2000) + "...";
+      }
+    }
+
+    return `Content from "${targetTab.label}" (${url}):
+
+${cleanContent}`;
   } catch (error) {
-    return {
-      error: `Failed to fetch page content: ${error.message}`,
-      url,
-      suggestion: "Try refreshing the tab or ensuring it's fully loaded",
-    };
+    return `Error retrieving content from ${url}: ${error.message}. Try refreshing the tab or checking if it's accessible.`;
   }
 };
 
@@ -339,6 +336,39 @@ export async function* fetchWithHistory(messages) {
         role: ChatHistoryMessage.getRoleLabel(msg.role).toLowerCase(), // Convert "System" -> "system"
       }))
     : [];
+
+  // Determine if we should require tool usage based on the user's query
+  function shouldRequireTools(messages) {
+    const lastUserMessage = messages.filter(m => m.role === "user").pop();
+    if (!lastUserMessage) return false;
+
+    const content = lastUserMessage.content.toLowerCase();
+
+    // Keywords that strongly suggest tool usage is needed
+    const toolKeywords = [
+      "browser history",
+      "history about",
+      "visited",
+      "browsing history",
+      "open tab",
+      "current tab",
+      "tabs open",
+      "what tabs",
+      "page content",
+      "what does",
+      "content of",
+      "read the",
+      "search my",
+      "find in my",
+      "check my",
+      "look at my",
+    ];
+
+    return toolKeywords.some(keyword => content.includes(keyword));
+  }
+
+  const shouldUseTools = shouldRequireTools(convo);
+  console.warn("[Tool Detection]", shouldUseTools ? "SHOULD use tools" : "auto", "for query:", convo[convo.length - 1]?.content?.substring(0, 100));
 
   // Helper to run the model once (streaming) on current convo
   const streamModelResponse = () =>
