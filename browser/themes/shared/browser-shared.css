@@ -1541,6 +1541,17 @@ browser {
   list-style-image: url("chrome://global/skin/icons/indicator-private-browsing.svg");
 }
 
+#smart-window-dev-onboarding {
+  list-style-image: url("chrome://browser/content/static-robot.png");
+
+  /* stylelint-disable-next-line media-query-no-invalid */
+  @media not -moz-pref("browser.smartwindow.developer") {
+    & {
+      display: none;
+    }
+  }
+}
+
 #smart-window-toggle-status {
   display: grid;
   grid-template-columns: auto 1fr;
