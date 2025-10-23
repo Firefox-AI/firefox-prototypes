@@ -1053,6 +1053,41 @@ export function createClickableInsightToken(insight, onInsightClick) {
 }
 
 /**
+ * Copies insights to clipboard
+ *
+ * @returns {void}
+ */
+export function copyInsightsToClipboard() {
+  const insightsData = getInsightsData();
+  const hasGeneratedInsights = Object.keys(insightsData)?.length > 0;
+
+  const insightsJson = {
+    title: "Smart Window Insights",
+    exportDate: new Date().toISOString(),
+    hasGeneratedInsights,
+    categories: {}
+  };
+
+  Object.entries(hasGeneratedInsights ? insightsData : DEFAULT_INSIGHTS_DATA)
+    .filter(([_, value]) => Array.isArray(value))
+    .forEach(([category, insights]) => {
+      if (insights?.length > 0) {
+        insightsJson.categories[category] = insights;
+      }
+    });
+
+  const outputString = JSON.stringify(insightsJson, null, 2);
+
+  // Copy to clipboard
+  navigator.clipboard.writeText(outputString).then(() => {
+    console.info("[Insights] Copied insights to clipboard", outputString);
+    alert("Copied insights to clipboard");
+  }).catch(error => {
+    console.error("[Insights] Failed to copy to clipboard:", error);
+  });
+}
+
+/**
  * Creates the insights overlay component
  *
  * @param {() => void} onClose
@@ -1133,6 +1168,13 @@ export function createInsightsOverlay(
             ?disabled=${state.isGenerating || state.generatedCount === 0}
           >
             Clear Generated
+          </button>
+          <button
+            class="action-btn secondary"
+            @click=${copyInsightsToClipboard}
+            title="Copy insights to clipboard"
+          >
+            📋 Copy Insights
           </button>
         </div>
 
