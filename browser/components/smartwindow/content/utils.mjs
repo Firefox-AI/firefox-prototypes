@@ -547,89 +547,10 @@ Return only the JSON array, no other text:`;
       console.error("Failed to parse AI response as JSON:", parseError);
     }
 
-    // Fallback to static prompts if AI response is invalid
-    return generateFallbackPrompts(contextTabs);
+    // Return empty array if AI response is invalid
+    return [];
   } catch (error) {
     console.error("Error generating smart quick prompts:", error);
-    return generateFallbackPrompts(contextTabs);
+    return [];
   }
-}
-
-/**
- * Generates fallback prompts when AI is unavailable or fails.
- *
- * @param {Array} contextTabs - Array of tab objects
- * @returns {Array} Array of fallback suggestion objects
- */
-function generateFallbackPrompts(contextTabs = []) {
-  const suggestions = [];
-
-  if (contextTabs.length > 1) {
-    // Multi-tab context prompts
-    const tabTitles = contextTabs
-      .map(tab => tab.title)
-      .filter(title => title && title !== "Untitled");
-    const uniqueTitles = [...new Set(tabTitles)].slice(0, 3);
-
-    if (uniqueTitles.length) {
-      const topics = uniqueTitles.join(", ");
-      suggestions.push(
-        { text: `Compare ${topics}`, type: "chat" },
-        { text: `What do ${topics} have in common?`, type: "chat" }
-      );
-    }
-
-    suggestions.push(
-      { text: `research across ${contextTabs.length} tabs`, type: "search" },
-      { text: `summarize content from selected tabs`, type: "chat" }
-    );
-  } else {
-    // Single tab context
-    const tabTitle = contextTabs[0]?.title || "";
-    const titleWords = tabTitle
-      .split(/\s+/)
-      .filter(word => word.length > 2)
-      .slice(0, 3);
-    const topic = titleWords.join(" ") || "this";
-
-    suggestions.push(
-      { text: `What is ${topic} about?`, type: "chat" },
-      { text: `How does ${topic} work?`, type: "chat" },
-      { text: `${topic} guide`, type: "search" },
-      { text: `${topic} tutorial`, type: "search" }
-    );
-  }
-
-  // Add domain suggestions from context tabs
-  const domains = new Set();
-  for (const tab of contextTabs) {
-    if (tab.url) {
-      try {
-        const domain = tab.url
-          .replace(/^https?:\/\//, "")
-          .replace(/^www\./, "")
-          .split("/")[0];
-        if (
-          domain &&
-          domain !== "about:blank" &&
-          !domain.startsWith("about:")
-        ) {
-          domains.add(domain);
-        }
-      } catch (e) {
-        // Skip invalid URLs
-      }
-    }
-  }
-
-  // Add up to 2 unique domains
-  const domainArray = Array.from(domains).slice(0, 2);
-  domainArray.forEach(domain => {
-    suggestions.push({ text: domain, type: "navigate" });
-  });
-
-  // Add action prompt
-  suggestions.push({ text: "tab next", type: "action" });
-
-  return suggestions;
 }
