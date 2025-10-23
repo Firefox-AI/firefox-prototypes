@@ -15,6 +15,11 @@ import {
   getMentionSuggestions,
 } from "chrome://browser/content/smartwindow/mentions.mjs";
 
+// Track autofill state
+let autofillState = null;
+let deletedQuery = "";
+let previousText = "";
+
 export function attachToElement(element, options = {}) {
   const { onKeyDown, onUpdate, onSuggestionSelect, getQueryTypeIcon } = options;
 
@@ -225,15 +230,39 @@ export function attachToElement(element, options = {}) {
     onUpdate: ({ editor: editorInstance }) => {
       const text = editorInstance.getText();
 
-      // Hide suggestions if input is empty or if mentions already exist
+      // Check if user deleted autofilled content
+      if (autofillState) {
+        if (text !== autofillState.value && text.length < autofillState.value.length) {
+          // User deleted autofill
+          deletedQuery = autofillState.originalPrefix.toLowerCase().trim();
+          autofillState = null;
+        } else if (text.length > autofillState.value.length) {
+          // User typed beyond autofill
+          autofillState = null;
+        }
+      }
+
+      // Reset deletion memory when typing forward
       if (
-        (!text.trim() &&
-          suggestionsContainer &&
-          !suggestionsContainer.classList.contains("hidden")) ||
-        hasExistingMentions(editorInstance.getJSON())
+        deletedQuery &&
+        previousText &&
+        text.toLowerCase().startsWith(previousText.toLowerCase()) &&
+        text.length > previousText.length
       ) {
+        deletedQuery = "";
+      }
+
+      previousText = text;
+
+      // Hide suggestions if input is empty or if mentions already exist
+      if ((
+        !text.trim() &&
+        suggestionsContainer &&
+        !suggestionsContainer.classList.contains("hidden")
+      ) || hasExistingMentions(editorInstance.getJSON())) {
         hideSuggestions();
       }
+
       // Only call external onUpdate if not suppressed (e.g., during autofill)
       if (onUpdate && !suppressUpdateCallback) {
         onUpdate(text);
@@ -490,21 +519,31 @@ export function attachToElement(element, options = {}) {
       // Get current text to check if user has typed more since autofill was requested
       const currentText = editor.getText();
 
-      // Extract the expected prefix (what user had typed when autofill was requested)
-      const expectedPrefix = autofillData.value.substring(
-        0,
-        autofillData.selectionStart
-      );
+      // Block if query matches or is subset of deleted query
+      if (
+        deletedQuery && (
+          currentText.toLowerCase().trim() === deletedQuery ||
+          deletedQuery.startsWith(currentText.toLowerCase().trim())
+        )
+      ) {
+        return;
+      }
 
-      // Only apply autofill if current text is still the expected prefix
-      // This prevents losing user input if they typed quickly before autofill kicked in
+      // Extract the expected prefix (what user had typed when autofill was requested)
+      const expectedPrefix = autofillData.value.substring(0, autofillData.selectionStart);
+
+      // Only apply autofill if current query is still the expected prefix
       if (currentText != expectedPrefix) {
         return;
       }
 
+      autofillState = {
+        value: autofillData.value.trim(),
+        originalPrefix: currentText,
+      };
+
       // Suppress update callback during autofill to prevent re-triggering suggestions
       suppressUpdateCallback = true;
-
       // Set the autofilled text
       editor.commands.setContent(autofillData.value);
 
@@ -568,6 +607,10 @@ export function attachToElement(element, options = {}) {
     },
 
     clear() {
+      autofillState = null;
+      deletedQuery = "";
+      previousText = "";
+
       editor.commands.setContent("");
       // Hide suggestions when clearing
       hideSuggestions();
