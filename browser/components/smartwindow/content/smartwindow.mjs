@@ -1364,6 +1364,11 @@ class SmartWindowPage {
     // Mark that user has manually edited the query
     this.userHasEditedQuery = true;
 
+    // Don’t show suggestions mid-conversation
+    if (this.chatBot?.messages?.length > 0) {
+      return;
+    }
+
     // Debounce live suggestions
     this.suggestionDebounceTimer = setTimeout(() => {
       this.generateLiveSuggestions(query);
@@ -1395,16 +1400,20 @@ class SmartWindowPage {
       return;
     }
 
+    const textFromBar = this.smartbar?.getText?.() || "";
+    const htmlFromBar = this.smartbar?.getHTML?.() || null;
+
+    // Hide suggestions after selection
+    if (this.smartbar) {
+      this.smartbar.clear();
+      this.smartbar.hideSuggestions();
+    }
+
     document.documentElement.setAttribute("haschat", "true");
 
     const type = await this.getEffectiveQueryType(query);
 
-    // Hide suggestions after selection
-    if (this.smartbar) {
-      this.smartbar.hideSuggestions();
-    }
-
-    // Handle chat queries with chatbot component in both modes
+    // Handle chat queries with chatbot component in different modes
     if (type === "chat") {
       // Show chat component and submit the prompt with tab context
       this.showChatMode();
@@ -1419,8 +1428,6 @@ class SmartWindowPage {
         // Pass page text if current tab is in context
         const includePageText = this.isCurrentTabInContext();
 
-        const textFromBar = this.smartbar?.getText?.() || "";
-        const htmlFromBar = this.smartbar?.getHTML?.() || null;
         const text = textFromBar || (typeof query === "string" ? query : "");
         const html = htmlFromBar;
 
@@ -1469,15 +1476,9 @@ class SmartWindowPage {
       this.suggestionDebounceTimer = null;
     }
 
-    // Clear editor and reset state
-    if (this.smartbar) {
-      this.smartbar.clear();
-    }
+    // Reset state
     this.updateSubmitButton("");
     this.userHasEditedQuery = false;
-    if (this.smartbar) {
-      this.smartbar.hideSuggestions();
-    }
   }
 
   performNavigation(query, type, clickEvent = null) {
