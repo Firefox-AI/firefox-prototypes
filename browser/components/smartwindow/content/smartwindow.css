@@ -586,6 +586,10 @@ body {
     padding: var(--space-medium);
     font-size: 14px;
   }
+
+  .tab-context-right, .tab-context-left {
+    width: 100%;
+  }
 }
 
 :root.chat-mode-bottom {
@@ -819,6 +823,7 @@ body {
 .tab-context-left {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-small);
 }
 
@@ -826,6 +831,7 @@ body {
 .tab-context-right {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-medium);
 }
 
