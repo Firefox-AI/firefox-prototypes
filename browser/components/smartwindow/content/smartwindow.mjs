@@ -1001,10 +1001,10 @@ class SmartWindowPage {
     this.toggleInsights = document.getElementById("toggle-insights");
     if (this.toggleInsights) {
       const PREF = "browser.smartwindow.useInsights";
-      this.toggleInsights.checked = !Services.prefs.getBoolPref(PREF, true);
+      this.toggleInsights.checked = Services.prefs.getBoolPref(PREF, true);
       // persist when changed
       this.toggleInsights.addEventListener("change", e => {
-        Services.prefs.setBoolPref(PREF, !e.target.checked);
+        Services.prefs.setBoolPref(PREF, e.target.checked);
       });
     }
   }
