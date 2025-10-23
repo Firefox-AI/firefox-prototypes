@@ -84,7 +84,19 @@ var SmartWindow = {
         case "smart-window-switch-classic":
         // fall through
         case "smart-window-switch-smart":
-          this.toggleSmartWindow();
+          if (
+            Services.prefs.getBoolPref(
+              "browser.smartwindow.skipOnboarding",
+              true
+            )
+          ) {
+            this.toggleSmartWindow();
+          } else {
+            this.showOnboarding();
+          }
+          break;
+        case "smart-window-dev-onboarding":
+          this.showOnboarding();
           break;
         case "smart-window-open-private":
           OpenBrowserWindow({ private: true });
@@ -119,6 +131,15 @@ var SmartWindow = {
         this.toggleSidebar();
       });
     }
+  },
+
+  showOnboarding() {
+    window.openTrustedLinkIn(
+      Services.urlFormatter.formatURL(
+        "chrome://browser/content/smartwindow/welcome.html"
+      ),
+      "tab"
+    );
   },
 
   toggleSmartWindow() {
