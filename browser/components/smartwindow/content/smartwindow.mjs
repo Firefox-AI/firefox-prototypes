@@ -996,6 +996,17 @@ class SmartWindowPage {
         }
       });
     }
+
+    // Setup insights toggle
+    this.toggleInsights = document.getElementById("toggle-insights");
+    if (this.toggleInsights) {
+      const PREF = "browser.smartwindow.useInsights";
+      this.toggleInsights.checked = Services.prefs.getBoolPref(PREF, true);
+      // persist when changed
+      this.toggleInsights.addEventListener("change", e => {
+        Services.prefs.setBoolPref(PREF, e.target.checked);
+      });
+    }
   }
 
   async updateSubmitButton(query) {
@@ -1376,12 +1387,7 @@ class SmartWindowPage {
       topChromeWindow
     );
     if (this.smartbar) {
-      this.smartbar.showSuggestions(
-        suggestions,
-        "Suggestions:",
-        false,
-        query,
-      );
+      this.smartbar.showSuggestions(suggestions, "Suggestions:", false, query);
 
       // Apply autofill if available
       if (autofillData) {
