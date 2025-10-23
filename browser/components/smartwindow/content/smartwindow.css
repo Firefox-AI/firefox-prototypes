@@ -1221,6 +1221,16 @@ body {
   justify-content: center;
 }
 
+#multi-stage-message-root {
+  .welcome-text {
+    max-width: 600px;
+  }
+
+  .main-content {
+    background-color: rgba(247, 230, 251, 1);
+  }
+}
+
 .toggle-insights {
   font-size: 14px;
   display: inline-flex;
