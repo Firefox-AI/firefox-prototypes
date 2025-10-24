@@ -1093,17 +1093,22 @@ export function createInsightsOverlay(
           <button
             class="action-btn secondary"
             @click=${copyInsightsToClipboard}
-            title="Copy insights to clipboard"
+            title="Copy signals to clipboard"
           >
-            📋 Copy Insights
+            📋 Copy Signals
           </button>
         </div>
 
         <div class="llm-insights-section">
           <input
             id="llm-insights-input"
-            placeholder="Enter text to generate and add insights"
+            placeholder="Enter text to generate and add signal"
             class="key-input"
+            @keydown=${e => {
+              if (e.key === "Enter" && !state.isGenerating) {
+                handleGenerateCustom(e);
+              }
+            }}
           />
           <button
             id="llm-insights-submit"
@@ -1111,9 +1116,7 @@ export function createInsightsOverlay(
             @click=${handleGenerateCustom}
             ?disabled=${state.isGenerating}
           >
-            ${state.isGenerating
-              ? "Generating..."
-              : "Generate Insights with LLM"}
+            ${state.isGenerating ? "Generating..." : "Generate Signal with LLM"}
           </button>
         </div>
 
@@ -1266,6 +1269,8 @@ insightsStyles = css`
     width: 90%;
     overflow: hidden;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
   }
 
   .insights-header {
@@ -1275,6 +1280,7 @@ insightsStyles = css`
     padding: 1rem 1.5rem;
     border-bottom: 1px solid #e0e0e0;
     background: #f8f9fa;
+    flex-shrink: 0;
   }
 
   .insights-header h3 {
@@ -1316,8 +1322,9 @@ insightsStyles = css`
 
   .insights-content {
     padding: 1.5rem;
-    max-height: 60vh;
+    flex: 1;
     overflow-y: auto;
+    min-height: 0;
   }
 
   .insight-category {
@@ -1382,6 +1389,7 @@ insightsStyles = css`
     padding: 1rem 1.5rem;
     border-bottom: 1px solid #e0e0e0;
     background: #fafbfc;
+    flex-shrink: 0;
   }
 
   .action-btn {
@@ -1428,6 +1436,7 @@ insightsStyles = css`
     border-bottom: 1px solid #e0e0e0;
     color: #666;
     font-size: 0.875rem;
+    flex-shrink: 0;
   }
 
   .spinner {
@@ -1453,6 +1462,7 @@ insightsStyles = css`
     font-size: 0.875rem;
     margin: 0 1.5rem 1rem;
     border-radius: 4px;
+    flex-shrink: 0;
   }
 
   .delete-insight-btn {
@@ -1500,6 +1510,7 @@ insightsStyles = css`
     border-bottom: 1px solid #e0e0e0;
     background: #f8f9fa;
     align-items: center;
+    flex-shrink: 0;
   }
 
   .llm-insights-section .key-input {
