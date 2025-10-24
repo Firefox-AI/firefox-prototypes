@@ -50,6 +50,7 @@ class SmartWindowPage {
     this.modelPicker = null;
     this.queryTypePicker = null;
     this.currentPromptsType = "starters"; // Track whether showing "starters" or "followups"
+    this.effectiveQueryType = "";
 
     this.selectedTabContexts = [];
     this.recentTabs = [];
@@ -85,36 +86,14 @@ class SmartWindowPage {
     }
   }
 
-  getQueryTypeLabel(type) {
-    switch (type) {
-      case "navigate":
-        return "Navigate";
-      case "chat":
-        return "Ask";
-      case "action":
-        return "Action";
-      case "search":
-        return "Search";
-      default:
-        return "Search";
-    }
-  }
-
   async getEffectiveQueryType(query) {
+    if (!query.trim()) {
+      return "";
+    }
+
     // If query contains @mention use type "chat"
     if (this.smartbar && this.smartbar.hasExistingMentions()) {
       return "chat";
-    }
-
-    // Get user's preference for query type override
-    const userOverride = Services.prefs.getStringPref(
-      "browser.smartwindow.queryType",
-      "auto"
-    );
-
-    // If user chose a specific type, use that (unless it's "auto")
-    if (userOverride !== "auto") {
-      return userOverride;
     }
 
     // Otherwise, use the ML detection
@@ -664,10 +643,9 @@ class SmartWindowPage {
 
     this.smartbar = attachToElement(editorDiv, {
       onKeyDown: event => this.handleKeyDown(event),
-      onUpdate: text => this.handleSearch(text),
+      onUpdate: ({ text, isAutofilled }) => this.handleOnUpdate({ text, isAutofilled }),
       onSuggestionSelect: suggestion => this.handleEnter(suggestion.text),
       getQueryTypeIcon: type => this.getQueryTypeIcon(type),
-      getQueryTypeLabel: type => this.getQueryTypeLabel(type),
     });
 
     this.searchInput = editorDiv;
@@ -869,20 +847,13 @@ class SmartWindowPage {
     }
   }
 
-  setupSubmitButton() {
-    // Find the submit button
-    this.submitButton = document.getElementById("submit-button");
-    this.buttonText = this.submitButton?.querySelector(".button-text");
+  async setupSubmitButton() {
+    // Find the combined button select component
+    await customElements.whenDefined("combined-button-select");
+    this.submitButton = document.getElementById("combined-button-select");
+    console.log("[this.submitButton]", this.submitButton);
 
-    if (!this.submitButton) {
-      return;
-    }
-
-    // Set initial state
-    this.updateSubmitButton("");
-
-    // Add click handler
-    this.submitButton.addEventListener("click", () => {
+    this.submitButton.addEventListener("submit", () => {
       const text = this.smartbar ? this.smartbar.getText() : "";
       if (text.trim()) {
         this.handleEnter(text);
@@ -892,43 +863,17 @@ class SmartWindowPage {
       }
     });
 
-    // Setup model picker
+    this.submitButton.addEventListener("selection-change", (e) => {
+      const { value: forcedQueryType } = e.detail;
+      this.effectiveQueryType = forcedQueryType;
+    });
+
+    // Setup model picker (keep existing code)
     this.modelPicker = document.getElementById("model-picker");
     if (this.modelPicker) {
-      // Set initial value from pref
-      this.modelPicker.value = Services.prefs.getStringPref(
-        "browser.smartwindow.model"
-      );
-
-      // Update pref when model changes
+      this.modelPicker.value = Services.prefs.getStringPref("browser.smartwindow.model");
       this.modelPicker.addEventListener("change", () => {
-        Services.prefs.setStringPref(
-          "browser.smartwindow.model",
-          this.modelPicker.value
-        );
-      });
-    }
-
-    // Setup query type picker
-    this.queryTypePicker = document.getElementById("query-type-picker");
-    if (this.queryTypePicker) {
-      // Set initial value from pref (default to "auto")
-      this.queryTypePicker.value = Services.prefs.getStringPref(
-        "browser.smartwindow.queryType",
-        "auto"
-      );
-
-      // Update pref when query type changes
-      this.queryTypePicker.addEventListener("change", () => {
-        Services.prefs.setStringPref(
-          "browser.smartwindow.queryType",
-          this.queryTypePicker.value
-        );
-        // Update button immediately if there's text
-        const text = this.smartbar ? this.smartbar.getText() : "";
-        if (text.trim()) {
-          this.updateSubmitButton(text);
-        }
+        Services.prefs.setStringPref("browser.smartwindow.model", this.modelPicker.value);
       });
     }
 
@@ -941,24 +886,6 @@ class SmartWindowPage {
       this.toggleInsights.addEventListener("change", e => {
         Services.prefs.setBoolPref(PREF, e.target.checked);
       });
-    }
-  }
-
-  async updateSubmitButton(query) {
-    if (!this.submitButton || !this.buttonText) {
-      return;
-    }
-
-    if (query.trim()) {
-      // When there's text, show the appropriate action label
-      const type = await this.getEffectiveQueryType(query);
-      const label = this.getQueryTypeLabel(type);
-      this.buttonText.textContent = label;
-      this.submitButton.classList.add("has-text");
-    } else {
-      // When empty, show arrow
-      this.buttonText.textContent = "→";
-      this.submitButton.classList.remove("has-text");
     }
   }
 
@@ -1136,7 +1063,6 @@ class SmartWindowPage {
           );
           this.smartbar.setEditable(true);
           const text = this.smartbar.getText();
-          this.updateSubmitButton(text);
           // Show quick prompts if input is empty
           if (!text.trim()) {
             this.showQuickPrompts().catch(console.error);
@@ -1226,7 +1152,6 @@ class SmartWindowPage {
           if (this.smartbar) {
             this.smartbar.clear();
           }
-          this.updateSubmitButton("");
           this.userHasEditedQuery = false;
           if (this.smartbar) {
             this.smartbar.hideSuggestions();
@@ -1301,9 +1226,10 @@ class SmartWindowPage {
     }
   }
 
-  handleSearch(query) {
+  async handleOnUpdate({ text: query, isAutofilled }) {
     // Update submit button based on query
-    this.updateSubmitButton(query);
+    this.effectiveQueryType = await this.getEffectiveQueryType(query);
+    this.submitButton.selectedValue = this.effectiveQueryType;
 
     // Clear any existing debounce timer first
     if (this.suggestionDebounceTimer) {
@@ -1326,6 +1252,11 @@ class SmartWindowPage {
 
     // Don’t show suggestions mid-conversation
     if (this.chatBot?.messages?.length > 0) {
+      return;
+    }
+
+    // Prevent re-generation of suggestions when the query update was triggered by autofill
+    if (isAutofilled) {
       return;
     }
 
@@ -1360,8 +1291,6 @@ class SmartWindowPage {
 
     document.documentElement.setAttribute("haschat", "true");
 
-    const type = await this.getEffectiveQueryType(query);
-
     // Hide suggestions after selection
     if (this.smartbar) {
       this.smartbar.clear();
@@ -1369,7 +1298,7 @@ class SmartWindowPage {
     }
 
     // Handle chat queries with chatbot component in different modes
-    if (type === "chat") {
+    if (this.effectiveQueryType === "chat") {
       // Show chat component and submit the prompt with tab context
       this.showChatMode();
 
@@ -1435,7 +1364,7 @@ class SmartWindowPage {
       }
       // For chat on smart window page (not sidebar), don't open sidebar
       // The sidebar logic is handled by performNavigation for search/navigate types
-    } else if (type === "action") {
+    } else if (this.effectiveQueryType === "action") {
       if (this.isSidebarMode) {
         // NOTE: Can we remove this isSidebarMode? ask @mardak
         // Handle actions in sidebar
@@ -1443,7 +1372,7 @@ class SmartWindowPage {
       } else {
         // In full page mode, convert actions to search
         this.hideChatMode();
-        this.performNavigation(query, type);
+        this.performNavigation(query, this.effectiveQueryType);
       }
     } else {
       // For navigate and search, hide chat mode and show regular messages
@@ -1452,10 +1381,10 @@ class SmartWindowPage {
         // NOTE: does this still exist? ask @mardak
         // this.addMessage(`Navigating: ${query}`, "user");
       }
-      this.performNavigation(query, type);
+      this.performNavigation(query, this.effectiveQueryType);
 
       // Open sidebar for search queries when not in sidebar mode and not on a new tab
-      if (type === "search" && !this.isSidebarMode) {
+      if (this.effectiveQueryType === "search" && !this.isSidebarMode) {
         // Tell the chrome window to show the sidebar
         if (topChromeWindow.SmartWindow) {
           topChromeWindow.SmartWindow.showSidebar();
@@ -1470,7 +1399,6 @@ class SmartWindowPage {
     }
 
     // Reset state
-    this.updateSubmitButton("");
     this.userHasEditedQuery = false;
   }
 
