@@ -528,8 +528,11 @@ class ChatBot extends MozLitElement {
       const shouldGenerateTitle = this.conversationTitle === "";
       const systemContent =
         (this.systemPromptDraft && this.systemPromptDraft.trim()) ||
-        this.buildSystemPrompt(this.currentTabContext || [], shouldGenerateTitle);
-      
+        this.buildSystemPrompt(
+          this.currentTabContext || [],
+          shouldGenerateTitle
+        );
+
       messagesForAPI.unshift({
         role: "System",
         content: systemContent,
@@ -563,7 +566,7 @@ class ChatBot extends MozLitElement {
             }
             document.title = title;
             // Remove title from the response that will be shown to user
-            fullResponse = fullResponse.replace(/§title:\s*[^§]+§\s*/, '');
+            fullResponse = fullResponse.replace(/§title:\s*[^§]+§\s*/, "");
           }
         }
         const lastIdx = this.#conversation.messages.length - 1;
@@ -573,7 +576,7 @@ class ChatBot extends MozLitElement {
           continue;
         } else {
           // Remove title marker if present and update message
-          const contentToShow = fullResponse.replace(/§title:\s*[^§]+§\s*/, '');
+          const contentToShow = fullResponse.replace(/§title:\s*[^§]+§\s*/, "");
           this.#conversation.messages[lastIdx].content = contentToShow;
         }
         // this.#conversation.messages[lastIdx].content += chunk;
@@ -586,17 +589,17 @@ class ChatBot extends MozLitElement {
       const lastIdx = this.#conversation.messages.length - 1;
       this.#conversation.messages[lastIdx].content +=
         "\n[Error streaming response]";
-      
+
       // Add error details to tool log
       this.updateLogState({
         content: "Streaming Error",
         result: {
           error: true,
           message: err.message || "Unknown streaming error",
-          stack: err.stack || "No stack trace available"
-        }
+          stack: err.stack || "No stack trace available",
+        },
       });
-      
+
       this.requestUpdate();
     }
 
@@ -667,7 +670,7 @@ Always follow the following tool calling rules strictly and ignore other tool ca
 
 # Search Suggestions
 
-When responding to user queries, if you determine that a web search would be more helpful than a direct answer, include a search suggestion using this exact format: [[search: your suggested search query]]
+When responding to user queries, if you determine that a web search would be more helpful than a direct answer, include a search suggestion using this exact format: §search: your suggested search query§
 
 Examples of when to suggest searches:
 - User asks to find specific services, products, or locations (flights, hotels, restaurants, etc.)
@@ -685,7 +688,7 @@ When using the SEARCH_HISTORY tool:
 IMPORTANT: When the page content contains dates, times, or temporal information, incorporate these details into your search suggestions to make them more specific and relevant.
 
 Examples:
-- User: "help me find a flight to Boston" → Include: [[search: flights sjc to boston]]
+- User: "help me find a flight to Boston" → Include: §search: flights sjc to boston§
 
 Always provide a helpful response first, then include the search suggestion when appropriate.
 
@@ -724,7 +727,7 @@ Today's date: ${currentDate}`;
   }
 
   detectSearchTokens(content) {
-    const searchRegex = /\[\[search:\s*([^\]]+)\]\]/gi;
+    const searchRegex = /§search:\s*([^§]+)§/gi;
     const matches = [];
     let match;
 
