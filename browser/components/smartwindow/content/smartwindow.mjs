@@ -643,7 +643,7 @@ class SmartWindowPage {
 
     this.smartbar = attachToElement(editorDiv, {
       onKeyDown: event => this.handleKeyDown(event),
-      onUpdate: text => this.handleOnUpdate(text),
+      onUpdate: ({ text, isAutofilled }) => this.handleOnUpdate({ text, isAutofilled }),
       onSuggestionSelect: suggestion => this.handleEnter(suggestion.text),
       getQueryTypeIcon: type => this.getQueryTypeIcon(type),
     });
@@ -1226,7 +1226,7 @@ class SmartWindowPage {
     }
   }
 
-  async handleOnUpdate(query) {
+  async handleOnUpdate({ text: query, isAutofilled }) {
     // Update submit button based on query
     this.effectiveQueryType = await this.getEffectiveQueryType(query);
     this.submitButton.selectedValue = this.effectiveQueryType;
@@ -1252,6 +1252,11 @@ class SmartWindowPage {
 
     // Don’t show suggestions mid-conversation
     if (this.chatBot?.messages?.length > 0) {
+      return;
+    }
+
+    // Prevent re-generation of suggestions when the query update was triggered by autofill
+    if (isAutofilled) {
       return;
     }
 
