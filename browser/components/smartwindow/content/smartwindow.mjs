@@ -871,13 +871,13 @@ class SmartWindowPage {
     });
 
     // Setup model picker (keep existing code)
-    // this.modelPicker = document.getElementById("model-picker");
-    // if (this.modelPicker) {
-    //   this.modelPicker.value = Services.prefs.getStringPref("browser.smartwindow.model");
-    //   this.modelPicker.addEventListener("change", () => {
-    //     Services.prefs.setStringPref("browser.smartwindow.model", this.modelPicker.value);
-    //   });
-    // }
+    this.modelPicker = document.getElementById("model-picker");
+    if (this.modelPicker) {
+      this.modelPicker.value = Services.prefs.getStringPref("browser.smartwindow.model");
+      this.modelPicker.addEventListener("change", () => {
+        Services.prefs.setStringPref("browser.smartwindow.model", this.modelPicker.value);
+      });
+    }
 
     // Setup insights toggle
     this.toggleInsights = document.getElementById("toggle-insights");
