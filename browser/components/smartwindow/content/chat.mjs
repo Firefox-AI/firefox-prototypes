@@ -537,7 +537,6 @@ class ChatBot extends MozLitElement {
     }
 
     const stream = fetchWithHistory(messagesForAPI);
-    let titleCaptured = false;
     let fullResponse = "";
     try {
       // Append chunks as they arrive
@@ -552,7 +551,7 @@ class ChatBot extends MozLitElement {
         }
         fullResponse += chunk;
         // Extract title if this is the first message and we haven't captured it yet
-        if (!titleCaptured) {
+        if (this.conversationTitle === "") {
           const titleMatch = fullResponse.match(/§title:\s*([^§]+)§/);
           if (titleMatch) {
             const title = titleMatch[1].trim();
@@ -563,14 +562,13 @@ class ChatBot extends MozLitElement {
               this.#conversation.title = title;
             }
             document.title = title;
-            titleCaptured = true;
             // Remove title from the response that will be shown to user
             fullResponse = fullResponse.replace(/§title:\s*[^§]+§\s*/, '');
           }
         }
         const lastIdx = this.#conversation.messages.length - 1;
         // Only update with content after title extraction
-        if (!titleCaptured) {
+        if (this.conversationTitle === "") {
           // Don't update message yet, wait for title
           continue;
         } else {
