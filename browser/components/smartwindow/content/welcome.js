@@ -70,7 +70,8 @@ XPCOMUtils.defineLazyPreferenceGetter(
                     data: {
                       entrypoint: "activity-stream-firstrun",
                     },
-                    type: "SHOW_FIREFOX_ACCOUNTS",
+                    type: "FXA_SMART_WINDOW_SIGNIN_FLOW",
+                    navigate: true,
                   },
                 ],
               },
@@ -101,14 +102,10 @@ function addStylesheet(href) {
 
 // TODO
 // Check if a) is signedIn b)  Has FxAccount and not signed in  c) doesn't have FxAccount
-// a) Check consent stored in pref `messaging-system-action.smart-window-tos` , if yes toggle to smart window
+// a) Check consent stored in pref `messaging-system-action.smart-window-tos` , if yes toggle to smart window without redirect to account.firefox.com
 // b) and c) Redirect to account.firefox.com for account creation and signin and on success call toggle smart window
+// See GENAI-2201
 
-/**
- * Render content based on about:welcome multistage template.
- *
- * @param ready
- */
 function renderMultistage(ready) {
   const AWParent = new lazy.AboutWelcomeParent();
   const receive = name => data =>
@@ -130,7 +127,9 @@ function renderMultistage(ready) {
   );
   window.AWAddScreenImpression = receive("ADD_SCREEN_IMPRESSION");
   window.AWSendToParent = (name, data) => receive(name)(data);
-  window.AWFinish = () => {};
+  window.AWFinish = () => {
+    window.close();
+  };
   window.AWWaitForMigrationClose = receive("WAIT_FOR_MIGRATION_CLOSE");
   window.AWEvaluateScreenTargeting = receive("EVALUATE_SCREEN_TARGETING");
   window.AWEvaluateAttributeTargeting = receive("EVALUATE_ATTRIBUTE_TARGETING");
