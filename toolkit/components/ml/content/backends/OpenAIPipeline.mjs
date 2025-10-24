@@ -330,6 +330,7 @@ export class OpenAIPipeline {
       const client = new OpenAIPipeline.OpenAILib.OpenAI({
         baseURL: baseURL ? baseURL : "http://localhost:11434/v1",
         apiKey: apiKey || "ollama",
+        maxRetries: 10,
       });
       const stream = request.streamOptions?.enabled || false;
       const tools = request.tools || [];
