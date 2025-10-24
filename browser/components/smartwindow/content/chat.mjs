@@ -398,6 +398,7 @@ class ChatBot extends MozLitElement {
       showPrompt: { type: Boolean },
       systemPromptDraft: { type: String },
       saveStatus: { type: String },
+      conversationTitle: { type: String },
     };
   }
 
@@ -427,6 +428,7 @@ class ChatBot extends MozLitElement {
     this._lastSavedAt = null;
     this._lastUserHTML = null;
     this._uiMeta = new Map();
+    this.conversationTitle = "";
 
     // TODO: Figure out what/where to get this info from, if necessary
     this.#conversation = new ChatHistoryConversation({
@@ -523,9 +525,11 @@ class ChatBot extends MozLitElement {
 
     if (messagesForAPI.length) {
       // Insert system prompt as the first message
+      const shouldGenerateTitle = this.conversationTitle === "";
       const systemContent =
         (this.systemPromptDraft && this.systemPromptDraft.trim()) ||
-        this.buildSystemPrompt(this.currentTabContext || []);
+        this.buildSystemPrompt(this.currentTabContext || [], shouldGenerateTitle);
+      
       messagesForAPI.unshift({
         role: "System",
         content: systemContent,
@@ -533,6 +537,8 @@ class ChatBot extends MozLitElement {
     }
 
     const stream = fetchWithHistory(messagesForAPI);
+    let titleCaptured = false;
+    let fullResponse = "";
     try {
       // Append chunks as they arrive
       for await (const chunk of stream) {
@@ -544,8 +550,35 @@ class ChatBot extends MozLitElement {
           });
           continue;
         }
+        fullResponse += chunk;
+        // Extract title if this is the first message and we haven't captured it yet
+        if (!titleCaptured) {
+          const titleMatch = fullResponse.match(/§title:\s*([^§]+)§/);
+          if (titleMatch) {
+            const title = titleMatch[1].trim();
+            console.warn("[Assistant] Title Captured:", title);
+            this.conversationTitle = title;
+            // Update conversation title
+            if (this.#conversation) {
+              this.#conversation.title = title;
+            }
+            document.title = title;
+            titleCaptured = true;
+            // Remove title from the response that will be shown to user
+            fullResponse = fullResponse.replace(/§title:\s*[^§]+§\s*/, '');
+          }
+        }
         const lastIdx = this.#conversation.messages.length - 1;
-        this.#conversation.messages[lastIdx].content += chunk;
+        // Only update with content after title extraction
+        if (!titleCaptured) {
+          // Don't update message yet, wait for title
+          continue;
+        } else {
+          // Remove title marker if present and update message
+          const contentToShow = fullResponse.replace(/§title:\s*[^§]+§\s*/, '');
+          this.#conversation.messages[lastIdx].content = contentToShow;
+        }
+        // this.#conversation.messages[lastIdx].content += chunk;
         this.scrollToBottom();
         this.requestUpdate();
       }
@@ -609,7 +642,7 @@ class ChatBot extends MozLitElement {
     await this.sendPrompt();
   }
 
-  buildSystemPrompt(tabContext = []) {
+  buildSystemPrompt(tabContext = [], includeTitleGeneration = false) {
     const useInsights = Services.prefs.getBoolPref(
       "browser.smartwindow.useInsights",
       true
@@ -663,13 +696,22 @@ ${
     ? `# Insights and Personalization Rules
 ${buildInsightsSystemPrompt()}`
     : ""
-}
+}`;
 
-# Real Time & User Information
+    if (includeTitleGeneration) {
+      systemPrompt += `\n\n# Title Generation Rules
+At the start of your response, you must create a concise title for the conversation based on the user's message.
+The title should be less than 6 words and should reflect the main topic or intent of the user's message.
+Do not end with punctuation (no period, question mark, etc.). Do not generate questions as titles.
+
+Format the title as follows: §title: title§`;
+    }
+
+
+    systemPrompt += `\n\n# Real Time & User Information
 
 Today's date: ${currentDate}`;
 
-    // Include tab context information with tab IDs
     const contextTabs = this.currentTabContext || tabContext;
     if (contextTabs && contextTabs.length) {
       systemPrompt += `\nTab Context (URL to Tab ID mapping):`;
@@ -679,7 +721,7 @@ Today's date: ${currentDate}`;
     }
     systemPrompt += `\n\nYou have access to a tool called 'get_page_content' that can fetch the actual page content for any of these tabs when needed. Use this tool when the user's query would benefit from specific page content analysis.`;
 
-    console.warn("Built system prompt:", systemPrompt);
+    // console.warn("Built system prompt:", systemPrompt);
 
     return systemPrompt;
   }
