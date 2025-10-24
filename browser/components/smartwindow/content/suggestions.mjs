@@ -4,6 +4,7 @@
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  ChatHistory: "resource:///modules/smartwindow/ChatHistory.sys.mjs",
   UrlbarController:
     "moz-src:///browser/components/urlbar/UrlbarController.sys.mjs",
   UrlbarProvidersManager:
@@ -348,20 +349,24 @@ export async function generateLiveSuggestions(query, topChromeWindow) {
 function trimConversation(messages) {
   // Keep only natural user/assistant messages; drop tool calls and tool outputs.
   const out = [];
+  const MESSAGE_ROLE = lazy.ChatHistory.MESSAGE_ROLE;
+
   for (const m of messages) {
     if (
-      (m.role === "user" || m.role === "assistant") &&
+      (m.role === MESSAGE_ROLE.USER || m.role === MESSAGE_ROLE.ASSISTANT) &&
       m.content &&
       m.content.trim()
     ) {
       // skip assistant messages that only carry tool_calls and have empty content
       if (
-        m.role === "assistant" &&
+        m.role === MESSAGE_ROLE.ASSISTANT &&
         (!m.content.trim() || m.content.trim() === "")
       ) {
         continue;
       }
-      out.push({ role: m.role, content: m.content });
+      // Convert numeric role to string for LLM
+      const roleString = m.role === MESSAGE_ROLE.USER ? "user" : "assistant";
+      out.push({ role: roleString, content: m.content });
     }
   }
   // Limit to last 10-15 messages for focused context

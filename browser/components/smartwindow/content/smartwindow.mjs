@@ -49,6 +49,7 @@ class SmartWindowPage {
     this.chatBot = null;
     this.modelPicker = null;
     this.queryTypePicker = null;
+    this.currentPromptsType = "starters"; // Track whether showing "starters" or "followups"
 
     this.selectedTabContexts = [];
     this.recentTabs = [];
@@ -120,7 +121,7 @@ class SmartWindowPage {
     return await detectQueryType(query);
   }
 
-  // AI-powered suggestion generation using tab context with caching
+  // Generate conversation starters with caching
   async generateQuickPrompts(tabTitle = "") {
     let contextTabs = this.getAllContextTabs();
 
@@ -137,15 +138,7 @@ class SmartWindowPage {
       return [];
     }
 
-    // Check if we're in an active conversation
-    const hasActiveConversation = this.chatBot?.messages?.length > 0;
-
-    // For followup prompts, skip caching and generate fresh each time
-    if (hasActiveConversation) {
-      return await this._generatePromptsInternal(contextTabs, tabTitle);
-    }
-
-    // For conversation starters, use caching
+    // Use caching for conversation starters
     const cacheKey =
       topChromeWindow.SmartWindow.getContextCacheKey(contextTabs);
     const cachedPromise =
@@ -161,36 +154,16 @@ class SmartWindowPage {
     return await promptsPromise;
   }
 
-  // Internal method to actually generate the prompts
+  // Internal method to generate conversation starters
   async _generatePromptsInternal(contextTabs, tabTitle) {
     try {
-      // Check if we're in an active conversation
-      const hasActiveConversation = this.chatBot?.messages?.length > 0;
-
-      if (hasActiveConversation) {
-        // Generate followup prompts based on conversation history
-        const currentTab =
-          this.lastTabInfo || (contextTabs.length ? contextTabs[0] : null);
-        const suggestions = await generateFollowupPrompts(
-          this.chatBot.messages,
-          currentTab,
-          6
-        );
-        if (suggestions && suggestions.length) {
-          return suggestions;
-        }
-      } else {
-        // Generate conversation starters based on tab context
-        const suggestions = await generateConversationStarters(contextTabs, 6);
-        if (suggestions && suggestions.length) {
-          return suggestions;
-        }
+      const suggestions = await generateConversationStarters(contextTabs, 6);
+      if (suggestions && suggestions.length) {
+        return suggestions;
       }
     } catch (error) {
-      console.error("Failed to generate AI prompts:", error);
+      console.error("Failed to generate conversation starters:", error);
     }
-
-    // Return empty array if AI fails
     return [];
   }
 
@@ -994,6 +967,11 @@ class SmartWindowPage {
       return;
     }
 
+    // Don't overwrite followup prompts with conversation starters
+    if (this.currentPromptsType === "followups") {
+      return;
+    }
+
     // Use stored tab info for context
     const tabTitle = this.lastTabInfo?.title || "";
 
@@ -1005,14 +983,17 @@ class SmartWindowPage {
       return;
     }
 
-    this.displayQuickPrompts(prompts);
+    this.displayQuickPrompts(prompts, "starters");
     this.userHasEditedQuery = false;
   }
 
-  displayQuickPrompts(prompts) {
+  displayQuickPrompts(prompts, type = "starters") {
     if (!this.quickPromptsContainer) {
       return;
     }
+
+    // Store the type of prompts being displayed
+    this.currentPromptsType = type;
 
     // Show container
     this.quickPromptsContainer.classList.remove("hidden");
@@ -1413,6 +1394,44 @@ class SmartWindowPage {
         );
 
         await this.saveChatMessagesForCurrentContext();
+
+        // Generate followup prompts after assistant responds
+        if (!this.smartbar?.getText()?.trim()) {
+          try {
+            // Use conversation title instead of tab when on the full page chat
+            let contextForPrompts;
+            const isSmartWindowPage = this.lastTabInfo?.url?.includes(
+              "chrome://browser/content/smartwindow/smartwindow.html"
+            );
+
+            if (isSmartWindowPage) {
+              // Use conversation title for context
+              const title =
+                this.chatBot?.conversationTitle ||
+                this.#conversation?.title ||
+                "Chat";
+              contextForPrompts = {
+                title,
+                url: "conversation",
+              };
+            } else {
+              // Use actual tab context
+              contextForPrompts =
+                this.lastTabInfo || this.getAllContextTabs()[0];
+            }
+
+            const followups = await generateFollowupPrompts(
+              this.#conversation.messages,
+              contextForPrompts,
+              6
+            );
+            if (followups?.length) {
+              this.displayQuickPrompts(followups, "followups");
+            }
+          } catch (error) {
+            console.error("Failed to generate followup prompts:", error);
+          }
+        }
       }
       // For chat on smart window page (not sidebar), don't open sidebar
       // The sidebar logic is handled by performNavigation for search/navigate types
@@ -1550,6 +1569,9 @@ class SmartWindowPage {
     if (!this.isSidebarMode) {
       this.toggleBottomChatMode(false);
     }
+
+    // Reset prompt type to allow showing conversation starters again
+    this.currentPromptsType = "starters";
 
     // Chat bot component stays visible (for the insights button)
     // No need to toggle display
