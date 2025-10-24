@@ -2,9 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { detectQueryType, generateSmartQuickPrompts } from "./utils.mjs";
+import { detectQueryType } from "./utils.mjs";
 import { attachToElement } from "chrome://browser/content/smartwindow/smartbar.mjs";
-import { generateLiveSuggestions } from "./suggestions.mjs";
+import {
+  generateLiveSuggestions,
+  generateConversationStarters,
+  generateFollowupPrompts,
+} from "./suggestions.mjs";
 import { showHistoryOverlay } from "chrome://browser/content/smartwindow/history.mjs";
 
 const { ChatHistory, ChatHistoryConversation } = ChromeUtils.importESModule(
@@ -133,6 +137,15 @@ class SmartWindowPage {
       return [];
     }
 
+    // Check if we're in an active conversation
+    const hasActiveConversation = this.chatBot?.messages?.length > 0;
+
+    // For followup prompts, skip caching and generate fresh each time
+    if (hasActiveConversation) {
+      return await this._generatePromptsInternal(contextTabs, tabTitle);
+    }
+
+    // For conversation starters, use caching
     const cacheKey =
       topChromeWindow.SmartWindow.getContextCacheKey(contextTabs);
     const cachedPromise =
@@ -150,11 +163,28 @@ class SmartWindowPage {
 
   // Internal method to actually generate the prompts
   async _generatePromptsInternal(contextTabs, tabTitle) {
-    // Use AI to generate smart prompts
     try {
-      const suggestions = await generateSmartQuickPrompts(contextTabs);
-      if (suggestions && suggestions.length) {
-        return suggestions;
+      // Check if we're in an active conversation
+      const hasActiveConversation = this.chatBot?.messages?.length > 0;
+
+      if (hasActiveConversation) {
+        // Generate followup prompts based on conversation history
+        const currentTab =
+          this.lastTabInfo || (contextTabs.length ? contextTabs[0] : null);
+        const suggestions = await generateFollowupPrompts(
+          this.chatBot.messages,
+          currentTab,
+          6
+        );
+        if (suggestions && suggestions.length) {
+          return suggestions;
+        }
+      } else {
+        // Generate conversation starters based on tab context
+        const suggestions = await generateConversationStarters(contextTabs, 6);
+        if (suggestions && suggestions.length) {
+          return suggestions;
+        }
       }
     } catch (error) {
       console.error("Failed to generate AI prompts:", error);
