@@ -27,7 +27,7 @@ export function attachToElement(element, options = {}) {
   let currentSuggestions = [];
   let selectedSuggestionIndex = -1;
   let suggestionsContainer = null;
-  let suppressUpdateCallback = false;
+  let isAutofilled = false;
 
   // Get existing mention IDs from the content
   function getExistingMentionIds(json) {
@@ -263,9 +263,9 @@ export function attachToElement(element, options = {}) {
         hideSuggestions();
       }
 
-      // Only call external onUpdate if not suppressed (e.g., during autofill)
-      if (onUpdate && !suppressUpdateCallback) {
-        onUpdate(text);
+      // Call external onUpdate
+      if (onUpdate) {
+        onUpdate({ text, isAutofilled });
       }
     },
     editorProps: {
@@ -544,8 +544,8 @@ export function attachToElement(element, options = {}) {
         originalPrefix: currentText,
       };
 
-      // Suppress update callback during autofill to prevent re-triggering suggestions
-      suppressUpdateCallback = true;
+      // Mark that the text update was initiated by autofill
+      isAutofilled = true;
       // Set the autofilled text
       editor.commands.setContent(autofillData.value);
 
@@ -556,8 +556,8 @@ export function attachToElement(element, options = {}) {
 
       editor.commands.setTextSelection({ from, to });
 
-      // Re-enable update callback
-      suppressUpdateCallback = false;
+      // Reset after setting the autofilled text
+      isAutofilled = false;
     },
 
     getText() {
