@@ -4,6 +4,7 @@
 
 browser.jar:
     content/browser/smartwindow/chat.mjs                     (content/chat.mjs)
+    content/browser/smartwindow/combined-button-select.mjs   (content/combined-button-select.mjs)
     content/browser/smartwindow/tool-log.mjs                 (content/tool-log.mjs)
     content/browser/smartwindow/history.mjs                  (content/history.mjs)
     content/browser/smartwindow/insights.mjs                 (content/insights.mjs)
