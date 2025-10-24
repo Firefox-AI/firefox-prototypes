@@ -67,6 +67,9 @@ def get_taskcluster_client(service: str):
     else:
         options = taskcluster.optionsFromEnvironment()
 
+    if not options["rootUrl"]:
+        options["rootUrl"] = get_root_url(False)
+
     return getattr(taskcluster, service[0].upper() + service[1:])(options)
 
 
