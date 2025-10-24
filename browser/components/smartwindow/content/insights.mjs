@@ -864,7 +864,7 @@ Return ONLY a JSON array of objects, no prose, no code fences. Each object must 
  * Calls LLM to generate insights and processes the response
  *
  * @param {object} profile - Profile data to analyze
- * @param {string} source - Source type ('history' or 'conversation')
+ * @param {string} source - Source type ('history', 'conversation', or 'custom')
  * @returns {Promise<object>} Parsed JSON response with categories
  */
 async function generateInsightsWithLLM(profile, source) {
@@ -902,7 +902,7 @@ async function generateInsightsWithLLM(profile, source) {
   }
 
   if (!Array.isArray(list) || list.length === 0) {
-    throw new Error("Failed to generate valid insight list");
+    throw new Error("Failed to generate valid insight list: " + rawContent);
   }
 
   return list; // array of insights
@@ -1077,6 +1077,52 @@ export async function generateInsightsFromConversations() {
 }
 
 /**
+ * Generates insights from custom text input using LLM
+ *
+ * @param {string} inputText - The text input from user
+ * @returns {Promise<void>}
+ */
+export async function generateInsightsFromCustomText(inputText) {
+  const smartWindow = getSmartWindow();
+
+  if (smartWindow?.isGeneratingInsights()) {
+    throw new Error("Already generating insights");
+  }
+
+  if (!inputText || !inputText.trim()) {
+    throw new Error("No input text provided");
+  }
+
+  smartWindow?.setGeneratingInsights(true);
+  smartWindow?.setInsightsError(null);
+
+  try {
+    console.log(
+      "[Insights] Generating insights from custom text input:",
+      inputText.trim()
+    );
+
+    const list = await generateInsightsWithLLM(inputText.trim(), "custom");
+    console.log("[Insights] LLM returned insights:", JSON.stringify(list));
+
+    const { addedCount } = addInsightsToData(list);
+    console.log(
+      `[Insights] Added ${addedCount}/${list.length} insights from custom input`
+    );
+  } catch (error) {
+    console.error(
+      "[Insights] Generation from Custom text input failed:",
+      error
+    );
+    const errorMsg = error.message || String(error);
+    smartWindow?.setInsightsError(errorMsg);
+    throw error;
+  } finally {
+    smartWindow?.setGeneratingInsights(false);
+  }
+}
+
+/**
  * Clears all generated insights
  */
 export function clearGeneratedInsights() {
@@ -1120,7 +1166,7 @@ export function buildInsightsSystemPrompt() {
     : DEFAULT_INSIGHTS_DATA;
 
   let systemPrompt = `
-When responding, if you use any user insights from the list below to personalize your response (even implicitly), you must reference them by including [[insight: specific term]] inline, directly after the phrase or sentence where the insight is applied. Use specific terms from the list rather than broad categories, and include multiple tags if multiple insights are relevant. This enables better personalization features—do not skip tagging if an insight influences your answer. Only tag insights you actually use; avoid tagging irrelevant ones.
+When responding, if you use any user insights from the list below to personalize your response (even implicitly), you must reference them by including §insight: specific term§ inline, directly after the phrase or sentence where the insight is applied. Use specific terms from the list rather than broad categories, and include multiple tags if multiple insights are relevant. This enables better personalization features—do not skip tagging if an insight influences your answer. Only tag insights you actually use; avoid tagging irrelevant ones.
 
 User Insights List:`;
 
@@ -1135,9 +1181,9 @@ User Insights List:`;
   systemPrompt += `
 
 Examples of Insight Tagging:
-- User asks about flights: Weave in personalization like "Since you often fly from SJC [[insight: SJC]], consider direct options..."
-- User asks about meals: "This recipe fits your interest in seasonal cooking [[insight: seasonal cooking]] and healthy recipes [[insight: healthy recipes]]."
-- User asks about shoes: "For hiking boots, check REI [[insight: REI]] based on your outdoor gear research [[insight: outdoor gear research]]."`;
+- User asks about flights: Weave in personalization like "Since you often fly from SJC §insight: SJC§, consider direct options..."
+- User asks about meals: "This recipe fits your interest in seasonal cooking §insight: seasonal cooking§ and healthy recipes §insight: healthy recipes§."
+- User asks about shoes: "For hiking boots, check REI §insight: REI§ based on your outdoor gear research §insight: outdoor gear research§."`;
 
   return systemPrompt;
 }
@@ -1165,13 +1211,13 @@ export function deleteInsight(insight, category) {
 }
 
 /**
- * Detects [[insight: ...]] tokens in content
+ * Detects §insight: ...§ tokens in content
  *
  * @param {string} content
  * @returns {Array<{fullMatch:string, insight:string, startIndex:number, endIndex:number}>}
  */
 export function detectInsightTokens(content) {
-  const insightRegex = /\[\[insight:\s*([^\]]+)\]\]/gi;
+  const insightRegex = /§insight:\s*([^§]+)§/gi;
   const matches = [];
   let match;
 
@@ -1266,24 +1312,47 @@ export function createInsightsOverlay(
   const handleGenerateHistory = async () => {
     try {
       await generateInsightsFromHistory();
-      // Force re-render by triggering a state change
-      window.dispatchEvent(new CustomEvent("insights-updated"));
     } catch (error) {
       console.error("Failed to generate insights from history:", error);
     }
+    window.dispatchEvent(new CustomEvent("insights-updated"));
   };
 
   const handleGenerateConversations = async () => {
     try {
       await generateInsightsFromConversations();
-      window.dispatchEvent(new CustomEvent("insights-updated"));
     } catch (error) {
       console.error("Failed to generate insights from conversations:", error);
     }
+    window.dispatchEvent(new CustomEvent("insights-updated"));
   };
 
   const handleClearGenerated = () => {
     clearGeneratedInsights();
+    window.dispatchEvent(new CustomEvent("insights-updated"));
+  };
+
+  const handleGenerateCustom = async event => {
+    // Get the input element from the event target's parent
+    const input = event.target.parentElement.querySelector(
+      "#llm-insights-input"
+    );
+    const text = input?.value?.trim();
+
+    if (!text) {
+      console.warn("No text provided for LLM insights generation");
+      return;
+    }
+
+    try {
+      await generateInsightsFromCustomText(text);
+      // Clear the input after successful generation
+      if (input) {
+        input.value = "";
+      }
+    } catch (error) {
+      console.error("Failed to generate insights with LLM:", error);
+    }
     window.dispatchEvent(new CustomEvent("insights-updated"));
   };
 
@@ -1328,9 +1397,30 @@ export function createInsightsOverlay(
           <button
             class="action-btn secondary"
             @click=${copyInsightsToClipboard}
-            title="Copy insights to clipboard"
+            title="Copy signals to clipboard"
           >
-            📋 Copy Insights
+            📋 Copy Signals
+          </button>
+        </div>
+
+        <div class="llm-insights-section">
+          <input
+            id="llm-insights-input"
+            placeholder="Enter text to generate and add signal"
+            class="key-input"
+            @keydown=${e => {
+              if (e.key === "Enter" && !state.isGenerating) {
+                handleGenerateCustom(e);
+              }
+            }}
+          />
+          <button
+            id="llm-insights-submit"
+            class="key-submit-button"
+            @click=${handleGenerateCustom}
+            ?disabled=${state.isGenerating}
+          >
+            ${state.isGenerating ? "Generating..." : "Generate Signal with LLM"}
           </button>
         </div>
 
@@ -1347,6 +1437,10 @@ export function createInsightsOverlay(
         <div class="insights-content">
           ${(() => {
             // Only keep keys whose value is an ARRAY (i.e., categories).
+            // we switched from categories to insights as below
+            // categories -> insights
+            // category -> insight_short
+            // insights -> insight_summary
             const insights = Object.entries(dataToDisplay)
               .filter(([, value]) => Array.isArray(value))
               .map(([category, insight_summary]) => {
@@ -1479,6 +1573,8 @@ insightsStyles = css`
     width: 90%;
     overflow: hidden;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
   }
 
   .insights-header {
@@ -1488,6 +1584,7 @@ insightsStyles = css`
     padding: 1rem 1.5rem;
     border-bottom: 1px solid #e0e0e0;
     background: #f8f9fa;
+    flex-shrink: 0;
   }
 
   .insights-header h3 {
@@ -1529,8 +1626,9 @@ insightsStyles = css`
 
   .insights-content {
     padding: 1.5rem;
-    max-height: 60vh;
+    flex: 1;
     overflow-y: auto;
+    min-height: 0;
   }
 
   .insight-category {
@@ -1595,6 +1693,7 @@ insightsStyles = css`
     padding: 1rem 1.5rem;
     border-bottom: 1px solid #e0e0e0;
     background: #fafbfc;
+    flex-shrink: 0;
   }
 
   .action-btn {
@@ -1641,6 +1740,7 @@ insightsStyles = css`
     border-bottom: 1px solid #e0e0e0;
     color: #666;
     font-size: 0.875rem;
+    flex-shrink: 0;
   }
 
   .spinner {
@@ -1666,6 +1766,7 @@ insightsStyles = css`
     font-size: 0.875rem;
     margin: 0 1.5rem 1rem;
     border-radius: 4px;
+    flex-shrink: 0;
   }
 
   .delete-insight-btn {
@@ -1704,6 +1805,67 @@ insightsStyles = css`
     font-size: 0.75rem;
     color: #666;
     font-weight: 500;
+  }
+
+  .llm-insights-section {
+    display: flex;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e0e0e0;
+    background: #f8f9fa;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .llm-insights-section .key-input {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    background: white;
+    transition: all 0.2s;
+  }
+
+  .llm-insights-section .key-input:focus {
+    outline: none;
+    border-color: #0066cc;
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+  }
+
+  .llm-insights-section .key-input::placeholder {
+    color: #999;
+  }
+
+  .llm-insights-section .key-submit-button {
+    padding: 0.75rem 1.5rem;
+    background: #0066cc;
+    color: white;
+    border: 1px solid #0052a3;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .llm-insights-section .key-submit-button:hover:not(:disabled) {
+    background: #0052a3;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 102, 204, 0.2);
+  }
+
+  .llm-insights-section .key-submit-button:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 102, 204, 0.2);
+  }
+
+  .llm-insights-section .key-submit-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
   }
 `;
 
