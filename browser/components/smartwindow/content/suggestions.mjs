@@ -237,17 +237,51 @@ export async function generateLiveSuggestions(query, topChromeWindow) {
     const searchResults = urlbarSuggestions.filter(s => s.type === "search");
 
     if (searchResults.length) {
+      // Get the intent for the original query
+      const queryIntentType = await detectQueryType(query);
+      const oppositeType = queryIntentType === "search" ? "chat" : "search";
+      
       // Process search results through detectQueryType to determine final type
       const resultsToProcess = searchResults.slice(0, 6);
+      const processedSuggestions = [];
+      
       for (const result of resultsToProcess) {
         const detectedType = await detectQueryType(result.text);
-        suggestions.push({
+        processedSuggestions.push({
           title: result.title,
           text: result.text,
           icon: result.icon,
           type: detectedType,
         });
       }
+      
+      // Reorder suggestions: intent type first, opposite type second, then others
+      const intentSuggestions = processedSuggestions.filter(s => s.type === queryIntentType);
+      const oppositeSuggestions = processedSuggestions.filter(s => s.type === oppositeType);
+      const otherSuggestions = processedSuggestions.filter(s => s.type !== queryIntentType && s.type !== oppositeType);
+      
+      // Add in desired order: intent first, then opposite, then others
+      if (intentSuggestions.length > 0) {
+        suggestions.push(intentSuggestions[0]); // First suggestion matches intent
+      }
+      
+      // Ensure we always have an opposite type as second suggestion
+      if (oppositeSuggestions.length > 0) {
+        suggestions.push(oppositeSuggestions[0]); // Second suggestion is opposite
+      } else {
+        // If no opposite suggestions from urlbar, create one using the original query
+        suggestions.push({ 
+          title: "", 
+          text: query, 
+          icon: "", 
+          type: oppositeType 
+        });
+      }
+      
+      // Add remaining suggestions
+      suggestions.push(...intentSuggestions.slice(1));
+      suggestions.push(...oppositeSuggestions.slice(1));
+      suggestions.push(...otherSuggestions);
     }
 
     // Add navigate results as-is
@@ -275,10 +309,19 @@ export async function generateLiveSuggestions(query, topChromeWindow) {
     // If we don't have enough suggestions, add some fallbacks
     if (suggestions.length < 4) {
       const queryType = await detectQueryType(query);
+      const oppositeType = queryType === "search" ? "chat" : "search";
 
       // Add the query itself if not already present
       if (!suggestions.some(s => s.text === query)) {
-        suggestions.push({ text: query, type: queryType });
+        // If this is the first suggestion, ensure it follows intent-first pattern
+        if (suggestions.length === 0) {
+          suggestions.push({ text: query, type: queryType });
+        } else if (suggestions.length === 1 && suggestions[0].type === queryType) {
+          // If first suggestion matches intent, add opposite type as second
+          suggestions.push({ text: query, type: oppositeType });
+        } else {
+          suggestions.push({ text: query, type: queryType });
+        }
       }
 
       // Add some generic suggestions if still short
