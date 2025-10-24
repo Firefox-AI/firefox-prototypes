@@ -459,12 +459,7 @@ const LIVE_INSIGHTS_SCHEMA = {
   items: {
     type: "object",
     additionalProperties: false,
-    required: [
-      "category",
-      "intent",
-      "insight_summary",
-      "score",
-    ],
+    required: ["category", "intent", "insight_summary", "score"],
     properties: {
       category: { type: ["string", "null"], enum: [...CATEGORIES, null] },
       intent: { type: ["string", "null"], enum: [...INTENTS, null] },
@@ -610,7 +605,7 @@ async function generateInsightsWithLLM(profile, source) {
   }
 
   if (!Array.isArray(list) || list.length === 0) {
-    throw new Error("Failed to generate valid insight list");
+    throw new Error("Failed to generate valid insight list: " + rawContent);
   }
 
   return list; // array of insights
@@ -917,7 +912,7 @@ export function copyInsightsToClipboard() {
     title: "Smart Window Insights",
     exportDate: new Date().toISOString(),
     hasGeneratedInsights,
-    categories: {}
+    categories: {},
   };
 
   Object.entries(hasGeneratedInsights ? insightsData : DEFAULT_INSIGHTS_DATA)
@@ -931,12 +926,15 @@ export function copyInsightsToClipboard() {
   const outputString = JSON.stringify(insightsJson, null, 2);
 
   // Copy to clipboard
-  navigator.clipboard.writeText(outputString).then(() => {
-    console.info("[Insights] Copied insights to clipboard", outputString);
-    alert("Copied insights to clipboard");
-  }).catch(error => {
-    console.error("[Insights] Failed to copy to clipboard:", error);
-  });
+  navigator.clipboard
+    .writeText(outputString)
+    .then(() => {
+      console.info("[Insights] Copied insights to clipboard", outputString);
+      alert("Copied insights to clipboard");
+    })
+    .catch(error => {
+      console.error("[Insights] Failed to copy to clipboard:", error);
+    });
 }
 
 /**
@@ -962,20 +960,19 @@ export function createInsightsOverlay(
   const handleGenerateHistory = async () => {
     try {
       await generateInsightsFromHistory();
-      // Force re-render by triggering a state change
-      window.dispatchEvent(new CustomEvent("insights-updated"));
     } catch (error) {
       console.error("Failed to generate insights from history:", error);
     }
+    window.dispatchEvent(new CustomEvent("insights-updated"));
   };
 
   const handleGenerateConversations = async () => {
     try {
       await generateInsightsFromConversations();
-      window.dispatchEvent(new CustomEvent("insights-updated"));
     } catch (error) {
       console.error("Failed to generate insights from conversations:", error);
     }
+    window.dispatchEvent(new CustomEvent("insights-updated"));
   };
 
   const handleClearGenerated = () => {
