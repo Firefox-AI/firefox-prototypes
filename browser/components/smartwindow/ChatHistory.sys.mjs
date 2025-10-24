@@ -393,7 +393,8 @@ export class ChatHistory {
           :created_date, :updated_date, :status, :active_branch_tip_message_id
         )
         ON CONFLICT(conv_id) DO UPDATE
-          SET updated_date = :updated_date,
+          SET title = :title,
+              updated_date = :updated_date,
               status = :status,
               active_branch_tip_message_id = :active_branch_tip_message_id
           `,
