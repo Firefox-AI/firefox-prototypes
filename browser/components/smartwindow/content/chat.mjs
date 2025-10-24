@@ -553,33 +553,22 @@ class ChatBot extends MozLitElement {
           continue;
         }
         fullResponse += chunk;
-        // Extract title if this is the first message and we haven't captured it yet
-        if (this.conversationTitle === "") {
-          const titleMatch = fullResponse.match(/§title:\s*([^§]+)§/);
-          if (titleMatch) {
-            const title = titleMatch[1].trim();
-            console.warn("[Assistant] Title Captured:", title);
-            this.conversationTitle = title;
-            // Update conversation title
-            if (this.#conversation) {
-              this.#conversation.title = title;
-            }
-            document.title = title;
-            // Remove title from the response that will be shown to user
-            fullResponse = fullResponse.replace(/§title:\s*[^§]+§\s*/, "");
+
+        // Extract title for immediate use (don't remove from content yet)
+        const { title } = this.parseContentWithTokens(fullResponse);
+
+        if (this.conversationTitle === "" && title) {
+          console.warn("[Assistant] Title Captured:", title);
+          this.conversationTitle = title;
+          if (this.#conversation) {
+            this.#conversation.title = title;
           }
+          document.title = title;
         }
+
         const lastIdx = this.#conversation.messages.length - 1;
-        // Only update with content after title extraction
-        if (this.conversationTitle === "") {
-          // Don't update message yet, wait for title
-          continue;
-        } else {
-          // Remove title marker if present and update message
-          const contentToShow = fullResponse.replace(/§title:\s*[^§]+§\s*/, "");
-          this.#conversation.messages[lastIdx].content = contentToShow;
-        }
-        // this.#conversation.messages[lastIdx].content += chunk;
+        // Store raw content WITH tokens for later rendering
+        this.#conversation.messages[lastIdx].content = fullResponse;
         this.scrollToBottom();
         this.requestUpdate();
       }
@@ -743,21 +732,45 @@ Today's date: ${currentDate}`;
     return matches;
   }
 
+  detectTitleTokens(content) {
+    const titleRegex = /§title:\s*([^§]+)§/gi;
+    const matches = [];
+    let match;
+
+    while ((match = titleRegex.exec(content)) !== null) {
+      matches.push({
+        fullMatch: match[0],
+        title: match[1].trim(),
+        startIndex: match.index,
+        endIndex: match.index + match[0].length,
+      });
+    }
+
+    return matches;
+  }
+
   parseContentWithTokens(content) {
     const searchTokens = this.detectSearchTokens(content);
     const insightTokens = detectInsightTokens(content);
-    const allTokens = [...searchTokens, ...insightTokens].sort(
+    const titleTokens = this.detectTitleTokens(content);
+    const allTokens = [...searchTokens, ...insightTokens, ...titleTokens].sort(
       (a, b) => b.startIndex - a.startIndex
     );
 
     if (allTokens.length === 0) {
-      return { cleanContent: content, searchQueries: [], usedInsights: [] };
+      return {
+        cleanContent: content,
+        searchQueries: [],
+        usedInsights: [],
+        title: null,
+      };
     }
 
     // Remove tokens from content for display
     let cleanContent = content;
     const searchQueries = [];
     const usedInsights = [];
+    let title = null;
 
     // Process tokens in reverse order to maintain correct indices
     for (const token of allTokens) {
@@ -767,13 +780,20 @@ Today's date: ${currentDate}`;
         usedInsights.unshift(token.insight); // Add to beginning to maintain order
         // Track this insight as used in the conversation
         this.conversationInsights.add(token.insight);
+      } else if (token.title) {
+        title = token.title; // Only one title expected
       }
       cleanContent =
         cleanContent.slice(0, token.startIndex) +
         cleanContent.slice(token.endIndex);
     }
 
-    return { cleanContent: cleanContent.trim(), searchQueries, usedInsights };
+    return {
+      cleanContent: cleanContent.trim(),
+      searchQueries,
+      usedInsights,
+      title,
+    };
   }
 
   handleSearchQuery(query, clickEvent) {
