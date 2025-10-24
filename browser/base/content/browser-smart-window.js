@@ -82,7 +82,8 @@ var SmartWindow = {
     view.addEventListener("command", event => {
       switch (event.target.id) {
         case "smart-window-switch-classic":
-        // fall through
+          this.toggleSmartWindow();
+          break;
         case "smart-window-switch-smart":
           if (
             Services.prefs.getBoolPref(
