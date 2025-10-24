@@ -1028,7 +1028,7 @@ export function createInsightsOverlay(
     window.dispatchEvent(new CustomEvent("insights-updated"));
   };
 
-  const handleGenerateInsightsWithLLM = async event => {
+  const handleGenerateCustom = async event => {
     // Get the input element from the event target's parent
     const input = event.target.parentElement.querySelector(
       "#llm-insights-input"
@@ -1108,7 +1108,7 @@ export function createInsightsOverlay(
           <button
             id="llm-insights-submit"
             class="key-submit-button"
-            @click=${handleGenerateInsightsWithLLM}
+            @click=${handleGenerateCustom}
             ?disabled=${state.isGenerating}
           >
             ${state.isGenerating
