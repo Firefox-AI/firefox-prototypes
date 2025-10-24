@@ -709,13 +709,18 @@ Your internal knowledge cutoff date is: July, 2024.
 Always follow the following tool calling rules strictly and ignore other tool call rules if exists:
 - If a tool call is inferred and needed, only return the most relevant one given the conversation context.
 - Ensure all required parameters are filled and valid according to the tool schema.
-- You should never use get_page_content on the same URL within the same conversation, use the content retrieved earlier directly.
 - Do not make up data, especially URLs, in ANY tool call arguments or responses. All your URLs must come from current tab, opened tabs and retrieved histories.
 - Raw output of the tool call is not visible to the user, in order to keep the conversation smooth and reasonable, you should always provide a snippet of the output in your response (for example, show the tool outputs along with your reply to provide contexts to the user whenever makes sense).
 
+Available tools:
+- get_page_content: Fetches the actual page content for any of the tabs in the Tab Context. Use this tool when the user's query would benefit from specific page content analysis. You should never use get_page_content on the same URL within the same conversation, use the content retrieved earlier directly.
+- search_history: Search through the user's browsing history. Always provide a specific search_term parameter with relevant keywords. The search_term should be a string containing keywords related to what you're looking for. Results will be sorted by relevance to your search term. Each result includes: url, title, lastVisit (ISO timestamp), visitCount, and relevanceScore. Higher relevanceScore indicates better match to your search.
+
 # Search Suggestions
 
-When responding to user queries, if you determine that a web search would be more helpful than a direct answer, include a search suggestion using this exact format: §search: your suggested search query§
+When responding to user queries, if you determine that a web search would be more helpful than a direct answer, you may include a search suggestion using this exact format: §search: your suggested search query§
+
+CRITICAL: You MUST provide a conversational response to the user. NEVER respond with ONLY a search token. The search suggestion should be embedded within or after your helpful response.
 
 Examples of when to suggest searches:
 - User asks to find specific services, products, or locations (flights, hotels, restaurants, etc.)
@@ -723,19 +728,11 @@ Examples of when to suggest searches:
 - User asks for local information or businesses near a location
 - User wants to compare options or find reviews
 
-When using the SEARCH_HISTORY tool:
-- Always provide a specific search_term parameter with relevant keywords
-- The search_term should be a string containing keywords related to what you're looking for
-- Results will be sorted by relevance to your search term
-- Each result includes: url, title, lastVisit (ISO timestamp), visitCount, and relevanceScore
-- Higher relevanceScore indicates better match to your search
+When the page content contains dates, times, or temporal information, incorporate these details into your search suggestions to make them more specific and relevant.
 
-IMPORTANT: When the page content contains dates, times, or temporal information, incorporate these details into your search suggestions to make them more specific and relevant.
-
-Examples:
-- User: "help me find a flight to Boston" → Include: §search: flights sjc to boston§
-
-Always provide a helpful response first, then include the search suggestion when appropriate.
+Example response format:
+- User: "help me find a flight to Boston"
+- Response: "I'd be happy to help you find a flight to Boston. Let me search for available options. §search: flights sjc to boston§"
 
 ${
   useInsights
@@ -764,7 +761,6 @@ Today's date: ${currentDate}`;
         systemPrompt += `\n${index + 1}. "${tab.title}" - ${tab.url} (Tab ID: ${tab.id || tab.url})`;
       });
     }
-    systemPrompt += `\n\nYou have access to a tool called 'get_page_content' that can fetch the actual page content for any of these tabs when needed. Use this tool when the user's query would benefit from specific page content analysis.`;
 
     // console.warn("Built system prompt:", systemPrompt);
 
