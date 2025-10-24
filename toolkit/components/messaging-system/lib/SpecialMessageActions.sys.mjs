@@ -744,6 +744,11 @@ export const SpecialMessageActions = {
       case "FXA_SIGNIN_FLOW":
         /** @returns {Promise<boolean>} */
         return this.fxaSignInFlow(action.data, browser);
+      case "FXA_SMART_WINDOW_SIGNIN_FLOW":
+        if (await this.fxaSignInFlow(action.data, browser)) {
+          window.SmartWindow.toggleSmartWindow();
+        }
+        break;
       case "OPEN_PROTECTION_PANEL": {
         let { gProtectionsHandler } = window;
         gProtectionsHandler.showProtectionsPopup({});
