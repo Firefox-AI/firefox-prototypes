@@ -74,13 +74,6 @@
                   <option value="gpt-3.5-turbo">gpt-3.5</option>
                   <option value="mistral-small-2503">mistral</option>
                 </select>
-                <select class="query-type-picker" id="query-type-picker">
-                  <option value="auto">Auto</option>
-                  <option value="chat">Chat</option>
-                  <option value="search">Search</option>
-                  <option value="navigate">Navigate</option>
-                  <option value="action">Action</option>
-                </select>
               </span>
             </div>
             <div class="tab-context-right">
@@ -107,9 +100,11 @@
                   <span class="tab-count">0 tabs</span>
                 </div>
               </div>
-              <button class="submit-button" id="submit-button">
-                <span class="button-text">→</span>
-              </button>
+              <combined-button-select
+                id="combined-button-select"
+                button-text="→"
+                selected-value="auto"
+              ></combined-button-select>
             </div>
             <div class="tab-dropdown" id="tab-dropdown" style="display: none">
               <div class="dropdown-header">Select tabs for context:</div>
@@ -213,6 +208,10 @@
     <script
       type="module"
       src="chrome://browser/content/smartwindow/chat.mjs"
+    ></script>
+    <script
+      type="module"
+      src="chrome://browser/content/smartwindow/combined-button-select.mjs"
     ></script>
     <script
       type="module"
