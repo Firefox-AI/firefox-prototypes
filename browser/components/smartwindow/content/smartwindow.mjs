@@ -5,6 +5,7 @@
 import { detectQueryType, generateSmartQuickPrompts } from "./utils.mjs";
 import { attachToElement } from "chrome://browser/content/smartwindow/smartbar.mjs";
 import { generateLiveSuggestions } from "./suggestions.mjs";
+import { showHistoryOverlay } from "chrome://browser/content/smartwindow/history.mjs";
 
 const { ChatHistory, ChatHistoryConversation } = ChromeUtils.importESModule(
   "resource:///modules/smartwindow/ChatHistory.sys.mjs"
@@ -1536,6 +1537,45 @@ class SmartWindowPage {
     }
   }
 
+  async loadConversationFromHistory(conversation) {
+    if (!this.chatBot || !conversation) {
+      return;
+    }
+
+    try {
+      // Save current chat messages before loading new conversation
+      await this.saveChatMessagesForCurrentContext();
+
+      // Load the selected conversation
+      this.#conversation = conversation;
+
+      // Update chatBot with conversation messages
+      this.chatBot.messages = [...conversation.messages];
+      this.chatBot.conversationTitle = conversation.title || "";
+      this.chatBot.requestUpdate();
+
+      // Update tab conversations map if conversation has a URL
+      if (conversation.pageUrl) {
+        this.#tabConversations.set(conversation.pageUrl.href, conversation);
+      }
+
+      // Show chat mode
+      this.showChatMode();
+
+      // Scroll to bottom after messages are loaded
+      setTimeout(() => this.chatBot.scrollToBottom(), 0);
+
+      console.log(
+        `[SmartWindow] Loaded conversation from history: ${conversation.id}`
+      );
+    } catch (error) {
+      console.error(
+        "[SmartWindow] Failed to load conversation from history:",
+        error
+      );
+    }
+  }
+
   setupQuickActionEventListeners() {
     this.quickActionButtons.history?.addEventListener("click", e => {
       e.stopPropagation();
@@ -1553,6 +1593,14 @@ class SmartWindowPage {
 
       document.location.href =
         "chrome://browser/content/smartwindow/insights.html";
+    });
+
+    this.quickActionButtons.chats?.addEventListener("click", e => {
+      e.stopPropagation();
+
+      showHistoryOverlay(conversation => {
+        this.loadConversationFromHistory(conversation);
+      });
     });
 
     this.quickActionButtons.developer?.addEventListener("click", e => {
@@ -1574,6 +1622,7 @@ class SmartWindowPage {
     this.quickActionButtons = {
       history: document.getElementById("history-button"),
       insights: document.getElementById("insights-button"),
+      chats: document.getElementById("chats-button"),
       developer: document.getElementById("developer-button"),
     };
 
