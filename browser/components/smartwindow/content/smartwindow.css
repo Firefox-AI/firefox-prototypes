@@ -513,7 +513,6 @@ body {
   font-weight: var(--font-weight-bold);
 }
 
-
 .suggestion-url::before {
   content: "—";
   color: #333;
@@ -586,6 +585,10 @@ body {
   .suggestion-button {
     padding: var(--space-medium);
     font-size: 14px;
+  }
+
+  .tab-context-right, .tab-context-left {
+    width: 100%;
   }
 }
 
@@ -820,6 +823,7 @@ body {
 .tab-context-left {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-small);
 }
 
@@ -827,6 +831,7 @@ body {
 .tab-context-right {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-medium);
 }
 
@@ -1220,4 +1225,23 @@ body {
   width: 100%;
   display: flex;
   justify-content: center;
+}
+
+#multi-stage-message-root {
+  .welcome-text {
+    max-width: 600px;
+  }
+
+  .main-content {
+    background-color: rgba(247, 230, 251, 1);
+  }
+}
+
+.toggle-insights {
+  font-size: 14px;
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  cursor: pointer;
+  color: #666;
 }

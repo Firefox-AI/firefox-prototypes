@@ -1541,6 +1541,17 @@ browser {
   list-style-image: url("chrome://global/skin/icons/indicator-private-browsing.svg");
 }
 
+#smart-window-dev-onboarding {
+  list-style-image: url("chrome://browser/content/static-robot.png");
+
+  /* stylelint-disable-next-line media-query-no-invalid */
+  @media not -moz-pref("browser.smartwindow.developer") {
+    & {
+      display: none;
+    }
+  }
+}
+
 #smart-window-toggle-status {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -1603,10 +1614,10 @@ browser {
 
 /* Splitter styling to match the left sidebar */
 #smartwindow-splitter {
-  width: 5px;
-  margin-inline-end: -5px;
+  width: 15px;
+  margin-inline-end: -15px;
   border: 0;
-  min-width: 5px;
+  min-width: 15px;
   background-color: transparent;
   position: relative;
   z-index: 10;
