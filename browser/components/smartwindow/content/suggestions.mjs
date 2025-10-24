@@ -12,7 +12,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs",
 });
 
-import { detectQueryType } from "./utils.mjs";
+import { detectQueryType, createOpenAIEngine } from "./utils.mjs";
 
 // Top US websites for prefix matching navigation suggestions
 const TOP_US_WEBSITES = [
@@ -336,5 +336,236 @@ export async function generateLiveSuggestions(query, topChromeWindow) {
       suggestions,
       autofillData: null,
     };
+  }
+}
+
+/**
+ * Helper to trim conversation history to recent messages
+ *
+ * @param {Array} messages - Array of chat messages
+ * @returns {Array} Trimmed array of user/assistant messages
+ */
+function trimConversation(messages) {
+  // Keep only natural user/assistant messages; drop tool calls and tool outputs.
+  const out = [];
+  for (const m of messages) {
+    if (
+      (m.role === "user" || m.role === "assistant") &&
+      m.content &&
+      m.content.trim()
+    ) {
+      // skip assistant messages that only carry tool_calls and have empty content
+      if (
+        m.role === "assistant" &&
+        (!m.content.trim() || m.content.trim() === "")
+      ) {
+        continue;
+      }
+      out.push({ role: m.role, content: m.content });
+    }
+  }
+  // Limit to last 10-15 messages for focused context
+  return out.slice(-15);
+}
+
+/**
+ * Format object to JSON string safely
+ *
+ * @param {*} obj - Object to format
+ * @returns {string} JSON string or string representation
+ */
+const formatJson = obj => {
+  try {
+    return JSON.stringify(obj);
+  } catch {
+    return String(obj);
+  }
+};
+
+const CONVERSATION_STARTERS_TEMPLATE = `You are an expert in suggesting conversation starters for a browser assistant.
+
+========
+Today's date:
+{date}
+
+========
+Current Tab:
+{current_tab}
+
+========
+Opened Tabs:
+{opened_tabs}
+
+========
+The following tools are available to the browser assistant:
+- search_open_tabs(type): search through user's currently open tabs by category/topic
+- get_page_content(url): retrieve raw page content for analysis
+- search_history(search_term): find previously visited pages by keywords
+
+========
+Generate {n} conversation starter suggestions that can help the user begin a chat with the browser assistant.
+
+Rules:
+- Be concise but specific, limit to maximum 8 words for each suggestion
+- If current tab context is available (not about:blank/newtab), focus suggestions on that context
+- Else if opened tabs are available, balance suggestions across those contexts
+- Suggestions should be common questions or requests that make logical sense
+- Do not suggest actions requiring extra steps (like share, save, etc.)
+- Do not suggest opening new pages or requiring additional information
+
+Return ONLY the suggestions, one per line, no numbering, no extra formatting:`;
+
+const FOLLOWUP_PROMPTS_TEMPLATE = `You are an expert suggesting next queries for a browser assistant user during a conversation.
+
+========
+Today's date:
+{date}
+
+========
+Current Tab:
+{current_tab}
+
+========
+Conversation History (latest last):
+{conversation}
+
+========
+Generate {n} suggested next queries that the user might ask next.
+
+Rules:
+- Keep each under 8 words and conversational
+- Stay relevant to the current tab and recent assistant replies
+- Do not repeat earlier user queries verbatim
+- Provide diverse and helpful directions based on the conversation
+
+Return ONLY the suggestions, one per line, no numbering, no extra formatting:`;
+
+/**
+ * Generates conversation starter prompts based on tab context
+ *
+ * @param {Array} contextTabs - Array of tab objects with title, url, favicon
+ * @param {number} n - Number of suggestions to generate (default 6)
+ * @returns {Promise<Array>} Array of {text, type} suggestion objects
+ */
+export async function generateConversationStarters(contextTabs = [], n = 6) {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Format current tab (first in context or empty)
+    const currentTab = contextTabs.length
+      ? formatJson({ title: contextTabs[0].title, url: contextTabs[0].url })
+      : "No current tab";
+
+    // Format opened tabs
+    const openedTabs =
+      contextTabs.length > 1
+        ? formatJson(
+            contextTabs.slice(1).map(t => ({ title: t.title, url: t.url }))
+          )
+        : contextTabs.length === 1
+          ? "Only current tab is open"
+          : "No tabs available";
+
+    const filled = CONVERSATION_STARTERS_TEMPLATE.replace(
+      "{current_tab}",
+      currentTab
+    )
+      .replace("{opened_tabs}", openedTabs)
+      .replace("{n}", String(n))
+      .replace("{date}", today);
+
+    const engineInstance = await createOpenAIEngine("smart-start");
+
+    const result = await engineInstance.run({
+      args: [
+        {
+          role: "system",
+          content: "Return only the requested suggestions, one per line.",
+        },
+        { role: "user", content: filled },
+      ],
+    });
+
+    const text = result.finalOutput.trim() || "";
+
+    // Parse newline-separated responses
+    const lines = text
+      .split(/\n+/)
+      .map(l => l.trim())
+      .filter(Boolean);
+
+    // Clean up any numbering or bullet points that might have been added
+    const prompts = lines
+      .map(line => {
+        const cleaned = line.replace(/^[-*\d.)\]]+\s*/, "");
+        return cleaned;
+      })
+      .filter(p => !!p.length);
+
+    return prompts.slice(0, n).map(text => ({ text, type: "chat" }));
+  } catch (e) {
+    console.warn("[suggestions][conversation-starters] failed:", e);
+    return [];
+  }
+}
+
+/**
+ * Generates followup prompt suggestions based on conversation history
+ *
+ * @param {Array} conversationHistory - Array of chat messages
+ * @param {object} currentTab - Current tab object with title, url
+ * @param {number} n - Number of suggestions to generate (default 6)
+ * @returns {Promise<Array>} Array of {text, type} suggestion objects
+ */
+export async function generateFollowupPrompts(
+  conversationHistory,
+  currentTab,
+  n = 6
+) {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const convo = trimConversation(conversationHistory);
+    const filled = FOLLOWUP_PROMPTS_TEMPLATE.replace(
+      "{current_tab}",
+      currentTab
+        ? formatJson({ title: currentTab.title, url: currentTab.url })
+        : "No tab"
+    )
+      .replace("{conversation}", formatJson(convo))
+      .replace("{n}", String(n))
+      .replace("{date}", today);
+
+    const engineInstance = await createOpenAIEngine("smart-follow");
+
+    const result = await engineInstance.run({
+      args: [
+        {
+          role: "system",
+          content: "Return only the requested suggestions, one per line.",
+        },
+        { role: "user", content: filled },
+      ],
+    });
+
+    const text = result.finalOutput.trim() || "";
+
+    // Parse newline-separated responses
+    const lines = text
+      .split(/\n+/)
+      .map(l => l.trim())
+      .filter(Boolean);
+
+    // Clean up any numbering or bullet points
+    const prompts = lines
+      .map(line => {
+        const cleaned = line.replace(/^[-*\d.)\]]+\s*/, "");
+        return cleaned;
+      })
+      .filter(p => !!p.length);
+
+    return prompts.slice(0, n).map(text => ({ text, type: "chat" }));
+  } catch (e) {
+    console.warn("[suggestions][followup-prompts] failed:", e);
+    return [];
   }
 }

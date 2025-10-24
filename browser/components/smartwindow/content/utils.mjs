@@ -48,15 +48,16 @@ export async function detectQueryType(query) {
 /**
  * Creates an OpenAI engine instance configured with Smart Window preferences.
  *
+ * @param engineId
  * @returns {Promise<object>} The configured engine instance
  */
-export async function createOpenAIEngine() {
+export async function createOpenAIEngine(engineId = "smart-openai") {
   try {
     const engineInstance = await createEngine({
       apiKey: Services.prefs.getStringPref("browser.smartwindow.key"),
       backend: "openai",
       baseURL: Services.prefs.getStringPref("browser.smartwindow.endpoint"),
-      engineId: "smart-openai",
+      engineId,
       modelId: Services.prefs.getStringPref("browser.smartwindow.model"),
       modelRevision: "main",
       taskName: "text-generation",
@@ -340,7 +341,9 @@ export async function* fetchWithHistory(messages) {
   // Determine if we should require tool usage based on the user's query
   function shouldRequireTools(messages) {
     const lastUserMessage = messages.filter(m => m.role === "user").pop();
-    if (!lastUserMessage) return false;
+    if (!lastUserMessage) {
+      return false;
+    }
 
     const content = lastUserMessage.content.toLowerCase();
 
@@ -368,7 +371,12 @@ export async function* fetchWithHistory(messages) {
   }
 
   const shouldUseTools = shouldRequireTools(convo);
-  console.warn("[Tool Detection]", shouldUseTools ? "SHOULD use tools" : "auto", "for query:", convo[convo.length - 1]?.content?.substring(0, 100));
+  console.warn(
+    "[Tool Detection]",
+    shouldUseTools ? "SHOULD use tools" : "auto",
+    "for query:",
+    convo[convo.length - 1]?.content?.substring(0, 100)
+  );
 
   // Helper to run the model once (streaming) on current convo
   const streamModelResponse = () =>
@@ -498,89 +506,5 @@ export async function sendPrompt(content, previousMessages = []) {
   } catch (error) {
     console.error("Error sending prompt:", error);
     return "Error: Failed to get response from AI service.";
-  }
-}
-
-/**
- * Generates intelligent quick prompts based on tab context using AI.
- *
- * @param {Array} contextTabs - Array of tab objects with title, url, and content
- * @returns {Promise<Array>} Array of suggestion objects with text and type
- */
-export async function generateSmartQuickPrompts(contextTabs = []) {
-  try {
-    // console.log(
-    //   "Generating smart quick prompts with AI...",
-    //   contextTabs,
-    //   Error().stack
-    // );
-
-    // Build context from tabs
-    let tabContext = "";
-    if (contextTabs.length === 0) {
-      tabContext = "No tabs are selected for context.";
-    } else if (contextTabs.length === 1) {
-      const tab = contextTabs[0];
-      tabContext = `Current tab: "${tab.title}" at ${tab.url}`;
-    } else {
-      tabContext = `Multiple tabs selected (${contextTabs.length}):\n`;
-      contextTabs.forEach((tab, i) => {
-        tabContext += `${i + 1}. "${tab.title}" at ${tab.url}\n`;
-      });
-    }
-
-    const prompt = `Based on the following browser tab context, generate 8 intelligent quick prompts that would be useful to a user. Return ONLY a JSON array with objects containing "text" and "type" fields.
-
-Tab context:
-${tabContext}
-
-Generate a mix of:
-- 3-4 "chat" prompts: Questions or requests for analysis/explanation about the content (end with ? or ask for summaries, comparisons, explanations)
-- 2-3 "search" prompts: Search queries to find related information (specific topics, guides, tutorials)
-- 1-2 "navigate" prompts: Useful websites or domains related to the content (just domain names or short URLs)
-
-Make the prompts specific and contextually relevant. For chat prompts, focus on understanding, comparing, or analyzing the content. For search prompts, focus on finding related resources or deeper information. For navigate prompts, suggest relevant websites.
-
-Example format:
-[
-  {"text": "What are the main concepts in this article?", "type": "chat"},
-  {"text": "machine learning tutorials", "type": "search"},
-  {"text": "stackoverflow.com", "type": "navigate"}
-]
-
-Return only the JSON array, no other text:`;
-
-    const response = await sendPrompt(prompt);
-
-    // Try to parse the JSON response
-    try {
-      const cleanedResponse = response
-        .trim()
-        .replace(/^```json\s*/, "")
-        .replace(/\s*```$/, "");
-      const suggestions = JSON.parse(cleanedResponse);
-
-      // Validate the structure
-      if (Array.isArray(suggestions) && suggestions.length) {
-        const validSuggestions = suggestions.filter(
-          s =>
-            s.text &&
-            s.type &&
-            ["chat", "search", "navigate", "action"].includes(s.type)
-        );
-
-        if (validSuggestions.length) {
-          return validSuggestions.slice(0, 8); // Limit to 8 suggestions
-        }
-      }
-    } catch (parseError) {
-      console.error("Failed to parse AI response as JSON:", parseError);
-    }
-
-    // Return empty array if AI response is invalid
-    return [];
-  } catch (error) {
-    console.error("Error generating smart quick prompts:", error);
-    return [];
   }
 }
