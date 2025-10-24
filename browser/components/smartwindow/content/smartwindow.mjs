@@ -528,25 +528,39 @@ class SmartWindowPage {
   // Save chat messages to all tabs in current context
   async saveChatMessagesForCurrentContext() {
     if (this.chatBot && this.chatBot.messages && this.chatBot.messages.length) {
-      // Save messages to a conversation for each tab's URL
-      for (const tab of this.selectedTabContexts) {
-        const tabConversation =
-          this.#tabConversations.get(tab.url) ??
-          new ChatHistoryConversation({
-            title: "",
-            description: "",
-            pageUrl: new URL(tab.url),
-            pageMeta: "",
-          });
+      // Update the shared conversation title from chatBot
+      this.#conversation.title = this.chatBot.conversationTitle || "";
 
-        tabConversation.messages = this.#conversation.messages;
-
-        this.#tabConversations.set(tab.url, tabConversation);
-
+      if (this.selectedTabContexts.length === 0) {
+        // No tab context (e.g., full page experience on new tab)
+        // Save to the current conversation with empty/current URL
         try {
-          await this.#chatHistory.updateConversation(tabConversation);
+          await this.#chatHistory.updateConversation(this.#conversation);
         } catch (error) {
-          console.error("Error saving the conversation:", tabConversation);
+          console.error("Error saving the conversation:", this.#conversation);
+        }
+      } else {
+        // Save messages to a conversation for each tab's URL
+        for (const tab of this.selectedTabContexts) {
+          const tabConversation =
+            this.#tabConversations.get(tab.url) ??
+            new ChatHistoryConversation({
+              title: "",
+              description: "",
+              pageUrl: new URL(tab.url),
+              pageMeta: "",
+            });
+
+          tabConversation.messages = this.#conversation.messages;
+          tabConversation.title = this.chatBot.conversationTitle || "";
+
+          this.#tabConversations.set(tab.url, tabConversation);
+
+          try {
+            await this.#chatHistory.updateConversation(tabConversation);
+          } catch (error) {
+            console.error("Error saving the conversation:", tabConversation);
+          }
         }
       }
     }
@@ -607,6 +621,7 @@ class SmartWindowPage {
     if (savedMessages.length) {
       // Restore saved messages and show chat mode
       this.chatBot.messages = [...savedMessages];
+      this.chatBot.conversationTitle = conversation?.title || "";
       this.chatBot.requestUpdate();
       this.showChatMode();
       // Scroll to bottom after messages are loaded
@@ -1062,6 +1077,12 @@ class SmartWindowPage {
         if (this.chatBot.updateLogState) {
           this.chatBot.updateLogState(e.detail);
         }
+      });
+
+      this.chatBot.addEventListener("title-updated", e => {
+        console.log("[SmartWindow] Title updated:", e.detail.title);
+        // Save the conversation to ChatHistory when title is edited
+        this.saveChatMessagesForCurrentContext();
       });
     }
 
