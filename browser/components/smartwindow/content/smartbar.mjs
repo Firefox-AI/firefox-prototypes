@@ -331,7 +331,9 @@ export function attachToElement(element, options = {}) {
 
     const icon = document.createElement("span");
     icon.className = "suggestion-icon";
-    if (suggestion.icon) {
+    const useProvidedIcon = suggestion.type !== "action" && suggestion.type !== "search"
+
+    if (useProvidedIcon && suggestion.icon) {
       const imgElement = document.createElement("img");
       imgElement.src = suggestion.icon;
       imgElement.alt = "";
