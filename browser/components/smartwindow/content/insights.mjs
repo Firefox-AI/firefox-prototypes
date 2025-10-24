@@ -73,14 +73,12 @@ export const INTENTS = [
   "Resume / Revisit",
 ];
 
-// Higher is better: user > chat > search > history
-const SOURCE_PRIORITY = {
-  user: 4,
-  chat: 3,
-  conversation: 3, // in case chat rows use "conversation"
-  search: 2,
-  history: 1,
-};
+// // Higher is better: user > chat > search > history
+//   user: 4,
+//   chat: 3,
+//   conversation: 3, // in case chat rows use "conversation"
+//   search: 2,
+//   history: 1,
 
 /**
  * User insights data organized by category
@@ -101,7 +99,6 @@ const DEFAULT_INSIGHTS_DATA = {};
 async function getRecentHistory(opts = {}) {
   const days = opts.days ?? 60;
   const maxResults = opts.maxResults ?? 500;
-  const minVisits = opts.minVisits ?? 3;
 
   const { PlacesUtils } = ChromeUtils.importESModule(
     "resource://gre/modules/PlacesUtils.sys.mjs"
@@ -124,47 +121,62 @@ async function getRecentHistory(opts = {}) {
       const looksLikeSearch =
         /search|results|query/i.test(p) || /[?&](q|query|p)=/i.test(q);
 
-      return isSE || looksLikeSearch;
+      return isSE && looksLikeSearch;
     } catch {
       return false;
     }
   };
 
-  const getDomain = urlStr => {
-    try {
-      return new URL(urlStr ?? "").hostname;
-    } catch {
-      return "";
-    }
-  };
-
-  // We:
-  // 1) pull the last N days of visits,
-  // 2) group by place (URL) to get count + last visit time,
-  // 3) sort by last visit desc and cap with :maxResults (SQL-side),
-  // 4) compute source by URL heuristic (JS-side).
   const SQL = `
-    WITH recent AS (
+    WITH visit_info AS (
       SELECT
-        p.id            AS place_id,
-        p.url           AS url,
-        p.title         AS title,
-        MAX(v.visit_date) AS last_visit,
-        COUNT(*)        AS visit_count
+        p.id                     AS place_id,
+        p.url                    AS url,
+        o.host                   AS host,
+        p.title                  AS title,
+        v.visit_date             AS visit_date,
+        p.frecency               AS frecency,
+        CASE WHEN o.frecency = -1 THEN 1 ELSE o.frecency END AS domain_frecency
       FROM moz_places p
       JOIN moz_historyvisits v ON v.place_id = p.id
+      JOIN moz_origins o       ON p.origin_id = o.id
       WHERE v.visit_date >= :cutoff
-      GROUP BY p.id
-      ORDER BY last_visit DESC
+        AND p.title IS NOT NULL
+        AND p.frecency IS NOT NULL
+      ORDER BY v.visit_date DESC
       LIMIT :limit
+    ),
+
+    /* Collapse to one row per place to compute percentiles (like your groupby/place_id mean) */
+    per_place AS (
+      SELECT
+        place_id,
+        MAX(frecency)         AS frecency,         -- frecency is per-place; MAX/AVG are equivalent if stable
+        MAX(domain_frecency)  AS domain_frecency
+      FROM visit_info
+      GROUP BY place_id
+    ),
+
+    /* Percentiles using window function CUME_DIST() */
+    per_place_with_pct AS (
+      SELECT
+        place_id,
+        ROUND(100.0 * CUME_DIST() OVER (ORDER BY frecency),        2) AS frecency_pct,
+        ROUND(100.0 * CUME_DIST() OVER (ORDER BY domain_frecency), 2) AS domain_frecency_pct
+      FROM per_place
     )
+
+    /* Final rows: original visits + joined percentiles + source label */
     SELECT
-      r.url      AS url,
-      r.title    AS title,
-      r.last_visit AS last_visit,
-      r.visit_count AS visit_count
-    FROM recent r
-    -- (domain will be parsed in JS for consistency)
+      v.url,
+      v.host,
+      v.title,
+      v.visit_date,
+      p.frecency_pct,
+      p.domain_frecency_pct
+    FROM visit_info v
+    JOIN per_place_with_pct p USING (place_id)
+    ORDER BY v.visit_date DESC
   `;
 
   try {
@@ -179,33 +191,27 @@ async function getRecentHistory(opts = {}) {
         const out = [];
         for (const row of stmt) {
           const url = row.getResultByName("url");
+          const host = row.getResultByName("host");
           const title = row.getResultByName("title") || "";
-          const lastVisitMicros = row.getResultByName("last_visit") || 0;
-          const visitCount = row.getResultByName("visit_count") || 0;
+          const visitDateMicros = row.getResultByName("visit_date") || 0;
+          const frequencyPct = row.getResultByName("frecency_pct") || 0;
+          const domainFrequencyPct =
+            row.getResultByName("domain_frecency_pct") || 0;
 
           out.push({
             url,
+            domain: host,
             title,
-            domain: getDomain(url),
-            visit_time: new Date(
-              Math.floor(lastVisitMicros / 1000)
-            ).toISOString(),
-            visit_count: visitCount,
+            visitDateMicros,
+            frequencyPct,
+            domainFrequencyPct,
             source: isSearchVisit(url) ? "search" : "history",
           });
         }
         return out;
       }
     );
-
-    // console.debug(`rows = ${JSON.stringify(rows)}`);
-    // Filter by minVisits (keep URLs visited >= minVisits)
-    const filtered = rows.filter(r => r.visit_count >= minVisits);
-
-    // Already sorted by last visit desc from SQL, but ensure:
-    filtered.sort((a, b) => (a.visit_time < b.visit_time ? 1 : -1));
-    // console.debug(`filtered = ${JSON.stringify(filtered)}`);
-    return filtered;
+    return rows;
   } catch (error) {
     console.error("Failed to fetch Places history via SQL:", error);
     return [];
@@ -213,128 +219,425 @@ async function getRecentHistory(opts = {}) {
 }
 
 /**
- * Applies half-life decay weighting + source priority.
+ * Sessionize visits using a 15-min gap and 2-hour max session length.
+ * Mutates and returns a new array with session_id + session_start fields.
  *
- * @param {Array<{visit_time:string, visit_count:number, source?:string}>} rows
- * @param {number} [halfLifeDays=14]
- * @returns {Array}
+ * @param {Array<{visitDateMicros:number}>} rows
+ * @param {number} gapSec         - max allowed gap between consecutive visits in a session (default 900s = 15m)
+ * @param {number} maxSessionSec  - max session duration from first to current visit (default 7200s = 2h)
+ * @returns {Array} new array sorted by time asc with session_id, session_start_ms, session_start_iso
  */
-function addWeights(rows, halfLifeDays = 14) {
-  const nowMs = Date.now();
+function sessionizeVisits(rows, gapSec = 15 * 60, maxSessionSec = 2 * 60 * 60) {
+  // 1) normalize timestamps (μs -> ms), drop invalid
+  const normalized = rows
+    .map(r => {
+      const tMs = Number.isFinite(r.visitDateMicros)
+        ? Math.floor(r.visitDateMicros / 1000) // μs -> ms
+        : NaN;
+      return { ...r, visitTimeMs: tMs };
+    })
+    .filter(r => Number.isFinite(r.visitTimeMs));
 
-  return rows.map(row => {
-    const visitMs = new Date(row.visit_time).getTime() || 0;
-    const ageDays = Math.max(0, (nowMs - visitMs) / 86400000);
+  // 2) sort ascending by time
+  normalized.sort((a, b) => a.visitTimeMs - b.visitTimeMs);
 
-    // Recency via half-life
-    const recency_weight = Math.pow(0.5, ageDays / halfLifeDays);
+  // 3) sessionize
+  let sessId = 0;
+  let curStartMs = null;
+  let prevMs = null;
 
-    // Source priority (default history=1)
-    const source_weight =
-      SOURCE_PRIORITY[(row.source || "").toLowerCase()] ?? 1;
+  for (const r of normalized) {
+    const tMs = r.visitTimeMs;
 
-    // Soft visit-count factor: log-scaled and capped
-    //  - 1 visit -> ~1.0
-    //  - 3 visits -> ~1.4
-    //  - 10 visits -> ~1.7
-    //  - 100+ visits -> cap at ~2.0
-    const rawCount = Math.max(1, Number(row.visit_count) || 1);
-    const count_weight = Math.min(2.0, 1 + 0.4 * Math.log1p(rawCount));
-
-    const weight_score = source_weight * recency_weight;
-    const weighted_visits = Number((weight_score * count_weight).toFixed(3));
-
-    return {
-      ...row,
-      recency_weight,
-      source_weight,
-      count_weight,
-      weight_score, // source * recency
-      weighted_visits, // final score (for ranking)
-    };
-  });
-}
-
-/**
- * Sort: source tier → weighted_visits → recency → most recent
- *
- * @param {{source?: string, weighted_visits?: number, recency_weight?: number, visit_time?: string}} a
- * @param {{source?: string, weighted_visits?: number, recency_weight?: number, visit_time?: string}} b
- * @returns {number}
- */
-function sortBySignal(a, b) {
-  const sa = SOURCE_PRIORITY[(a.source || "").toLowerCase()] ?? 1;
-  const sb = SOURCE_PRIORITY[(b.source || "").toLowerCase()] ?? 1;
-
-  if (sb !== sa) {
-    return sb - sa;
-  } // source first
-  if (b.weighted_visits !== a.weighted_visits) {
-    return b.weighted_visits - a.weighted_visits;
-  } // overall score
-  if (b.recency_weight !== a.recency_weight) {
-    return b.recency_weight - a.recency_weight;
-  } // tie-break
-  return a.visit_time < b.visit_time ? 1 : -1; // newest last
-}
-
-/**
- * Generates profile summary for LLM input.
- * Groups by URL/title and calculates average weighted visits.
- *
- * @param {Array<{
- *   url: string,
- *   title: string,
- *   domain?: string,
- *   visit_time?: string,
- *   visit_count?: number,
- *   source?: string,
- *   recency_weight?: number,
- *   source_weight?: number,
- *   count_weight?: number,
- *   weight_score?: number,
- *   weighted_visits?: number
- * }>} rows
- * @returns {{ profile_summarized: Array<{url:string, title:string, weighted_visits:number}>, search_texts: Record<string, number> }}
- */
-function generateProfileInputs(rows) {
-  // Group by URL+title
-  const acc = new Map();
-  for (const row of rows) {
-    const key = `${row.url}\u0001${row.title}`;
-    const cur = acc.get(key);
-    if (cur) {
-      cur.sum += row.weighted_visits;
-      cur.n += 1;
+    if (prevMs === null) {
+      // first row
+      curStartMs = tMs;
+      r.session_id = sessId;
+      r.session_start_ms = curStartMs;
+      r.session_start_iso = new Date(curStartMs).toISOString();
     } else {
-      acc.set(key, {
-        url: row.url,
-        title: row.title,
-        sum: row.weighted_visits,
-        n: 1,
-      });
+      const gapOk = (tMs - prevMs) / 1000 <= gapSec;
+      const lenOk = (tMs - curStartMs) / 1000 <= maxSessionSec;
+
+      if (!gapOk || !lenOk) {
+        // start a new session
+        sessId += 1;
+        curStartMs = tMs;
+      }
+      r.session_id = sessId;
+      r.session_start_ms = curStartMs;
+      r.session_start_iso = new Date(curStartMs).toISOString();
+    }
+
+    prevMs = tMs;
+  }
+
+  return normalized;
+}
+
+/* ---------- helpers ---------- */
+const unique = arr => [...new Set(arr)];
+const isFiniteNumber = v => typeof v === "number" && Number.isFinite(v);
+
+// normalize ns/us/ms/s -> seconds (float, 3dp)
+function normalizeEpochSeconds(ts) {
+  if (ts == null) {
+    return null;
+  }
+  let x = Number(ts);
+  if (!Number.isFinite(x)) {
+    return null;
+  }
+  if (x > 1e14) {
+    x /= 1e9;
+  } // ns
+  else if (x > 1e11) {
+    x /= 1e6;
+  } // us
+  else if (x > 1e10) {
+    x /= 1e3;
+  } // ms
+  // else assume seconds
+  return Math.round(x * 1000) / 1000;
+}
+
+// deep “to_native” sanitizer: stringify keys, drop NaN/Infinity -> null
+function toNative(o) {
+  if (Array.isArray(o)) {
+    return o.map(toNative);
+  }
+  if (o && typeof o === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(o)) {
+      out[String(k)] = toNative(v);
+    }
+    return out;
+  }
+  if (typeof o === "number") {
+    return Number.isFinite(o) ? o : null;
+  }
+  if (typeof o === "boolean" || typeof o === "string" || o == null) {
+    return o;
+  }
+  try {
+    return String(o);
+  } catch {
+    return null;
+  }
+}
+
+function _toSeconds(ts) {
+  // Normalize sec/ms/µs → seconds (float)
+  if (ts == null) {
+    return 0.0;
+  }
+  let x = Number(ts);
+  if (!Number.isFinite(x)) {
+    return 0.0;
+  }
+  if (x > 1e15) {
+    return x / 1e6;
+  } // microseconds
+  if (x > 1e12) {
+    return x / 1e3;
+  } // milliseconds
+  return x; // seconds (or small float)
+}
+
+function round2(x) {
+  return Math.round(Number(x) * 100) / 100;
+}
+
+// get or init helper for plain objects holding Set fields
+function getOrInit(obj, key, initFn) {
+  if (!Object.prototype.hasOwnProperty.call(obj, key)) {
+    obj[key] = initFn();
+  }
+  return obj[key];
+}
+
+function generateProfileInputs(rows) {
+  /* ---------- index by session ---------- */
+  const bySession = new Map();
+  for (const r of rows) {
+    const sid = r.session_id;
+    if (!bySession.has(sid)) {
+      bySession.set(sid, []);
+    }
+    bySession.get(sid).push(r);
+  }
+
+  /* ---------- 1) title_with_frecency_pct_for_sessions_lkp ---------- */
+  // session_id -> { title: frecency_pct }
+  const title_with_frecency_pct_for_sessions_lkp = {};
+  for (const [sid, items] of bySession) {
+    const m = {};
+    for (const r of items) {
+      const title = r.title ?? "";
+      const pct = r.frequencyPct; // already a percentage (float)
+      if (title && isFiniteNumber(pct)) {
+        m[title] = pct;
+      }
+    }
+    title_with_frecency_pct_for_sessions_lkp[sid] = m;
+  }
+
+  /* ---------- 2) domain_with_frecency_pct_for_sessions_lkp ---------- */
+  // session_id -> { host: domain_frecency_pct }
+  const domain_with_frecency_pct_for_sessions_lkp = {};
+  for (const [sid, items] of bySession) {
+    const m = {};
+    for (const r of items) {
+      const host = r.domain ?? r.host ?? "";
+      const pct = r.domainFrequencyPct;
+      if (host && isFiniteNumber(pct)) {
+        m[host] = pct;
+      }
+    }
+    domain_with_frecency_pct_for_sessions_lkp[sid] = m;
+  }
+
+  /* ---------- 3) session_search_summary_lkp ---------- */
+  // session_id -> { search_count, search_titles (unique), last_searched }
+  const session_search_summary_lkp = {};
+  for (const [sid, items] of bySession) {
+    const searchItems = items.filter(r => r.source === "search");
+    if (searchItems.length === 0) {
+      session_search_summary_lkp[sid] = {};
+      continue;
+    }
+    const search_titles = unique(searchItems.map(r => r.title).filter(Boolean));
+    // choose the same raw timestamp field you use elsewhere (visitDateMicros)
+    const last_searched_raw = Math.max(
+      ...searchItems.map(r => Number(r.visitDateMicros) || 0)
+    );
+    session_search_summary_lkp[sid] = {
+      session_id: sid,
+      search_count: searchItems.length,
+      search_titles,
+      // keep raw us/ms/etc.
+      last_searched: last_searched_raw,
+    };
+  }
+
+  /* ---------- 4) session_times_lkp ---------- */
+  const session_times_lkp = { start_time: {}, end_time: {} };
+  for (const [sid, items] of bySession) {
+    // you used visit_date (microseconds) in pandas; here use visitDateMicros to match your rows
+    const tsList = items
+      .map(r => Number(r.visitDateMicros))
+      .filter(n => Number.isFinite(n));
+    if (tsList.length) {
+      session_times_lkp.start_time[sid] = Math.min(...tsList);
+      session_times_lkp.end_time[sid] = Math.max(...tsList);
+    } else {
+      session_times_lkp.start_time[sid] = null;
+      session_times_lkp.end_time[sid] = null;
     }
   }
 
-  const profile_summarized = Array.from(acc.values())
-    .map(v => ({
-      url: v.url,
-      title: v.title,
-      weighted_visits: Math.round((v.sum / v.n) * 1000) / 1000,
-    }))
-    .sort((a, b) => b.weighted_visits - a.weighted_visits);
+  /* ---------- 5) build prepared_inputs ---------- */
+  const prepared_inputs = [];
+  for (const sid of bySession.keys()) {
+    const rec = {
+      session_id: sid,
+      title_scores: title_with_frecency_pct_for_sessions_lkp[sid] || {},
+      domain_scores: domain_with_frecency_pct_for_sessions_lkp[sid] || {},
+      session_start_time: normalizeEpochSeconds(
+        session_times_lkp.start_time[sid]
+      ),
+      session_end_time: normalizeEpochSeconds(session_times_lkp.end_time[sid]),
+      search_events: session_search_summary_lkp[sid] || {},
+    };
+    prepared_inputs.push(toNative(rec));
+  }
+  return prepared_inputs;
+}
 
-  // Extract search texts (titles with "search" in URL)
-  const search_texts = {};
-  for (const searchRow of rows.filter(x => /search/i.test(x.url))) {
-    const key = searchRow.title || "(untitled)";
-    if (!search_texts[key]) {
-      search_texts[key] = 0;
+function aggregateSessions(prepared_inputs) {
+  // Python defaultdict equivalents
+  const agg_domains = {}; // domain -> {score, last_seen, sessions:Set}
+  const agg_titles = {}; // title  -> {score, last_seen, sessions:Set}
+  const agg_searches = {}; // session_id -> {search_count, search_titles:Set, last_searched}
+
+  const nowSec = Date.now() / 1000;
+  const num_of_sessions = prepared_inputs.length;
+
+  for (const s of prepared_inputs) {
+    const sid = s.session_id;
+    const st = s.session_start_time;
+    const et = s.session_end_time;
+    const last = et || st || nowSec;
+
+    // ---- domains
+    const domScores = s.domain_scores || {};
+    for (const [d, sc] of Object.entries(domScores)) {
+      const x = getOrInit(agg_domains, d, () => ({
+        score: 0.0,
+        last_seen: 0,
+        sessions: new Set(),
+      }));
+      x.score = Number(sc); // last value wins (matches Python loop)
+      x.last_seen = Math.max(x.last_seen, last);
+      x.sessions.add(sid);
     }
-    search_texts[key] += searchRow.weighted_visits;
+
+    // ---- titles
+    const titScores = s.title_scores || {};
+    for (const [t, sc] of Object.entries(titScores)) {
+      const key = t; // if you stem, do it here
+      const x = getOrInit(agg_titles, key, () => ({
+        score: 0.0,
+        last_seen: 0,
+        sessions: new Set(),
+      }));
+      x.score = Number(sc); // last value wins
+      x.last_seen = Math.max(x.last_seen, last);
+      x.sessions.add(sid);
+    }
+
+    // ---- searches (single structure per session_id)
+    const se = s.search_events || {};
+    if (Object.keys(se).length) {
+      const rec = getOrInit(agg_searches, sid, () => ({
+        search_count: 0,
+        search_titles: new Set(),
+        last_searched: 0.0,
+      }));
+      rec.search_count += Number(se.search_count || 0);
+      for (const title of se.search_titles || []) {
+        rec.search_titles.add(title);
+      }
+      rec.last_searched = Math.max(
+        rec.last_searched,
+        _toSeconds(se.last_searched)
+      );
+    }
   }
 
-  return { profile_summarized, search_texts };
+  // convert sets → counts + session_importance
+  for (const v of Object.values(agg_domains)) {
+    const n = v.sessions.size;
+    v.num_sessions = n;
+    v.session_importance = n > 0 ? round2(num_of_sessions / n) : 0.0;
+    delete v.sessions;
+  }
+  for (const v of Object.values(agg_titles)) {
+    const n = v.sessions.size;
+    v.num_sessions = n;
+    v.session_importance = n > 0 ? round2(num_of_sessions / n) : 0.0;
+    delete v.sessions;
+  }
+
+  // finalize searches: set → array
+  for (const sid of Object.keys(agg_searches)) {
+    const rec = agg_searches[sid];
+    rec.search_titles = [...rec.search_titles];
+  }
+
+  return [agg_domains, agg_titles, agg_searches];
+}
+
+// --- withRecency ---
+function withRecency(
+  score,
+  sessionImportance,
+  lastSeenSec,
+  {
+    halfLifeDays = 14,
+    floor = 0.5,
+    sessionWeight = 1.0,
+    now = undefined, // seconds (if you pass ms, we’ll normalize)
+  } = {}
+) {
+  const nowSec = now != null ? _toSeconds(now) : Date.now() / 1000;
+  const lastSec = _toSeconds(lastSeenSec);
+
+  const ageDays = Math.max(0, (nowSec - lastSec) / 86400);
+  const decay = Math.pow(0.5, ageDays / halfLifeDays); // half-life decay
+  const importanceScore =
+    Number(score) * (Number(sessionImportance) * Number(sessionWeight));
+  // keep a base weight via `floor` and blend in recency
+  return round2(importanceScore * (floor + (1 - floor) * decay));
+}
+
+// --- top-k aggregation ---
+function topkAggregates(
+  agg_domains,
+  agg_titles,
+  agg_searches,
+  {
+    k_domains = 30,
+    k_titles = 60,
+    k_searches = 10,
+    now = undefined, // optional; seconds or ms, we normalize
+  } = {}
+) {
+  const nowRaw = now != null ? now : Date.now() / 1000; // we’ll normalize inside withRecency
+
+  // domains → [ [domain, {.., rank_score}], ... ]
+  const dom_items = Object.entries(agg_domains).map(([d, v]) => [
+    d,
+    {
+      ...v,
+      rank_score: withRecency(v.score, v.session_importance, v.last_seen, {
+        now: nowRaw,
+      }),
+    },
+  ]);
+
+  // titles → [ [title, {.., rank_score}], ... ]
+  const tit_items = Object.entries(agg_titles).map(([t, v]) => [
+    t,
+    {
+      ...v,
+      rank_score: withRecency(v.score, v.session_importance, v.last_seen, {
+        now: nowRaw,
+      }),
+    },
+  ]);
+
+  // searches are keyed by session_id; base score is search_count, importance=1.0
+  const srch_items = Object.entries(agg_searches).map(([sid, v]) => {
+    const base = Number(v.search_count || 0);
+    const last = Number(v.last_searched || 0);
+    return [
+      // keep sid as number if possible
+      Number.isFinite(Number(sid)) ? Number(sid) : sid,
+      {
+        ...v,
+        rank_score: withRecency(base, 1.0, last, { now: nowRaw }),
+      },
+    ];
+  });
+
+  // sort: rank_score desc, then tie-breakers like python lambda
+  dom_items.sort(
+    (a, b) =>
+      b[1].rank_score - a[1].rank_score ||
+      (b[1].num_sessions || 0) - (a[1].num_sessions || 0) ||
+      (b[1].last_seen || 0) - (a[1].last_seen || 0)
+  );
+
+  tit_items.sort(
+    (a, b) =>
+      b[1].rank_score - a[1].rank_score ||
+      (b[1].num_sessions || 0) - (a[1].num_sessions || 0) ||
+      (b[1].last_seen || 0) - (a[1].last_seen || 0)
+  );
+
+  srch_items.sort(
+    (a, b) =>
+      b[1].rank_score - a[1].rank_score ||
+      (b[1].search_count || 0) - (a[1].search_count || 0) ||
+      (b[1].last_searched || 0) - (a[1].last_searched || 0)
+  );
+
+  return [
+    dom_items.slice(0, k_domains),
+    tit_items.slice(0, k_titles),
+    srch_items.slice(0, k_searches),
+  ];
 }
 
 // ============================================================================
@@ -565,17 +868,9 @@ Return ONLY a JSON array of objects, no prose, no code fences. Each object must 
  * @returns {Promise<object>} Parsed JSON response with categories
  */
 async function generateInsightsWithLLM(profile, source) {
-  // const profile_records =
-  //   source === "history"
-  //     ? (profile?.profile_summarized ?? profile ?? [])
-  //     : Array.isArray(profile)
-  //       ? profile
-  //       : [];
   let profile_records = [];
   if (source === "history") {
     profile_records = profile?.profile_summarized ?? profile ?? [];
-  } else if (source === "custom") {
-    profile_records = profile;
   } else if (Array.isArray(profile)) {
     profile_records = profile;
   }
@@ -704,13 +999,22 @@ export async function generateInsightsFromHistory() {
     }
 
     console.log(`[Insights] Found ${baseRows.length} history items`);
-    const rows = addWeights(baseRows, 14).sort(sortBySignal);
-    // console.debug(`rows after sortBySignal = ${JSON.stringify(rows)}`);
+    const sessionized = sessionizeVisits(baseRows);
 
-    const profile = generateProfileInputs(rows);
+    const prepared_inputs = generateProfileInputs(sessionized);
+
+    const [agg_domains, agg_titles, agg_searches] =
+      aggregateSessions(prepared_inputs);
+
+    const prepared_inputs_topk = topkAggregates(
+      agg_domains,
+      agg_titles,
+      agg_searches,
+      { k_domains: 30, k_titles: 60, k_searches: 10 } // options object
+    );
 
     console.log("[Insights] Generating insights with LLM...");
-    const list = await generateInsightsWithLLM(profile, "history");
+    const list = await generateInsightsWithLLM(prepared_inputs_topk, "history");
 
     const { addedCount } = addInsightsToData(list);
     console.log(
