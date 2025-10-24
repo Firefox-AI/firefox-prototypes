@@ -871,6 +871,8 @@ async function generateInsightsWithLLM(profile, source) {
   let profile_records = [];
   if (source === "history") {
     profile_records = profile?.profile_summarized ?? profile ?? [];
+  } else if (source === "custom") {
+    profile_records = profile;
   } else if (Array.isArray(profile)) {
     profile_records = profile;
   }
