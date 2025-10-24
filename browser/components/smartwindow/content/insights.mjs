@@ -575,7 +575,7 @@ async function generateInsightsWithLLM(profile, source) {
   if (source === "history") {
     profile_records = profile?.profile_summarized ?? profile ?? [];
   } else if (source === "custom") {
-    profile_records = profile?.profile_summarized ?? profile ?? [];
+    profile_records = profile;
   } else if (Array.isArray(profile)) {
     profile_records = profile;
   }
@@ -793,26 +793,23 @@ export async function generateInsightsFromCustomText(inputText) {
   smartWindow?.setInsightsError(null);
 
   try {
-    console.log("[Insights] Generating insights from custom text input: ", inputText.trim());
+    console.log(
+      "[Insights] Generating insights from custom text input:",
+      inputText.trim()
+    );
 
-    // Create a simple profile structure with the input text
-    const profile = {
-      profile_summarized: [{
-        url: "custom-input",
-        title: inputText.trim(),
-        weighted_visits: 1.0
-      }]
-    };
-
-    console.log("[Insights] Generating insights with LLM...");
-    const list = await generateInsightsWithLLM(profile, "custom");
+    const list = await generateInsightsWithLLM(inputText.trim(), "custom");
+    console.log("[Insights] LLM returned insights:", JSON.stringify(list));
 
     const { addedCount } = addInsightsToData(list);
     console.log(
       `[Insights] Added ${addedCount}/${list.length} insights from custom input`
     );
   } catch (error) {
-    console.error("[Insights] Generation from Custom text input failed:", error);
+    console.error(
+      "[Insights] Generation from Custom text input failed:",
+      error
+    );
     const errorMsg = error.message || String(error);
     smartWindow?.setInsightsError(errorMsg);
     throw error;
@@ -1031,9 +1028,11 @@ export function createInsightsOverlay(
     window.dispatchEvent(new CustomEvent("insights-updated"));
   };
 
-  const handleGenerateInsightsWithLLM = async (event) => {
+  const handleGenerateInsightsWithLLM = async event => {
     // Get the input element from the event target's parent
-    const input = event.target.parentElement.querySelector("#llm-insights-input");
+    const input = event.target.parentElement.querySelector(
+      "#llm-insights-input"
+    );
     const text = input?.value?.trim();
 
     if (!text) {
@@ -1047,11 +1046,10 @@ export function createInsightsOverlay(
       if (input) {
         input.value = "";
       }
-      // Force re-render by triggering a state change
-      window.dispatchEvent(new CustomEvent("insights-updated"));
     } catch (error) {
       console.error("Failed to generate insights with LLM:", error);
     }
+    window.dispatchEvent(new CustomEvent("insights-updated"));
   };
 
   return html`
@@ -1113,7 +1111,9 @@ export function createInsightsOverlay(
             @click=${handleGenerateInsightsWithLLM}
             ?disabled=${state.isGenerating}
           >
-            ${state.isGenerating ? "Generating..." : "Generate Insights with LLM"}
+            ${state.isGenerating
+              ? "Generating..."
+              : "Generate Insights with LLM"}
           </button>
         </div>
 
