@@ -561,7 +561,7 @@ Return ONLY a JSON array of objects, no prose, no code fences. Each object must 
  * Calls LLM to generate insights and processes the response
  *
  * @param {object} profile - Profile data to analyze
- * @param {string} source - Source type ('history' or 'conversation')
+ * @param {string} source - Source type ('history', 'conversation', or 'custom')
  * @returns {Promise<object>} Parsed JSON response with categories
  */
 async function generateInsightsWithLLM(profile, source) {
@@ -574,6 +574,8 @@ async function generateInsightsWithLLM(profile, source) {
   let profile_records = [];
   if (source === "history") {
     profile_records = profile?.profile_summarized ?? profile ?? [];
+  } else if (source === "custom") {
+    profile_records = profile;
   } else if (Array.isArray(profile)) {
     profile_records = profile;
   }
@@ -762,6 +764,52 @@ export async function generateInsightsFromConversations() {
     );
   } catch (error) {
     console.error("[Insights] Generation failed:", error);
+    const errorMsg = error.message || String(error);
+    smartWindow?.setInsightsError(errorMsg);
+    throw error;
+  } finally {
+    smartWindow?.setGeneratingInsights(false);
+  }
+}
+
+/**
+ * Generates insights from custom text input using LLM
+ *
+ * @param {string} inputText - The text input from user
+ * @returns {Promise<void>}
+ */
+export async function generateInsightsFromCustomText(inputText) {
+  const smartWindow = getSmartWindow();
+
+  if (smartWindow?.isGeneratingInsights()) {
+    throw new Error("Already generating insights");
+  }
+
+  if (!inputText || !inputText.trim()) {
+    throw new Error("No input text provided");
+  }
+
+  smartWindow?.setGeneratingInsights(true);
+  smartWindow?.setInsightsError(null);
+
+  try {
+    console.log(
+      "[Insights] Generating insights from custom text input:",
+      inputText.trim()
+    );
+
+    const list = await generateInsightsWithLLM(inputText.trim(), "custom");
+    console.log("[Insights] LLM returned insights:", JSON.stringify(list));
+
+    const { addedCount } = addInsightsToData(list);
+    console.log(
+      `[Insights] Added ${addedCount}/${list.length} insights from custom input`
+    );
+  } catch (error) {
+    console.error(
+      "[Insights] Generation from Custom text input failed:",
+      error
+    );
     const errorMsg = error.message || String(error);
     smartWindow?.setInsightsError(errorMsg);
     throw error;
@@ -980,6 +1028,30 @@ export function createInsightsOverlay(
     window.dispatchEvent(new CustomEvent("insights-updated"));
   };
 
+  const handleGenerateCustom = async event => {
+    // Get the input element from the event target's parent
+    const input = event.target.parentElement.querySelector(
+      "#llm-insights-input"
+    );
+    const text = input?.value?.trim();
+
+    if (!text) {
+      console.warn("No text provided for LLM insights generation");
+      return;
+    }
+
+    try {
+      await generateInsightsFromCustomText(text);
+      // Clear the input after successful generation
+      if (input) {
+        input.value = "";
+      }
+    } catch (error) {
+      console.error("Failed to generate insights with LLM:", error);
+    }
+    window.dispatchEvent(new CustomEvent("insights-updated"));
+  };
+
   return html`
     <style>
       ${insightsStyles?.cssText ?? ""}
@@ -1024,6 +1096,24 @@ export function createInsightsOverlay(
             title="Copy insights to clipboard"
           >
             📋 Copy Insights
+          </button>
+        </div>
+
+        <div class="llm-insights-section">
+          <input
+            id="llm-insights-input"
+            placeholder="Enter text to generate and add insights"
+            class="key-input"
+          />
+          <button
+            id="llm-insights-submit"
+            class="key-submit-button"
+            @click=${handleGenerateCustom}
+            ?disabled=${state.isGenerating}
+          >
+            ${state.isGenerating
+              ? "Generating..."
+              : "Generate Insights with LLM"}
           </button>
         </div>
 
@@ -1401,6 +1491,66 @@ insightsStyles = css`
     font-size: 0.75rem;
     color: #666;
     font-weight: 500;
+  }
+
+  .llm-insights-section {
+    display: flex;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e0e0e0;
+    background: #f8f9fa;
+    align-items: center;
+  }
+
+  .llm-insights-section .key-input {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    background: white;
+    transition: all 0.2s;
+  }
+
+  .llm-insights-section .key-input:focus {
+    outline: none;
+    border-color: #0066cc;
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+  }
+
+  .llm-insights-section .key-input::placeholder {
+    color: #999;
+  }
+
+  .llm-insights-section .key-submit-button {
+    padding: 0.75rem 1.5rem;
+    background: #0066cc;
+    color: white;
+    border: 1px solid #0052a3;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .llm-insights-section .key-submit-button:hover:not(:disabled) {
+    background: #0052a3;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 102, 204, 0.2);
+  }
+
+  .llm-insights-section .key-submit-button:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 102, 204, 0.2);
+  }
+
+  .llm-insights-section .key-submit-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
   }
 `;
 
