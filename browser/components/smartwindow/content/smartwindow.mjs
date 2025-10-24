@@ -1591,8 +1591,9 @@ class SmartWindowPage {
     this.quickActionButtons.insights?.addEventListener("click", e => {
       e.stopPropagation();
 
-      document.location.href =
-        "chrome://browser/content/smartwindow/insights.html";
+      if (this.chatBot) {
+        this.chatBot.handleInsightClick();
+      }
     });
 
     this.quickActionButtons.chats?.addEventListener("click", e => {
