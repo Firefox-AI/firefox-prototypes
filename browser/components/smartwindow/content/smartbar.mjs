@@ -54,6 +54,43 @@ export function attachToElement(element, options = {}) {
     return getExistingMentionIds(json)?.length > 0;
   }
 
+  // Handle tab switch behaviour
+  function switchToMatchingTab({ url, title, query } = {}, win = window) {
+    const searchTerm = (url || title || query || "").toLowerCase();
+    if (!searchTerm) {
+      return;
+    }
+
+    let browserWindow = win && win.gBrowser ? win : Services.wm.getMostRecentWindow("navigator:browser");
+    if (!browserWindow || !browserWindow.gBrowser) {
+      return;
+    }
+
+    const { gBrowser } = browserWindow;
+    const tabs = Array.from(gBrowser.tabs);
+
+    const match = tabs.find((tab) => {
+      const linkedBrowser = tab.linkedBrowser;
+      const titleText = (linkedBrowser?.contentTitle || tab.label || "").toLowerCase();
+      const urlText = (linkedBrowser?.currentURI?.spec || "").toLowerCase();
+
+      if (url) {
+        return urlText.includes(searchTerm);
+      }
+      if (title) {
+        return titleText.includes(searchTerm);
+      }
+      return titleText.includes(searchTerm) || urlText.includes(searchTerm);
+    });
+
+    if (!match) {
+      return;
+    }
+
+    browserWindow.focus();
+    gBrowser.selectedTab = match;
+  }
+
   // Create suggestions container
   function createSuggestionsContainer() {
     suggestionsContainer = document.createElement("div");
@@ -389,6 +426,17 @@ export function attachToElement(element, options = {}) {
 
     button.addEventListener("click", e => {
       e.preventDefault();
+      // If this is a "tab switch" row, activate the tab instead
+      if (suggestion.type === "action") {
+        switchToMatchingTab({
+          url: suggestion.url,
+          title: suggestion.title,
+          query: suggestion.query || suggestion.text
+        }, window);
+        return;
+      }
+
+      // default behavior for all other suggestion types
       editor.commands.setContent(suggestion.text);
       if (onSuggestionSelect) {
         onSuggestionSelect(suggestion);
