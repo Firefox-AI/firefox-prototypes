@@ -49,6 +49,60 @@ class ChatBot extends MozLitElement {
       margin-bottom: 1rem;
     }
 
+    .conversation-title-container {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1rem 0 0.5rem 0;
+      margin-bottom: 0.5rem;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .conversation-title {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #333;
+      flex: 1;
+    }
+
+    .title-edit-button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0.25rem;
+      border-radius: 4px;
+      color: #666;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition:
+        background-color 0.2s,
+        color 0.2s;
+      margin: 0;
+    }
+
+    .title-edit-button:hover {
+      background-color: #f0f0f0;
+      color: #333;
+    }
+
+    .title-input {
+      flex: 1;
+      font-size: 1.25rem;
+      font-weight: 600;
+      padding: 0.5rem;
+      border: 1px solid #0066cc;
+      border-radius: 4px;
+      outline: none;
+      margin: 0;
+    }
+
+    .title-input:focus {
+      border-color: #0052a3;
+      box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
+    }
+
     .message {
       max-width: 70%;
       padding: 0.75rem;
@@ -399,6 +453,7 @@ class ChatBot extends MozLitElement {
       systemPromptDraft: { type: String },
       saveStatus: { type: String },
       conversationTitle: { type: String },
+      editingTitle: { type: Boolean },
     };
   }
 
@@ -429,6 +484,7 @@ class ChatBot extends MozLitElement {
     this._lastUserHTML = null;
     this._uiMeta = new Map();
     this.conversationTitle = "";
+    this.editingTitle = false;
 
     // TODO: Figure out what/where to get this info from, if necessary
     this.#conversation = new ChatHistoryConversation({
@@ -890,6 +946,47 @@ Today's date: ${currentDate}`;
     this.requestUpdate();
   }
 
+  handleTitleEdit() {
+    this.editingTitle = true;
+    this.requestUpdate();
+    // Focus the input after render
+    setTimeout(() => {
+      const input = this.shadowRoot.getElementById("title-input");
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    }, 0);
+  }
+
+  handleTitleSave(e) {
+    const newTitle = e.target.value.trim();
+    this.conversationTitle = newTitle;
+    if (this.#conversation) {
+      this.#conversation.title = newTitle;
+    }
+    this.editingTitle = false;
+    this.requestUpdate();
+
+    // Dispatch event to trigger ChatHistory save
+    const event = new CustomEvent("title-updated", {
+      detail: { title: newTitle },
+      bubbles: true,
+    });
+    this.dispatchEvent(event);
+  }
+
+  handleTitleKeyDown(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.target.blur(); // Trigger save via blur handler
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      this.editingTitle = false;
+      this.requestUpdate();
+    }
+  }
+
   render() {
     // Count total insights for the badge
     const insightsData =
@@ -979,6 +1076,54 @@ Today's date: ${currentDate}`;
       ${this.#conversation.messages.length !== 0
         ? html`
             <div class="chat">
+              ${this.conversationTitle || this.editingTitle
+                ? html`
+                    <div class="conversation-title-container">
+                      ${this.editingTitle
+                        ? html`
+                            <input
+                              id="title-input"
+                              class="title-input"
+                              type="text"
+                              .value=${this.conversationTitle || ""}
+                              @blur=${e => this.handleTitleSave(e)}
+                              @keydown=${e => this.handleTitleKeyDown(e)}
+                              placeholder="Untitled conversation"
+                            />
+                          `
+                        : html`
+                            <h2 class="conversation-title">
+                              ${this.conversationTitle ||
+                              "Untitled conversation"}
+                            </h2>
+                            <button
+                              class="title-edit-button"
+                              @click=${() => this.handleTitleEdit()}
+                              title="Edit title"
+                            >
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                              >
+                                <path
+                                  d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                />
+                                <path
+                                  d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
+                                  fill="currentColor"
+                                />
+                              </svg>
+                            </button>
+                          `}
+                    </div>
+                  `
+                : ""}
               ${this.#conversation.messages.map((msg, i) => {
                 const { cleanContent, searchQueries, usedInsights } =
                   msg.role === ChatHistory.MESSAGE_ROLE.ASSISTANT
