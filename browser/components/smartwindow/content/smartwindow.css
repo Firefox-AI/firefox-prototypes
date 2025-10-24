@@ -601,6 +601,10 @@ body {
     height: 100vh;
   }
 
+  .smart-window-container #results-container {
+    order: 1; /* Results at top */
+  }
+
   .smart-window-container #chat-bot {
     /* Make chat bot scrollable and take remaining space */
     flex: 1 1 auto;
@@ -734,9 +738,15 @@ body {
   overflow-wrap: break-word;
 }
 
-/* Hide quick prompts in fullscreen mode when chat is active */
+/* Position quick prompts above input in fullscreen mode when chat is active */
 :root.chat-mode-bottom:not(.sidebar-mode) .smart-window-container .quick-prompts-container {
-  display: none;
+  order: 2; /* Place after results-container but before search-box */
+  margin: 0 auto var(--space-medium);
+  padding: 0 var(--space-large);
+}
+
+:root.chat-mode-bottom:not(.sidebar-mode) .smart-window-container .search-box {
+  order: 3; /* Place search box after quick prompts */
 }
 
 /* Keep quick prompts visible but with reduced opacity in sidebar mode when chat is active */
