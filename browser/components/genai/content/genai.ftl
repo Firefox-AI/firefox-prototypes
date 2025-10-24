@@ -31,3 +31,5 @@ sidebar-menu-genai-smart-assist-label =
   .label = Smart Assist
 
 genai-smart-assist-title = Smart Assist
+
+genai-welcome-onboarding-tos = Smart Window uses your open tabs and browsing history to make things more personal. Are you okay with the new Terms of Use?

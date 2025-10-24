@@ -518,7 +518,11 @@ class ChatBot extends MozLitElement {
     this.requestUpdate();
 
     // Prepare messages with system prompt for the API call
-    const messagesForAPI = this.#conversation.messages.map(m => ({ role: m.role, content: m.content, }));
+    const messagesForAPI = this.#conversation.messages.map(m => ({
+      role: m.role,
+      content: m.content,
+    }));
+
     if (messagesForAPI.length) {
       // Insert system prompt as the first message
       const shouldGenerateTitle = this.conversationTitle === "";
@@ -584,6 +588,17 @@ class ChatBot extends MozLitElement {
       const lastIdx = this.#conversation.messages.length - 1;
       this.#conversation.messages[lastIdx].content +=
         "\n[Error streaming response]";
+      
+      // Add error details to tool log
+      this.updateLogState({
+        content: "Streaming Error",
+        result: {
+          error: true,
+          message: err.message || "Unknown streaming error",
+          stack: err.stack || "No stack trace available"
+        }
+      });
+      
       this.requestUpdate();
     }
 
@@ -628,6 +643,10 @@ class ChatBot extends MozLitElement {
   }
 
   buildSystemPrompt(tabContext = [], includeTitleGeneration = false) {
+    const useInsights = Services.prefs.getBoolPref(
+      "browser.smartwindow.useInsights",
+      true
+    );
     const currentDate = new Date().toLocaleDateString("en-US", {
       weekday: "long",
       year: "numeric",
@@ -672,8 +691,12 @@ Examples:
 
 Always provide a helpful response first, then include the search suggestion when appropriate.
 
-# Insights and Personalization Rules
-${buildInsightsSystemPrompt()}`;
+${
+  useInsights
+    ? `# Insights and Personalization Rules
+${buildInsightsSystemPrompt()}`
+    : ""
+}`;
 
     if (includeTitleGeneration) {
       systemPrompt += `\n\n# Title Generation Rules
@@ -683,6 +706,7 @@ Do not end with punctuation (no period, question mark, etc.). Do not generate qu
 
 Format the title as follows: §title: title§`;
     }
+
 
     systemPrompt += `\n\n# Real Time & User Information
 
@@ -944,17 +968,17 @@ Today's date: ${currentDate}`;
                         searchQueries: [],
                         usedInsights: [],
                       };
-                
 
                 // render HTML when available, otherwise fallback to markdown.
                 const key = msg.id ?? msg.messageId ?? i;
                 const meta = this._uiMeta.get(key);
 
                 const bodyHTML =
-                  msg.role === ChatHistory.MESSAGE_ROLE.USER && meta?.displayHTML
+                  msg.role === ChatHistory.MESSAGE_ROLE.USER &&
+                  meta?.displayHTML
                     ? unsafeHTML(meta.displayHTML)
                     : unsafeHTML(this.marked(cleanContent));
-                  
+
                 return html`
                   <div
                     class="message ${msg.role === ChatHistory.MESSAGE_ROLE.USER

@@ -95,6 +95,11 @@ class SmartWindowPage {
   }
 
   async getEffectiveQueryType(query) {
+    // If query contains @mention use type "chat"
+    if (this.smartbar && this.smartbar.hasExistingMentions()) {
+      return "chat";
+    }
+
     // Get user's preference for query type override
     const userOverride = Services.prefs.getStringPref(
       "browser.smartwindow.queryType",
@@ -104,11 +109,6 @@ class SmartWindowPage {
     // If user chose a specific type, use that (unless it's "auto")
     if (userOverride !== "auto") {
       return userOverride;
-    }
-
-    // If query contains @mention use type "chat" (only when pref is "auto")
-    if (this.smartbar && this.smartbar.hasExistingMentions()) {
-      return "chat";
     }
 
     // Otherwise, use the ML detection
@@ -127,13 +127,9 @@ class SmartWindowPage {
         .slice(0, 5);
     }
 
-    // Always show some prompts, even without context
+    // Return empty array if no context
     if (contextTabs.length === 0) {
-      // Return default prompts when no context is available
-      return [
-        { text: "Show me similar music on YouTube", type: "search" },
-        { text: "Tips for using AI Mode", type: "chat" },
-      ];
+      return [];
     }
 
     const cacheKey =
@@ -160,91 +156,11 @@ class SmartWindowPage {
         return suggestions;
       }
     } catch (error) {
-      console.error(
-        "Failed to generate AI prompts, falling back to static prompts:",
-        error
-      );
+      console.error("Failed to generate AI prompts:", error);
     }
 
-    // Fallback to static prompts
-    return this.generateFallbackPrompts(contextTabs, tabTitle);
-  }
-
-  // Fallback prompt generation (simplified version of the original logic)
-  generateFallbackPrompts(contextTabs, tabTitle = "") {
-    const suggestions = [];
-
-    if (contextTabs.length > 1) {
-      // Multi-tab context prompts
-      const tabTitles = contextTabs
-        .map(tab => tab.title)
-        .filter(title => title && title !== "Untitled");
-      const uniqueTitles = [...new Set(tabTitles)].slice(0, 3);
-
-      if (uniqueTitles.length) {
-        const topics = uniqueTitles.join(", ");
-        suggestions.push(
-          { text: `Compare ${topics}`, type: "chat" },
-          { text: `What do ${topics} have in common?`, type: "chat" }
-        );
-      }
-
-      // Context-aware search
-      suggestions.push(
-        { text: `research across ${contextTabs.length} tabs`, type: "search" },
-        { text: `summarize content from selected tabs`, type: "chat" }
-      );
-    } else {
-      // Single tab context (original logic)
-      const titleWords = (tabTitle || contextTabs[0]?.title || "")
-        .split(/\s+/)
-        .filter(word => word.length > 2)
-        .slice(0, 3);
-      const topic = titleWords.join(" ") || "this";
-
-      // 2 chat prompts
-      suggestions.push(
-        { text: `What is ${topic} about?`, type: "chat" },
-        { text: `How does ${topic} work?`, type: "chat" }
-      );
-
-      // 2 search queries
-      suggestions.push(
-        { text: `${topic} guide`, type: "search" },
-        { text: `${topic} tutorial`, type: "search" }
-      );
-    }
-
-    // Add domain suggestions from context tabs
-    const domains = new Set();
-    for (const tab of contextTabs) {
-      if (tab.url) {
-        try {
-          const domain = tab.url
-            .replace(/^https?:\/\//, "")
-            .replace(/^www\./, "")
-            .split("/")[0];
-          if (
-            domain &&
-            domain !== "about:blank" &&
-            !domain.startsWith("about:")
-          ) {
-            domains.add(domain);
-          }
-        } catch (e) {}
-      }
-    }
-
-    // Add up to 2 unique domains
-    const domainArray = Array.from(domains).slice(0, 2);
-    domainArray.forEach(domain => {
-      suggestions.push({ text: domain, type: "navigate" });
-    });
-
-    // 1 action
-    //suggestions.push({ text: "tab next", type: "action" });
-
-    return suggestions;
+    // Return empty array if AI fails
+    return [];
   }
 
   // Tab Context Management Methods
@@ -996,6 +912,17 @@ class SmartWindowPage {
         }
       });
     }
+
+    // Setup insights toggle
+    this.toggleInsights = document.getElementById("toggle-insights");
+    if (this.toggleInsights) {
+      const PREF = "browser.smartwindow.useInsights";
+      this.toggleInsights.checked = Services.prefs.getBoolPref(PREF, true);
+      // persist when changed
+      this.toggleInsights.addEventListener("change", e => {
+        Services.prefs.setBoolPref(PREF, e.target.checked);
+      });
+    }
   }
 
   async updateSubmitButton(query) {
@@ -1364,6 +1291,11 @@ class SmartWindowPage {
     // Mark that user has manually edited the query
     this.userHasEditedQuery = true;
 
+    // Don’t show suggestions mid-conversation
+    if (this.chatBot?.messages?.length > 0) {
+      return;
+    }
+
     // Debounce live suggestions
     this.suggestionDebounceTimer = setTimeout(() => {
       this.generateLiveSuggestions(query);
@@ -1376,12 +1308,7 @@ class SmartWindowPage {
       topChromeWindow
     );
     if (this.smartbar) {
-      this.smartbar.showSuggestions(
-        suggestions,
-        "Suggestions:",
-        false,
-        query,
-      );
+      this.smartbar.showSuggestions(suggestions, "Suggestions:", false, query);
 
       // Apply autofill if available
       if (autofillData) {
@@ -1395,16 +1322,20 @@ class SmartWindowPage {
       return;
     }
 
+    const textFromBar = this.smartbar?.getText?.() || "";
+    const htmlFromBar = this.smartbar?.getHTML?.() || null;
+
     document.documentElement.setAttribute("haschat", "true");
 
     const type = await this.getEffectiveQueryType(query);
 
     // Hide suggestions after selection
     if (this.smartbar) {
+      this.smartbar.clear();
       this.smartbar.hideSuggestions();
     }
 
-    // Handle chat queries with chatbot component in both modes
+    // Handle chat queries with chatbot component in different modes
     if (type === "chat") {
       // Show chat component and submit the prompt with tab context
       this.showChatMode();
@@ -1419,8 +1350,6 @@ class SmartWindowPage {
         // Pass page text if current tab is in context
         const includePageText = this.isCurrentTabInContext();
 
-        const textFromBar = this.smartbar?.getText?.() || "";
-        const htmlFromBar = this.smartbar?.getHTML?.() || null;
         const text = textFromBar || (typeof query === "string" ? query : "");
         const html = htmlFromBar;
 
@@ -1469,15 +1398,9 @@ class SmartWindowPage {
       this.suggestionDebounceTimer = null;
     }
 
-    // Clear editor and reset state
-    if (this.smartbar) {
-      this.smartbar.clear();
-    }
+    // Reset state
     this.updateSubmitButton("");
     this.userHasEditedQuery = false;
-    if (this.smartbar) {
-      this.smartbar.hideSuggestions();
-    }
   }
 
   performNavigation(query, type, clickEvent = null) {
