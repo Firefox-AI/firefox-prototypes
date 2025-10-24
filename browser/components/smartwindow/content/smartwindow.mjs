@@ -643,8 +643,10 @@ class SmartWindowPage {
 
     this.smartbar = attachToElement(editorDiv, {
       onKeyDown: event => this.handleKeyDown(event),
-      onUpdate: ({ text, isAutofilled }) => this.handleOnUpdate({ text, isAutofilled }),
-      onSuggestionSelect: suggestion => this.handleEnter(suggestion.text),
+      onUpdate: ({ text, isAutofilled }) =>
+        this.handleOnUpdate({ text, isAutofilled }),
+      onSuggestionSelect: suggestion =>
+        this.handleEnter(suggestion.text, suggestion.type),
       getQueryTypeIcon: type => this.getQueryTypeIcon(type),
     });
 
@@ -863,7 +865,7 @@ class SmartWindowPage {
       }
     });
 
-    this.submitButton.addEventListener("selection-change", (e) => {
+    this.submitButton.addEventListener("selection-change", e => {
       const { value: forcedQueryType } = e.detail;
       this.effectiveQueryType = forcedQueryType;
     });
@@ -1281,7 +1283,7 @@ class SmartWindowPage {
     }
   }
 
-  async handleEnter(query) {
+  async handleEnter(query, suggestionType = null) {
     if (!query.trim()) {
       return;
     }
@@ -1291,6 +1293,8 @@ class SmartWindowPage {
 
     document.documentElement.setAttribute("haschat", "true");
 
+    const type = suggestionType || (await this.getEffectiveQueryType(query));
+
     // Hide suggestions after selection
     if (this.smartbar) {
       this.smartbar.clear();
@@ -1298,7 +1302,7 @@ class SmartWindowPage {
     }
 
     // Handle chat queries with chatbot component in different modes
-    if (this.effectiveQueryType === "chat") {
+    if (type === "chat") {
       // Show chat component and submit the prompt with tab context
       this.showChatMode();
 
@@ -1364,7 +1368,7 @@ class SmartWindowPage {
       }
       // For chat on smart window page (not sidebar), don't open sidebar
       // The sidebar logic is handled by performNavigation for search/navigate types
-    } else if (this.effectiveQueryType === "action") {
+    } else if (type === "action") {
       if (this.isSidebarMode) {
         // NOTE: Can we remove this isSidebarMode? ask @mardak
         // Handle actions in sidebar
@@ -1372,7 +1376,7 @@ class SmartWindowPage {
       } else {
         // In full page mode, convert actions to search
         this.hideChatMode();
-        this.performNavigation(query, this.effectiveQueryType);
+        this.performNavigation(query, type);
       }
     } else {
       // For navigate and search, hide chat mode and show regular messages
@@ -1381,10 +1385,10 @@ class SmartWindowPage {
         // NOTE: does this still exist? ask @mardak
         // this.addMessage(`Navigating: ${query}`, "user");
       }
-      this.performNavigation(query, this.effectiveQueryType);
+      this.performNavigation(query, type);
 
       // Open sidebar for search queries when not in sidebar mode and not on a new tab
-      if (this.effectiveQueryType === "search" && !this.isSidebarMode) {
+      if (type === "search" && !this.isSidebarMode) {
         // Tell the chrome window to show the sidebar
         if (topChromeWindow.SmartWindow) {
           topChromeWindow.SmartWindow.showSidebar();
