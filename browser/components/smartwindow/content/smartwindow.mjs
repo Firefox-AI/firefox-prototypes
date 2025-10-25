@@ -858,7 +858,7 @@ class SmartWindowPage {
     this.submitButton.addEventListener("submit", () => {
       const text = this.smartbar ? this.smartbar.getText() : "";
       if (text.trim()) {
-        this.handleEnter(text);
+        this.handleEnter(text, this.effectiveQueryType);
       } else if (this.smartbar) {
         // If empty, focus the editor
         this.smartbar.focus();
@@ -868,6 +868,7 @@ class SmartWindowPage {
     this.submitButton.addEventListener("selection-change", e => {
       const { value: forcedQueryType } = e.detail;
       this.effectiveQueryType = forcedQueryType;
+      this.submitButton.handleSubmit();
     });
 
     // Setup model picker (keep existing code)
