@@ -354,7 +354,7 @@ tasks:
               ownTaskId: {$eval: as_slugid("decision_task")}
           in:
               $if: >
-                tasks_for == "github-push" && head_branch == "refs/heads/main"
+                tasks_for == "github-push" && head_branch == "refs/heads/smart-window"
               then:
                   $let:
                       short_head_ref:
