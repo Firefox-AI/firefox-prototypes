@@ -9,7 +9,7 @@ import {
   generateConversationStarters,
   generateFollowupPrompts,
 } from "./suggestions.mjs";
-import { showHistoryOverlay } from "chrome://browser/content/smartwindow/history.mjs";
+import { showChatHistoryOverlay } from "chrome://browser/content/smartwindow/chat-history.mjs";
 
 const { ChatHistory, ChatHistoryConversation } = ChromeUtils.importESModule(
   "resource:///modules/smartwindow/ChatHistory.sys.mjs"
@@ -853,7 +853,6 @@ class SmartWindowPage {
     // Find the combined button select component
     await customElements.whenDefined("combined-button-select");
     this.submitButton = document.getElementById("combined-button-select");
-    console.log("[this.submitButton]", this.submitButton);
 
     this.submitButton.addEventListener("submit", () => {
       const text = this.smartbar ? this.smartbar.getText() : "";
@@ -981,6 +980,59 @@ class SmartWindowPage {
     }
   }
 
+  handleSearchHistoryTool(historyItems) {
+    console.log(
+      "[SmartWindow] handleSearchHistoryTool - historyItems",
+      historyItems,
+      "Type:", typeof historyItems,
+      "IsArray:", Array.isArray(historyItems)
+    );
+
+    // Ensure historyItems is an array
+    const items = Array.isArray(historyItems) ? historyItems : [];
+
+    if (items.length === 0) {
+      console.log("[SmartWindow] No history items to display");
+      return;
+    }
+
+    // Create and show the overlay
+    const historyOverlay = document.createElement("page-history-overlay");
+
+    // Set the history data (expected format)
+    historyOverlay.historyItems = items;
+
+    // Open the overlay
+    historyOverlay.isOpen = true;
+
+    // Listen for events
+    historyOverlay.addEventListener("close", () => {
+      historyOverlay.isOpen = false;
+    });
+
+    historyOverlay.addEventListener("item-selected", (event) => {
+      const selectedItem = event.detail;
+      console.warn("[SmartWindow] Selected history item:", selectedItem);
+
+      // Close the overlay
+      historyOverlay.isOpen = false;
+
+      // Navigate to the selected URL
+      if (selectedItem.url) {
+        topChromeWindow.gBrowser.selectedBrowser.fixupAndLoadURIString(
+          selectedItem.url,
+          {
+            triggeringPrincipal:
+              Services.scriptSecurityManager.getSystemPrincipal(),
+          }
+        );
+      }
+    });
+
+    // Add to DOM
+    document.body.appendChild(historyOverlay);
+  }
+
   setupEventListeners() {
     document.addEventListener("FocusSmartSearchInput", () => {
       this.smartbar.focus();
@@ -1023,7 +1075,13 @@ class SmartWindowPage {
         // Handle tool call responses
         switch (e.detail.tool) {
           case "search_history":
-            console.info("[SmartWindow] Handle search_history");
+            try {
+              // FIXME: Sanitize JSON
+              const parsedData = JSON.parse(e.detail.result);
+              this.handleSearchHistoryTool(parsedData?.results);
+            } catch (error) {
+              console.error("[SmartWindow] Failed to parse tool data", error);
+            }
             break;
           // Do nothing
           default:
@@ -1594,7 +1652,7 @@ class SmartWindowPage {
     this.quickActionButtons.chats?.addEventListener("click", e => {
       e.stopPropagation();
 
-      showHistoryOverlay(conversation => {
+      showChatHistoryOverlay(conversation => {
         this.loadConversationFromHistory(conversation);
       });
     });
