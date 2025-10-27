@@ -1019,6 +1019,16 @@ class SmartWindowPage {
         if (this.chatBot.updateLogState) {
           this.chatBot.updateLogState(e.detail);
         }
+
+        // Handle tool call responses
+        switch (e.detail.tool) {
+          case "search_history":
+            console.info("[SmartWindow] Handle search_history");
+            break;
+          // Do nothing
+          default:
+            break;
+        }
       });
 
       this.chatBot.addEventListener("title-updated", e => {
