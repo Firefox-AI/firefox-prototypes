@@ -603,6 +603,7 @@ class ChatBot extends MozLitElement {
         // Specifically handle tool call log messages so it does not end up in the chat bubble
         if (chunk.type === "tool_call_log") {
           this.handleLogToolCall({
+            tool: chunk.tool,
             content: chunk.content,
             result: chunk.result || "no result",
           });
