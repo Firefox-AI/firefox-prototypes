@@ -93,7 +93,6 @@ const DEFAULT_INSIGHTS_DATA = {};
  * @param {object} opts
  * @param {number} [opts.days=60]          How far back to look
  * @param {number} [opts.maxResults=500]   Max rows to return (after sort)
- * @param {number} [opts.minVisits=2]      Keep URLs with >= this many visits
  * @returns {Promise<Array<{url:string,title:string,domain:string,visit_time:string,visit_count:number,source:'history'|'search'}>>}
  */
 async function getRecentHistory(opts = {}) {
@@ -570,74 +569,87 @@ function topkAggregates(
     k_domains = 30,
     k_titles = 60,
     k_searches = 10,
-    now = undefined, // optional; seconds or ms, we normalize
+    now = undefined, // optional; seconds or ms, normalized inside withRecency
   } = {}
 ) {
-  const nowRaw = now != null ? now : Date.now() / 1000; // we’ll normalize inside withRecency
+  const nowRaw = now != null ? now : Date.now() / 1000;
 
-  // domains → [ [domain, {.., rank_score}], ... ]
-  const dom_items = Object.entries(agg_domains).map(([d, v]) => [
-    d,
-    {
-      ...v,
-      rank_score: withRecency(v.score, v.session_importance, v.last_seen, {
-        now: nowRaw,
-      }),
-    },
-  ]);
+  // --- enrich with rank (for sorting), but don't keep extra fields in output ---
 
-  // titles → [ [title, {.., rank_score}], ... ]
-  const tit_items = Object.entries(agg_titles).map(([t, v]) => [
-    t,
-    {
-      ...v,
-      rank_score: withRecency(v.score, v.session_importance, v.last_seen, {
-        now: nowRaw,
-      }),
-    },
-  ]);
-
-  // searches are keyed by session_id; base score is search_count, importance=1.0
-  const srch_items = Object.entries(agg_searches).map(([sid, v]) => {
-    const base = Number(v.search_count || 0);
-    const last = Number(v.last_searched || 0);
-    return [
-      // keep sid as number if possible
-      Number.isFinite(Number(sid)) ? Number(sid) : sid,
-      {
-        ...v,
-        rank_score: withRecency(base, 1.0, last, { now: nowRaw }),
-      },
-    ];
+  // domains: [{key, rank, num_sessions, last_seen}]
+  const domTmp = Object.entries(agg_domains).map(([d, v]) => {
+    const rank = withRecency(v.score, v.session_importance, v.last_seen, {
+      now: nowRaw,
+    });
+    return {
+      key: d,
+      rank,
+      num_sessions: v.num_sessions || 0,
+      last_seen: v.last_seen || 0,
+    };
   });
 
-  // sort: rank_score desc, then tie-breakers like python lambda
-  dom_items.sort(
+  // titles: [{key, rank, num_sessions, last_seen}]
+  const titTmp = Object.entries(agg_titles).map(([t, v]) => {
+    const rank = withRecency(v.score, v.session_importance, v.last_seen, {
+      now: nowRaw,
+    });
+    return {
+      key: t,
+      rank,
+      num_sessions: v.num_sessions || 0,
+      last_seen: v.last_seen || 0,
+    };
+  });
+
+  // searches: [{sid, cnt, q, ls, rank}]
+  const srchTmp = Object.entries(agg_searches).map(([sidRaw, v]) => {
+    const sid = Number.isFinite(Number(sidRaw)) ? Number(sidRaw) : sidRaw;
+    const cnt = Number(v.search_count || 0);
+    const ls  = _toSeconds(v.last_searched || 0);
+    const rank = withRecency(cnt, 1.0, v.last_searched || 0, { now: nowRaw });
+    return {
+      sid,
+      cnt,
+      q: Array.isArray(v.search_titles) ? v.search_titles : [],
+      ls,
+      rank,
+    };
+  });
+
+  // --- sort with tie-breakers using temp fields only ---
+  domTmp.sort(
     (a, b) =>
-      b[1].rank_score - a[1].rank_score ||
-      (b[1].num_sessions || 0) - (a[1].num_sessions || 0) ||
-      (b[1].last_seen || 0) - (a[1].last_seen || 0)
+      b.rank - a.rank ||
+      b.num_sessions - a.num_sessions ||
+      b.last_seen - a.last_seen
+  );
+  titTmp.sort(
+    (a, b) =>
+      b.rank - a.rank ||
+      b.num_sessions - a.num_sessions ||
+      b.last_seen - a.last_seen
+  );
+  srchTmp.sort(
+    (a, b) =>
+      b.rank - a.rank ||
+      b.cnt - a.cnt ||
+      b.ls - a.ls
   );
 
-  tit_items.sort(
-    (a, b) =>
-      b[1].rank_score - a[1].rank_score ||
-      (b[1].num_sessions || 0) - (a[1].num_sessions || 0) ||
-      (b[1].last_seen || 0) - (a[1].last_seen || 0)
-  );
+  // --- trim & emit compact structures ---
+  const dom_items = domTmp.slice(0, k_domains).map(({ key, rank }) => [key, round2(rank)]);
+  const tit_items = titTmp.slice(0, k_titles).map(({ key, rank }) => [key, round2(rank)]);
+  const srch_items = srchTmp.slice(0, k_searches).map(({ sid, cnt, q, ls, rank }) => ({
+    sid,
+    cnt,
+    q,
+    ls,
+    r: round2(rank),
+  }));
 
-  srch_items.sort(
-    (a, b) =>
-      b[1].rank_score - a[1].rank_score ||
-      (b[1].search_count || 0) - (a[1].search_count || 0) ||
-      (b[1].last_searched || 0) - (a[1].last_searched || 0)
-  );
-
-  return [
-    dom_items.slice(0, k_domains),
-    tit_items.slice(0, k_titles),
-    srch_items.slice(0, k_searches),
-  ];
+  // keep your original outer shape: [domains, titles, searches]
+  return [dom_items, tit_items, srch_items];
 }
 
 // ============================================================================
@@ -762,14 +774,50 @@ const LIVE_INSIGHTS_SCHEMA = {
   items: {
     type: "object",
     additionalProperties: false,
-    required: ["category", "intent", "insight_summary", "score"],
+    required: [
+      "category","intent","insight_summary","score","why","evidence","entities_used"
+    ],
     properties: {
-      category: { type: ["string", "null"], enum: [...CATEGORIES, null] },
-      intent: { type: ["string", "null"], enum: [...INTENTS, null] },
-      insight_summary: { type: ["string", "null"] },
+      category: { type: ["string","null"], enum: [...CATEGORIES, null] },
+      intent:   { type: ["string","null"], enum: [...INTENTS,   null] },
+      insight_summary: { type: ["string","null"] },
       score: { type: "integer", minimum: 1, maximum: 5 },
-    },
-  },
+
+      why: { type: "string", minLength: 12, maxLength: 200 },
+
+      evidence: {
+        type: "array",
+        minItems: 1,
+        maxItems: 4,
+        items: {
+          type: "object",
+          required: ["type","value"],
+          additionalProperties: false,
+          properties: {
+            type: { type: "string", enum: ["domain","title","search","chat","user"] },
+            value: { type: "string" },
+            weight: { type: "number", minimum: 0, maximum: 1 },
+            session_ids: { type: "array", items: { type: ["integer","string"] } }
+          }
+        }
+      },
+
+      entities_used: {
+        type: "array",
+        minItems: 1,
+        items: {
+          type: "object",
+          required: ["name","from","local_type"],
+          additionalProperties: false,
+          properties: {
+            name: { type: "string" },
+            from: { type: "string", enum: ["domain","title","search"] },
+            local_type: { type: "string" }
+          }
+        }
+      }
+    }
+  }
 };
 
 /**
@@ -825,6 +873,7 @@ ${intentsList}
 - Dont include person name unless they are popular to avoid any PII.
 - Dont generate insight from just odd one visit.
 - The insights are generated based on a pattern of visits.
+- Don’t infer product relationships between unrelated domains unless both appear together in the same session evidence.
 - No vague phrasing like "various", "often".
 - No duplicate of any item in related_insights (normalize case + remove punctuation before comparing).
 - If no safe, specific insight is supported by Inputs, set "insight_summary": null.
@@ -835,23 +884,43 @@ ${intentsList}
     - “Cooks Mediterranean seafood from TasteAtlas recipes”
     - “Tracks minimalist fashion drops at Uniqlo”
 
-## Scoring priorities (important)
-- Base "score" on both *strength* and *recency* of evidence.
-- Boost if evidence comes from higher-priority sources:
-  user (highest) > chat/conversation > search > history (lowest).
-- Penalize insights supported only by stale, low-frequency history.
-- A recent history signal can reach 1; consistent multi-source evidence can be 1-2.
-- A recent search signal can reach 2; consistent multi-source evidence can be 2-3.
-- A single recent chat signal can reach 4; 
-- A single recent user signal can reach 5;
-- Do not assign 5 unless the pattern is strong and recent.
+## Scoring priorities
+- Base "score" on *strength + recency*; boost multi-source corroboration.
+- Source priority: user (highest) > chat > search > history (lowest).
+- Typical caps: recent history ≤1; search up to 2; multi-source 2–3; recent chat 4; explicit user 5.
+- Do not assign 5 unless pattern is strong and recent.
+
+## Coverage & Diversity
+- Prefer different categories and intents when evidence exists.
+- Avoid repeating the same brand unless constraints differ meaningfully.
+
+## Evidence (REQUIRED)
+For each insight, include 1–4 items in "evidence". Each item:
+- "type": one of ["domain","title","search","chat","user"].
+- "value": a **verbatim** string copied from profile_records (for domain/title/search) or a short user/chat quote.
+- "session_ids": optional array of session ids (if available from inputs).
+- "weight": optional 0–1 indicating contribution strength.
+The evidence strings MUST be directly copyable from profile_records for domain/title/search. Do not paraphrase these.
+
+## Entities (REQUIRED)
+Also include "entities_used": an array listing the concrete entities referenced in the summary:
+- "name": brand/site/product term that appears as a substring in one of the evidence "value" strings.
+- "from": one of ["domain","title","search"], the source where the name comes from.
+- "local_type": short label like "bank","retailer","search","comms","productivity","reference","news","other".
+If you cannot anchor entities to the provided evidence strings, set "insight_summary": null.
+
+## Reason ("why")
+Add "why": 12–40 words that briefly explains the rationale, referencing the cited evidence (no new claims or invented entities).
 
 Return ONLY a JSON array of objects, no prose, no code fences. Each object must have:
 {
   "category": "<one of the categories or null>",
   "intent": "<one of the intents or null>",
   "insight_summary": "<4–10 words, crisp and specific or null>",
-  "score": <integer 1-5>
+  "score": <integer 1-5>,
+  "why": "<12–40 words>",
+  "evidence": [ { "type":"domain|title|search|chat|user", "value":"...", "session_ids":[...], "weight":0.0–1.0 }, ... ],
+  "entities_used": [ { "name":"...", "from":"domain|title|search", "local_type":"..." }, ... ]
 }
 `.trim();
 }
@@ -881,6 +950,11 @@ async function generateInsightsWithLLM(profile, source) {
     profile_records,
     related_insights: [],
   });
+
+  // promptText is the full payload
+  const total = estimateTokens(promptText);
+  console.debug("Approx tokens:", total);
+  // console.debug(`promptText = ${JSON.stringify(promptText)}`);
 
   const engine = await createOpenAIEngine();
   const response = await engine.run({
@@ -924,57 +998,173 @@ function addInsightsToData(payload) {
 
   const items = Array.isArray(payload) ? payload : [payload];
 
-  // ensure new by-category index exists
-  if (
-    !insightsData.insightsDataByCategory ||
-    typeof insightsData.insightsDataByCategory !== "object"
-  ) {
-    insightsData.insightsDataByCategory = {};
-  }
+  // NEW: rich index
+  insightsData.insightsDataByCategory = insightsData.insightsDataByCategory || {};
 
-  let addedCount = 0; // legacy category -> label additions
-  let upsertedByCategory = 0; // new by-short upserts
+  let addedCount = 0;
+  let upsertedByCategory = 0;
 
   for (const obj of items) {
     const category = (obj?.category ?? "").trim();
     const summary = (obj?.insight_summary ?? "").trim();
     const intent = (obj?.intent ?? "").trim();
     const score = Number.isFinite(obj?.score) ? Number(obj.score) : null;
+    const evidence = Array.isArray(obj?.evidence) ? obj.evidence : [];
+    const why = typeof obj?.why === "string" ? obj.why : "";
+    const entities_used = Array.isArray(obj?.entities_used) ? obj.entities_used : (prev?.entities_used ?? []);
 
     if (category) {
       const prev = insightsData.insightsDataByCategory[category];
-      // Upsert if new or summary changed (or we have better metadata)
-      if (
-        !prev ||
-        (summary && summary !== prev.insight_summary) ||
-        (intent && intent !== prev.intent) ||
-        (Number.isFinite(score) && score !== prev.score)
-      ) {
-        insightsData.insightsDataByCategory[category] = {
-          insight_summary: summary || prev?.insight_summary || "",
-          category: category || prev?.category || "",
-          intent: intent || prev?.intent || "",
-          score: Number.isFinite(score) ? score : (prev?.score ?? null),
-        };
-        upsertedByCategory += 1;
-      }
+      const next = {
+        insight_summary: summary || prev?.insight_summary || "",
+        category: category || prev?.category || "",
+        intent: intent || prev?.intent || "",
+        score: Number.isFinite(score) ? score : (prev?.score ?? null),
+        evidence: evidence.length ? evidence : (prev?.evidence ?? []),
+        why: why || prev?.why || "",
+        entities_used
+      };
+      insightsData.insightsDataByCategory[category] = next;
+      upsertedByCategory += 1;
     }
 
-    // ---- Legacy storage (category -> labels array) ----
-    // Falls back to summary if category is missing.
+    // Legacy chips: keep the short text so UI shows tags today
     const label = summary;
     if (category) {
-      if (!insightsData[category]) {
-        insightsData[category] = [];
-      }
+      if (!insightsData[category]) insightsData[category] = [];
       if (!insightsData[category].includes(label)) {
         insightsData[category].push(label);
+        addedCount += 1;
       }
     }
   }
 
   smartWindow?.setInsightsData(insightsData);
   return { addedCount, upsertedByCategory };
+}
+
+
+function validateInsightGeneric(ins) {
+  if (!ins || !ins.insight_summary || !ins.category || !Array.isArray(ins.entities_used)) {
+    return { ok:false, reason:"missing_fields" };
+  }
+
+  // evidence presence
+  if (!Array.isArray(ins.evidence) || ins.evidence.length < 1) {
+    return { ok:false, reason:"no_evidence" };
+  }
+
+  // at least one entity appears in the summary
+  const sum = String(ins.insight_summary).toLowerCase();
+  const summaryHasEntity = ins.entities_used.some(e => sum.includes(String(e.name || "").toLowerCase()));
+  if (!summaryHasEntity) return { ok:false, reason:"summary_missing_entity" };
+
+  return { ok:true };
+}
+
+function specificityBonus(insight) {
+  // heuristic: favor concrete constraints/entities in the sentence
+  const s = (insight.insight_summary || "").toLowerCase();
+  let b = 0;
+  if (/\b(under|below|\$ ?\d+|\d+-\d+)\b/.test(s)) b += 0.15;   // price
+  if (/\b(xs|s|m|l|xl|xxl|\d{1,2}(\.\d)?(in|cm|gb|tb))\b/.test(s)) b += 0.1; // size/spec
+  if (/\b(gluten[-\s]?free|vegan|keto|dairy[-\s]?free)\b/.test(s)) b += 0.15; // diet
+  if (/[A-Z][a-z]+(?:\s&\s[A-Z][a-z]+)?/.test(insight.insight_summary)) b += 0.1; // brand-ish
+  return b;
+}
+
+function normalizeBrand(str) {
+  return (str || "")
+    .toLowerCase()
+    .replace(/https?:\/\/(www\.)?/g, "")
+    .replace(/\.(com|ca|org|net|io|ai)\b/g, "")
+    .replace(/[^\w\s]/g, " ")
+    .trim();
+}
+
+function extractBrandsFromEvidence(ev = []) {
+  const bag = new Set();
+  for (const e of ev || []) {
+    const v = normalizeBrand(e?.value);
+    if (v) bag.add(v.split(/\s+/)[0]); // rough head token
+  }
+  return bag;
+}
+
+function synthWhyFromEvidence(ev = []) {
+  const bits = (ev || []).slice(0, 3).map(e => {
+    const t = e?.type || "signal";
+    const v = (e?.value || "").slice(0, 80);
+    return `${t}: ${v}`;
+    });
+  return bits.length
+    ? `Supported by ${bits.join("; ")}`
+    : "Supported by recent ranked signals";
+}
+
+function rankAndDiversify(insights, { maxPerCategory = 2, maxPerIntent = 2 } = {}) {
+  // score ↑ with specificity + multi-source corroboration
+  for (const x of insights) {
+    const base = Math.max(1, Math.min(5, Number(x.score) || 1)) / 5;
+    const ev = Array.isArray(x.evidence) ? x.evidence : [];
+    const sources = new Set(ev.map(e => e?.type));
+    const brandBonus = /[A-Z][a-z]+/.test(x.insight_summary || "") ? 0.05 : 0;
+    const multiSrcBonus = Math.min(sources.size - 1, 2) * 0.1; // up to +0.2
+    const specBonus = specificityBonus(x); // your existing heuristic
+    x.__rank = base + brandBonus + multiSrcBonus + specBonus;
+    if (!x.why) x.why = synthWhyFromEvidence(ev);
+  }
+
+  // sort by rank
+  insights.sort((a, b) => b.__rank - a.__rank);
+
+  // enforce diversity caps
+  const byCat = new Map();
+  const byIntent = new Map();
+  const byBrand = new Map();
+  const out = [];
+
+  for (const x of insights) {
+    const c = x.category || "null";
+    const i = x.intent || "null";
+
+    // soft brand de-dup
+    const brands = extractBrandsFromEvidence(x.evidence);
+    let brandClash = false;
+    for (const b of brands) {
+      const seen = byBrand.get(b) || 0;
+      if (seen >= 2) { brandClash = true; break; }
+    }
+    if (brandClash) continue;
+
+    if ((byCat.get(c) || 0) >= maxPerCategory) continue;
+    if ((byIntent.get(i) || 0) >= maxPerIntent) continue;
+
+    out.push(x);
+    byCat.set(c, (byCat.get(c) || 0) + 1);
+    byIntent.set(i, (byIntent.get(i) || 0) + 1);
+    for (const b of brands) {
+      byBrand.set(b, (byBrand.get(b) || 0) + 1);
+    }
+  }
+
+  return out;
+}
+
+function estimateTokens(str) {
+  // Very rough: 1 token ≈ 4 chars
+  return Math.ceil((str || "").length / 4);
+}
+
+
+function partitionAndValidate(items) {
+  const validated = [];
+  const rejected  = [];
+  for (const x of items) {
+    const v = validateInsightGeneric(x); // <- your generic validator
+    (v.ok ? validated : rejected).push({ ins: x, reason: v.reason, detail: v.detail });
+  }
+  return { validated: validated.map(r => r.ins), rejected };
 }
 
 /**
@@ -994,7 +1184,7 @@ export async function generateInsightsFromHistory() {
 
   try {
     console.log("[Insights] Fetching browsing history...");
-    const baseRows = await getRecentHistory({ days: 60, maxResults: 500 });
+    const baseRows = await getRecentHistory({ days: 60, maxResults: 1000 });
 
     if (baseRows.length === 0) {
       throw new Error("No browsing history found");
@@ -1008,15 +1198,27 @@ export async function generateInsightsFromHistory() {
     const [agg_domains, agg_titles, agg_searches] =
       aggregateSessions(prepared_inputs);
 
+    // console.debug(`agg_titles = ${JSON.stringify(agg_titles)}`);
+
     const prepared_inputs_topk = topkAggregates(
       agg_domains,
       agg_titles,
       agg_searches,
-      { k_domains: 30, k_titles: 60, k_searches: 10 } // options object
+      { k_domains: 50, k_titles: 60, k_searches: 10 } // options object
     );
 
+    console.log(`prepared_inputs_topk = ${JSON.stringify(prepared_inputs_topk)}`);
     console.log("[Insights] Generating insights with LLM...");
-    const list = await generateInsightsWithLLM(prepared_inputs_topk, "history");
+    const listRaw = await generateInsightsWithLLM(prepared_inputs_topk, "history");
+
+
+    // 1) validate first
+    const { validated, rejected } = partitionAndValidate(listRaw);
+    if (rejected.length) {
+      console.warn("[Insights] Rejected insights (history):", JSON.stringify(rejected, null, 2));
+    }
+
+    const list = rankAndDiversify(validated, { maxPerCategory: 5, maxPerIntent: 2 });
 
     const { addedCount } = addInsightsToData(list);
     console.log(
@@ -1062,7 +1264,14 @@ export async function generateInsightsFromConversations() {
     // console.debug(`chatHistory = ${JSON.stringify(chatHistory)}`);
     console.log(`[Insights] Found ${chatHistory.length} conversations`);
     console.log("[Insights] Generating insights with LLM...");
-    const list = await generateInsightsWithLLM(chatHistory, "conversation");
+    const listRaw = await generateInsightsWithLLM(chatHistory, "conversation");
+
+    const { validated, rejected } = partitionAndValidate(listRaw);
+    if (rejected.length) {
+      console.warn("[Insights] Rejected insights (conversations):", JSON.stringify(rejected, null, 2));
+    }
+
+    const list = rankAndDiversify(validated, { maxPerCategory: 2, maxPerIntent: 2 });
 
     const { addedCount } = addInsightsToData(list);
     console.log(
@@ -1104,7 +1313,14 @@ export async function generateInsightsFromCustomText(inputText) {
       inputText.trim()
     );
 
-    const list = await generateInsightsWithLLM(inputText.trim(), "custom");
+    const listRaw = await generateInsightsWithLLM(inputText.trim(), "custom");
+    const { validated, rejected } = partitionAndValidate(listRaw);
+    if (rejected.length) {
+      console.warn("[Insights] Rejected insights (custom):", JSON.stringify(rejected, null, 2));
+    }
+
+    const list = rankAndDiversify(validated, { maxPerCategory: 2, maxPerIntent: 2 });
+
     console.log("[Insights] LLM returned insights:", JSON.stringify(list));
 
     const { addedCount } = addInsightsToData(list);
@@ -1291,6 +1507,12 @@ export function copyInsightsToClipboard() {
     });
 }
 
+function getRichInsight(category) {
+  const data = getInsightsData();
+  return data?.insightsDataByCategory?.[category] || null;
+}
+
+
 /**
  * Creates the insights overlay component
  *
@@ -1461,7 +1683,12 @@ export function createInsightsOverlay(
               });
 
             return insights.map(
-              ({ category, insight_summary }) => html`
+              ({ category, insight_summary }) => {
+                const rich = getRichInsight(category);
+                const whyText = rich?.why || "";
+                const ev = (rich?.evidence || []).slice(0, 2).map(e => `${e.type}: ${e.value}`);
+
+                return html`
                 <div class="insight-category">
                   <h4>${category}</h4>
                   <div class="insight-items">
@@ -1521,10 +1748,21 @@ export function createInsightsOverlay(
                         </span>
                       `;
                     })}
+
+                    ${rich ? html`
+                      <span class="insight-item info">
+                        <span class="insight-text">ℹ︎</span>
+                        <span class="insight-popover">
+                          <strong>Why:</strong> ${whyText || "—"}<br/>
+                          <strong>Evidence:</strong>
+                          <ul>${ev.map(x => html`<li>${x}</li>`)}</ul>
+                        </span>
+                      </span>
+                    ` : ""}
                   </div>
                 </div>
-              `
-            );
+              `;
+          });
           })()}
         </div>
       </div>
@@ -1869,6 +2107,15 @@ insightsStyles = css`
     transform: none;
     box-shadow: none;
   }
+
+  .insight-item.info { position: relative; background:#fffbe6; border-color:#ffe58f; }
+  .insight-item.info .insight-popover {
+    display:none; position:absolute; z-index:2; top:120%; left:0;
+    background:#fff; border:1px solid #ddd; border-radius:8px;
+    padding:.5rem .75rem; width:280px; box-shadow:0 6px 20px rgba(0,0,0,.12);
+  }
+  .insight-item.info:hover .insight-popover { display:block; }
+  .insight-item.info ul { margin:.25rem 0 0; padding-left:1rem; }
 `;
 
 /**
