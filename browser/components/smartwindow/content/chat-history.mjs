@@ -376,7 +376,7 @@ export function createHistoryOverlay(onClose, onSelectConversation) {
  *
  * @param {Function} onSelectConversation - Callback when conversation is selected
  */
-export function showHistoryOverlay(onSelectConversation) {
+export function showChatHistoryOverlay(onSelectConversation) {
   // Create overlay root if it doesn't exist
   let container = document.getElementById("history-overlay-root");
   if (!container) {

@@ -166,32 +166,48 @@ const search_browser_history = async ({ search_term, limit = 10 }) => {
     for (let i = 0; i < root.childCount && rows.length < limit; i++) {
       const node = root.getChild(i);
       const lastVisit = lazy.PlacesUtils.toDate(node.time);
-      const visitDate = lastVisit.toLocaleDateString();
+
+      // Get favicon URL for the page
+      let faviconUrl = null;
+      try {
+        const faviconURI = Services.io.newURI(node.uri);
+        faviconUrl = `page-icon:${faviconURI.spec}`;
+      } catch (e) {
+        // If favicon lookup fails, continue without it
+        console.warn("Could not get favicon for:", node.uri);
+      }
+
       rows.push({
         title: node.title || node.uri,
         url: node.uri,
-        visitDate,
+        visitDate: lastVisit.toISOString(), // ISO timestamp format
         visitCount: node.accessCount || 0,
+        relevanceScore: node.frecency || 0, // Use frecency as relevance score
+        ...(faviconUrl && { favicon: faviconUrl }) // Only include favicon if available
       });
     }
 
     if (rows.length === 0) {
-      return `No browser history found for "${search_term}".`;
+      return JSON.stringify({
+        search_term,
+        results: [],
+        message: `No browser history found for "${search_term}".`
+      });
     }
 
-    const historyList = rows
-      .map(
-        (item, index) =>
-          `${index + 1}. "${item.title}" at ${item.url} (visited ${item.visitCount} times, last on ${item.visitDate})`
-      )
-      .join("\n");
-
-    return `Found ${rows.length} history entries for "${search_term}":
-
-${historyList}`;
+    // Return as JSON string with metadata
+    return JSON.stringify({
+      search_term,
+      count: rows.length,
+      results: rows
+    });
   } catch (error) {
     console.error("Error searching browser history:", error);
-    return `Error searching browser history for "${search_term}": ${error.message}`;
+    return JSON.stringify({
+      search_term,
+      error: `Error searching browser history: ${error.message}`,
+      results: []
+    });
   } finally {
     if (root && openedRoot) {
       root.containerOpen = false;
