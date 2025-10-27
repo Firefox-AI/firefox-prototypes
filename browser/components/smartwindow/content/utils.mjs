@@ -467,6 +467,7 @@ export async function* fetchWithHistory(messages) {
             toolParams
           )}`,
           type: "tool_call_log",
+          tool: toolName,
           result,
         };
         yield assistantToolCallLogMsg;
