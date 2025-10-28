@@ -20,9 +20,10 @@ const { ChatHistoryMessage } = ChromeUtils.importESModule(
  * Uses navigate heuristics for URLs/domains, then ML model for chat/search classification.
  *
  * @param {string} query - The query string to analyze
+ * @param {boolean} isFollowup - Whether this is a followup in an existing conversation
  * @returns {Promise<string>} The detected query type: "navigate", "chat", "action", or "search"
  */
-export async function detectQueryType(query) {
+export async function detectQueryType(query, isFollowup = false) {
   const trimmedQuery = query.trim().toLowerCase();
 
   // navigate heuristics (protocols or domain without spaces)
@@ -34,6 +35,11 @@ export async function detectQueryType(query) {
     !trimmedQuery.includes(" ")
   ) {
     return "navigate";
+  }
+
+  // If this is a followup in an existing conversation, default to chat
+  if (isFollowup) {
+    return "chat";
   }
 
   // Use ML model for chat vs search classification
@@ -183,7 +189,7 @@ const search_browser_history = async ({ search_term, limit = 10 }) => {
         visitDate: lastVisit.toISOString(), // ISO timestamp format
         visitCount: node.accessCount || 0,
         relevanceScore: node.frecency || 0, // Use frecency as relevance score
-        ...(faviconUrl && { favicon: faviconUrl }) // Only include favicon if available
+        ...(faviconUrl && { favicon: faviconUrl }), // Only include favicon if available
       });
     }
 
@@ -191,7 +197,7 @@ const search_browser_history = async ({ search_term, limit = 10 }) => {
       return JSON.stringify({
         search_term,
         results: [],
-        message: `No browser history found for "${search_term}".`
+        message: `No browser history found for "${search_term}".`,
       });
     }
 
@@ -199,14 +205,14 @@ const search_browser_history = async ({ search_term, limit = 10 }) => {
     return JSON.stringify({
       search_term,
       count: rows.length,
-      results: rows
+      results: rows,
     });
   } catch (error) {
     console.error("Error searching browser history:", error);
     return JSON.stringify({
       search_term,
       error: `Error searching browser history: ${error.message}`,
-      results: []
+      results: [],
     });
   } finally {
     if (root && openedRoot) {
