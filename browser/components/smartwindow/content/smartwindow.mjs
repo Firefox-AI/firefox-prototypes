@@ -96,8 +96,11 @@ class SmartWindowPage {
       return "chat";
     }
 
-    // Otherwise, use the ML detection
-    return await detectQueryType(query);
+    // Check if we're in an active conversation
+    const isFollowup = this.chatBot?.messages?.length > 0;
+
+    // Use the ML detection (with followup context)
+    return await detectQueryType(query, isFollowup);
   }
 
   // Generate conversation starters with caching
@@ -873,9 +876,14 @@ class SmartWindowPage {
     // Setup model picker (keep existing code)
     this.modelPicker = document.getElementById("model-picker");
     if (this.modelPicker) {
-      this.modelPicker.value = Services.prefs.getStringPref("browser.smartwindow.model");
+      this.modelPicker.value = Services.prefs.getStringPref(
+        "browser.smartwindow.model"
+      );
       this.modelPicker.addEventListener("change", () => {
-        Services.prefs.setStringPref("browser.smartwindow.model", this.modelPicker.value);
+        Services.prefs.setStringPref(
+          "browser.smartwindow.model",
+          this.modelPicker.value
+        );
       });
     }
 
@@ -984,8 +992,10 @@ class SmartWindowPage {
     console.log(
       "[SmartWindow] handleSearchHistoryTool - historyItems",
       historyItems,
-      "Type:", typeof historyItems,
-      "IsArray:", Array.isArray(historyItems)
+      "Type:",
+      typeof historyItems,
+      "IsArray:",
+      Array.isArray(historyItems)
     );
 
     // Ensure historyItems is an array
@@ -1010,7 +1020,7 @@ class SmartWindowPage {
       historyOverlay.isOpen = false;
     });
 
-    historyOverlay.addEventListener("item-selected", (event) => {
+    historyOverlay.addEventListener("item-selected", event => {
       const selectedItem = event.detail;
       console.warn("[SmartWindow] Selected history item:", selectedItem);
 
