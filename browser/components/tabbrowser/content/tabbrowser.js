@@ -6581,9 +6581,7 @@
         return;
       }
 
-      this.#handleTabMove(aTab, () =>
-        aSplitViewWrapper.container.appendChild(aTab)
-      );
+      this.#handleTabMove(aTab, () => aSplitViewWrapper.appendChild(aTab));
       this.removeFromMultiSelectedTabs(aTab);
       this.tabContainer._notifyBackgroundTab(aTab);
     }
