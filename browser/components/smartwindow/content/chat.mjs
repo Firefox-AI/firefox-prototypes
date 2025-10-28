@@ -569,15 +569,15 @@ class ChatBot extends MozLitElement {
       this._lastUserHTML = null;
     }
 
-    // Prepare an empty assistant message for streaming
-    this.#conversation.addAssistantMessage("");
-    this.requestUpdate();
-
     // Prepare messages with system prompt for the API call
     const messagesForAPI = this.#conversation.messages.map(m => ({
       role: m.role,
       content: m.content,
     }));
+
+    // Prepare an empty assistant message for streaming
+    this.#conversation.addAssistantMessage("");
+    this.requestUpdate();
 
     if (messagesForAPI.length) {
       // Insert system prompt as the first message
