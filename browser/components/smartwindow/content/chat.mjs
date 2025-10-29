@@ -454,6 +454,7 @@ class ChatBot extends MozLitElement {
       saveStatus: { type: String },
       conversationTitle: { type: String },
       editingTitle: { type: Boolean },
+      searchEngines: { type: Array },
     };
   }
 
@@ -486,6 +487,7 @@ class ChatBot extends MozLitElement {
     this._uiMeta = new Map();
     this.conversationTitle = "";
     this.editingTitle = false;
+    this.searchEngines = [];
 
     // TODO: Figure out what/where to get this info from, if necessary
     this.#conversation = new ChatHistoryConversation({
@@ -524,7 +526,7 @@ class ChatBot extends MozLitElement {
     this._lastUserHTML = null;
   }
 
-  connectedCallback() {
+  async connectedCallback() {
     super.connectedCallback();
     // Listen for insights-updated events to re-render the overlay
     this._insightsUpdatedHandler = () => {
@@ -532,6 +534,31 @@ class ChatBot extends MozLitElement {
     };
     window.addEventListener("insights-updated", this._insightsUpdatedHandler);
     Services.prefs.addObserver(PROMPT_PREF, this._prefObserver);
+
+    // Load search engines with their icons
+    await this.loadSearchEngines();
+  }
+
+  async loadSearchEngines() {
+    try {
+      const engines = await Services.search.getEngines();
+      const engineData = await Promise.all(
+        engines.map(async engine => {
+          try {
+            const iconURL = await engine.getIconURL();
+            return { name: engine.name, iconURL };
+          } catch (err) {
+            console.warn(`Failed to get icon for ${engine.name}:`, err);
+            return { name: engine.name, iconURL: null };
+          }
+        })
+      );
+      this.searchEngines = engineData;
+      this.requestUpdate();
+    } catch (err) {
+      console.error("Failed to load search engines:", err);
+      this.searchEngines = [];
+    }
   }
 
   disconnectedCallback() {
@@ -907,11 +934,10 @@ Today's date: ${currentDate}`;
     return div.innerHTML;
   }
 
-  handleSearchQuery(query, clickEvent) {
+  handleSearchQuery(query, engineName, clickEvent) {
     // Dispatch custom event to be handled by smartwindow.mjs
-    // Todo - render this as a link to default search provider instead of using a button with events.
     const event = new CustomEvent("search-suggested", {
-      detail: { query, clickEvent },
+      detail: { query, engineName, clickEvent },
       bubbles: true,
     });
     this.dispatchEvent(event);
@@ -1258,37 +1284,61 @@ Today's date: ${currentDate}`;
                         `
                       : ""}
                     <div class="message-body">${bodyHTML}</div>
-                    ${searchQueries.length
+                    ${searchQueries.length && this.searchEngines.length
                       ? html`
                           <div class="search-suggestions">
                             ${searchQueries.map(
                               query => html`
-                                <button
-                                  class="search-button"
-                                  @click=${e =>
-                                    this.handleSearchQuery(query, e)}
+                                <div
+                                  style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; align-items: center;"
                                 >
-                                  <svg
-                                    width="16"
-                                    height="16"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
+                                  <span style="font-weight: 500; color: #666;"
+                                    >Search for "${query}":</span
                                   >
-                                    <circle
-                                      cx="11"
-                                      cy="11"
-                                      r="8"
-                                      stroke="currentColor"
-                                      stroke-width="2"
-                                    />
-                                    <path
-                                      d="21 21l-4.35-4.35"
-                                      stroke="currentColor"
-                                      stroke-width="2"
-                                    />
-                                  </svg>
-                                  Search: ${query}
-                                </button>
+                                  ${this.searchEngines.map(
+                                    engine => html`
+                                      <button
+                                        class="search-button"
+                                        @click=${e =>
+                                          this.handleSearchQuery(
+                                            query,
+                                            engine.name,
+                                            e
+                                          )}
+                                        title="Search with ${engine.name}"
+                                      >
+                                        ${engine.iconURL
+                                          ? html`<img
+                                              src=${engine.iconURL}
+                                              alt=${engine.name}
+                                              width="16"
+                                              height="16"
+                                              style="display: block;"
+                                            />`
+                                          : html`<svg
+                                              width="16"
+                                              height="16"
+                                              viewBox="0 0 24 24"
+                                              fill="none"
+                                            >
+                                              <circle
+                                                cx="11"
+                                                cy="11"
+                                                r="8"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                              />
+                                              <path
+                                                d="21 21l-4.35-4.35"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                              />
+                                            </svg>`}
+                                        ${engine.name}
+                                      </button>
+                                    `
+                                  )}
+                                </div>
                               `
                             )}
                           </div>
