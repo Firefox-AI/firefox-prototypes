@@ -929,10 +929,6 @@ ${intentsList}
 - Typical caps: recent history ≤1; search up to 2; multi-source 2–3; recent chat 4; explicit user 5.
 - Do not assign 5 unless pattern is strong and recent.
 
-## Coverage & Diversity
-- Prefer different categories and intents when evidence exists.
-- Avoid repeating the same brand unless constraints differ meaningfully.
-
 ## Evidence (REQUIRED)
 For each insight, include 1–4 items in "evidence". Each item:
 - "type": one of ["domain","title","search","chat","user"].
@@ -1269,7 +1265,7 @@ export async function generateInsightsFromHistory() {
       agg_domains,
       agg_titles,
       agg_searches,
-      { k_domains: 50, k_titles: 60, k_searches: 10 } // options object
+      { k_domains: 100, k_titles: 60, k_searches: 10 } // options object
     );
 
     console.log(
