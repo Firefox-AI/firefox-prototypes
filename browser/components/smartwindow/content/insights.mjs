@@ -606,7 +606,7 @@ function topkAggregates(
   const srchTmp = Object.entries(agg_searches).map(([sidRaw, v]) => {
     const sid = Number.isFinite(Number(sidRaw)) ? Number(sidRaw) : sidRaw;
     const cnt = Number(v.search_count || 0);
-    const ls  = _toSeconds(v.last_searched || 0);
+    const ls = _toSeconds(v.last_searched || 0);
     const rank = withRecency(cnt, 1.0, v.last_searched || 0, { now: nowRaw });
     return {
       sid,
@@ -630,23 +630,24 @@ function topkAggregates(
       b.num_sessions - a.num_sessions ||
       b.last_seen - a.last_seen
   );
-  srchTmp.sort(
-    (a, b) =>
-      b.rank - a.rank ||
-      b.cnt - a.cnt ||
-      b.ls - a.ls
-  );
+  srchTmp.sort((a, b) => b.rank - a.rank || b.cnt - a.cnt || b.ls - a.ls);
 
   // --- trim & emit compact structures ---
-  const dom_items = domTmp.slice(0, k_domains).map(({ key, rank }) => [key, round2(rank)]);
-  const tit_items = titTmp.slice(0, k_titles).map(({ key, rank }) => [key, round2(rank)]);
-  const srch_items = srchTmp.slice(0, k_searches).map(({ sid, cnt, q, ls, rank }) => ({
-    sid,
-    cnt,
-    q,
-    ls,
-    r: round2(rank),
-  }));
+  const dom_items = domTmp
+    .slice(0, k_domains)
+    .map(({ key, rank }) => [key, round2(rank)]);
+  const tit_items = titTmp
+    .slice(0, k_titles)
+    .map(({ key, rank }) => [key, round2(rank)]);
+  const srch_items = srchTmp
+    .slice(0, k_searches)
+    .map(({ sid, cnt, q, ls, rank }) => ({
+      sid,
+      cnt,
+      q,
+      ls,
+      r: round2(rank),
+    }));
 
   // keep your original outer shape: [domains, titles, searches]
   return [dom_items, tit_items, srch_items];
@@ -775,12 +776,18 @@ const LIVE_INSIGHTS_SCHEMA = {
     type: "object",
     additionalProperties: false,
     required: [
-      "category","intent","insight_summary","score","why","evidence","entities_used"
+      "category",
+      "intent",
+      "insight_summary",
+      "score",
+      "why",
+      "evidence",
+      "entities_used",
     ],
     properties: {
-      category: { type: ["string","null"], enum: [...CATEGORIES, null] },
-      intent:   { type: ["string","null"], enum: [...INTENTS,   null] },
-      insight_summary: { type: ["string","null"] },
+      category: { type: ["string", "null"], enum: [...CATEGORIES, null] },
+      intent: { type: ["string", "null"], enum: [...INTENTS, null] },
+      insight_summary: { type: ["string", "null"] },
       score: { type: "integer", minimum: 1, maximum: 5 },
 
       why: { type: "string", minLength: 12, maxLength: 200 },
@@ -791,15 +798,21 @@ const LIVE_INSIGHTS_SCHEMA = {
         maxItems: 4,
         items: {
           type: "object",
-          required: ["type","value"],
+          required: ["type", "value"],
           additionalProperties: false,
           properties: {
-            type: { type: "string", enum: ["domain","title","search","chat","user"] },
+            type: {
+              type: "string",
+              enum: ["domain", "title", "search", "chat", "user"],
+            },
             value: { type: "string" },
             weight: { type: "number", minimum: 0, maximum: 1 },
-            session_ids: { type: "array", items: { type: ["integer","string"] } }
-          }
-        }
+            session_ids: {
+              type: "array",
+              items: { type: ["integer", "string"] },
+            },
+          },
+        },
       },
 
       entities_used: {
@@ -807,17 +820,17 @@ const LIVE_INSIGHTS_SCHEMA = {
         minItems: 1,
         items: {
           type: "object",
-          required: ["name","from","local_type"],
+          required: ["name", "from", "local_type"],
           additionalProperties: false,
           properties: {
             name: { type: "string" },
-            from: { type: "string", enum: ["domain","title","search"] },
-            local_type: { type: "string" }
-          }
-        }
-      }
-    }
-  }
+            from: { type: "string", enum: ["domain", "title", "search"] },
+            local_type: { type: "string" },
+          },
+        },
+      },
+    },
+  },
 };
 
 /**
@@ -999,7 +1012,8 @@ function addInsightsToData(payload) {
   const items = Array.isArray(payload) ? payload : [payload];
 
   // NEW: rich index
-  insightsData.insightsDataByCategory = insightsData.insightsDataByCategory || {};
+  insightsData.insightsDataByCategory =
+    insightsData.insightsDataByCategory || {};
 
   let addedCount = 0;
   let upsertedByCategory = 0;
@@ -1011,7 +1025,9 @@ function addInsightsToData(payload) {
     const score = Number.isFinite(obj?.score) ? Number(obj.score) : null;
     const evidence = Array.isArray(obj?.evidence) ? obj.evidence : [];
     const why = typeof obj?.why === "string" ? obj.why : "";
-    const entities_used = Array.isArray(obj?.entities_used) ? obj.entities_used : (prev?.entities_used ?? []);
+    const entities_used = Array.isArray(obj?.entities_used)
+      ? obj.entities_used
+      : (prev?.entities_used ?? []);
 
     if (category) {
       const prev = insightsData.insightsDataByCategory[category];
@@ -1022,7 +1038,7 @@ function addInsightsToData(payload) {
         score: Number.isFinite(score) ? score : (prev?.score ?? null),
         evidence: evidence.length ? evidence : (prev?.evidence ?? []),
         why: why || prev?.why || "",
-        entities_used
+        entities_used,
       };
       insightsData.insightsDataByCategory[category] = next;
       upsertedByCategory += 1;
@@ -1031,7 +1047,9 @@ function addInsightsToData(payload) {
     // Legacy chips: keep the short text so UI shows tags today
     const label = summary;
     if (category) {
-      if (!insightsData[category]) insightsData[category] = [];
+      if (!insightsData[category]) {
+        insightsData[category] = [];
+      }
       if (!insightsData[category].includes(label)) {
         insightsData[category].push(label);
         addedCount += 1;
@@ -1043,33 +1061,49 @@ function addInsightsToData(payload) {
   return { addedCount, upsertedByCategory };
 }
 
-
 function validateInsightGeneric(ins) {
-  if (!ins || !ins.insight_summary || !ins.category || !Array.isArray(ins.entities_used)) {
-    return { ok:false, reason:"missing_fields" };
+  if (
+    !ins ||
+    !ins.insight_summary ||
+    !ins.category ||
+    !Array.isArray(ins.entities_used)
+  ) {
+    return { ok: false, reason: "missing_fields" };
   }
 
   // evidence presence
   if (!Array.isArray(ins.evidence) || ins.evidence.length < 1) {
-    return { ok:false, reason:"no_evidence" };
+    return { ok: false, reason: "no_evidence" };
   }
 
   // at least one entity appears in the summary
   const sum = String(ins.insight_summary).toLowerCase();
-  const summaryHasEntity = ins.entities_used.some(e => sum.includes(String(e.name || "").toLowerCase()));
-  if (!summaryHasEntity) return { ok:false, reason:"summary_missing_entity" };
+  const summaryHasEntity = ins.entities_used.some(e =>
+    sum.includes(String(e.name || "").toLowerCase())
+  );
+  if (!summaryHasEntity) {
+    return { ok: false, reason: "summary_missing_entity" };
+  }
 
-  return { ok:true };
+  return { ok: true };
 }
 
 function specificityBonus(insight) {
   // heuristic: favor concrete constraints/entities in the sentence
   const s = (insight.insight_summary || "").toLowerCase();
   let b = 0;
-  if (/\b(under|below|\$ ?\d+|\d+-\d+)\b/.test(s)) b += 0.15;   // price
-  if (/\b(xs|s|m|l|xl|xxl|\d{1,2}(\.\d)?(in|cm|gb|tb))\b/.test(s)) b += 0.1; // size/spec
-  if (/\b(gluten[-\s]?free|vegan|keto|dairy[-\s]?free)\b/.test(s)) b += 0.15; // diet
-  if (/[A-Z][a-z]+(?:\s&\s[A-Z][a-z]+)?/.test(insight.insight_summary)) b += 0.1; // brand-ish
+  if (/\b(under|below|\$ ?\d+|\d+-\d+)\b/.test(s)) {
+    b += 0.15;
+  } // price
+  if (/\b(xs|s|m|l|xl|xxl|\d{1,2}(\.\d)?(in|cm|gb|tb))\b/.test(s)) {
+    b += 0.1;
+  } // size/spec
+  if (/\b(gluten[-\s]?free|vegan|keto|dairy[-\s]?free)\b/.test(s)) {
+    b += 0.15;
+  } // diet
+  if (/[A-Z][a-z]+(?:\s&\s[A-Z][a-z]+)?/.test(insight.insight_summary)) {
+    b += 0.1;
+  } // brand-ish
   return b;
 }
 
@@ -1086,7 +1120,9 @@ function extractBrandsFromEvidence(ev = []) {
   const bag = new Set();
   for (const e of ev || []) {
     const v = normalizeBrand(e?.value);
-    if (v) bag.add(v.split(/\s+/)[0]); // rough head token
+    if (v) {
+      bag.add(v.split(/\s+/)[0]);
+    } // rough head token
   }
   return bag;
 }
@@ -1096,13 +1132,16 @@ function synthWhyFromEvidence(ev = []) {
     const t = e?.type || "signal";
     const v = (e?.value || "").slice(0, 80);
     return `${t}: ${v}`;
-    });
+  });
   return bits.length
     ? `Supported by ${bits.join("; ")}`
     : "Supported by recent ranked signals";
 }
 
-function rankAndDiversify(insights, { maxPerCategory = 2, maxPerIntent = 2 } = {}) {
+function rankAndDiversify(
+  insights,
+  { maxPerCategory = 2, maxPerIntent = 2 } = {}
+) {
   // score ↑ with specificity + multi-source corroboration
   for (const x of insights) {
     const base = Math.max(1, Math.min(5, Number(x.score) || 1)) / 5;
@@ -1112,7 +1151,9 @@ function rankAndDiversify(insights, { maxPerCategory = 2, maxPerIntent = 2 } = {
     const multiSrcBonus = Math.min(sources.size - 1, 2) * 0.1; // up to +0.2
     const specBonus = specificityBonus(x); // your existing heuristic
     x.__rank = base + brandBonus + multiSrcBonus + specBonus;
-    if (!x.why) x.why = synthWhyFromEvidence(ev);
+    if (!x.why) {
+      x.why = synthWhyFromEvidence(ev);
+    }
   }
 
   // sort by rank
@@ -1133,12 +1174,21 @@ function rankAndDiversify(insights, { maxPerCategory = 2, maxPerIntent = 2 } = {
     let brandClash = false;
     for (const b of brands) {
       const seen = byBrand.get(b) || 0;
-      if (seen >= 2) { brandClash = true; break; }
+      if (seen >= 2) {
+        brandClash = true;
+        break;
+      }
     }
-    if (brandClash) continue;
+    if (brandClash) {
+      continue;
+    }
 
-    if ((byCat.get(c) || 0) >= maxPerCategory) continue;
-    if ((byIntent.get(i) || 0) >= maxPerIntent) continue;
+    if ((byCat.get(c) || 0) >= maxPerCategory) {
+      continue;
+    }
+    if ((byIntent.get(i) || 0) >= maxPerIntent) {
+      continue;
+    }
 
     out.push(x);
     byCat.set(c, (byCat.get(c) || 0) + 1);
@@ -1156,13 +1206,16 @@ function estimateTokens(str) {
   return Math.ceil((str || "").length / 4);
 }
 
-
 function partitionAndValidate(items) {
   const validated = [];
-  const rejected  = [];
+  const rejected = [];
   for (const x of items) {
     const v = validateInsightGeneric(x); // <- your generic validator
-    (v.ok ? validated : rejected).push({ ins: x, reason: v.reason, detail: v.detail });
+    (v.ok ? validated : rejected).push({
+      ins: x,
+      reason: v.reason,
+      detail: v.detail,
+    });
   }
   return { validated: validated.map(r => r.ins), rejected };
 }
@@ -1207,18 +1260,28 @@ export async function generateInsightsFromHistory() {
       { k_domains: 50, k_titles: 60, k_searches: 10 } // options object
     );
 
-    console.log(`prepared_inputs_topk = ${JSON.stringify(prepared_inputs_topk)}`);
+    console.log(
+      `prepared_inputs_topk = ${JSON.stringify(prepared_inputs_topk)}`
+    );
     console.log("[Insights] Generating insights with LLM...");
-    const listRaw = await generateInsightsWithLLM(prepared_inputs_topk, "history");
-
+    const listRaw = await generateInsightsWithLLM(
+      prepared_inputs_topk,
+      "history"
+    );
 
     // 1) validate first
     const { validated, rejected } = partitionAndValidate(listRaw);
     if (rejected.length) {
-      console.warn("[Insights] Rejected insights (history):", JSON.stringify(rejected, null, 2));
+      console.warn(
+        "[Insights] Rejected insights (history):",
+        JSON.stringify(rejected, null, 2)
+      );
     }
 
-    const list = rankAndDiversify(validated, { maxPerCategory: 5, maxPerIntent: 2 });
+    const list = rankAndDiversify(validated, {
+      maxPerCategory: 5,
+      maxPerIntent: 2,
+    });
 
     const { addedCount } = addInsightsToData(list);
     console.log(
@@ -1268,10 +1331,16 @@ export async function generateInsightsFromConversations() {
 
     const { validated, rejected } = partitionAndValidate(listRaw);
     if (rejected.length) {
-      console.warn("[Insights] Rejected insights (conversations):", JSON.stringify(rejected, null, 2));
+      console.warn(
+        "[Insights] Rejected insights (conversations):",
+        JSON.stringify(rejected, null, 2)
+      );
     }
 
-    const list = rankAndDiversify(validated, { maxPerCategory: 2, maxPerIntent: 2 });
+    const list = rankAndDiversify(validated, {
+      maxPerCategory: 2,
+      maxPerIntent: 2,
+    });
 
     const { addedCount } = addInsightsToData(list);
     console.log(
@@ -1316,10 +1385,16 @@ export async function generateInsightsFromCustomText(inputText) {
     const listRaw = await generateInsightsWithLLM(inputText.trim(), "custom");
     const { validated, rejected } = partitionAndValidate(listRaw);
     if (rejected.length) {
-      console.warn("[Insights] Rejected insights (custom):", JSON.stringify(rejected, null, 2));
+      console.warn(
+        "[Insights] Rejected insights (custom):",
+        JSON.stringify(rejected, null, 2)
+      );
     }
 
-    const list = rankAndDiversify(validated, { maxPerCategory: 2, maxPerIntent: 2 });
+    const list = rankAndDiversify(validated, {
+      maxPerCategory: 2,
+      maxPerIntent: 2,
+    });
 
     console.log("[Insights] LLM returned insights:", JSON.stringify(list));
 
@@ -1512,7 +1587,6 @@ function getRichInsight(category) {
   return data?.insightsDataByCategory?.[category] || null;
 }
 
-
 /**
  * Creates the insights overlay component
  *
@@ -1682,13 +1756,14 @@ export function createInsightsOverlay(
                 return a.category.localeCompare(b.category);
               });
 
-            return insights.map(
-              ({ category, insight_summary }) => {
-                const rich = getRichInsight(category);
-                const whyText = rich?.why || "";
-                const ev = (rich?.evidence || []).slice(0, 2).map(e => `${e.type}: ${e.value}`);
+            return insights.map(({ category, insight_summary }) => {
+              const rich = getRichInsight(category);
+              const whyText = rich?.why || "";
+              const ev = (rich?.evidence || [])
+                .slice(0, 2)
+                .map(e => `${e.type}: ${e.value}`);
 
-                return html`
+              return html`
                 <div class="insight-category">
                   <h4>${category}</h4>
                   <div class="insight-items">
@@ -1748,21 +1823,24 @@ export function createInsightsOverlay(
                         </span>
                       `;
                     })}
-
-                    ${rich ? html`
-                      <span class="insight-item info">
-                        <span class="insight-text">ℹ︎</span>
-                        <span class="insight-popover">
-                          <strong>Why:</strong> ${whyText || "—"}<br/>
-                          <strong>Evidence:</strong>
-                          <ul>${ev.map(x => html`<li>${x}</li>`)}</ul>
-                        </span>
-                      </span>
-                    ` : ""}
+                    ${rich
+                      ? html`
+                          <span class="insight-item info">
+                            <span class="insight-text">ℹ︎</span>
+                            <span class="insight-popover">
+                              <strong>Why:</strong> ${whyText || "—"}<br />
+                              <strong>Evidence:</strong>
+                              <ul>
+                                ${ev.map(x => html`<li>${x}</li>`)}
+                              </ul>
+                            </span>
+                          </span>
+                        `
+                      : ""}
                   </div>
                 </div>
               `;
-          });
+            });
           })()}
         </div>
       </div>
@@ -2108,14 +2186,31 @@ insightsStyles = css`
     box-shadow: none;
   }
 
-  .insight-item.info { position: relative; background:#fffbe6; border-color:#ffe58f; }
-  .insight-item.info .insight-popover {
-    display:none; position:absolute; z-index:2; top:120%; left:0;
-    background:#fff; border:1px solid #ddd; border-radius:8px;
-    padding:.5rem .75rem; width:280px; box-shadow:0 6px 20px rgba(0,0,0,.12);
+  .insight-item.info {
+    position: relative;
+    background: #fffbe6;
+    border-color: #ffe58f;
   }
-  .insight-item.info:hover .insight-popover { display:block; }
-  .insight-item.info ul { margin:.25rem 0 0; padding-left:1rem; }
+  .insight-item.info .insight-popover {
+    display: none;
+    position: absolute;
+    z-index: 2;
+    top: 120%;
+    left: 0;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    width: 280px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  }
+  .insight-item.info:hover .insight-popover {
+    display: block;
+  }
+  .insight-item.info ul {
+    margin: 0.25rem 0 0;
+    padding-left: 1rem;
+  }
 `;
 
 /**
