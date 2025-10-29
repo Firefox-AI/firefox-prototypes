@@ -463,6 +463,7 @@ class ChatBot extends MozLitElement {
 
   set messages(new_messages) {
     this.#conversation.messages = new_messages;
+    this.requestUpdate();
   }
 
   constructor() {
@@ -1394,6 +1395,15 @@ Today's date: ${currentDate}`;
           `
         : ""}
     `;
+  }
+
+  set conversation(convo) {
+    this.#conversation = convo;
+    this.requestUpdate();
+  }
+
+  get conversation() {
+    return this.#conversation;
   }
 }
 
