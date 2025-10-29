@@ -1047,8 +1047,9 @@ class SmartWindowPage {
     if (this.chatBot) {
       this.chatBot.addEventListener("search-suggested", e => {
         const query = e.detail.query;
+        const engineName = e.detail.engineName;
         const clickEvent = e.detail.clickEvent;
-        this.performNavigation(query, "search", clickEvent);
+        this.performNavigation(query, "search", clickEvent, engineName);
       });
 
       this.chatBot.addEventListener("tool-call", e => {
@@ -1492,7 +1493,7 @@ class SmartWindowPage {
     this.userHasEditedQuery = false;
   }
 
-  performNavigation(query, type, clickEvent = null) {
+  async performNavigation(query, type, clickEvent = null, engineName = null) {
     // Save chat messages for current tab before navigating
     if (this.chatBot && this.chatBot.messages && this.chatBot.messages.length) {
       // topChromeWindow.SmartWindow.setChatMessages(
@@ -1510,8 +1511,24 @@ class SmartWindowPage {
         url = query.startsWith("about:") ? query : "https://" + query;
       }
     } else if (type === "search") {
-      // Handle search queries
-      url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+      // Handle search queries with specified engine or default
+      if (engineName) {
+        try {
+          const engine = await Services.search.getEngineByName(engineName);
+          if (engine) {
+            const submission = engine.getSubmission(query);
+            url = submission.uri.spec;
+          } else {
+            // Fallback to default if engine not found
+            url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+          }
+        } catch (error) {
+          console.error(`Failed to get search engine ${engineName}:`, error);
+          url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+        }
+      } else {
+        url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+      }
     } else if (type === "chat") {
       // For chat queries in full page mode, convert to search
       url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
