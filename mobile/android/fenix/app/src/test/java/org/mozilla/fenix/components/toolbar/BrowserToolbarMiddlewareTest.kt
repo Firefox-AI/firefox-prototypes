@@ -58,7 +58,7 @@ import mozilla.components.compose.browser.toolbar.concept.PageOrigin.Companion.C
 import mozilla.components.compose.browser.toolbar.concept.PageOrigin.Companion.PageOriginContextualMenuInteractions.CopyToClipboardClicked
 import mozilla.components.compose.browser.toolbar.concept.PageOrigin.Companion.PageOriginContextualMenuInteractions.LoadFromClipboardClicked
 import mozilla.components.compose.browser.toolbar.concept.PageOrigin.Companion.PageOriginContextualMenuInteractions.PasteFromClipboardClicked
-import mozilla.components.compose.browser.toolbar.store.BrowserEditToolbarAction
+import mozilla.components.compose.browser.toolbar.store.BrowserEditToolbarAction.SearchQueryUpdated
 import mozilla.components.compose.browser.toolbar.store.BrowserToolbarAction
 import mozilla.components.compose.browser.toolbar.store.BrowserToolbarInteraction.BrowserToolbarEvent
 import mozilla.components.compose.browser.toolbar.store.BrowserToolbarInteraction.BrowserToolbarEvent.Source
@@ -73,6 +73,7 @@ import mozilla.components.compose.browser.toolbar.store.BrowserToolbarStore
 import mozilla.components.compose.browser.toolbar.store.EnvironmentCleared
 import mozilla.components.compose.browser.toolbar.store.EnvironmentRehydrated
 import mozilla.components.compose.browser.toolbar.store.ProgressBarConfig
+import mozilla.components.compose.browser.toolbar.ui.BrowserToolbarQuery
 import mozilla.components.concept.engine.EngineSession.LoadUrlFlags
 import mozilla.components.concept.engine.cookiehandling.CookieBannersStorage
 import mozilla.components.concept.engine.permission.SitePermissionsStorage
@@ -713,7 +714,7 @@ class BrowserToolbarMiddlewareTest {
 
         verify(exactly = 0) { navController.navigate(any<NavDirections>()) }
         verify { appStore.dispatch(SearchStarted(currentTab.id)) }
-        assertEquals(currentTab.content.searchTerms, toolbarStore.state.editState.query)
+        assertEquals(currentTab.content.searchTerms, toolbarStore.state.editState.query.current)
     }
 
     @Test
@@ -843,7 +844,7 @@ class BrowserToolbarMiddlewareTest {
         toolbarStore.dispatch(PasteFromClipboardClicked)
 
         verify {
-            toolbarStore.dispatch(BrowserEditToolbarAction.SearchQueryUpdated(queryText))
+            toolbarStore.dispatch(SearchQueryUpdated(BrowserToolbarQuery(queryText)))
             appStore.dispatch(SearchStarted(currentTab.id))
         }
     }
@@ -942,6 +943,8 @@ class BrowserToolbarMiddlewareTest {
             navController = navController,
             browsingModeManager = browsingModeManager,
         )
+        mainLooperRule.idle()
+
         val tabCounterButton = toolbarStore.state.displayState.browserActionsEnd[1] as TabCounterAction
         assertEqualsTabCounterButton(expectedTabCounterButton(2, true), tabCounterButton)
         val tabCounterMenuItems = (tabCounterButton.onLongClick as CombinedEventAndMenu).menu.items()
@@ -978,6 +981,8 @@ class BrowserToolbarMiddlewareTest {
             navController = navController,
             browsingModeManager = browsingModeManager,
         )
+        mainLooperRule.idle()
+
         val tabCounterButton = toolbarStore.state.displayState.browserActionsEnd[1] as TabCounterAction
         assertEqualsTabCounterButton(expectedTabCounterButton(1, false), tabCounterButton)
         val tabCounterMenuItems = (tabCounterButton.onLongClick as CombinedEventAndMenu).menu.items()
@@ -1020,6 +1025,8 @@ class BrowserToolbarMiddlewareTest {
             navController = navController,
             browsingModeManager = browsingModeManager,
         )
+        mainLooperRule.idle()
+
         val tabCounterButton = toolbarStore.state.displayState.browserActionsEnd[1] as TabCounterAction
         assertEqualsTabCounterButton(expectedTabCounterButton(1, true), tabCounterButton)
         val tabCounterMenuItems = (tabCounterButton.onLongClick as CombinedEventAndMenu).menu.items()
@@ -1066,6 +1073,8 @@ class BrowserToolbarMiddlewareTest {
             navController = navController,
             browsingModeManager = browsingModeManager,
         )
+        mainLooperRule.idle()
+
         val tabCounterButton = toolbarStore.state.displayState.browserActionsEnd[1] as TabCounterAction
         assertEqualsTabCounterButton(expectedTabCounterButton(1, true), tabCounterButton)
         val tabCounterMenuItems = (tabCounterButton.onLongClick as CombinedEventAndMenu).menu.items()
@@ -1118,6 +1127,8 @@ class BrowserToolbarMiddlewareTest {
             navController = navController,
             browsingModeManager = browsingModeManager,
         )
+        mainLooperRule.idle()
+
         val tabCounterButton = toolbarStore.state.displayState.browserActionsEnd[1] as TabCounterAction
         assertEqualsTabCounterButton(expectedTabCounterButton(1, true), tabCounterButton)
         val tabCounterMenuItems = (tabCounterButton.onLongClick as CombinedEventAndMenu).menu.items()
@@ -1459,6 +1470,7 @@ class BrowserToolbarMiddlewareTest {
             browsingModeManager = browsingModeManager,
             navController = navController,
         )
+        mainLooperRule.idle()
 
         val shareButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
         assertEquals(expectedShareButton(), shareButton)
@@ -1496,6 +1508,7 @@ class BrowserToolbarMiddlewareTest {
             browsingModeManager = browsingModeManager,
             navController = navController,
         )
+        mainLooperRule.idle()
 
         val shareButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
         assertEquals(expectedShareButton(), shareButton)
@@ -2736,6 +2749,45 @@ class BrowserToolbarMiddlewareTest {
     }
 
     @Test
+    fun `GIVEN simple toolbar use add bookmark shortcut AND the current page is not bookmarked WHEN initializing toolbar THEN show Bookmark in end browser actions`() = runTest {
+        every { settings.shouldShowToolbarCustomization } returns true
+        every { settings.toolbarShortcutKey } returns ToolbarShortcutPreference.Keys.BOOKMARK
+        val toolbarStore = buildStore()
+
+        val bookmarkButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
+        assertEquals(expectedBookmarkButton(Source.AddressBar), bookmarkButton)
+    }
+
+    @Test
+    fun `GIVEN simple toolbar use add bookmark shortcut AND the current page is bookmarked WHEN initializing toolbar THEN show ACTIVE EditBookmark in end browser actions`() = runTest {
+        every { settings.shouldShowToolbarCustomization } returns true
+        every { settings.toolbarShortcutKey } returns ToolbarShortcutPreference.Keys.BOOKMARK
+
+        val tab = createTab("https://example.com")
+        val browserStore = BrowserStore(
+            BrowserState(
+                tabs = listOf(tab),
+                selectedTabId = tab.id,
+            ),
+        )
+
+        coEvery { bookmarksStorage.getBookmarksWithUrl(tab.content.url) } returns Result.success(
+            listOf(mockk(relaxed = true)),
+        )
+
+        val middleware = buildMiddleware(
+            browserStore = browserStore,
+            bookmarksStorage = bookmarksStorage,
+        )
+
+        val toolbarStore = buildStore(middleware)
+        mainLooperRule.idle()
+
+        val editButton = toolbarStore.state.displayState.browserActionsEnd [0] as ActionButtonRes
+        assertEquals(expectedEditBookmarkButton(Source.AddressBar), editButton)
+    }
+
+    @Test
     fun `mapShortcutToAction maps keys to actions and falls back to NewTab`() {
         assertEquals(
             ToolbarAction.NewTab,
@@ -2744,6 +2796,17 @@ class BrowserToolbarMiddlewareTest {
         assertEquals(
             ToolbarAction.Share,
             BrowserToolbarMiddleware.mapShortcutToAction(ToolbarShortcutPreference.Keys.SHARE),
+        )
+        assertEquals(
+            ToolbarAction.Bookmark,
+            BrowserToolbarMiddleware.mapShortcutToAction(ToolbarShortcutPreference.Keys.BOOKMARK),
+        )
+        assertEquals(
+            ToolbarAction.EditBookmark,
+            BrowserToolbarMiddleware.mapShortcutToAction(
+                ToolbarShortcutPreference.Keys.BOOKMARK,
+                true,
+            ),
         )
         assertEquals(
             ToolbarAction.NewTab,

@@ -2745,23 +2745,6 @@ nsLocalFile::GetFSRef(FSRef* aResult) {
 }
 
 NS_IMETHODIMP
-nsLocalFile::GetFSSpec(FSSpec* aResult) {
-  if (NS_WARN_IF(!aResult)) {
-    return NS_ERROR_INVALID_ARG;
-  }
-
-  FSRef fsRef;
-  nsresult rv = GetFSRef(&fsRef);
-  if (NS_SUCCEEDED(rv)) {
-    OSErr err = ::FSGetCatalogInfo(&fsRef, kFSCatInfoNone, nullptr, nullptr,
-                                   aResult, nullptr);
-    return MacErrorMapper(err);
-  }
-
-  return rv;
-}
-
-NS_IMETHODIMP
 nsLocalFile::GetFileType(OSType* aFileType) {
   CFURLRef url;
   if (NS_SUCCEEDED(GetCFURL(&url))) {
@@ -2904,20 +2887,6 @@ nsLocalFile::GetBundleDisplayName(nsAString& aOutBundleName) {
   }
 
   return NS_OK;
-}
-
-NS_IMETHODIMP nsLocalFile::InitWithFile(nsIFile* aFile) {
-  if (NS_WARN_IF(!aFile)) {
-    return NS_ERROR_INVALID_ARG;
-  }
-
-  nsAutoCString nativePath;
-  nsresult rv = aFile->GetNativePath(nativePath);
-  if (NS_FAILED(rv)) {
-    return rv;
-  }
-
-  return InitWithNativePath(nativePath);
 }
 
 nsresult NS_NewLocalFileWithFSRef(const FSRef* aFSRef,

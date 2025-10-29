@@ -264,6 +264,8 @@ body {
 }
 
 .mention-list {
+  --mention-row-h: 32px;
+  --mention-list-pad: 5px;
   background: linear-gradient(0deg, rgba(191, 143, 204, 0.05) 0%, rgba(191, 143, 204, 0.05) 100%), #fff;
   border: 1px solid #eab2f7;
   border-radius: 12px;
@@ -285,6 +287,13 @@ body {
   margin-top: 0;
 }
 
+.mention-list__scroller {
+  overflow-y: auto;
+  padding: var(--mention-list-pad) 0;
+  max-height: calc(4.45 * var(--mention-row-h) + 2 * var(--mention-list-pad));
+  scroll-snap-type: y proximity;
+}
+
 .mention-item {
   display: flex;
   align-items: center;
@@ -293,6 +302,8 @@ body {
   cursor: pointer;
   border-radius: 6px;
   transition: background-color 0.1s ease;
+  height: var(--mention-row-h);
+  padding: 0 12px; 
 }
 
 .mention-item:hover {
@@ -301,6 +312,22 @@ body {
 
 .mention-item.is-selected {
   background: rgba(191, 143, 204, 0.1);
+}
+
+.mention-view-more {
+  display: flex;
+  align-items: center;
+  border: 0;
+  width: 100%;
+  background: transparent;
+}
+
+.mention-view-more__icon {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .mention-icon {

@@ -1409,6 +1409,13 @@ pub struct AdapterInfo {
     pub device: u32,
     /// Type of device
     pub device_type: DeviceType,
+    /// [`Backend`]-specific PCI bus ID of the adapter.
+    ///
+    /// * For [`Backend::Vulkan`], [`VkPhysicalDevicePCIBusInfoPropertiesEXT`] is used,
+    ///   if available, in the form `bus:device.function`, e.g. `0000:01:00.0`.
+    ///
+    /// [`VkPhysicalDevicePCIBusInfoPropertiesEXT`]: https://registry.khronos.org/vulkan/specs/latest/man/html/VkPhysicalDevicePCIBusInfoPropertiesEXT.html
+    pub device_pci_bus_id: String,
     /// Driver name
     pub driver: String,
     /// Driver info
@@ -4564,23 +4571,34 @@ impl<T> PollType<T> {
     }
 }
 
-/// Error states after a device poll
+/// Error states after a device poll.
 #[derive(Debug)]
-#[cfg_attr(feature = "std", derive(thiserror::Error))]
 pub enum PollError {
     /// The requested Wait timed out before the submission was completed.
-    #[cfg_attr(
-        feature = "std",
-        error("The requested Wait timed out before the submission was completed.")
-    )]
     Timeout,
     /// The requested Wait was given a wrong submission index.
-    #[cfg_attr(
-        feature = "std",
-        error("Tried to wait using a submission index ({0}) that has not been returned by a successful submission (last successful submission: {1})")
-    )]
     WrongSubmissionIndex(u64, u64),
 }
+
+// This impl could be derived by `thiserror`, but by not doing so, we can reduce the number of
+// dependencies this early in the dependency graph, which may improve build parallelism.
+impl fmt::Display for PollError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PollError::Timeout => {
+                f.write_str("The requested Wait timed out before the submission was completed.")
+            }
+            PollError::WrongSubmissionIndex(requested, successful) => write!(
+                f,
+                "Tried to wait using a submission index ({requested}) \
+                that has not been returned by a successful submission \
+                (last successful submission: {successful}"
+            ),
+        }
+    }
+}
+
+impl core::error::Error for PollError {}
 
 /// Status of device poll operation.
 #[derive(Debug, PartialEq, Eq)]

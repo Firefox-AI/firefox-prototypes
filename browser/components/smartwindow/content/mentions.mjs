@@ -19,6 +19,9 @@ export class MentionDropdown {
     this.items = [];
     this.selectedIndex = 0;
     this.onSelectCallback = null;
+    this.tabBatchSize = 5;
+    this.visibleTabsCount = this.tabBatchSize;
+    this.scrollerEl = null;
   }
 
   create(items, onSelect) {
@@ -71,11 +74,63 @@ export class MentionDropdown {
       tabHeader.textContent = "Tabs";
       this.element.appendChild(tabHeader);
 
-      tabs.forEach(item => {
-        const div = this.createMentionItem(item, itemIndex);
-        this.element.appendChild(div);
+      if (!this.scrollerEl) {
+        this.scrollerEl = document.createElement("div");
+        this.scrollerEl.className = "mention-list__scroller";
+      }
+      const scroller = this.scrollerEl;
+      this.element.appendChild(scroller);
+
+      scroller.innerHTML = "";
+
+      const batchSize = this.tabBatchSize;
+
+      const initialEnd = Math.min(tabs.length, this.visibleTabsCount);
+      for (let i = 0; i < initialEnd; i++) {
+        const row = this.createMentionItem(tabs[i], itemIndex);
+        scroller.appendChild(row);
         itemIndex++;
-      });
+      }
+
+      if (this.visibleTabsCount < tabs.length) {
+        const moreRow = document.createElement("button");
+        moreRow.type = "button";
+        moreRow.className = "mention-item mention-view-more";
+        moreRow.setAttribute("aria-label", "View more tabs");
+        moreRow.innerHTML = `
+        <span class="mention-view-more__icon" aria-hidden="true">
+          <svg width="12" height="2" viewBox="0 0 12 2" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2 2H0V0H2V2Z" fill="black"/>
+            <path d="M7 2H5V0H7V2Z" fill="black"/>
+            <path d="M12 0V2H10V0H12Z" fill="black"/>
+          </svg>
+        </span>
+        <span>View more tabs</span>
+      `;
+
+        moreRow.addEventListener("click", e => {
+          e.preventDefault();
+          e.currentTarget.blur();
+
+          const start = this.visibleTabsCount;
+          this.visibleTabsCount += batchSize;
+
+          moreRow.remove();
+
+          const end = Math.min(this.visibleTabsCount, tabs.length);
+          for (let i = start; i < end; i++) {
+            const row = this.createMentionItem(tabs[i], itemIndex);
+            scroller.appendChild(row);
+            itemIndex++;
+          }
+
+          if (this.visibleTabsCount < tabs.length) {
+            scroller.appendChild(moreRow);
+          }
+        });
+
+        scroller.appendChild(moreRow);
+      }
     }
 
     // Render history section
@@ -161,7 +216,10 @@ export class MentionDropdown {
               Object.assign(elements.floating.style, {
                 maxWidth: `${Math.min(400, availableWidth)}px`,
                 maxHeight: `${Math.min(320, availableHeight)}px`,
-                overflowY: availableHeight < elements.floating.scrollHeight ? "auto" : "visible",
+                overflowY:
+                  availableHeight < elements.floating.scrollHeight
+                    ? "auto"
+                    : "visible",
               });
             },
           }),
@@ -275,10 +333,6 @@ export async function getMentionSuggestions(query) {
           url,
           favicon: tab.image || `page-icon:${url}`,
         });
-
-        if (suggestions.length >= 5) {
-          break;
-        }
       }
     }
   } catch (ex) {
@@ -320,5 +374,5 @@ export async function getMentionSuggestions(query) {
     }
   }
 
-  return suggestions.slice(0, 5);
+  return suggestions;
 }
