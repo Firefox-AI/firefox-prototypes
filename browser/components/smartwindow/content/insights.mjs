@@ -824,7 +824,6 @@ const LIVE_INSIGHTS_SCHEMA = {
       "score",
       "why",
       "evidence",
-      "entities_used",
     ],
     properties: {
       category: { type: ["string", "null"], enum: [...CATEGORIES, null] },
@@ -853,21 +852,6 @@ const LIVE_INSIGHTS_SCHEMA = {
               type: "array",
               items: { type: ["integer", "string"] },
             },
-          },
-        },
-      },
-
-      entities_used: {
-        type: "array",
-        minItems: 1,
-        items: {
-          type: "object",
-          required: ["name", "from", "local_type"],
-          additionalProperties: false,
-          properties: {
-            name: { type: "string" },
-            from: { type: "string", enum: ["domain", "title", "search"] },
-            local_type: { type: "string" },
           },
         },
       },
@@ -957,13 +941,6 @@ For each insight, include 1–4 items in "evidence". Each item:
 - "weight": optional 0–1 indicating contribution strength.
 The evidence strings MUST be directly copyable from profile_records for domain/title/search. Do not paraphrase these.
 
-## Entities (REQUIRED)
-Also include "entities_used": an array listing the concrete entities referenced in the summary:
-- "name": brand/site/product term that appears as a substring in one of the evidence "value" strings.
-- "from": one of ["domain","title","search"], the source where the name comes from.
-- "local_type": short label like "bank","retailer","search","comms","productivity","reference","news","other".
-If you cannot anchor entities to the provided evidence strings, set "insight_summary": null.
-
 ## Reason ("why")
 Add "why": 12–40 words that briefly explains the rationale, referencing the cited evidence (no new claims or invented entities).
 
@@ -974,8 +951,7 @@ Return ONLY a JSON array of objects, no prose, no code fences. Each object must 
   "insight_summary": "<4–10 words, crisp and specific or null>",
   "score": <integer 1-5>,
   "why": "<12–40 words>",
-  "evidence": [ { "type":"domain|title|search|chat|user", "value":"...", "session_ids":[...], "weight":0.0–1.0 }, ... ],
-  "entities_used": [ { "name":"...", "from":"domain|title|search", "local_type":"..." }, ... ]
+  "evidence": [ { "type":"domain|title|search|chat|user", "value":"...", "session_ids":[...], "weight":0.0–1.0 }, ... ]
 }
 `.trim();
 }
@@ -1079,9 +1055,6 @@ function addInsightsToData(payload) {
     const score = Number.isFinite(obj?.score) ? Number(obj.score) : null;
     const evidence = Array.isArray(obj?.evidence) ? obj.evidence : [];
     const why = typeof obj?.why === "string" ? obj.why : "";
-    const entities_used = Array.isArray(obj?.entities_used)
-      ? obj.entities_used
-      : (prev?.entities_used ?? []);
 
     if (category) {
       const prev = insightsData.insightsDataByCategory[category];
@@ -1092,7 +1065,6 @@ function addInsightsToData(payload) {
         score: Number.isFinite(score) ? score : (prev?.score ?? null),
         evidence: evidence.length ? evidence : (prev?.evidence ?? []),
         why: why || prev?.why || "",
-        entities_used,
       };
       insightsData.insightsDataByCategory[category] = next;
       upsertedByCategory += 1;
@@ -1116,27 +1088,13 @@ function addInsightsToData(payload) {
 }
 
 function validateInsightGeneric(ins) {
-  if (
-    !ins ||
-    !ins.insight_summary ||
-    !ins.category ||
-    !Array.isArray(ins.entities_used)
-  ) {
+  if (!ins || !ins.insight_summary || !ins.category) {
     return { ok: false, reason: "missing_fields" };
   }
 
   // evidence presence
   if (!Array.isArray(ins.evidence) || ins.evidence.length < 1) {
     return { ok: false, reason: "no_evidence" };
-  }
-
-  // at least one entity appears in the summary
-  const sum = String(ins.insight_summary).toLowerCase();
-  const summaryHasEntity = ins.entities_used.some(e =>
-    sum.includes(String(e.name || "").toLowerCase())
-  );
-  if (!summaryHasEntity) {
-    return { ok: false, reason: "summary_missing_entity" };
   }
 
   return { ok: true };
