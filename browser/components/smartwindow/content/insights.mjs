@@ -128,6 +128,74 @@ export const INTENTS = [
  */
 const DEFAULT_INSIGHTS_DATA = {};
 
+function getInsightsMeta() {
+  const sw = getSmartWindow();
+  const data = getInsightsData(); // fallback stash
+  const fromSW = sw?.getInsightsMeta?.();
+  const meta = fromSW ||
+    data.__meta || {
+      history: { lastMicros: 0, tail: [], deltaRuns: 0 },
+      conversations: { lastTs: 0, deltaRuns: 0 },
+      agg_cache: null, // { history: {0,1,2,num_sessions}, ... }
+    };
+  meta.history = meta.history || { lastMicros: 0, tail: [], deltaRuns: 0 };
+  meta.conversations = meta.conversations || { lastTs: 0, deltaRuns: 0 };
+  return meta;
+}
+
+function setInsightsMeta(meta) {
+  const sw = getSmartWindow();
+  if (sw?.setInsightsMeta) {
+    sw.setInsightsMeta(meta);
+  } else {
+    const insightsData = getInsightsData();
+    insightsData.__meta = meta;
+    sw?.setInsightsData?.(insightsData);
+  }
+}
+
+// ---- single-flight generation guard ----
+async function withGenerationLock(fn) {
+  const sw = getSmartWindow();
+  if (sw?.isGeneratingInsights()) {
+    throw new Error("Already generating insights");
+  }
+  try {
+    sw?.setGeneratingInsights(true);
+    sw?.setInsightsError(null);
+    return await fn();
+  } catch (e) {
+    sw?.setInsightsError(e?.message || String(e));
+    throw e;
+  } finally {
+    sw?.setGeneratingInsights(false);
+  }
+}
+
+async function runInsights(
+  profile_records,
+  source,
+  caps = { maxPerCategory: 2, maxPerIntent: 2 }
+) {
+  const listRaw = await generateInsightsWithLLM(profile_records, source);
+  const { validated, rejected } = partitionAndValidate(listRaw);
+  if (rejected.length) {
+    console.warn(
+      `[Insights] Rejected (${source}):`,
+      JSON.stringify(rejected, null, 2)
+    );
+  }
+  const list = rankAndDiversify(validated, caps);
+  if (!list.length) {
+    return { addedCount: 0 };
+  }
+  const { addedCount } = addInsightsToData(list);
+  console.log(
+    `[Insights] Added ${addedCount}/${list.length} insights from ${source}`
+  );
+  return { addedCount };
+}
+
 /**
  * Fetch recent browsing history from Places (SQL), aggregate by URL,
  * tag "search" vs "history", and filter low-visit URLs.
@@ -259,6 +327,43 @@ async function getRecentHistory(opts = {}) {
   }
 }
 
+async function getRecentHistoryDelta({
+  sinceMicros,
+  overlapMs = 3 * 3600 * 1000,
+  maxResults = 500,
+}) {
+  const nowMs = Date.now();
+  const overlapMicros = overlapMs * 1000;
+  const cutoffMicros = Math.max(0, (Number(sinceMicros) || 0) - overlapMicros);
+  // convert cutoff to "days" for the SQL helper
+  const rawDiffInDays = (nowMs - cutoffMicros / 1000) / 86400000;
+  return getRecentHistory({ days: rawDiffInDays, maxResults });
+}
+
+function pruneAndCarryTail(rows, { tailWindowMs = 3 * 3600 * 1000 }) {
+  if (!rows.length) {
+    return [];
+  }
+  const lastMs =
+    Math.max(...rows.map(r => Number(r.visitDateMicros) || 0)) / 1000;
+  const tailCutoffUs = lastMs * 1000 - tailWindowMs * 1000;
+  return rows.filter(r => (r.visitDateMicros || 0) >= tailCutoffUs);
+}
+
+function sessionizeIncremental(previousTail, newRows) {
+  // Only re-sessionize tail ∪ newRows
+  const windowRows = [...(previousTail || []), ...(newRows || [])];
+  if (!windowRows.length) {
+    return { windowSessionized: [], newTail: [] };
+  }
+
+  const windowSessionized = sessionizeVisits(windowRows);
+  const newTail = pruneAndCarryTail(windowSessionized, {
+    tailWindowMs: 3 * 3600 * 1000,
+  });
+  return { windowSessionized, newTail };
+}
+
 /**
  * Sessionize visits using a 15-min gap and 2-hour max session length.
  * Mutates and returns a new array with session_id + session_start fields.
@@ -269,51 +374,133 @@ async function getRecentHistory(opts = {}) {
  * @returns {Array} new array sorted by time asc with session_id, session_start_ms, session_start_iso
  */
 function sessionizeVisits(rows, gapSec = 15 * 60, maxSessionSec = 2 * 60 * 60) {
-  // 1) normalize timestamps (μs -> ms), drop invalid
   const normalized = rows
     .map(r => {
       const tMs = Number.isFinite(r.visitDateMicros)
-        ? Math.floor(r.visitDateMicros / 1000) // μs -> ms
+        ? Math.floor(r.visitDateMicros / 1000) // μs → ms
         : NaN;
       return { ...r, visitTimeMs: tMs };
     })
     .filter(r => Number.isFinite(r.visitTimeMs));
 
-  // 2) sort ascending by time
+  // sort ascending
   normalized.sort((a, b) => a.visitTimeMs - b.visitTimeMs);
 
-  // 3) sessionize
-  let sessId = 0;
   let curStartMs = null;
   let prevMs = null;
 
   for (const r of normalized) {
     const tMs = r.visitTimeMs;
 
-    if (prevMs === null) {
-      // first row
-      curStartMs = tMs;
-      r.session_id = sessId;
-      r.session_start_ms = curStartMs;
-      r.session_start_iso = new Date(curStartMs).toISOString();
-    } else {
-      const gapOk = (tMs - prevMs) / 1000 <= gapSec;
-      const lenOk = (tMs - curStartMs) / 1000 <= maxSessionSec;
+    const startNew =
+      prevMs === null ||
+      (tMs - prevMs) / 1000 > gapSec ||
+      (tMs - curStartMs) / 1000 > maxSessionSec;
 
-      if (!gapOk || !lenOk) {
-        // start a new session
-        sessId += 1;
-        curStartMs = tMs;
-      }
-      r.session_id = sessId;
-      r.session_start_ms = curStartMs;
-      r.session_start_iso = new Date(curStartMs).toISOString();
+    if (startNew) {
+      curStartMs = tMs;
     }
+
+    // STABLE session_id derived from session start time (ms)
+    const stableId = curStartMs | 0; // bitwise OR to coerce to 32-bit int (still stable)
+    r.session_start_ms = curStartMs;
+    r.session_start_iso = new Date(curStartMs).toISOString();
+    r.session_id = stableId;
 
     prevMs = tMs;
   }
 
   return normalized;
+}
+
+function unpackAggTriplet(agg) {
+  if (!agg) {
+    return [{}, {}, {}];
+  }
+  if (Array.isArray(agg)) {
+    return agg.slice(0, 3);
+  }
+  // object with numeric keys
+  return [
+    agg[0] ?? agg["0"] ?? {},
+    agg[1] ?? agg["1"] ?? {},
+    agg[2] ?? agg["2"] ?? {},
+  ];
+}
+
+function mergeAggregates(prev, delta) {
+  const [pd, pt, ps] = prev || [{}, {}, {}];
+  const [dd, dt, ds] = delta;
+
+  const md = { ...pd };
+  for (const [k, v] of Object.entries(dd || {})) {
+    const cur = md[k] || {
+      score: 0,
+      last_seen: 0,
+      num_sessions: 0,
+      session_importance: 0,
+    };
+    md[k] = {
+      score: v.score, // last wins (your logic)
+      last_seen: Math.max(cur.last_seen || 0, v.last_seen || 0),
+      num_sessions: (cur.num_sessions || 0) + (v.num_sessions || 0), // approximate: we’ll recompute properly below
+      session_importance: 0, // recompute later
+    };
+  }
+
+  const mt = { ...pt };
+  for (const [k, v] of Object.entries(dt || {})) {
+    const cur = mt[k] || {
+      score: 0,
+      last_seen: 0,
+      num_sessions: 0,
+      session_importance: 0,
+    };
+    mt[k] = {
+      score: v.score,
+      last_seen: Math.max(cur.last_seen || 0, v.last_seen || 0),
+      num_sessions: (cur.num_sessions || 0) + (v.num_sessions || 0),
+      session_importance: 0,
+    };
+  }
+
+  const ms = { ...(ps || {}) };
+  for (const [sid, v] of Object.entries(ds || {})) {
+    const cur = ms[sid] || {
+      search_count: 0,
+      search_titles: [],
+      last_searched: 0,
+    };
+    const newTitles = new Set([
+      ...(cur.search_titles || []),
+      ...(v.search_titles || []),
+    ]);
+    ms[sid] = {
+      search_count: (cur.search_count || 0) + (v.search_count || 0),
+      search_titles: [...newTitles],
+      last_searched: Math.max(cur.last_searched || 0, v.last_searched || 0),
+    };
+  }
+
+  return [md, mt, ms];
+}
+
+function recomputeSessionImportance(agg_domains, agg_titles, totalSessions) {
+  for (const v of Object.values(agg_domains)) {
+    const n = v.num_sessions || 0;
+    v.session_importance =
+      n > 0 ? Math.round((totalSessions / n) * 100) / 100 : 0;
+  }
+  for (const v of Object.values(agg_titles)) {
+    const n = v.num_sessions || 0;
+    v.session_importance =
+      n > 0 ? Math.round((totalSessions / n) * 100) / 100 : 0;
+  }
+}
+
+function aggregateDelta(windowSessionized) {
+  const prepared = generateProfileInputs(windowSessionized);
+  return aggregateSessions(prepared); // returns [agg_domains, agg_titles, agg_searches]
 }
 
 /* ---------- helpers ---------- */
@@ -367,24 +554,25 @@ function toNative(o) {
   }
 }
 
-function _toSeconds(ts) {
-  // Normalize sec/ms/µs → seconds (float)
+// Normalize sec/ms/µs/ns -> seconds (float)
+function toSeconds(ts) {
   if (ts == null) {
-    return 0.0;
+    return 0;
   }
   let x = Number(ts);
   if (!Number.isFinite(x)) {
-    return 0.0;
+    return 0;
   }
   if (x > 1e15) {
     return x / 1e6;
-  } // microseconds
+  } // µs
   if (x > 1e12) {
     return x / 1e3;
-  } // milliseconds
-  return x; // seconds (or small float)
+  } // ms
+  return x; // s
 }
 
+// Round to 2 decimals
 function round2(x) {
   return Math.round(Number(x) * 100) / 100;
 }
@@ -496,7 +684,6 @@ function generateProfileInputs(rows) {
 }
 
 function aggregateSessions(prepared_inputs) {
-  // Python defaultdict equivalents
   const agg_domains = {}; // domain -> {score, last_seen, sessions:Set}
   const agg_titles = {}; // title  -> {score, last_seen, sessions:Set}
   const agg_searches = {}; // session_id -> {search_count, search_titles:Set, last_searched}
@@ -551,7 +738,7 @@ function aggregateSessions(prepared_inputs) {
       }
       rec.last_searched = Math.max(
         rec.last_searched,
-        _toSeconds(se.last_searched)
+        toSeconds(se.last_searched)
       );
     }
   }
@@ -591,8 +778,8 @@ function withRecency(
     now = undefined, // seconds (if you pass ms, we’ll normalize)
   } = {}
 ) {
-  const nowSec = now != null ? _toSeconds(now) : Date.now() / 1000;
-  const lastSec = _toSeconds(lastSeenSec);
+  const nowSec = now != null ? toSeconds(now) : Date.now() / 1000;
+  const lastSec = toSeconds(lastSeenSec);
 
   const ageDays = Math.max(0, (nowSec - lastSec) / 86400);
   const decay = Math.pow(0.5, ageDays / halfLifeDays); // half-life decay
@@ -648,7 +835,7 @@ function topkAggregates(
   const srchTmp = Object.entries(agg_searches).map(([sidRaw, v]) => {
     const sid = Number.isFinite(Number(sidRaw)) ? Number(sidRaw) : sidRaw;
     const cnt = Number(v.search_count || 0);
-    const ls = _toSeconds(v.last_searched || 0);
+    const ls = toSeconds(v.last_searched || 0);
     const rank = withRecency(cnt, 1.0, v.last_searched || 0, { now: nowRaw });
     return {
       sid,
@@ -764,7 +951,10 @@ async function getUserChats(opts = {}) {
           continue;
         }
 
-        const ts = Number(m.createdDate ?? 0);
+        let ts = Number(m.createdDate ?? 0);
+        if (ts > 0 && ts < 1e12) {
+          ts *= 1000;
+        }
         if (ts && ts < startTime) {
           continue;
         }
@@ -794,7 +984,7 @@ async function getUserChats(opts = {}) {
                 0,
                 Math.min(1, Math.exp(-Math.LN2 * (ageDays / halfLifeDays)))
               );
-        return { url, messages, freshness_score };
+        return { url, messages, freshness_score, lastTs };
       })
       .filter(x => !!x.messages.length)
       .sort((a, b) => b.freshness_score - a.freshness_score)
@@ -805,6 +995,18 @@ async function getUserChats(opts = {}) {
     console.error("Failed to fetch chat history:", error);
     return [];
   }
+}
+
+async function getUserChatsDelta({
+  sinceTs,
+  halfLifeDays = 14,
+  maxConversations = 50,
+}) {
+  const all = await getUserChats({ days: 30, maxConversations, halfLifeDays });
+  if (!sinceTs) {
+    return all;
+  }
+  return all.filter(c => Number(c.lastTs || 0) >= Number(sinceTs));
 }
 
 // ============================================================================
@@ -905,6 +1107,10 @@ ${categoriesList}
 Choose ONLY one from this list; if none fits, use null:
 ${intentsList}
 
+## Duplicate insight rules (must follow)
+- Dont add duplicate insights that are already in related_insights.
+- Dont repeat insights about entities that are already in related_insights.
+
 ## Insight rules (write 1 short, specific sentence)
 - Style = <who/what + action + constraint>, 4–10 words, no trailing period.
 - Must include at least 1 concrete entity (brand/site/product/event) OR a clear constraint (price, time, size, color).
@@ -914,7 +1120,7 @@ ${intentsList}
 - The insights are generated based on a pattern of visits.
 - Don’t infer product relationships between unrelated domains unless both appear together in the same session evidence.
 - No vague phrasing like "various", "often".
-- No duplicate of any item in related_insights (normalize case + remove punctuation before comparing).
+- Don't generate a new insight unless it is quite different from known items in related_insights.
 - If no safe, specific insight is supported by Inputs, set "insight_summary": null.
 - Examples of good form:
     - “Prefers LLBean & Nordstrom formalwear collections”
@@ -976,17 +1182,23 @@ async function generateInsightsWithLLM(profile, source) {
   // Check for custom prompt in module state
   const customPromptTemplate = getCustomPrompt();
 
+  const insightsData = getInsightsData();
+  const related_insights = Object.values(insightsData)
+    .filter(Array.isArray)
+    .flat()
+    .slice(0, 300);
+
   let promptText;
   if (customPromptTemplate) {
     // Replace placeholders in custom template
     promptText = customPromptTemplate
       .replace("{PROFILE_RECORDS}", JSON.stringify(profile_records, null, 2))
-      .replace("{RELATED_INSIGHTS}", JSON.stringify([], null, 2));
+      .replace("{RELATED_INSIGHTS}", JSON.stringify(related_insights, null, 2));
   } else {
     // Use default prompt builder
     promptText = buildLiveInsightPrompt({
       profile_records,
-      related_insights: [],
+      related_insights,
     });
   }
 
@@ -1228,81 +1440,178 @@ function partitionAndValidate(items) {
   return { validated: validated.map(r => r.ins), rejected };
 }
 
-/**
- * Generates insights from browsing history using LLM
- *
- * @returns {Promise<void>}
- */
-export async function generateInsightsFromHistory() {
-  const smartWindow = getSmartWindow();
+export async function analyzeHistorySmart() {
+  const meta = getInsightsMeta();
+  const firstRun =
+    !Number.isFinite(meta.history?.lastMicros) ||
+    (meta.history?.lastMicros || 0) === 0;
 
-  if (smartWindow?.isGeneratingInsights()) {
-    throw new Error("Already generating insights");
+  if (firstRun) {
+    return generateInsightsFromHistory({ days: 60, maxResults: 1000 }); // unchanged full run
   }
+  return updateInsightsFromHistoryIncremental();
+}
 
-  smartWindow?.setGeneratingInsights(true);
-  smartWindow?.setInsightsError(null);
+export async function analyzeConversationsSmart() {
+  const meta = getInsightsMeta();
+  const firstRun =
+    !Number.isFinite(meta.conversations?.lastTs) ||
+    (meta.conversations?.lastTs || 0) === 0;
 
-  try {
+  if (firstRun) {
+    return generateInsightsFromConversations(); // uses your existing 30-day logic
+  }
+  return updateInsightsFromConversationsIncremental();
+}
+
+/**
+ * Generates insights from browsing history using an LLM.
+ *
+ * Fetches recent Places history, sessionizes visits, aggregates signals,
+ * calls the LLM to produce insights, and writes results into SmartWindow storage.
+ *
+ * @param {object} [opts] - Options for the analysis.
+ * @param {number} [opts.days=60] - How many days of history to scan.
+ * @param {number} [opts.maxResults=1000] - Max history rows to fetch from Places.
+ * @returns {Promise<void>} Resolves when insights are generated and stored.
+ * @throws {Error} If an analysis is already running, no history is found,
+ *   or an internal step fails (history fetch, LLM call, or storage write).
+ */
+export async function generateInsightsFromHistory(
+  opts = { days: 60, maxResults: 1000 }
+) {
+  return withGenerationLock(async () => {
+    const { days = 60, maxResults = 1000 } = opts;
+
     console.log("[Insights] Fetching browsing history...");
-    const baseRows = await getRecentHistory({ days: 60, maxResults: 1000 });
-
-    if (baseRows.length === 0) {
+    const baseRows = await getRecentHistory({ days, maxResults });
+    if (!baseRows.length) {
       throw new Error("No browsing history found");
     }
 
     console.log(`[Insights] Found ${baseRows.length} history items`);
     const sessionized = sessionizeVisits(baseRows);
+    const prepared = generateProfileInputs(sessionized);
+    const [agg_domains, agg_titles, agg_searches] = aggregateSessions(prepared);
 
-    const prepared_inputs = generateProfileInputs(sessionized);
-
-    const [agg_domains, agg_titles, agg_searches] =
-      aggregateSessions(prepared_inputs);
-
-    // console.debug(`agg_titles = ${JSON.stringify(agg_titles)}`);
-
-    const prepared_inputs_topk = topkAggregates(
-      agg_domains,
-      agg_titles,
-      agg_searches,
-      { k_domains: 100, k_titles: 60, k_searches: 10 } // options object
-    );
-
-    console.log(
-      `prepared_inputs_topk = ${JSON.stringify(prepared_inputs_topk)}`
-    );
-    console.log("[Insights] Generating insights with LLM...");
-    const listRaw = await generateInsightsWithLLM(
-      prepared_inputs_topk,
-      "history"
-    );
-
-    // 1) validate first
-    const { validated, rejected } = partitionAndValidate(listRaw);
-    if (rejected.length) {
-      console.warn(
-        "[Insights] Rejected insights (history):",
-        JSON.stringify(rejected, null, 2)
-      );
-    }
-
-    const list = rankAndDiversify(validated, {
-      maxPerCategory: 5,
-      maxPerIntent: 2,
+    const topk = topkAggregates(agg_domains, agg_titles, agg_searches, {
+      k_domains: 50,
+      k_titles: 60,
+      k_searches: 10,
     });
 
-    const { addedCount } = addInsightsToData(list);
-    console.log(
-      `[Insights] Added ${addedCount}/${list.length} insights from history`
+    console.log(`[Insights] Generating insights with LLM...`);
+    await runInsights(topk, "history", { maxPerCategory: 5, maxPerIntent: 2 });
+
+    // Seed meta for incrementals
+    const meta = getInsightsMeta();
+    const newestMicros = Math.max(
+      0,
+      ...baseRows.map(r => Number(r.visitDateMicros) || 0)
     );
-  } catch (error) {
-    console.error("[Insights] Generation failed:", error);
-    const errorMsg = error.message || String(error);
-    smartWindow?.setInsightsError(errorMsg);
-    throw error;
-  } finally {
-    smartWindow?.setGeneratingInsights(false);
-  }
+    meta.history.lastMicros = newestMicros;
+    meta.history.tail = [];
+    meta.history.deltaRuns = 0;
+
+    meta.agg_cache = meta.agg_cache || {};
+    meta.agg_cache.history = {
+      0: agg_domains,
+      1: agg_titles,
+      2: agg_searches,
+      num_sessions: new Set(sessionized.map(x => x.session_id)).size,
+    };
+    setInsightsMeta(meta);
+  });
+}
+
+export async function updateInsightsFromHistoryIncremental() {
+  return withGenerationLock(async () => {
+    const meta = getInsightsMeta();
+    const lastMicros = meta.history?.lastMicros || 0;
+    const prevTail = meta.history?.tail || [];
+    const prevAgg = meta.agg_cache?.history || null; // [d,t,s,num_sessions]
+    const overLapHours = 0.5;
+
+    const deltaRows = await getRecentHistoryDelta({
+      sinceMicros: lastMicros,
+      overlapMs: overLapHours * 3600 * 1000,
+      maxResults: 500,
+    });
+    console.debug(`deltaRows length = ${deltaRows.length}`);
+    if (!deltaRows.length && prevTail.length === 0) {
+      console.log("[Insights] No new history rows.");
+      return;
+    }
+
+    const { windowSessionized, newTail } = sessionizeIncremental(
+      prevTail,
+      deltaRows
+    );
+    const newestMicros = Math.max(
+      lastMicros,
+      ...deltaRows.map(r => Number(r.visitDateMicros) || 0)
+    );
+
+    // If nothing new beyond tail, just advance meta and exit
+    if (!windowSessionized.length && newestMicros <= lastMicros) {
+      meta.history.tail = newTail;
+      setInsightsMeta(meta);
+      return;
+    }
+
+    // Build & merge aggregates
+    const deltaAgg = aggregateDelta(windowSessionized);
+    let mergedAgg, totalSessions;
+    if (prevAgg) {
+      const prevTriplet = unpackAggTriplet(prevAgg);
+      mergedAgg = mergeAggregates(prevTriplet, deltaAgg);
+      totalSessions =
+        (meta.agg_cache.history?.num_sessions || 0) +
+        new Set(windowSessionized.map(x => x.session_id)).size;
+    } else {
+      mergedAgg = deltaAgg;
+      totalSessions = new Set(windowSessionized.map(x => x.session_id)).size;
+    }
+    recomputeSessionImportance(mergedAgg[0], mergedAgg[1], totalSessions);
+
+    // Top-k on just the delta to keep prompts small
+    const deltaTopK = topkAggregates(deltaAgg[0], deltaAgg[1], deltaAgg[2], {
+      k_domains: 20,
+      k_titles: 30,
+      k_searches: 5,
+    });
+    const deltaMagnitude =
+      deltaTopK[0].length + deltaTopK[1].length + deltaTopK[2].length;
+
+    if (deltaMagnitude > 0) {
+      await runInsights(deltaTopK, "history", {
+        maxPerCategory: 3,
+        maxPerIntent: 2,
+      });
+    } else {
+      console.log("[Insights] Delta too small; skipping LLM.");
+    }
+
+    // Persist meta + caches
+    meta.history.lastMicros = newestMicros;
+    meta.history.tail = newTail.map(r => ({
+      url: r.url,
+      domain: r.domain,
+      title: r.title,
+      visitDateMicros: r.visitDateMicros,
+      frequencyPct: r.frequencyPct,
+      domainFrequencyPct: r.domainFrequencyPct,
+      source: r.source,
+    }));
+    meta.agg_cache = meta.agg_cache || {};
+    meta.agg_cache.history = {
+      0: mergedAgg[0],
+      1: mergedAgg[1],
+      2: mergedAgg[2],
+      num_sessions: totalSessions,
+    };
+    setInsightsMeta(meta);
+  });
 }
 
 /**
@@ -1311,57 +1620,57 @@ export async function generateInsightsFromHistory() {
  * @returns {Promise<void>}
  */
 export async function generateInsightsFromConversations() {
-  const smartWindow = getSmartWindow();
-
-  if (smartWindow?.isGeneratingInsights()) {
-    throw new Error("Already generating insights");
-  }
-
-  smartWindow?.setGeneratingInsights(true);
-  smartWindow?.setInsightsError(null);
-
-  try {
+  return withGenerationLock(async () => {
     console.log("[Insights] Fetching conversation history...");
     const chatHistory = await getUserChats({
       days: 30,
       maxConversations: 50,
       halfLifeDays: 14,
     });
-
-    if (chatHistory.length === 0) {
+    if (!chatHistory.length) {
       throw new Error("No conversation history found");
     }
 
-    // console.debug(`chatHistory = ${JSON.stringify(chatHistory)}`);
     console.log(`[Insights] Found ${chatHistory.length} conversations`);
-    console.log("[Insights] Generating insights with LLM...");
-    const listRaw = await generateInsightsWithLLM(chatHistory, "conversation");
-
-    const { validated, rejected } = partitionAndValidate(listRaw);
-    if (rejected.length) {
-      console.warn(
-        "[Insights] Rejected insights (conversations):",
-        JSON.stringify(rejected, null, 2)
-      );
-    }
-
-    const list = rankAndDiversify(validated, {
+    await runInsights(chatHistory, "conversation", {
       maxPerCategory: 2,
       maxPerIntent: 2,
     });
 
-    const { addedCount } = addInsightsToData(list);
-    console.log(
-      `[Insights] Added ${addedCount}/${list.length} insights from conversations`
+    // Watermark
+    const meta = getInsightsMeta();
+    meta.conversations.lastTs = Math.max(
+      0,
+      ...chatHistory.map(c => c.lastTs || 0)
     );
-  } catch (error) {
-    console.error("[Insights] Generation failed:", error);
-    const errorMsg = error.message || String(error);
-    smartWindow?.setInsightsError(errorMsg);
-    throw error;
-  } finally {
-    smartWindow?.setGeneratingInsights(false);
-  }
+    setInsightsMeta(meta);
+  });
+}
+
+export async function updateInsightsFromConversationsIncremental() {
+  return withGenerationLock(async () => {
+    const meta = getInsightsMeta();
+    const lastTs = meta.conversations?.lastTs || 0;
+
+    const delta = await getUserChatsDelta({
+      sinceTs: lastTs,
+      halfLifeDays: 14,
+      maxConversations: 50,
+    });
+    if (!delta.length) {
+      console.log("[Insights] No new conversations.");
+      return;
+    }
+
+    await runInsights(delta, "conversation", {
+      maxPerCategory: 2,
+      maxPerIntent: 2,
+    });
+
+    const newest = Math.max(lastTs, ...delta.map(d => d.lastTs || 0));
+    meta.conversations.lastTs = newest;
+    setInsightsMeta(meta);
+  });
 }
 
 /**
@@ -1371,56 +1680,14 @@ export async function generateInsightsFromConversations() {
  * @returns {Promise<void>}
  */
 export async function generateInsightsFromCustomText(inputText) {
-  const smartWindow = getSmartWindow();
-
-  if (smartWindow?.isGeneratingInsights()) {
-    throw new Error("Already generating insights");
-  }
-
-  if (!inputText || !inputText.trim()) {
-    throw new Error("No input text provided");
-  }
-
-  smartWindow?.setGeneratingInsights(true);
-  smartWindow?.setInsightsError(null);
-
-  try {
-    console.log(
-      "[Insights] Generating insights from custom text input:",
-      inputText.trim()
-    );
-
-    const listRaw = await generateInsightsWithLLM(inputText.trim(), "custom");
-    const { validated, rejected } = partitionAndValidate(listRaw);
-    if (rejected.length) {
-      console.warn(
-        "[Insights] Rejected insights (custom):",
-        JSON.stringify(rejected, null, 2)
-      );
+  return withGenerationLock(async () => {
+    const text = (inputText || "").trim();
+    if (!text) {
+      throw new Error("No input text provided");
     }
 
-    const list = rankAndDiversify(validated, {
-      maxPerCategory: 2,
-      maxPerIntent: 2,
-    });
-
-    console.log("[Insights] LLM returned insights:", JSON.stringify(list));
-
-    const { addedCount } = addInsightsToData(list);
-    console.log(
-      `[Insights] Added ${addedCount}/${list.length} insights from custom input`
-    );
-  } catch (error) {
-    console.error(
-      "[Insights] Generation from Custom text input failed:",
-      error
-    );
-    const errorMsg = error.message || String(error);
-    smartWindow?.setInsightsError(errorMsg);
-    throw error;
-  } finally {
-    smartWindow?.setGeneratingInsights(false);
-  }
+    await runInsights(text, "custom", { maxPerCategory: 2, maxPerIntent: 2 });
+  });
 }
 
 /**
@@ -1472,10 +1739,10 @@ When responding, if you use any user insights from the list below to personalize
 User Insights List:`;
 
   // Build insights list from data
-  Object.entries(dataToUse).forEach(([category, insights]) => {
+  Object.entries(dataToUse).forEach(([_category, insights]) => {
     if (insights.length) {
       const insightString = insights.join(", ");
-      systemPrompt += `\n- ${category}: ${insightString}.`;
+      systemPrompt += `\n- ${insightString}.`;
     }
   });
 
@@ -1626,22 +1893,23 @@ export function createInsightsOverlay(
 
   const handleGenerateHistory = async () => {
     try {
-      await generateInsightsFromHistory();
-    } catch (error) {
-      console.error("Failed to generate insights from history:", error);
+      await analyzeHistorySmart();
+    } catch (e) {
+      console.error("Failed to generate insights from history:", e);
     }
     window.dispatchEvent(new CustomEvent("insights-updated"));
   };
 
   const handleGenerateConversations = async () => {
     try {
-      await generateInsightsFromConversations();
-    } catch (error) {
-      console.error("Failed to generate insights from conversations:", error);
+      await analyzeConversationsSmart();
+    } catch (e) {
+      console.error("Failed to generate insights from conversations:", e);
     }
     window.dispatchEvent(new CustomEvent("insights-updated"));
   };
 
+  // Dynamic labels based on whether we have any watermark yet:
   const handleClearGenerated = () => {
     clearGeneratedInsights();
     window.dispatchEvent(new CustomEvent("insights-updated"));
