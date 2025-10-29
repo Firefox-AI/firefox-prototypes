@@ -61,7 +61,10 @@ export function attachToElement(element, options = {}) {
       return;
     }
 
-    let browserWindow = win && win.gBrowser ? win : Services.wm.getMostRecentWindow("navigator:browser");
+    let browserWindow =
+      win && win.gBrowser
+        ? win
+        : Services.wm.getMostRecentWindow("navigator:browser");
     if (!browserWindow || !browserWindow.gBrowser) {
       return;
     }
@@ -69,9 +72,13 @@ export function attachToElement(element, options = {}) {
     const { gBrowser } = browserWindow;
     const tabs = Array.from(gBrowser.tabs);
 
-    const match = tabs.find((tab) => {
+    const match = tabs.find(tab => {
       const linkedBrowser = tab.linkedBrowser;
-      const titleText = (linkedBrowser?.contentTitle || tab.label || "").toLowerCase();
+      const titleText = (
+        linkedBrowser?.contentTitle ||
+        tab.label ||
+        ""
+      ).toLowerCase();
       const urlText = (linkedBrowser?.currentURI?.spec || "").toLowerCase();
 
       if (url) {
@@ -173,15 +180,15 @@ export function attachToElement(element, options = {}) {
         ],
         [
           "span",
-          { class: "mention-label", title: label || id },
-          `@${label || id}`,
+          { class: "mention-label", title: `${label} (${id})` },
+          `${label || id}`,
         ],
       ];
     },
 
     renderText({ node }) {
       const { id, label } = node.attrs;
-      return `@${label || id}`;
+      return `${label || id}`;
     },
   });
 
@@ -269,7 +276,10 @@ export function attachToElement(element, options = {}) {
 
       // Check if user deleted autofilled content
       if (autofillState) {
-        if (text !== autofillState.value && text.length < autofillState.value.length) {
+        if (
+          text !== autofillState.value &&
+          text.length < autofillState.value.length
+        ) {
           // User deleted autofill
           deletedQuery = autofillState.originalPrefix.toLowerCase().trim();
           autofillState = null;
@@ -292,11 +302,12 @@ export function attachToElement(element, options = {}) {
       previousText = text;
 
       // Hide suggestions if input is empty or if mentions already exist
-      if ((
-        !text.trim() &&
-        suggestionsContainer &&
-        !suggestionsContainer.classList.contains("hidden")
-      ) || hasExistingMentions(editorInstance.getJSON())) {
+      if (
+        (!text.trim() &&
+          suggestionsContainer &&
+          !suggestionsContainer.classList.contains("hidden")) ||
+        hasExistingMentions(editorInstance.getJSON())
+      ) {
         hideSuggestions();
       }
 
@@ -368,7 +379,8 @@ export function attachToElement(element, options = {}) {
 
     const icon = document.createElement("span");
     icon.className = "suggestion-icon";
-    const useProvidedIcon = suggestion.type !== "action" && suggestion.type !== "search"
+    const useProvidedIcon =
+      suggestion.type !== "action" && suggestion.type !== "search";
 
     if (useProvidedIcon && suggestion.icon) {
       const imgElement = document.createElement("img");
@@ -428,11 +440,14 @@ export function attachToElement(element, options = {}) {
       e.preventDefault();
       // If this is a "tab switch" row, activate the tab instead
       if (suggestion.type === "action") {
-        switchToMatchingTab({
-          url: suggestion.url,
-          title: suggestion.title,
-          query: suggestion.query || suggestion.text
-        }, window);
+        switchToMatchingTab(
+          {
+            url: suggestion.url,
+            title: suggestion.title,
+            query: suggestion.query || suggestion.text,
+          },
+          window
+        );
         return;
       }
 
@@ -571,16 +586,18 @@ export function attachToElement(element, options = {}) {
 
       // Block if query matches or is subset of deleted query
       if (
-        deletedQuery && (
-          currentText.toLowerCase().trim() === deletedQuery ||
-          deletedQuery.startsWith(currentText.toLowerCase().trim())
-        )
+        deletedQuery &&
+        (currentText.toLowerCase().trim() === deletedQuery ||
+          deletedQuery.startsWith(currentText.toLowerCase().trim()))
       ) {
         return;
       }
 
       // Extract the expected prefix (what user had typed when autofill was requested)
-      const expectedPrefix = autofillData.value.substring(0, autofillData.selectionStart);
+      const expectedPrefix = autofillData.value.substring(
+        0,
+        autofillData.selectionStart
+      );
 
       // Only apply autofill if current query is still the expected prefix
       if (currentText != expectedPrefix) {
@@ -618,8 +635,10 @@ export function attachToElement(element, options = {}) {
           return node.text || "";
         }
         if (node.type === "mention") {
-          // Use the ID (URL) instead of the label (title) for mentions
-          return `@${node.attrs.label || node.attrs.id || ""}`;
+          const label = node.attrs.label || "";
+          const url = node.attrs.id || "";
+          // Send both title and URL to LLM
+          return `@${label} (${url})`;
         }
         if (node.type === "paragraph" || node.type === "doc") {
           // Handle paragraphs and document nodes
