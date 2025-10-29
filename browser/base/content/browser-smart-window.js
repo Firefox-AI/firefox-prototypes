@@ -44,6 +44,7 @@ var SmartWindow = {
     this.initButtons();
     this.setupTabAttrObserver();
     this.reconcileUIToSmartWindowState();
+    this.setupTabEventListeners();
 
     window
       .matchMedia(`-moz-pref("sidebar.verticalTabs")`)
@@ -550,6 +551,27 @@ var SmartWindow = {
     }
   },
 
+  setupTabEventListeners() {
+    if (gBrowser?.tabContainer) {
+      // Listen for new tabs being opened
+      this._tabOpenListener = () => {
+        console.log("[Smart Window] Tab opened");
+        this.hidePageHistory();
+      };
+
+      // Listen for tab selection changes
+      this._tabSelectListener = () => {
+        console.log("[Smart Window] Tab selected");
+        // Do nothing
+      };
+
+      gBrowser.tabContainer.addEventListener("TabOpen", this._tabOpenListener);
+      gBrowser.tabContainer.addEventListener("TabSelect", this._tabSelectListener);
+
+      console.log("[Smart Window] Tab event listeners set up");
+    }
+  },
+
   focusContentSmartbar() {
     if (gBrowser.currentURI.spec.includes("smartwindow/smartwindow.html")) {
       gBrowser.selectedBrowser.contentDocument?.dispatchEvent(
@@ -584,5 +606,74 @@ var SmartWindow = {
     }
 
     console.log("Smart Window shutdown complete");
+  },
+
+  async showPageHistory(historyItems) {
+    // Dynamically import the component if not already loaded
+    if (!customElements.get("page-history-overlay")) {
+      try {
+        await import("chrome://browser/content/smartwindow/page-history.mjs");
+        console.log("[SmartWindow] page-history.mjs loaded");
+      } catch (error) {
+        console.error("[SmartWindow] Failed to load page-history.mjs:", error);
+        return;
+      }
+    }
+
+    // Create the page-history-overlay element
+    const historyOverlay = document.createElement("page-history-overlay");
+    historyOverlay.id = "page-history-overlay-instance";
+    historyOverlay.historyItems = historyItems;
+    historyOverlay.isOpen = true;
+
+    // Listen for close event
+    historyOverlay.addEventListener("close", () => {
+      this.hidePageHistory();
+    });
+
+    // Listen for item selection
+    historyOverlay.addEventListener("item-selected", event => {
+      const selectedItem = event.detail;
+      console.log("[SmartWindow] Selected history item:", selectedItem);
+
+      if (selectedItem.url) {
+        gBrowser.selectedBrowser.fixupAndLoadURIString(
+          selectedItem.url,
+          {
+            triggeringPrincipal:
+              Services.scriptSecurityManager.getSystemPrincipal(),
+          }
+        );
+      }
+
+      this.hidePageHistory();
+    });
+
+    // Add to tabbrowser-tabbox
+    const tabbox = document.getElementById("tabbrowser-tabbox");
+    if (tabbox) {
+      tabbox.appendChild(historyOverlay);
+      console.log("[SmartWindow] History overlay added to tabbrowser-tabbox");
+    } else {
+      console.error("[SmartWindow] tabbrowser-tabbox not found");
+      return;
+    }
+
+    // Force a render update
+    requestAnimationFrame(() => {
+      historyOverlay.requestUpdate?.();
+    });
+  },
+
+  hidePageHistory() {
+    const historyOverlay = document.getElementById("page-history-overlay-instance");
+    if (historyOverlay) {
+      historyOverlay.isOpen = false;
+      // Remove from DOM after animation
+      setTimeout(() => {
+        historyOverlay.remove();
+        console.log("[SmartWindow] History overlay removed");
+      }, 300);
+    }
   },
 };

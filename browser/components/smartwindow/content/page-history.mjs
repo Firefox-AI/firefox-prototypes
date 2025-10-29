@@ -209,21 +209,20 @@ export class PageHistoryOverlay extends LitElement {
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
+      background: var(--smart-window-gradient);
+      border: 1px solid #eab2f7;
+      border-radius: 8px 8px 0 0;
       display: flex;
+      padding: 5rem 2.5rem 2.5rem;
       align-items: center;
       justify-content: center;
       z-index: 1000;
     }
 
     .history-modal {
-      background: white;
-      border-radius: 8px;
-      max-width: 920px;
-      max-height: 80vh;
-      width: 90%;
+      height: 100%;
+      width: 100%;
       overflow: hidden;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
       display: flex;
       flex-direction: column;
     }
@@ -233,23 +232,36 @@ export class PageHistoryOverlay extends LitElement {
       justify-content: space-between;
       align-items: center;
       padding: 1rem 1.5rem;
-      border-bottom: 1px solid #e0e0e0;
-      background: #f8f9fa;
+      position: relative;
+    }
+
+    .history-header::before {
+      content: "";
+      opacity: 0.5;
+      background: linear-gradient(90deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0) 60%, rgba(0, 0, 0, 0.5) 100%);
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      height: 1px;
+      width: calc(100% - 4rem);
     }
 
     .history-header h3 {
       margin: 0;
       color: #333;
-      font-size: 1.25rem;
+      font-size: 15px;
       font-weight: 600;
+      width: 100%;
+      text-align: center;
     }
 
     .close-btn {
       background: none;
       border: none;
-      font-size: 1.5rem;
+      font-size: 2rem;
       cursor: pointer;
-      color: #666;
+      color: #333;
       padding: 0;
       width: 30px;
       height: 30px;
@@ -258,6 +270,9 @@ export class PageHistoryOverlay extends LitElement {
       justify-content: center;
       border-radius: 50%;
       margin: 0;
+      position: fixed;
+      right: 1.5rem;
+      top: 1.5rem;
     }
 
     .close-btn:hover {
@@ -266,8 +281,6 @@ export class PageHistoryOverlay extends LitElement {
 
     .search-container {
       padding: 1rem 1.5rem;
-      border-bottom: 1px solid #e0e0e0;
-      background: white;
     }
 
     .search-input {
@@ -366,7 +379,7 @@ export class PageHistoryOverlay extends LitElement {
       width: 100%;
       aspect-ratio: 16 / 9;
       border-radius: 8px;
-      background: linear-gradient(45deg, rgba(191, 143, 204, 0.15) 0%, rgba(191, 143, 204, 0.35) 100%), rgb(255, 255, 255);
+      background: #fff;
       overflow: hidden;
       box-shadow: var(--box-shadow-level-1-shadow-1-x, 0) var(--box-shadow-level-1-shadow-1-y, 0) var(--box-shadow-level-1-shadow-1-blur, 1px) var(--box-shadow-level-1-shadow-1-spread, 0) var(--box-shadow-level-1-shadow-1-color, rgba(0, 0, 0, 0.15)), var(--box-shadow-level-1-shadow-2-x, 0) var(--box-shadow-level-1-shadow-2-y, 1px) var(--box-shadow-level-1-shadow-2-blur, 2px) var(--box-shadow-level-1-shadow-2-spread, 0) var(--box-shadow-level-1-shadow-2-color, rgba(0, 0, 0, 0.20));
     }
@@ -380,10 +393,10 @@ export class PageHistoryOverlay extends LitElement {
     .thumbnail-placeholder {
       width: 100%;
       height: 100%;
-      background: linear-gradient(45deg, rgba(191, 143, 204, 0.15) 0%, rgba(191, 143, 204, 0.35) 100%), rgb(255, 255, 255);
+      background: #fff;
       display: flex;
       align-items: center;
-      color: #fff;
+      color: #666;
       justify-content: center;
       font-size: 2.5rem;
     }
