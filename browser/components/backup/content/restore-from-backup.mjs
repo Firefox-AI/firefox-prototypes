@@ -77,12 +77,7 @@ export default class RestoreFromBackup extends MozLitElement {
     );
 
     // If we have a backup file, but not the associated info, fetch the info
-    if (
-      this.backupServiceState?.backupFileToRestore &&
-      !this.backupServiceState?.backupFileInfo
-    ) {
-      this.getBackupFileInfo();
-    }
+    this.maybeGetBackupFileInfo();
 
     this.addEventListener("BackupUI:SelectNewFilepickerPath", this);
 
@@ -90,6 +85,15 @@ export default class RestoreFromBackup extends MozLitElement {
     if (this.aboutWelcomeEmbedded) {
       this._handleWindowResize = () => this.resizeTextarea();
       window.addEventListener("resize", this._handleWindowResize);
+    }
+  }
+
+  maybeGetBackupFileInfo() {
+    if (
+      this.backupServiceState?.backupFileToRestore &&
+      !this.backupServiceState?.backupFileInfo
+    ) {
+      this.getBackupFileInfo();
     }
   }
 
@@ -123,6 +127,10 @@ export default class RestoreFromBackup extends MozLitElement {
           detail: { recoveryInProgress: inProgress },
         })
       );
+
+      // It's possible that backupFileToRestore got updated and we need to
+      // refetch the fileInfo
+      this.maybeGetBackupFileInfo();
     }
   }
 
@@ -376,6 +384,7 @@ export default class RestoreFromBackup extends MozLitElement {
           style=${styles}
           @input=${this.handleTextareaResize}
           aria-describedby=${describedBy}
+          data-l10n-id="restore-from-backup-filepicker-input"
         ></textarea>
       `;
     }
@@ -387,6 +396,7 @@ export default class RestoreFromBackup extends MozLitElement {
         readonly
         .value=${backupFileName}
         style=${styles}
+        data-l10n-id="restore-from-backup-filepicker-input"
       />
     `;
   }

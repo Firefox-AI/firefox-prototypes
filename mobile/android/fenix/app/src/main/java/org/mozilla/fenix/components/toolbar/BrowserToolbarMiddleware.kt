@@ -56,6 +56,7 @@ import mozilla.components.compose.browser.toolbar.store.BrowserToolbarState
 import mozilla.components.compose.browser.toolbar.store.EnvironmentCleared
 import mozilla.components.compose.browser.toolbar.store.EnvironmentRehydrated
 import mozilla.components.compose.browser.toolbar.store.ProgressBarConfig
+import mozilla.components.compose.browser.toolbar.ui.BrowserToolbarQuery
 import mozilla.components.concept.engine.EngineSession.LoadUrlFlags
 import mozilla.components.concept.engine.cookiehandling.CookieBannersStorage
 import mozilla.components.concept.engine.permission.SitePermissions
@@ -238,7 +239,9 @@ class BrowserToolbarMiddleware(
 
                 updateStartBrowserActions(context)
                 updateCurrentPageOrigin(context)
-                updateEndBrowserActions(context)
+                environment?.fragment?.viewLifecycleOwner?.lifecycleScope?.launch {
+                    updateEndBrowserActions(context)
+                }
                 updateEndPageActions(context)
                 environment?.fragment?.viewLifecycleOwner?.lifecycleScope?.launch {
                     updateNavigationActions(context)
@@ -375,7 +378,7 @@ class BrowserToolbarMiddleware(
                         )
                     }
                 } else {
-                    context.dispatch(SearchQueryUpdated(searchTerms))
+                    context.dispatch(SearchQueryUpdated(BrowserToolbarQuery(searchTerms)))
                     appStore.dispatch(SearchStarted(selectedTab.id))
                 }
             }
@@ -395,7 +398,7 @@ class BrowserToolbarMiddleware(
                 }
             }
             is PasteFromClipboardClicked -> runWithinEnvironment {
-                context.dispatch(SearchQueryUpdated(clipboard.text.orEmpty()))
+                context.dispatch(SearchQueryUpdated(BrowserToolbarQuery(clipboard.text.orEmpty())))
                 appStore.dispatch(SearchStarted(browserStore.state.selectedTabId))
             }
             is LoadFromClipboardClicked -> {
@@ -668,12 +671,22 @@ class BrowserToolbarMiddleware(
             ),
     )
 
-    private fun updateEndBrowserActions(context: MiddlewareContext<BrowserToolbarState, BrowserToolbarAction>) =
+    private suspend fun updateEndBrowserActions(context: MiddlewareContext<BrowserToolbarState, BrowserToolbarAction>) {
+        val url = browserStore.state.selectedTab?.content?.url
+        val isBookmarked = if (url != null) {
+            withContext(ioDispatcher) {
+                bookmarksStorage.getBookmarksWithUrl(url).getOrDefault(listOf()).isNotEmpty()
+            }
+        } else {
+            false
+        }
+
         context.dispatch(
             BrowserActionsEndUpdated(
-                buildEndBrowserActions(),
+                buildEndBrowserActions(isBookmarked),
             ),
-    )
+        )
+    }
 
     private fun buildStartPageActions(): List<Action> {
         return listOf(
@@ -737,14 +750,16 @@ class BrowserToolbarMiddleware(
         }
     }
 
-    private fun buildEndBrowserActions(): List<Action> {
+    private fun buildEndBrowserActions(isBookmarked: Boolean): List<Action> {
         val isWideWindow = environment?.fragment?.isWideWindow() == true
         val isTallWindow = environment?.fragment?.isTallWindow() == true
         val tabStripEnabled = settings.isTabStripEnabled
         val shouldUseExpandedToolbar = settings.shouldUseExpandedToolbar
         val useCustomPrimary = settings.shouldShowToolbarCustomization && !shouldUseExpandedToolbar
-        val primarySlotAction = mapShortcutToAction(settings.toolbarShortcutKey)
-            .takeIf { useCustomPrimary } ?: ToolbarAction.NewTab
+        val primarySlotAction = mapShortcutToAction(
+            settings.toolbarShortcutKey,
+            isBookmarked,
+        ).takeIf { useCustomPrimary } ?: ToolbarAction.NewTab
 
         val configs = listOf(
             ToolbarActionConfig(primarySlotAction) {
@@ -1031,6 +1046,7 @@ class BrowserToolbarMiddleware(
                 it.snackbarState is SnackbarState.BookmarkAdded ||
                         it.snackbarState is SnackbarState.BookmarkDeleted
             }.collect { isBookmarked ->
+                updateEndBrowserActions(context)
                 updateNavigationActions(context)
             }
         }
@@ -1248,9 +1264,16 @@ class BrowserToolbarMiddleware(
     companion object {
         @VisibleForTesting
         @JvmStatic
-        internal fun mapShortcutToAction(key: String): ToolbarAction = when (key) {
+        internal fun mapShortcutToAction(
+            key: String,
+            isBookmarked: Boolean = false,
+        ): ToolbarAction = when (key) {
             ToolbarShortcutPreference.Keys.NEW_TAB -> ToolbarAction.NewTab
             ToolbarShortcutPreference.Keys.SHARE -> ToolbarAction.Share
+            ToolbarShortcutPreference.Keys.BOOKMARK -> when (isBookmarked) {
+                true -> ToolbarAction.EditBookmark
+                false -> ToolbarAction.Bookmark
+            }
             else -> ToolbarAction.NewTab
         }
     }
