@@ -15,6 +15,12 @@ const { ChatHistory, ChatHistoryMessage } = ChromeUtils.importESModule(
 export let insightsStyles;
 
 /**
+ * Module-level state for prompt editor
+ */
+let moduleCustomPrompt = null; // null means use default prompt
+let moduleShowPromptEditor = false;
+
+/**
  * Helper function to get SmartWindow instance
  */
 function getSmartWindow() {
@@ -33,6 +39,42 @@ function getInsightsData() {
 
   const stored = smartWindow.getInsightsData();
   return stored || {};
+}
+
+/**
+ * Gets the current custom prompt (null means use default)
+ *
+ * @returns {string|null}
+ */
+export function getCustomPrompt() {
+  return moduleCustomPrompt;
+}
+
+/**
+ * Sets the custom prompt (null means use default)
+ *
+ * @param {string|null} prompt
+ */
+export function setCustomPrompt(prompt) {
+  moduleCustomPrompt = prompt;
+}
+
+/**
+ * Gets prompt editor visibility state
+ *
+ * @returns {boolean}
+ */
+export function isPromptEditorVisible() {
+  return moduleShowPromptEditor;
+}
+
+/**
+ * Sets prompt editor visibility state
+ *
+ * @param {boolean} visible
+ */
+export function setPromptEditorVisible(visible) {
+  moduleShowPromptEditor = visible;
 }
 
 export const CATEGORIES = [
@@ -959,10 +1001,22 @@ async function generateInsightsWithLLM(profile, source) {
     profile_records = profile;
   }
 
-  const promptText = buildLiveInsightPrompt({
-    profile_records,
-    related_insights: [],
-  });
+  // Check for custom prompt in module state
+  const customPromptTemplate = getCustomPrompt();
+
+  let promptText;
+  if (customPromptTemplate) {
+    // Replace placeholders in custom template
+    promptText = customPromptTemplate
+      .replace("{PROFILE_RECORDS}", JSON.stringify(profile_records, null, 2))
+      .replace("{RELATED_INSIGHTS}", JSON.stringify([], null, 2));
+  } else {
+    // Use default prompt builder
+    promptText = buildLiveInsightPrompt({
+      profile_records,
+      related_insights: [],
+    });
+  }
 
   // promptText is the full payload
   const total = estimateTokens(promptText);
@@ -1607,6 +1661,15 @@ export function createInsightsOverlay(
     ? insightsData
     : DEFAULT_INSIGHTS_DATA;
 
+  // Helper to get default prompt with placeholders
+  const getDefaultPrompt = () =>
+    buildLiveInsightPrompt({
+      profile_records: "{PROFILE_RECORDS}",
+      related_insights: "{RELATED_INSIGHTS}",
+    })
+      .replace('"{PROFILE_RECORDS}"', "{PROFILE_RECORDS}")
+      .replace('"{RELATED_INSIGHTS}"', "{RELATED_INSIGHTS}");
+
   const handleGenerateHistory = async () => {
     try {
       await generateInsightsFromHistory();
@@ -1654,6 +1717,21 @@ export function createInsightsOverlay(
     window.dispatchEvent(new CustomEvent("insights-updated"));
   };
 
+  const handleTogglePromptEditor = () => {
+    setPromptEditorVisible(!isPromptEditorVisible());
+    window.dispatchEvent(new CustomEvent("insights-updated"));
+  };
+
+  const handlePromptChange = event => {
+    setCustomPrompt(event.target.value);
+  };
+
+  const handleResetPrompt = () => {
+    setCustomPrompt(null);
+    setPromptEditorVisible(false);
+    window.dispatchEvent(new CustomEvent("insights-updated"));
+  };
+
   return html`
     <style>
       ${insightsStyles?.cssText ?? ""}
@@ -1693,6 +1771,15 @@ export function createInsightsOverlay(
             Clear Generated
           </button>
           <button
+            class="action-btn secondary ${isPromptEditorVisible()
+              ? "active"
+              : ""}"
+            @click=${handleTogglePromptEditor}
+            title="Edit prompt template"
+          >
+            ${isPromptEditorVisible() ? "Hide Prompt" : "Edit Prompt"}
+          </button>
+          <button
             class="action-btn secondary"
             @click=${copyInsightsToClipboard}
             title="Copy signals to clipboard"
@@ -1700,6 +1787,34 @@ export function createInsightsOverlay(
             📋 Copy Signals
           </button>
         </div>
+
+        ${isPromptEditorVisible()
+          ? html`
+              <div class="prompt-editor-section">
+                <div class="prompt-editor-header">
+                  <span class="prompt-editor-label">Prompt Template</span>
+                  <span class="prompt-editor-help"
+                    >Use {PROFILE_RECORDS} and {RELATED_INSIGHTS} as
+                    placeholders</span
+                  >
+                </div>
+                <textarea
+                  id="prompt-editor-textarea"
+                  class="prompt-editor-textarea"
+                  @input=${handlePromptChange}
+                  .value=${getCustomPrompt() || getDefaultPrompt()}
+                ></textarea>
+                <div class="prompt-editor-actions">
+                  <button
+                    class="action-btn secondary"
+                    @click=${handleResetPrompt}
+                  >
+                    Reset to Default
+                  </button>
+                </div>
+              </div>
+            `
+          : ""}
 
         <div class="llm-insights-section">
           <input
@@ -2210,6 +2325,67 @@ insightsStyles = css`
   .insight-item.info ul {
     margin: 0.25rem 0 0;
     padding-left: 1rem;
+  }
+
+  .action-btn.secondary.active {
+    background: #e8f4fd;
+    color: #0066cc;
+    border-color: #b3d7f2;
+    font-weight: 600;
+  }
+
+  .prompt-editor-section {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e0e0e0;
+    background: #f8f9fa;
+    flex-shrink: 0;
+  }
+
+  .prompt-editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+
+  .prompt-editor-label {
+    font-weight: 600;
+    color: #333;
+    font-size: 0.875rem;
+  }
+
+  .prompt-editor-help {
+    font-size: 0.75rem;
+    color: #666;
+    font-style: italic;
+  }
+
+  .prompt-editor-textarea {
+    width: 100%;
+    min-height: 300px;
+    max-height: 400px;
+    padding: 0.75rem;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    font-family: "Monaco", "Menlo", "Courier New", monospace;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    background: white;
+    resize: vertical;
+    box-sizing: border-box;
+  }
+
+  .prompt-editor-textarea:focus {
+    outline: none;
+    border-color: #0066cc;
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+  }
+
+  .prompt-editor-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    justify-content: flex-end;
   }
 `;
 
