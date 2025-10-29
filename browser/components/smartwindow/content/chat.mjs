@@ -849,6 +849,63 @@ Today's date: ${currentDate}`;
     };
   }
 
+  /**
+   * Reconstructs mention HTML from text format: @Title (URL)
+   * Used when restoring messages from history without displayHTML
+   *
+   * @param text
+   */
+  reconstructMentionsFromText(text) {
+    // Pattern: @Title (URL) where Title can contain spaces but not parentheses
+    // NB: title can actually include parantheses, so can't actually trust it to
+    // be the original page url
+    const mentionPattern = /@([^(]+?)\s+\(([^)]+)\)/g;
+
+    let result = text;
+    let match;
+    const replacements = [];
+
+    // Find all mentions and prepare replacements
+    while ((match = mentionPattern.exec(text)) !== null) {
+      const fullMatch = match[0];
+      const title = match[1].trim();
+      const url = match[2].trim();
+
+      // Create the same HTML structure as renderHTML in smartbar.mjs
+      const iconSrc = `page-icon:${url}`;
+      const mentionHTML =
+        `<span class="mention" data-id="${this.escapeHTML(url)}" data-icon="">` +
+        `<img src="${iconSrc}" alt="" class="mention-icon" width="16" height="16">` +
+        `<span class="mention-label" title="${this.escapeHTML(title)} (${this.escapeHTML(url)})">${this.escapeHTML(title)}</span>` +
+        `</span>`;
+
+      replacements.push({
+        start: match.index,
+        end: match.index + fullMatch.length,
+        replacement: mentionHTML,
+      });
+    }
+
+    // Apply replacements in reverse order to maintain correct indices
+    for (let i = replacements.length - 1; i >= 0; i--) {
+      const { start, end, replacement } = replacements[i];
+      result = result.substring(0, start) + replacement + result.substring(end);
+    }
+
+    return result;
+  }
+
+  /**
+   * Escape HTML special characters
+   *
+   * @param str
+   */
+  escapeHTML(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
   handleSearchQuery(query, clickEvent) {
     // Dispatch custom event to be handled by smartwindow.mjs
     // Todo - render this as a link to default search provider instead of using a button with events.
@@ -1157,11 +1214,23 @@ Today's date: ${currentDate}`;
                 const key = msg.id ?? msg.messageId ?? i;
                 const meta = this._uiMeta.get(key);
 
-                const bodyHTML =
+                let bodyHTML;
+                if (
                   msg.role === ChatHistory.MESSAGE_ROLE.USER &&
                   meta?.displayHTML
-                    ? unsafeHTML(meta.displayHTML)
-                    : unsafeHTML(this.marked(cleanContent));
+                ) {
+                  // Use rich HTML if available (current session)
+                  bodyHTML = unsafeHTML(meta.displayHTML);
+                } else if (msg.role === ChatHistory.MESSAGE_ROLE.USER) {
+                  // For user messages without displayHTML (restored from history),
+                  // reconstruct mentions from text format before rendering markdown
+                  const contentWithMentions =
+                    this.reconstructMentionsFromText(cleanContent);
+                  bodyHTML = unsafeHTML(this.marked(contentWithMentions));
+                } else {
+                  // For assistant messages, use markdown
+                  bodyHTML = unsafeHTML(this.marked(cleanContent));
+                }
 
                 return html`
                   <div
