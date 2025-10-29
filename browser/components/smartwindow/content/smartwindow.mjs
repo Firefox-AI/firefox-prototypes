@@ -1006,41 +1006,14 @@ class SmartWindowPage {
       return;
     }
 
-    // Create and show the overlay
-    const historyOverlay = document.createElement("page-history-overlay");
-
-    // Set the history data (expected format)
-    historyOverlay.historyItems = items;
-
-    // Open the overlay
-    historyOverlay.isOpen = true;
-
-    // Listen for events
-    historyOverlay.addEventListener("close", () => {
-      historyOverlay.isOpen = false;
-    });
-
-    historyOverlay.addEventListener("item-selected", event => {
-      const selectedItem = event.detail;
-      console.warn("[SmartWindow] Selected history item:", selectedItem);
-
-      // Close the overlay
-      historyOverlay.isOpen = false;
-
-      // Navigate to the selected URL
-      if (selectedItem.url) {
-        topChromeWindow.gBrowser.selectedBrowser.fixupAndLoadURIString(
-          selectedItem.url,
-          {
-            triggeringPrincipal:
-              Services.scriptSecurityManager.getSystemPrincipal(),
-          }
-        );
-      }
-    });
-
-    // Add to DOM
-    document.body.appendChild(historyOverlay);
+    const topWindow = window.browsingContext?.topChromeWindow;
+    if (topWindow?.SmartWindow) {
+      //this.showViewTab("history");
+      // Call the method on the chrome window's SmartWindow object
+      topWindow.SmartWindow.showPageHistory(historyItems);
+    } else {
+      console.error("[SmartWindow] SmartWindow not available");
+    }
   }
 
   setupEventListeners() {
@@ -1103,6 +1076,37 @@ class SmartWindowPage {
         console.log("[SmartWindow] Title updated:", e.detail.title);
         // Save the conversation to ChatHistory when title is edited
         this.saveChatMessagesForCurrentContext();
+      });
+
+      this.chatBot.addEventListener("show-page-history", () => {
+        console.log("[SmartWindow] History button clicked");
+        // Show dummy history
+        this.handleSearchHistoryTool([
+          {
+            title: "GitHub - mozilla/firefox",
+            url: "https://github.com/mozilla/firefox",
+            visitDate: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+            visitCount: 5,
+            relevanceScore: 95,
+            favicon: "page-icon:https://github.com/mozilla/firefox"
+          },
+          {
+            title: "MDN Web Docs - JavaScript",
+            url: "https://developer.mozilla.org/en-US/docs/Web/JavaScript",
+            visitDate: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+            visitCount: 12,
+            relevanceScore: 92,
+            favicon: "page-icon:https://developer.mozilla.org/"
+          },
+          {
+            title: "Stack Overflow",
+            url: "https://stackoverflow.com/",
+            visitDate: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+            visitCount: 23,
+            relevanceScore: 88,
+            favicon: "page-icon:https://stackoverflow.com/"
+          }
+        ]);
       });
     }
 
@@ -1639,16 +1643,19 @@ class SmartWindowPage {
     }
   }
 
+  showViewTab(tabId) {
+    const viewHandler = topChromeWindow?.FirefoxViewHandler;
+    if (viewHandler) {
+      viewHandler.openTab(tabId);
+    } else {
+      console.warn("[SmartWindow] FirefoxViewHandler is not available.");
+    }
+  }
+
   setupQuickActionEventListeners() {
     this.quickActionButtons.history?.addEventListener("click", e => {
       e.stopPropagation();
-
-      const viewHandler = topChromeWindow?.FirefoxViewHandler;
-      if (viewHandler) {
-        viewHandler.openTab("history");
-      } else {
-        console.warn("[SmartWindow] FirefoxViewHandler is not available.");
-      }
+      this.showViewTab("history");
     });
 
     this.quickActionButtons.insights?.addEventListener("click", e => {
