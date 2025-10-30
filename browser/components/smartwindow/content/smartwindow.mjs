@@ -1019,6 +1019,67 @@ class SmartWindowPage {
     }
   }
 
+  /**
+   * Handle prompt submitted from GenAI (text selection shortcuts, context menus, etc.)
+   *
+   * @param {object} data - Contains promptText, tabContext, pageText
+   */
+  async handleGenAIPrompt(data) {
+    const { promptText, tabContext, pageText } = data;
+
+    console.log("[SmartWindow] Received GenAI prompt:", {
+      promptText: promptText?.substring(0, 100) + "...",
+      tabContext,
+      hasPageText: !!pageText,
+    });
+
+    if (!this.chatBot) {
+      console.error("[SmartWindow] chatBot not available");
+      return;
+    }
+
+    try {
+      // Get or create conversation for current tab
+      if (!gBrowser.selectedTab.conversation) {
+        gBrowser.selectedTab.conversation = new ChatHistoryConversation({
+          title: "",
+          description: "",
+          pageUrl: tabContext[0]?.url || "",
+          pageMeta: "",
+        });
+      }
+
+      // Update tab context UI with the received tab info
+      if (tabContext && tabContext.length) {
+        this.selectedTabContexts = tabContext;
+        this.updateTabContextUI();
+      }
+
+      // Store page text if provided
+      if (pageText) {
+        this.currentTabPageText = pageText;
+      }
+
+      // Submit the pre-built prompt to chatBot
+      await this.chatBot.submitPrompt(
+        gBrowser.selectedTab.conversation,
+        { text: promptText },
+        tabContext,
+        pageText
+      );
+
+      // Show chat mode
+      this.showChatMode();
+
+      // Save to ChatHistory
+      await this.saveChatMessagesForCurrentContext();
+
+      console.log("[SmartWindow] GenAI prompt submitted successfully");
+    } catch (error) {
+      console.error("[SmartWindow] Failed to handle GenAI prompt:", error);
+    }
+  }
+
   setupEventListeners() {
     document.addEventListener("FocusSmartSearchInput", () => {
       this.smartbar.focus();
@@ -1037,9 +1098,11 @@ class SmartWindowPage {
       { capture: true }
     );
     if (this.isSidebarMode) {
-      window.addEventListener("SmartWindowMessage", e => {
+      window.addEventListener("SmartWindowMessage", async e => {
         if (e.detail.type === "TabUpdate") {
           this.updateTabStatus(e.detail.data);
+        } else if (e.detail.type === "SubmitPrompt") {
+          await this.handleGenAIPrompt(e.detail.data);
         }
       });
     }
