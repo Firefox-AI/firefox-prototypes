@@ -322,25 +322,6 @@ export async function generateLiveSuggestions(query, topChromeWindow) {
           suggestions.push({ text: query, type: queryType });
         }
       }
-
-      // Add some generic suggestions if still short
-      if (suggestions.length < 6) {
-        const fallbacks = [
-          //{ text: "tab next", type: "action" },
-          { text: "github.com", type: "navigate" },
-          { text: query + " guide", type: "search" },
-          { text: query + " tutorial", type: "search" },
-        ];
-
-        for (const fallback of fallbacks) {
-          if (suggestions.length >= 6) {
-            break;
-          }
-          if (!suggestions.some(s => s.text === fallback.text)) {
-            suggestions.push(fallback);
-          }
-        }
-      }
     }
 
     // If no autofill data from urlbar, check TOP_US_WEBSITES for prefix match
