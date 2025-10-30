@@ -1011,7 +1011,7 @@ class SmartWindowPage {
 
     const topWindow = window.browsingContext?.topChromeWindow;
     if (topWindow?.SmartWindow) {
-      this.showViewTab("history");
+      //this.showViewTab("history");
       // Call the method on the chrome window's SmartWindow object
       topWindow.SmartWindow.showPageHistory(historyItems);
     } else {
