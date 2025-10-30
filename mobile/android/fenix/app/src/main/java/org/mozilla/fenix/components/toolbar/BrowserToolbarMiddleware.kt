@@ -104,6 +104,7 @@ import org.mozilla.fenix.components.menu.MenuAccessPoint
 import org.mozilla.fenix.components.metrics.MetricsUtils
 import org.mozilla.fenix.components.toolbar.DisplayActions.AddBookmarkClicked
 import org.mozilla.fenix.components.toolbar.DisplayActions.EditBookmarkClicked
+import org.mozilla.fenix.components.toolbar.DisplayActions.HomepageClicked
 import org.mozilla.fenix.components.toolbar.DisplayActions.MenuClicked
 import org.mozilla.fenix.components.toolbar.DisplayActions.NavigateBackClicked
 import org.mozilla.fenix.components.toolbar.DisplayActions.NavigateBackLongClicked
@@ -112,8 +113,8 @@ import org.mozilla.fenix.components.toolbar.DisplayActions.NavigateForwardLongCl
 import org.mozilla.fenix.components.toolbar.DisplayActions.RefreshClicked
 import org.mozilla.fenix.components.toolbar.DisplayActions.ShareClicked
 import org.mozilla.fenix.components.toolbar.DisplayActions.StopRefreshClicked
+import org.mozilla.fenix.components.toolbar.DisplayActions.TranslateClicked
 import org.mozilla.fenix.components.toolbar.PageEndActionsInteractions.ReaderModeClicked
-import org.mozilla.fenix.components.toolbar.PageEndActionsInteractions.TranslateClicked
 import org.mozilla.fenix.components.toolbar.PageOriginInteractions.OriginClicked
 import org.mozilla.fenix.components.toolbar.TabCounterInteractions.AddNewPrivateTab
 import org.mozilla.fenix.components.toolbar.TabCounterInteractions.AddNewTab
@@ -148,6 +149,8 @@ internal sealed class DisplayActions : BrowserToolbarEvent {
     data class AddBookmarkClicked(override val source: Source) : DisplayActions()
     data class EditBookmarkClicked(override val source: Source) : DisplayActions()
     data class ShareClicked(override val source: Source) : DisplayActions()
+    data object TranslateClicked : DisplayActions()
+    data class HomepageClicked(override val source: Source) : DisplayActions()
 }
 
 @VisibleForTesting
@@ -174,8 +177,6 @@ internal sealed class PageEndActionsInteractions : BrowserToolbarEvent {
     data class ReaderModeClicked(
         val isActive: Boolean,
     ) : PageEndActionsInteractions()
-
-    data object TranslateClicked : PageEndActionsInteractions()
 }
 
 /**
@@ -587,6 +588,18 @@ class BrowserToolbarMiddleware(
                 next(action)
             }
 
+            is HomepageClicked -> runWithinEnvironment {
+                if (settings.enableHomepageAsNewTab) {
+                    useCases.fenixBrowserUseCases.navigateToHomepage()
+                } else {
+                    val directions = BrowserFragmentDirections.actionGlobalHome()
+                    browserAnimator?.captureEngineViewAndDrawStatically {
+                        navController.navigate(directions)
+                    } ?: navController.navigate(directions)
+                }
+                next(action)
+            }
+
             else -> next(action)
         }
     }
@@ -731,6 +744,9 @@ class BrowserToolbarMiddleware(
      */
     private fun buildEndPageActions(): List<Action> {
         val isWideScreen = environment?.fragment?.isWideWindow() == true
+        val tabStripEnabled = settings.isTabStripEnabled
+        val translateShortcutEnabled = settings.toolbarShortcutKey == ToolbarShortcutPreference.Keys.TRANSLATE
+        val shareShortcutEnabled = settings.toolbarShortcutKey == ToolbarShortcutPreference.Keys.SHARE
 
         return listOf(
             ToolbarActionConfig(ToolbarAction.ReaderMode) {
@@ -738,10 +754,11 @@ class BrowserToolbarMiddleware(
             },
             ToolbarActionConfig(ToolbarAction.Translate) {
                 browserScreenStore.state.pageTranslationStatus.isTranslationPossible &&
-                    isWideScreen && FxNimbus.features.translations.value().mainFlowToolbarEnabled
+                    isWideScreen && FxNimbus.features.translations.value().mainFlowToolbarEnabled &&
+                        !(translateShortcutEnabled && !tabStripEnabled)
             },
             ToolbarActionConfig(ToolbarAction.Share) {
-                isWideScreen && !settings.isTabStripEnabled
+                isWideScreen && !tabStripEnabled && !shareShortcutEnabled
             },
         ).filter { config ->
             config.isVisible()
@@ -1004,6 +1021,7 @@ class BrowserToolbarMiddleware(
         browserScreenStore.observeWhileActive {
             distinctUntilChangedBy { it.pageTranslationStatus }
             .collect {
+                updateEndBrowserActions(context)
                 updateEndPageActions(context)
             }
         }
@@ -1017,6 +1035,7 @@ class BrowserToolbarMiddleware(
                     it.selectedTab?.content?.canGoForward,
                 )
             }.collect {
+                updateEndBrowserActions(context)
                 updateStartBrowserActions(context)
             }
         }
@@ -1080,6 +1099,7 @@ class BrowserToolbarMiddleware(
         Bookmark,
         EditBookmark,
         Share,
+        Homepage,
     }
 
     private data class ToolbarActionConfig(
@@ -1254,6 +1274,12 @@ class BrowserToolbarMiddleware(
             contentDescription = R.string.browser_menu_share,
             onClick = ShareClicked(source),
         )
+
+        ToolbarAction.Homepage -> ActionButtonRes(
+            drawableResId = iconsR.drawable.mozac_ic_home_24,
+            contentDescription = R.string.browser_menu_homepage,
+            onClick = HomepageClicked(source),
+        )
     }
 
     private fun Source.toMetricSource() = when (this) {
@@ -1274,6 +1300,9 @@ class BrowserToolbarMiddleware(
                 true -> ToolbarAction.EditBookmark
                 false -> ToolbarAction.Bookmark
             }
+            ToolbarShortcutPreference.Keys.TRANSLATE -> ToolbarAction.Translate
+            ToolbarShortcutPreference.Keys.HOMEPAGE -> ToolbarAction.Homepage
+            ToolbarShortcutPreference.Keys.BACK -> ToolbarAction.Back
             else -> ToolbarAction.NewTab
         }
     }
