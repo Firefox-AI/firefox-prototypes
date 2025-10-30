@@ -127,6 +127,7 @@ export const INTENTS = [
  * Static data serves as placeholder until user generates insights
  */
 const DEFAULT_INSIGHTS_DATA = {};
+const DEFAULT_INSIGHTS_SYSTEM_PROMPT = "[ NO INSIGHTS FOUND FOR THIS USER! We could not retrieve any insights for this user ]"
 
 function getInsightsMeta() {
   const sw = getSmartWindow();
@@ -1727,6 +1728,10 @@ export function getInsightsState() {
  */
 export function buildInsightsSystemPrompt() {
   const insightsData = getInsightsData();
+
+  if (!insightsData || Object.keys(insightsData).length === 0) {
+    return DEFAULT_INSIGHTS_SYSTEM_PROMPT
+  }
 
   // Use generated insights if available, otherwise fall back to defaults
   const dataToUse = Object.keys(insightsData).length
