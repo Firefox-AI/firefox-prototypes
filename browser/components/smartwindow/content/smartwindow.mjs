@@ -26,14 +26,6 @@ class SmartWindowPage {
    * @type {import("../ChatHistory.sys.mjs").ChatHistory}
    */
   #chatHistory;
-  /**
-   * @type {import("../ChatHistory.sys.mjs").ChatHistory}
-   */
-  #conversation;
-  /**
-   * @type {Map<string, ChatHistoryConversation>}
-   */
-  #tabConversations;
 
   constructor() {
     this.searchInput = null;
@@ -60,13 +52,12 @@ class SmartWindowPage {
 
     this.#chatHistory = new ChatHistory();
 
-    this.#conversation = new ChatHistoryConversation({
+    gBrowser.selectedTab.conversation = new ChatHistoryConversation({
       title: "",
       description: "",
       pageUrl: "",
       pageMeta: "",
     });
-    this.#tabConversations = new Map();
 
     this.init();
   }
@@ -515,40 +506,47 @@ class SmartWindowPage {
   async saveChatMessagesForCurrentContext() {
     if (this.chatBot && this.chatBot.messages && this.chatBot.messages.length) {
       // Update the shared conversation title from chatBot
-      this.#conversation.title = this.chatBot.conversationTitle || "";
+      gBrowser.selectedTab.conversation.title =
+        this.chatBot.conversationTitle || "";
 
       if (this.selectedTabContexts.length === 0) {
         // No tab context (e.g., full page experience on new tab)
         // Save to the current conversation with empty/current URL
         try {
-          await this.#chatHistory.updateConversation(this.#conversation);
+          await this.#chatHistory.updateConversation(
+            gBrowser.selectedTab.conversation
+          );
         } catch (error) {
-          console.error("Error saving the conversation:", this.#conversation);
+          console.error(
+            "Error saving the conversation:",
+            gBrowser.selectedTab.conversation
+          );
         }
       } else {
         // Save messages to a conversation for each tab's URL
         for (const tab of this.selectedTabContexts) {
-          const tabConversation =
-            this.#tabConversations.get(tab.url) ??
-            new ChatHistoryConversation({
-              title: "",
-              description: "",
-              pageUrl: new URL(tab.url),
-              pageMeta: "",
-            });
+          gBrowser.tabs.forEach(async tab => {
+            if (!tab.conversation) {
+              return;
+            }
 
-          tabConversation.messages = this.#conversation.messages;
-          tabConversation.title = this.chatBot.conversationTitle || "";
-
-          this.#tabConversations.set(tab.url, tabConversation);
-
-          try {
-            await this.#chatHistory.updateConversation(tabConversation);
-          } catch (error) {
-            console.error("Error saving the conversation:", tabConversation);
-          }
+            try {
+              await this.#chatHistory.updateConversation(tab.conversation);
+            } catch (error) {
+              console.error("Error saving a conversation:", tab.conversation);
+            }
+          });
         }
       }
+    }
+
+    // Consolidate the conversation references to the one per tab and trigger re-render
+    if (
+      this.chatBot.conversation.id !== gBrowser.selectedTab.conversation.id &&
+      gBrowser.selectedTab.conversation.messages.length
+    ) {
+      this.chatBot.conversation = gBrowser.selectedTab.conversation;
+      this.chatBot.requestUpdate();
     }
   }
 
@@ -574,6 +572,11 @@ class SmartWindowPage {
   async loadChatMessagesForCurrentContext() {
     let conversation = null;
     if (!this.chatBot) {
+      return;
+    }
+
+    // Skip loading a conversation if there is already one going on
+    if (gBrowser.selectedTab.conversation.messages.length) {
       return;
     }
 
@@ -623,8 +626,7 @@ class SmartWindowPage {
 
     // Replace an empty conversation with the conversation that was loaded from SQLite
     if (conversation && conversation.messages.length) {
-      this.#conversation = conversation;
-      this.#tabConversations.set(this.lastTabInfo.url, this.#conversation);
+      gBrowser.selectedTab.conversation = conversation;
     }
   }
 
@@ -980,6 +982,10 @@ class SmartWindowPage {
 
       this.quickPromptsContainer.appendChild(pill);
     });
+
+    if (this.chatBot) {
+      this.chatBot.requestUpdate();
+    }
   }
 
   hideQuickPrompts() {
@@ -1171,7 +1177,7 @@ class SmartWindowPage {
           ) {
             const newLocation = browser.currentURI.spec;
             if (!this.isTabEligibleForContext(this.lastTabInfo)) {
-              this.#conversation.pageUrl = newLocation;
+              gBrowser.selectedTab.conversation.pageUrl = newLocation;
 
               this.initializeTabInfo().then(() => {
                 this.loadChatMessagesForCurrentContext();
@@ -1390,7 +1396,7 @@ class SmartWindowPage {
       this.showChatMode();
 
       // Make sure the tab info is updated
-      if (this.#conversation.pageUrl === "") {
+      if (gBrowser.selectedTab.conversation.pageUrl === "") {
         await this.initializeTabInfo();
       }
 
@@ -1403,7 +1409,7 @@ class SmartWindowPage {
         const html = htmlFromBar;
 
         await this.chatBot.submitPrompt(
-          this.#conversation,
+          gBrowser.selectedTab.conversation,
           { text, html },
           contextTabs,
           includePageText ? this.currentTabPageText : ""
@@ -1424,7 +1430,7 @@ class SmartWindowPage {
               // Use conversation title for context
               const title =
                 this.chatBot?.conversationTitle ||
-                this.#conversation?.title ||
+                gBrowser.selectedTab.conversation?.title ||
                 "Chat";
               contextForPrompts = {
                 title,
@@ -1437,7 +1443,7 @@ class SmartWindowPage {
             }
 
             const followups = await generateFollowupPrompts(
-              this.#conversation.messages,
+              gBrowser.selectedTab.conversation.messages,
               contextForPrompts,
               6
             );
@@ -1496,7 +1502,7 @@ class SmartWindowPage {
       //   topChromeWindow.gBrowser.selectedTab.linkedPanel,
       //   this.chatBot.messages
       // );
-      this.#chatHistory.updateConversation(this.#conversation);
+      this.#chatHistory.updateConversation(gBrowser.selectedTab.conversation);
     }
 
     let url = query;
@@ -1614,17 +1620,12 @@ class SmartWindowPage {
       await this.saveChatMessagesForCurrentContext();
 
       // Load the selected conversation
-      this.#conversation = conversation;
+      gBrowser.selectedTab.conversation = conversation;
 
       // Update chatBot with conversation messages
       this.chatBot.messages = [...conversation.messages];
       this.chatBot.conversationTitle = conversation.title || "";
       this.chatBot.requestUpdate();
-
-      // Update tab conversations map if conversation has a URL
-      if (conversation.pageUrl) {
-        this.#tabConversations.set(conversation.pageUrl.href, conversation);
-      }
 
       // Show chat mode
       this.showChatMode();
