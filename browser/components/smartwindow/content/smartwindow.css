@@ -174,7 +174,7 @@ body {
 
 .status-title {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: var(--font-weight-semibold);
   color: #1a1a1a;
   white-space: nowrap;
   overflow: hidden;
@@ -298,12 +298,11 @@ body {
   display: flex;
   align-items: center;
   gap: var(--space-medium);
-  padding: var(--space-small) var(--space-medium);
   cursor: pointer;
   border-radius: 6px;
   transition: background-color 0.1s ease;
   height: var(--mention-row-h);
-  padding: 0 12px; 
+  padding: 0 var(--space-medium);
 }
 
 .mention-item:hover {
@@ -347,7 +346,7 @@ body {
 
 .mention-title {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: var(--font-weight-semibold);
   color: #333;
   white-space: nowrap;
   overflow: hidden;
@@ -543,7 +542,8 @@ body {
     font-size: 14px;
   }
 
-  .tab-context-right, .tab-context-left {
+  .tab-context-right,
+  .tab-context-left {
     width: 100%;
   }
 }
@@ -765,7 +765,7 @@ body {
 
 .quick-action-text {
   font-size: 13px;
-  font-weight: 400;
+  font-weight: var(--font-weight);
   white-space: nowrap;
 }
 
@@ -803,7 +803,10 @@ body {
 
 /* Current Tab Button */
 .current-tab-button {
-  display: none; /* Hidden by default like in Figma */
+  --pill-pad-left: 8px;
+  --fav-size: 16px;
+  position: relative;
+  display: flex;
   align-items: center;
   gap: var(--space-small);
   padding: 6px var(--space-small);
@@ -818,21 +821,45 @@ body {
   cursor: pointer;
 }
 
+.current-tab-button .tab-favicon {
+  width: var(--fav-size);
+  height: var(--fav-size);
+  transition: opacity 120ms ease;
+}
+
+.current-tab-button:hover .tab-favicon {
+  opacity: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--border-radius-xsmall);
+  flex-shrink: 0;
+}
+
+.current-tab-button::before {
+  content: "×";
+  position: absolute;
+  left: var(--pill-pad-left);
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--fav-size);
+  height: var(--fav-size);
+  display: grid;
+  place-items: center;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
 .current-tab-button:hover {
   background: rgba(255, 255, 255, 0.95);
   border-color: rgba(0, 122, 255, 0.3);
   transform: translateY(-1px);
 }
 
-.current-tab-button.hidden {
-  display: none;
-}
-
-.tab-favicon {
-  width: 16px;
-  height: 16px;
-  border-radius: var(--border-radius-xsmall);
-  flex-shrink: 0;
+.current-tab-button:hover::before {
+  opacity: 1;
 }
 
 .tab-title {
@@ -840,25 +867,7 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-weight: 500;
-}
-
-.remove-tab-button {
-  background: none;
-  border: none;
-  color: #666;
-  cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
-  padding: var(--space-xxsmall);
-  margin: -2px;
-  border-radius: 3px;
-  transition: all 0.2s ease;
-}
-
-.remove-tab-button:hover {
-  background: rgba(255, 0, 0, 0.1);
-  color: #ff4444;
+  font-weight: var(--font-weight-semibold);
 }
 
 /* Add Tabs Button */
@@ -869,7 +878,7 @@ body {
   cursor: pointer;
   font-size: 13px;
   color: #15141a;
-  font-weight: 400;
+  font-weight: var(--font-weight);
   transition: all 0.2s ease;
   position: relative;
   border: none;
@@ -1025,7 +1034,7 @@ body {
   left: var(--space-xxsmall);
   color: white;
   font-size: 12px;
-  font-weight: bold;
+  font-weight: var(--font-weight-bold);
 }
 
 .dropdown-item .tab-favicon {
@@ -1160,7 +1169,7 @@ body {
   border: none;
   border-radius: var(--border-radius-medium);
   font-size: 15px;
-  font-weight: 500;
+  font-weight: var(--font-weight-semibold);
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
