@@ -1739,7 +1739,7 @@ export function buildInsightsSystemPrompt() {
     : DEFAULT_INSIGHTS_DATA;
 
   let systemPrompt = `
-When responding, if you use any user insights from the list below to personalize your response (even implicitly), you must reference them by including §insight: specific term§ inline, directly after the phrase or sentence where the insight is applied. Use specific terms from the list rather than broad categories, and include multiple tags if multiple insights are relevant. This enables better personalization features—do not skip tagging if an insight influences your answer. Only tag insights you actually use; avoid tagging irrelevant ones.
+A list of insights about the user appear below. These insights were derived using signals from the user's browsing behavior, previous chats with the browsing assistant, and explicit input from the user. When responding, if you use any user insights from the list below to personalize your response (even implicitly), you must reference them by including §insight: specific term§ inline, directly after the phrase or sentence where the insight is applied. Use specific terms from the list rather than broad categories, and include multiple tags if multiple insights are relevant. Include the insights EXACTLY as they appear in the list. This enables better personalization features—do not skip tagging if an insight influences your answer. Only tag insights you actually use; avoid tagging irrelevant ones.
 
 User Insights List:`;
 
