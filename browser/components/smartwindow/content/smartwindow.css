@@ -564,7 +564,6 @@ body {
   .smart-window-container #chat-bot {
     /* Make chat bot scrollable and take remaining space */
     flex: 1 1 auto;
-    overflow-y: auto;
   }
 
   .smart-window-container .search-box {
