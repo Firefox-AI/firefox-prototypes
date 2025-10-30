@@ -60,6 +60,18 @@ export class SmartWindowChild extends JSWindowActorChild {
         );
         break;
 
+      case "SmartWindow:SubmitPrompt":
+        // Submit a prompt from GenAI to the smart window chat
+        this.contentWindow.dispatchEvent(
+          new this.contentWindow.CustomEvent("SmartWindowMessage", {
+            detail: {
+              type: "SubmitPrompt",
+              data: message.data,
+            },
+          })
+        );
+        break;
+
       case "SmartWindow:FocusSmartbar":
         // Focus the smartbar in the sidebar
         this.contentWindow.document.dispatchEvent(
