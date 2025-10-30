@@ -26,17 +26,8 @@ class SmartWindowPage {
    * @type {import("../ChatHistory.sys.mjs").ChatHistory}
    */
   #chatHistory;
-  /**
-   * @type {import("../ChatHistory.sys.mjs").ChatHistory}
-   */
-  #conversation;
-  /**
-   * @type {Map<string, ChatHistoryConversation>}
-   */
-  #tabConversations;
 
   constructor() {
-    this.windowId = ChatHistory.makeGuid();
     this.searchInput = null;
     this.smartbar = null;
     this.resultsContainer = null;
@@ -61,17 +52,12 @@ class SmartWindowPage {
 
     this.#chatHistory = new ChatHistory();
 
-    this.#conversation =
-      gBrowser.selectedTab.conversation ||
-      new ChatHistoryConversation({
-        title: "",
-        description: "",
-        pageUrl: "",
-        pageMeta: "",
-      });
-    gBrowser.selectedTab.conversation = this.#conversation;
-
-    this.#tabConversations = new Map();
+    gBrowser.selectedTab.conversation = new ChatHistoryConversation({
+      title: "",
+      description: "",
+      pageUrl: "",
+      pageMeta: "",
+    });
 
     this.init();
   }
@@ -110,8 +96,6 @@ class SmartWindowPage {
 
   // Generate conversation starters with caching
   async generateQuickPrompts(tabTitle = "") {
-    console.log("generateQuickPrompts() :: window :: ", this.windowId);
-
     let contextTabs = this.getAllContextTabs();
 
     // If no context tabs, use recent tabs (up to 5)
@@ -145,8 +129,6 @@ class SmartWindowPage {
 
   // Internal method to generate conversation starters
   async _generatePromptsInternal(contextTabs, tabTitle) {
-    console.log("_generatePromptsInternal() :: window :: ", this.windowId);
-
     try {
       const suggestions = await generateConversationStarters(contextTabs, 6);
       if (suggestions && suggestions.length) {
@@ -160,8 +142,6 @@ class SmartWindowPage {
 
   // Tab Context Management Methods
   initializeTabContextUI() {
-    console.log("initializeTabContextUI() :: window :: ", this.windowId);
-
     this.tabContextElements = {
       bar: document.getElementById("tab-context-bar"),
       currentTabButton: document.getElementById("current-tab-button"),
@@ -182,8 +162,6 @@ class SmartWindowPage {
   }
 
   setupTabContextEventListeners() {
-    console.log("setupTabContextEventListeners() :: window :: ", this.windowId);
-
     // Current tab button - click opens dropdown (except for X button)
     this.tabContextElements.currentTabButton.addEventListener("click", e => {
       if (!e.target.classList.contains("remove-tab-button")) {
@@ -218,8 +196,6 @@ class SmartWindowPage {
   }
 
   async getRecentTabs() {
-    console.log("getRecentTabs() :: window :: ", this.windowId);
-
     try {
       const allTabs = Array.from(topChromeWindow.gBrowser.tabs);
       const recentTabs = [];
@@ -256,8 +232,6 @@ class SmartWindowPage {
   }
 
   async addTabToContext(tabInfo) {
-    console.log("addTabToContext() :: window :: ", this.windowId);
-
     // Check if tab is already in context
     const exists = this.selectedTabContexts.some(
       tab => tab.tabId === tabInfo.tabId
@@ -276,8 +250,6 @@ class SmartWindowPage {
   }
 
   async removeTabFromContext(tabId) {
-    console.log("removeTabFromContext() :: window :: ", this.windowId);
-
     // Save chat messages for the old context
     await this.saveChatMessagesForCurrentContext();
 
@@ -292,8 +264,6 @@ class SmartWindowPage {
   }
 
   updateTabContextUI() {
-    console.log("updateTabContextUI() :: window :: ", this.windowId);
-
     if (this.isCurrentTabInContext()) {
       this.tabContextElements.currentTabButton.classList.remove("hidden");
 
@@ -312,8 +282,6 @@ class SmartWindowPage {
   }
 
   updateAddTabsButtonState() {
-    console.log("updateAddTabsButtonState() :: window :: ", this.windowId);
-
     // Count non-current tabs for the "add tabs" button display
     const nonCurrentTabs = this.selectedTabContexts.filter(
       tab => !this.lastTabInfo || tab.tabId !== this.lastTabInfo.tabId
@@ -358,8 +326,6 @@ class SmartWindowPage {
   }
 
   async toggleTabDropdown() {
-    console.log("toggleTabDropdown() :: window :: ", this.windowId);
-
     const dropdown = this.tabContextElements.tabDropdown;
 
     if (dropdown.style.display === "block") {
@@ -370,8 +336,6 @@ class SmartWindowPage {
   }
 
   async openTabDropdown() {
-    console.log("openTabDropdown() :: window :: ", this.windowId);
-
     const dropdown = this.tabContextElements.tabDropdown;
     const dropdownList = this.tabContextElements.dropdownList;
 
@@ -405,15 +369,11 @@ class SmartWindowPage {
   }
 
   closeTabDropdown() {
-    console.log("closeTabDropdown() :: window :: ", this.windowId);
-
     this.tabContextElements.tabDropdown.style.display = "none";
     this.tabContextElements.addTabsButton.classList.remove("active");
   }
 
   createDropdownItem(tabInfo, isSelected) {
-    console.log("createDropdownItem() :: window :: ", this.windowId);
-
     const item = document.createElement("div");
     item.className = "dropdown-item";
     item.dataset.tabId = tabInfo.tabId;
@@ -472,8 +432,6 @@ class SmartWindowPage {
   }
 
   async updateQuickPromptsWithContext() {
-    console.log("updateQuickPromptsWithContext() :: window :: ", this.windowId);
-
     // Only update if user hasn't edited query and suggestions are showing
     const editorText = this.smartbar ? this.smartbar.getText() : "";
     if (
@@ -487,15 +445,11 @@ class SmartWindowPage {
   }
 
   getAllContextTabs() {
-    console.log("getAllContextTabs() :: window :: ", this.windowId);
-
     return this.selectedTabContexts;
   }
 
   // Helper function to check if a tab is eligible for context (filters out internal URLs)
   isTabEligibleForContext(tabInfo) {
-    console.log("isTabEligibleForContext() :: window :: ", this.windowId);
-
     if (!tabInfo || !tabInfo.url) {
       return false;
     }
@@ -514,8 +468,6 @@ class SmartWindowPage {
 
   // Helper to check if current tab is in context
   isCurrentTabInContext() {
-    console.log("isCurrentTabInContext() :: window :: ", this.windowId);
-
     return (
       this.lastTabInfo &&
       this.selectedTabContexts.some(tab => tab.tabId === this.lastTabInfo.tabId)
@@ -524,8 +476,6 @@ class SmartWindowPage {
 
   // Reset context to current tab (if eligible)
   async resetContextToCurrentTab() {
-    console.log("resetContextToCurrentTab() :: window :: ", this.windowId);
-
     // Save chat messages for the old context before changing
     try {
       await this.saveChatMessagesForCurrentContext();
@@ -554,45 +504,38 @@ class SmartWindowPage {
 
   // Save chat messages to all tabs in current context
   async saveChatMessagesForCurrentContext() {
-    console.log(
-      "saveChatMessagesForCurrentContext() :: window :: ",
-      this.windowId
-    );
-
     if (this.chatBot && this.chatBot.messages && this.chatBot.messages.length) {
       // Update the shared conversation title from chatBot
-      this.#conversation.title = this.chatBot.conversationTitle || "";
+      gBrowser.selectedTab.conversation.title =
+        this.chatBot.conversationTitle || "";
 
       if (this.selectedTabContexts.length === 0) {
         // No tab context (e.g., full page experience on new tab)
         // Save to the current conversation with empty/current URL
         try {
-          await this.#chatHistory.updateConversation(this.#conversation);
+          await this.#chatHistory.updateConversation(
+            gBrowser.selectedTab.conversation
+          );
         } catch (error) {
-          console.error("Error saving the conversation:", this.#conversation);
+          console.error(
+            "Error saving the conversation:",
+            gBrowser.selectedTab.conversation
+          );
         }
       } else {
         // Save messages to a conversation for each tab's URL
         for (const tab of this.selectedTabContexts) {
-          const tabConversation =
-            this.#tabConversations.get(tab.url) ??
-            new ChatHistoryConversation({
-              title: "",
-              description: "",
-              pageUrl: new URL(tab.url),
-              pageMeta: "",
-            });
+          gBrowser.tabs.forEach(async tab => {
+            if (!tab.conversation) {
+              return;
+            }
 
-          tabConversation.messages = this.#conversation.messages;
-          tabConversation.title = this.chatBot.conversationTitle || "";
-
-          this.#tabConversations.set(tab.url, tabConversation);
-
-          try {
-            await this.#chatHistory.updateConversation(tabConversation);
-          } catch (error) {
-            console.error("Error saving the conversation:", tabConversation);
-          }
+            try {
+              await this.#chatHistory.updateConversation(tab.conversation);
+            } catch (error) {
+              console.error("Error saving a conversation:", tab.conversation);
+            }
+          });
         }
       }
     }
@@ -602,9 +545,7 @@ class SmartWindowPage {
       this.chatBot.conversation.id !== gBrowser.selectedTab.conversation.id &&
       gBrowser.selectedTab.conversation.messages.length
     ) {
-      this.#conversation = gBrowser.selectedTab.conversation;
       this.chatBot.conversation = gBrowser.selectedTab.conversation;
-
       this.chatBot.requestUpdate();
     }
   }
@@ -629,11 +570,6 @@ class SmartWindowPage {
 
   // Load chat messages for the current context (prioritize current tab)
   async loadChatMessagesForCurrentContext() {
-    console.log(
-      "loadChatMessagesForCurrentContext() :: window :: ",
-      this.windowId
-    );
-
     let conversation = null;
     if (!this.chatBot) {
       return;
@@ -690,14 +626,11 @@ class SmartWindowPage {
 
     // Replace an empty conversation with the conversation that was loaded from SQLite
     if (conversation && conversation.messages.length) {
-      this.#conversation = conversation;
-      this.#tabConversations.set(this.lastTabInfo.url, this.#conversation);
+      gBrowser.selectedTab.conversation = conversation;
     }
   }
 
   async init() {
-    console.log("init() :: window :: ", this.windowId);
-
     if (document.readyState === "loading") {
       document.addEventListener(
         "DOMContentLoaded",
@@ -709,8 +642,6 @@ class SmartWindowPage {
   }
 
   async onDOMReady() {
-    console.log("onDOMReady() :: window :: ", this.windowId);
-
     this.isSidebarMode = embedderElement.id == "smartwindow-browser";
 
     const editorDiv = document.getElementById("tiptap-editor");
@@ -773,8 +704,6 @@ class SmartWindowPage {
   }
 
   setupKeyUI() {
-    console.log("setupKeyUI() :: window :: ", this.windowId);
-
     // Setup key input event listeners
     const keyInput = document.getElementById("key-input");
     const keySubmit = document.getElementById("key-submit");
@@ -812,8 +741,6 @@ class SmartWindowPage {
   }
 
   focusSearchInputWhenReady() {
-    console.log("focusSearchInputWhenReady() :: window :: ", this.windowId);
-
     // This can open in preloaded (background) browsers. Check visibility before focusing, and then also refocus
     // when tab is switched to.
     const focusWhenVisible = () => {
@@ -826,8 +753,6 @@ class SmartWindowPage {
   }
 
   async initializeTabInfo() {
-    console.log("initializeTabInfo() :: window :: ", this.windowId);
-
     const selectedTab = topChromeWindow.gBrowser.selectedTab;
     const selectedBrowser = topChromeWindow.gBrowser.selectedBrowser;
 
@@ -854,8 +779,6 @@ class SmartWindowPage {
   }
 
   #createStatusBar() {
-    console.log("#createStatusBar() :: window :: ", this.windowId);
-
     // Create status bar for current tab info
     const statusBar = document.createElement("div");
     statusBar.id = "status-bar";
@@ -881,8 +804,6 @@ class SmartWindowPage {
   }
 
   #toggleStatusBar() {
-    console.log("#toggleStatusBar() :: window :: ", this.windowId);
-
     let statusBar = document.getElementById("status-bar");
     let shouldOpen = !statusBar || statusBar.hidden;
     if (shouldOpen) {
@@ -896,8 +817,6 @@ class SmartWindowPage {
   }
 
   #fillStatusBar() {
-    console.log("#fillStatusBar() :: window :: ", this.windowId);
-
     let tabInfo = this.lastTabInfo;
     const titleEl = document.getElementById("status-title");
     const urlEl = document.getElementById("status-url");
@@ -936,8 +855,6 @@ class SmartWindowPage {
   }
 
   async setupSubmitButton() {
-    console.log("setupSubmitButton() :: window :: ", this.windowId);
-
     // Find the combined button select component
     await customElements.whenDefined("combined-button-select");
     this.submitButton = document.getElementById("combined-button-select");
@@ -985,8 +902,6 @@ class SmartWindowPage {
   }
 
   async showQuickPrompts() {
-    console.log("showQuickPrompts() :: window :: ", this.windowId);
-
     if (!this.quickPromptsContainer) {
       return;
     }
@@ -1012,8 +927,6 @@ class SmartWindowPage {
   }
 
   displayQuickPrompts(prompts, type = "starters") {
-    console.log("displayQuickPrompts() :: window :: ", this.windowId);
-
     if (!this.quickPromptsContainer) {
       return;
     }
@@ -1076,16 +989,12 @@ class SmartWindowPage {
   }
 
   hideQuickPrompts() {
-    console.log("hideQuickPrompts() :: window :: ", this.windowId);
-
     if (this.quickPromptsContainer) {
       this.quickPromptsContainer.classList.add("hidden");
     }
   }
 
   handleSearchHistoryTool(historyItems) {
-    console.log("handleSearchHistoryTool() :: window :: ", this.windowId);
-
     console.log(
       "[SmartWindow] handleSearchHistoryTool - historyItems",
       historyItems,
@@ -1141,8 +1050,6 @@ class SmartWindowPage {
   }
 
   setupEventListeners() {
-    console.log("setupEventListeners() :: window :: ", this.windowId);
-
     document.addEventListener("FocusSmartSearchInput", () => {
       this.smartbar.focus();
     });
@@ -1266,7 +1173,7 @@ class SmartWindowPage {
           ) {
             const newLocation = browser.currentURI.spec;
             if (!this.isTabEligibleForContext(this.lastTabInfo)) {
-              this.#conversation.pageUrl = newLocation;
+              gBrowser.selectedTab.conversation.pageUrl = newLocation;
 
               this.initializeTabInfo().then(() => {
                 this.loadChatMessagesForCurrentContext();
@@ -1345,8 +1252,6 @@ class SmartWindowPage {
   }
 
   async updateTabStatus(tabInfo) {
-    console.log("updateTabStatus() :: window :: ", this.windowId);
-
     // Close any open tab context dropdown when switching tabs
     this.closeTabDropdown();
 
@@ -1409,8 +1314,6 @@ class SmartWindowPage {
   }
 
   async handleOnUpdate({ text: query, isAutofilled }) {
-    console.log("handleOnUpdate() :: window :: ", this.windowId);
-
     // Update submit button based on query
     this.effectiveQueryType = await this.getEffectiveQueryType(query);
     this.submitButton.selectedValue = this.effectiveQueryType;
@@ -1451,8 +1354,6 @@ class SmartWindowPage {
   }
 
   async generateLiveSuggestions(query) {
-    console.log("generateLiveSuggestions() :: window :: ", this.windowId);
-
     const { suggestions, autofillData } = await generateLiveSuggestions(
       query,
       topChromeWindow
@@ -1468,8 +1369,6 @@ class SmartWindowPage {
   }
 
   async handleEnter(query, suggestionType = null) {
-    console.log("handleEnter() :: window :: ", this.windowId);
-
     if (!query.trim()) {
       return;
     }
@@ -1493,7 +1392,7 @@ class SmartWindowPage {
       this.showChatMode();
 
       // Make sure the tab info is updated
-      if (this.#conversation.pageUrl === "") {
+      if (gBrowser.selectedTab.conversation.pageUrl === "") {
         await this.initializeTabInfo();
       }
 
@@ -1506,7 +1405,7 @@ class SmartWindowPage {
         const html = htmlFromBar;
 
         await this.chatBot.submitPrompt(
-          this.#conversation,
+          gBrowser.selectedTab.conversation,
           { text, html },
           contextTabs,
           includePageText ? this.currentTabPageText : ""
@@ -1527,7 +1426,7 @@ class SmartWindowPage {
               // Use conversation title for context
               const title =
                 this.chatBot?.conversationTitle ||
-                this.#conversation?.title ||
+                gBrowser.selectedTab.conversation?.title ||
                 "Chat";
               contextForPrompts = {
                 title,
@@ -1540,7 +1439,7 @@ class SmartWindowPage {
             }
 
             const followups = await generateFollowupPrompts(
-              this.#conversation.messages,
+              gBrowser.selectedTab.conversation.messages,
               contextForPrompts,
               6
             );
@@ -1599,7 +1498,7 @@ class SmartWindowPage {
       //   topChromeWindow.gBrowser.selectedTab.linkedPanel,
       //   this.chatBot.messages
       // );
-      this.#chatHistory.updateConversation(this.#conversation);
+      this.#chatHistory.updateConversation(gBrowser.selectedTab.conversation);
     }
 
     let url = query;
@@ -1636,8 +1535,6 @@ class SmartWindowPage {
   }
 
   displayResults(results) {
-    console.log("displayResults() :: window :: ", this.windowId);
-
     this.clearResults();
 
     results.forEach(result => {
@@ -1655,14 +1552,10 @@ class SmartWindowPage {
   }
 
   clearResults() {
-    console.log("clearResults() :: window :: ", this.windowId);
-
     this.resultsContainer.textContent = "";
   }
 
   toggleBottomChatMode(useBottomMode) {
-    console.log("toggleBottomChatMode() :: window :: ", this.windowId);
-
     document.documentElement?.classList.toggle(
       "chat-mode-bottom",
       useBottomMode
@@ -1670,8 +1563,6 @@ class SmartWindowPage {
   }
 
   showChatMode() {
-    console.log("showChatMode() :: window :: ", this.windowId);
-
     // Hide any existing messages in results container
     const existingMessages = this.resultsContainer.querySelectorAll(".message");
     existingMessages.forEach(msg => (msg.style.display = "none"));
@@ -1692,8 +1583,6 @@ class SmartWindowPage {
   }
 
   hideChatMode() {
-    console.log("hideChatMode() :: window :: ", this.windowId);
-
     if (!this.isSidebarMode) {
       this.toggleBottomChatMode(false);
     }
@@ -1718,8 +1607,6 @@ class SmartWindowPage {
   }
 
   async loadConversationFromHistory(conversation) {
-    console.log("loadConversationFromHistory() :: window :: ", this.windowId);
-
     if (!this.chatBot || !conversation) {
       return;
     }
@@ -1729,17 +1616,12 @@ class SmartWindowPage {
       await this.saveChatMessagesForCurrentContext();
 
       // Load the selected conversation
-      this.#conversation = conversation;
+      gBrowser.selectedTab.conversation = conversation;
 
       // Update chatBot with conversation messages
       this.chatBot.messages = [...conversation.messages];
       this.chatBot.conversationTitle = conversation.title || "";
       this.chatBot.requestUpdate();
-
-      // Update tab conversations map if conversation has a URL
-      if (conversation.pageUrl) {
-        this.#tabConversations.set(conversation.pageUrl.href, conversation);
-      }
 
       // Show chat mode
       this.showChatMode();
@@ -1759,11 +1641,6 @@ class SmartWindowPage {
   }
 
   setupQuickActionEventListeners() {
-    console.log(
-      "setupQuickActionEventListeners() :: window :: ",
-      this.windowId
-    );
-
     this.quickActionButtons.history?.addEventListener("click", e => {
       e.stopPropagation();
 
@@ -1807,8 +1684,6 @@ class SmartWindowPage {
   }
 
   initializeQuickActionButtons() {
-    console.log("initializeQuickActionButtons() :: window :: ", this.windowId);
-
     this.quickActionButtons = {
       history: document.getElementById("history-button"),
       insights: document.getElementById("insights-button"),
