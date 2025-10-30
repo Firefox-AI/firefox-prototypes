@@ -126,8 +126,6 @@ class ChatBot extends MozLitElement {
       ul {
         display: block;
       }
-
-      overflow-x: auto;
     }
 
     .input-container {
@@ -193,6 +191,73 @@ class ChatBot extends MozLitElement {
 
     .search-button svg {
       flex-shrink: 0;
+    }
+
+    .search-more-dropdown {
+      position: relative;
+      display: inline-block;
+    }
+
+    .search-more-button {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.5rem 0.75rem;
+      background: #6c757d;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .search-more-button:hover {
+      background: #5a6268;
+    }
+
+    .search-more-button svg {
+      flex-shrink: 0;
+    }
+
+    .search-dropdown-menu {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      margin-top: 0.25rem;
+      background: white;
+      border: 1px solid #d8d8d8;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      min-width: 180px;
+      z-index: 1000;
+    }
+
+    .search-dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      background: white;
+      color: #333;
+      border: none;
+      font-size: 0.875rem;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      transition: background-color 0.2s;
+    }
+
+    .search-dropdown-item:first-child {
+      border-radius: 6px 6px 0 0;
+    }
+
+    .search-dropdown-item:last-child {
+      border-radius: 0 0 6px 6px;
+    }
+
+    .search-dropdown-item:hover {
+      background: #f0f0f0;
     }
 
     .chat-controls {
@@ -455,6 +520,7 @@ class ChatBot extends MozLitElement {
       conversationTitle: { type: String },
       editingTitle: { type: Boolean },
       searchEngines: { type: Array },
+      openDropdownQuery: { type: String },
     };
   }
 
@@ -488,6 +554,7 @@ class ChatBot extends MozLitElement {
     this.conversationTitle = "";
     this.editingTitle = false;
     this.searchEngines = [];
+    this.openDropdownQuery = null;
 
     // TODO: Figure out what/where to get this info from, if necessary
     this.#conversation = new ChatHistoryConversation({
@@ -1077,6 +1144,29 @@ Today's date: ${currentDate}`;
     }
   }
 
+  toggleSearchDropdown(query, e) {
+    e.stopPropagation();
+    this.openDropdownQuery = this.openDropdownQuery === query ? null : query;
+    this.requestUpdate();
+
+    if (this.openDropdownQuery) {
+      // Close dropdown when clicking outside
+      const closeDropdown = () => {
+        this.openDropdownQuery = null;
+        this.requestUpdate();
+        document.removeEventListener("click", closeDropdown);
+      };
+      setTimeout(() => {
+        document.addEventListener("click", closeDropdown);
+      }, 0);
+    }
+  }
+
+  handleDropdownSearchQuery(query, engineName, e) {
+    this.openDropdownQuery = null;
+    this.handleSearchQuery(query, engineName, e);
+  }
+
   render() {
     // Count total insights for the badge
     const insightsData =
@@ -1287,15 +1377,23 @@ Today's date: ${currentDate}`;
                     ${searchQueries.length && this.searchEngines.length
                       ? html`
                           <div class="search-suggestions">
-                            ${searchQueries.map(
-                              query => html`
+                            ${searchQueries.map(query => {
+                              const primaryEngines = this.searchEngines.slice(
+                                0,
+                                2
+                              );
+                              const moreEngines = this.searchEngines.slice(2);
+                              const isDropdownOpen =
+                                this.openDropdownQuery === query;
+
+                              return html`
                                 <div
                                   style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; align-items: center;"
                                 >
                                   <span style="font-weight: 500; color: #666;"
                                     >Search for "${query}":</span
                                   >
-                                  ${this.searchEngines.map(
+                                  ${primaryEngines.map(
                                     engine => html`
                                       <button
                                         class="search-button"
@@ -1338,9 +1436,90 @@ Today's date: ${currentDate}`;
                                       </button>
                                     `
                                   )}
+                                  ${moreEngines.length
+                                    ? html`
+                                        <div class="search-more-dropdown">
+                                          <button
+                                            class="search-more-button"
+                                            @click=${e =>
+                                              this.toggleSearchDropdown(
+                                                query,
+                                                e
+                                              )}
+                                            title="More search engines"
+                                          >
+                                            More
+                                            <svg
+                                              width="12"
+                                              height="12"
+                                              viewBox="0 0 24 24"
+                                              fill="none"
+                                            >
+                                              <path
+                                                d="M6 9l6 6 6-6"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                              />
+                                            </svg>
+                                          </button>
+                                          ${isDropdownOpen
+                                            ? html`
+                                                <div
+                                                  class="search-dropdown-menu"
+                                                >
+                                                  ${moreEngines.map(
+                                                    engine => html`
+                                                      <button
+                                                        class="search-dropdown-item"
+                                                        @click=${e =>
+                                                          this.handleDropdownSearchQuery(
+                                                            query,
+                                                            engine.name,
+                                                            e
+                                                          )}
+                                                      >
+                                                        ${engine.iconURL
+                                                          ? html`<img
+                                                              src=${engine.iconURL}
+                                                              alt=${engine.name}
+                                                              width="16"
+                                                              height="16"
+                                                              style="display: block;"
+                                                            />`
+                                                          : html`<svg
+                                                              width="16"
+                                                              height="16"
+                                                              viewBox="0 0 24 24"
+                                                              fill="none"
+                                                            >
+                                                              <circle
+                                                                cx="11"
+                                                                cy="11"
+                                                                r="8"
+                                                                stroke="currentColor"
+                                                                stroke-width="2"
+                                                              />
+                                                              <path
+                                                                d="21 21l-4.35-4.35"
+                                                                stroke="currentColor"
+                                                                stroke-width="2"
+                                                              />
+                                                            </svg>`}
+                                                        ${engine.name}
+                                                      </button>
+                                                    `
+                                                  )}
+                                                </div>
+                                              `
+                                            : ""}
+                                        </div>
+                                      `
+                                    : ""}
                                 </div>
-                              `
-                            )}
+                              `;
+                            })}
                           </div>
                         `
                       : ""}
