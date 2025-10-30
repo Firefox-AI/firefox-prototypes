@@ -512,11 +512,13 @@ export const GenAI = {
         // In this case it's not the URL in the browsingContext (like it is in other cases),
         // but the URL of the chatProvider is close enough to where the content will eventually
         // be sent.
-        lazy.ContentAnalysisUtils.setupContentAnalysisEventsForTextElement(
-          textAreaEl,
-          browser.browsingContext,
-          Services.io.newURI(lazy.chatProvider)
-        );
+        if (lazy.chatProvider) {
+          lazy.ContentAnalysisUtils.setupContentAnalysisEventsForTextElement(
+            textAreaEl,
+            browser.browsingContext,
+            Services.io.newURI(lazy.chatProvider)
+          );
+        }
 
         const resetHeight = () => {
           textAreaEl.style.height = "auto";
@@ -570,12 +572,17 @@ export const GenAI = {
   handleShortcutsMessage(name, data, browser) {
     const isInBrowserStack = browser?.closest(".browserStack");
 
+    // Allow shortcuts if either GenAI chat is enabled OR smart window mode is active
+    const isSmartWindowMode =
+      browser?.ownerGlobal?.SmartWindow?.isSmartWindowActive();
+    const canShowShortcuts = this.canShowChatEntrypoint || isSmartWindowMode;
+
     if (
       !isInBrowserStack ||
       !browser ||
       this.ignoredInputs.has(data.inputType) ||
       !lazy.chatShortcuts ||
-      !this.canShowChatEntrypoint
+      !canShowShortcuts
     ) {
       return;
     }
@@ -1148,6 +1155,11 @@ export const GenAI = {
       source: context.entry,
     });
 
+    // If smart window mode is active, redirect to smart window sidebar
+    if (context.window.SmartWindow?.isSmartWindowActive()) {
+      return await this.handleSmartWindowChat(promptObj, context);
+    }
+
     // If no provider is configured, open sidebar and wait once for onboarding
     const { SidebarController } = context.window;
 
@@ -1218,6 +1230,64 @@ export const GenAI = {
       lazy.chatProvider?.includes("file_chat-autosubmit.html")
     ) {
       this.setupAutoSubmit(browser, prompt, context);
+    }
+  },
+
+  /**
+   * Handle chat request by redirecting to smart window sidebar.
+   *
+   * @param {object} promptObj to convert to string
+   * @param {object} context of how the prompt should be handled
+   */
+  async handleSmartWindowChat(promptObj, context) {
+    const { SmartWindow } = context.window;
+
+    // Ensure smart window sidebar is visible
+    SmartWindow.showSidebar();
+
+    // Build the prompt using GenAI's existing logic with localization
+    await this.prepareChatPromptPrefix();
+    const promptText = this.buildChatPrompt(promptObj, context);
+
+    // Convert tab info for smart window's tab context UI
+    const tabContext = [
+      {
+        title: context.tabTitle,
+        url: context.url,
+        favicon: context.window.gBrowser.selectedTab.image || "",
+        tabId: context.window.gBrowser.selectedTab.linkedPanel,
+      },
+    ];
+
+    // Include page text for page-type content
+    const pageText = context.contentType === "page" ? context.selection : "";
+
+    // Get the smart window browser and send the prompt
+    const smartWindowBrowser = context.window.document.getElementById(
+      "smartwindow-browser"
+    );
+    if (!smartWindowBrowser?.browsingContext) {
+      console.error("[GenAI] Smart window browser not available");
+      return;
+    }
+
+    const actor =
+      smartWindowBrowser.browsingContext.currentWindowGlobal?.getActor(
+        "SmartWindow"
+      );
+    if (!actor) {
+      console.error("[GenAI] Smart window actor not available");
+      return;
+    }
+
+    try {
+      actor.sendAsyncMessage("SmartWindow:SubmitPrompt", {
+        promptText,
+        tabContext,
+        pageText,
+      });
+    } catch (error) {
+      console.error("[GenAI] Failed to send prompt to smart window:", error);
     }
   },
 };
