@@ -162,24 +162,13 @@ class SmartWindowPage {
   }
 
   setupTabContextEventListeners() {
-    // Current tab button - click opens dropdown (except for X button)
+    // Current tab button - click removes current tab from context
     this.tabContextElements.currentTabButton.addEventListener("click", e => {
-      if (!e.target.classList.contains("remove-tab-button")) {
-        e.stopPropagation();
-        this.toggleTabDropdown();
+      e.stopPropagation();
+      if (this.lastTabInfo) {
+        this.removeTabFromContext(this.lastTabInfo.tabId);
       }
     });
-
-    // Remove current tab button
-    this.tabContextElements.removeCurrentTab.addEventListener(
-      "click",
-      async e => {
-        e.stopPropagation();
-        if (this.lastTabInfo) {
-          this.removeTabFromContext(this.lastTabInfo.tabId);
-        }
-      }
-    );
 
     // Add tabs button
     this.tabContextElements.addTabsButton.addEventListener("click", e => {
@@ -264,18 +253,26 @@ class SmartWindowPage {
   }
 
   updateTabContextUI() {
-    if (this.isCurrentTabInContext()) {
-      this.tabContextElements.currentTabButton.classList.remove("hidden");
+    const els = this.tabContextElements;
+    const active = this.lastTabInfo;
 
-      if (this.lastTabInfo.favicon) {
-        this.tabContextElements.currentTabFavicon.src =
-          this.lastTabInfo.favicon;
-        this.tabContextElements.currentTabFavicon.style.display = "block";
+    if (this.isCurrentTabInContext()) {
+      els.currentTabButton.style.display = "flex";
+
+      if (active.favicon) {
+        els.currentTabFavicon.src = active.favicon;
+        els.currentTabFavicon.style.display = "block";
       } else {
-        this.tabContextElements.currentTabFavicon.style.display = "none";
+        els.currentTabFavicon.style.display = "none";
+      }
+
+      if (els.currentTabTitle) {
+        let title = active?.title || "Current tab";
+        els.currentTabTitle.textContent = title;
+        els.currentTabTitle.title = active?.url || "";
       }
     } else {
-      this.tabContextElements.currentTabButton.classList.add("hidden");
+      els.currentTabButton.style.display = "none";
     }
 
     this.updateAddTabsButtonState();
@@ -1094,7 +1091,7 @@ class SmartWindowPage {
             visitDate: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
             visitCount: 5,
             relevanceScore: 95,
-            favicon: "page-icon:https://github.com/mozilla/firefox"
+            favicon: "page-icon:https://github.com/mozilla/firefox",
           },
           {
             title: "MDN Web Docs - JavaScript",
@@ -1102,7 +1099,7 @@ class SmartWindowPage {
             visitDate: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
             visitCount: 12,
             relevanceScore: 92,
-            favicon: "page-icon:https://developer.mozilla.org/"
+            favicon: "page-icon:https://developer.mozilla.org/",
           },
           {
             title: "Stack Overflow",
@@ -1110,8 +1107,8 @@ class SmartWindowPage {
             visitDate: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
             visitCount: 23,
             relevanceScore: 88,
-            favicon: "page-icon:https://stackoverflow.com/"
-          }
+            favicon: "page-icon:https://stackoverflow.com/",
+          },
         ]);
       });
     }
