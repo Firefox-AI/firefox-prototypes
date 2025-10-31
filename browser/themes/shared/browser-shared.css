@@ -1445,26 +1445,16 @@ browser {
 }
 
 :root[smart-window] .tabbrowser-tab > .tab-stack > .tab-background[selected] {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.80) 0%, rgba(255, 255, 255, 0.00) 100%);
-  outline-color: #FFF;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 100%);
+  outline-color: #fff;
 }
 
 /* Smart Window Styles */
 :root[smart-window] {
   color-scheme: light !important;
   --smart-window-border: #8a61ff;
-  --smart-window-gradient: linear-gradient(
-      0deg,
-      rgba(255, 255, 255, 0.6),
-      rgba(255, 255, 255, 0.4)
-    ),
-    linear-gradient(
-      180deg,
-      #faf7ff 0%,
-      #f3ecff 30%,
-      #e6dcff 65%,
-      #d7caff 100%
-  );
+  --smart-window-gradient:
+    linear-gradient(0deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.4)), linear-gradient(180deg, #faf7ff 0%, #f3ecff 30%, #e6dcff 65%, #d7caff 100%);
   background: var(--smart-window-gradient) !important;
 
   --toolbar-bgcolor: transparent !important;
@@ -1492,7 +1482,7 @@ browser {
 
 :root[smart-window] #navigator-toolbox,
 :root[smart-window] #browser {
-  background: none !important
+  background: none !important;
 }
 
 /* Smart Window Toggle Button */
@@ -1516,7 +1506,7 @@ browser {
 
   /* Hide in private windows */
   :root[privatebrowsingmode="temporary"] & {
-    display: none !important
+    display: none !important;
   }
 }
 
@@ -1595,7 +1585,7 @@ browser {
 
 #smartwindow-box {
   max-width: 75vw;
-  min-width: 412px;
+  min-width: 200px;
 }
 
 #smartwindow-header {
@@ -1644,12 +1634,12 @@ browser {
   color: #fff;
   fill: currentColor;
   list-style-image: url(chrome://browser/skin/notification-icons/desktop-notification.svg);
-  background: linear-gradient(260deg, rgba(255, 183, 148, 0.80) -49.13%, rgba(181, 62, 175, 0.80) 63.71%, rgba(131, 62, 181, 0.80) 128.68%);
+  background: linear-gradient(260deg, rgba(255, 183, 148, 0.8) -49.13%, rgba(181, 62, 175, 0.8) 63.71%, rgba(131, 62, 181, 0.8) 128.68%);
 
   &[checked] {
     color: var(--text-color);
     border-color: rgba(191, 143, 204, 0.15);
-    background: linear-gradient(260deg, rgba(255, 183, 148, 0.10) -49.13%, rgba(181, 62, 175, 0.10) 63.71%, rgba(131, 62, 181, 0.10) 128.68%);
+    background: linear-gradient(260deg, rgba(255, 183, 148, 0.1) -49.13%, rgba(181, 62, 175, 0.1) 63.71%, rgba(131, 62, 181, 0.1) 128.68%);
     fill: var(--icon-color);
     list-style-image: url(chrome://global/skin/icons/close.svg);
   }
