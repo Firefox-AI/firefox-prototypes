@@ -232,9 +232,6 @@ class SmartWindowPage {
       this.selectedTabContexts.push(tabInfo);
       this.updateTabContextUI();
       this.updateQuickPromptsWithContext();
-
-      // Load chat messages for the new context
-      await this.loadChatMessagesForCurrentContext();
     }
   }
 
@@ -247,9 +244,6 @@ class SmartWindowPage {
     );
     this.updateTabContextUI();
     this.updateQuickPromptsWithContext();
-
-    // Load chat messages for the new context
-    await this.loadChatMessagesForCurrentContext();
   }
 
   updateTabContextUI() {
@@ -488,25 +482,33 @@ class SmartWindowPage {
       this.selectedTabContexts = [];
     }
     this.updateTabContextUI();
-
-    // Load chat messages for the new context
-    try {
-      await this.loadChatMessagesForCurrentContext();
-    } catch (error) {
-      console.error(
-        `[ERROR] resetContextToCurrentTab(): Could not load chat messages for current context: ${error}`
-      );
-    }
   }
 
   // Save chat messages to all tabs in current context
   async saveChatMessagesForCurrentContext() {
-    if (this.chatBot && this.chatBot.messages && this.chatBot.messages.length) {
+    // Consolidate the conversation references to the one per tab and trigger re-render
+    if (
+      this.chatBot.conversation.id !== gBrowser.selectedTab?.conversation?.id &&
+      gBrowser.selectedTab?.conversation?.messages?.length
+    ) {
+      this.chatBot.conversation = gBrowser.selectedTab.conversation;
+      this.chatBot.requestUpdate();
+    }
+
+    if (
+      this.chatBot &&
+      this.chatBot.messages &&
+      this.chatBot.messages.length &&
+      gBrowser.selectedTab?.conversation
+    ) {
       // Update the shared conversation title from chatBot
       gBrowser.selectedTab.conversation.title =
         this.chatBot.conversationTitle || "";
 
-      if (this.selectedTabContexts.length === 0) {
+      if (
+        this.selectedTabContexts.length === 0 &&
+        gBrowser.selectedTab?.conversation?.messages?.length
+      ) {
         // No tab context (e.g., full page experience on new tab)
         // Save to the current conversation with empty/current URL
         try {
@@ -520,30 +522,19 @@ class SmartWindowPage {
           );
         }
       } else {
-        // Save messages to a conversation for each tab's URL
-        for (const tab of this.selectedTabContexts) {
-          gBrowser.tabs.forEach(async tab => {
-            if (!tab.conversation) {
-              return;
-            }
+        gBrowser.tabs.forEach(async tab => {
+          if (!tab.conversation || !tab?.conversation?.messages?.length) {
+            return;
+          }
 
-            try {
-              await this.#chatHistory.updateConversation(tab.conversation);
-            } catch (error) {
-              console.error("Error saving a conversation:", tab.conversation);
-            }
-          });
-        }
+          try {
+            await this.#chatHistory.updateConversation(tab.conversation);
+          } catch (error) {
+            console.error("Error saving a conversation:", tab.conversation);
+            console.error(" error: ", error.toString());
+          }
+        });
       }
-    }
-
-    // Consolidate the conversation references to the one per tab and trigger re-render
-    if (
-      this.chatBot.conversation.id !== gBrowser.selectedTab.conversation.id &&
-      gBrowser.selectedTab.conversation.messages.length
-    ) {
-      this.chatBot.conversation = gBrowser.selectedTab.conversation;
-      this.chatBot.requestUpdate();
     }
   }
 
@@ -612,13 +603,6 @@ class SmartWindowPage {
       this.showChatMode();
       // Scroll to bottom after messages are loaded
       setTimeout(() => this.chatBot.scrollToBottom(), 0);
-    } else {
-      // NOTE: This breaks the chat it can't ask if the messages gets blanked
-      // console.log("setting blank messages");
-      //
-      // this.chatBot.messages = [];
-      // this.chatBot.requestUpdate();
-      // this.hideChatMode();
     }
 
     // Replace an empty conversation with the conversation that was loaded from SQLite
@@ -938,8 +922,8 @@ class SmartWindowPage {
     this.quickPromptsContainer.innerHTML = "";
 
     // Add emoji mapping for prompt types
-    const getEmoji = type => {
-      switch (type) {
+    const getEmoji = emojiType => {
+      switch (emojiType) {
         case "chat":
           return "💬";
         case "search":
@@ -1223,9 +1207,10 @@ class SmartWindowPage {
       });
     }
 
-    window.addEventListener("SmartWindowVisibilityChanged", _event => {
-      // TODO: The smart window opened or closed, maybe we need to do some kind of UI update
-      // event.detail.visible
+    window.addEventListener("SmartWindowVisibilityChanged", event => {
+      if (event.detail.visible) {
+        this.chatBot.requestUpdate();
+      }
     });
 
     if (gBrowser?.tabContainer) {
@@ -1238,17 +1223,50 @@ class SmartWindowPage {
           ) {
             const newLocation = browser.currentURI.spec;
             if (!this.isTabEligibleForContext(this.lastTabInfo)) {
-              gBrowser.selectedTab.conversation.pageUrl = newLocation;
+              if (gBrowser.selectedTab.conversation) {
+                gBrowser.selectedTab.conversation.pageUrl = newLocation;
+              } else {
+                gBrowser.selectedTab.conversation = new ChatHistoryConversation(
+                  {
+                    title: "",
+                    description: "",
+                    pageUrl: newLocation,
+                    pageMeta: "",
+                  }
+                );
+              }
 
-              this.initializeTabInfo().then(() => {
-                this.loadChatMessagesForCurrentContext();
-              });
+              this.chatBot.requestUpdate();
+              this.initializeTabInfo();
             }
           }
         },
       };
 
       gBrowser.addTabsProgressListener(tabListener);
+
+      gBrowser.tabContainer.addEventListener("TabSelect", () => {
+        this.chatBot.requestUpdate();
+      });
+
+      gBrowser.tabContainer.addEventListener("TabOpen", () => {
+        this.chatBot.requestUpdate();
+      });
+
+      gBrowser.tabContainer.addEventListener("TabAttrModified", event => {
+        if (event.target === gBrowser.selectedTab) {
+          // This small delay fixes the sidebar to render the correct conversation
+          // when switching between tabs. Without the delay, the tab will render the
+          // conversation from the previously selected tab even though the chatBot
+          // ends up with the correct conversation object after the switch is complete.
+          setTimeout(() => {
+            if (gBrowser.selectedTab?.conversation) {
+              this.chatBot.conversation = gBrowser.selectedTab.conversation;
+              this.chatBot.requestUpdate();
+            }
+          }, 50);
+        }
+      });
     }
   }
 
