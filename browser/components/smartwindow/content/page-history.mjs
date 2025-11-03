@@ -112,6 +112,8 @@ export class PageHistoryOverlay extends LitElement {
       return date.toLocaleDateString();
     };
 
+    const previewType = item.previewType || (item.thumbnail ? "thumbnail" : null);
+
     return html`
       <div
         class="history-item"
@@ -124,9 +126,13 @@ export class PageHistoryOverlay extends LitElement {
           ` : ''}
           <div class="history-title">${item.title || item.url}</div>
         </div>
-        <div class="item-thumbnail">
+        <div class="item-thumbnail ${previewType === "wireframe" ? "is-wireframe" : ""}">
           ${item.thumbnail ? html`
-            <img class="thumbnail-image" src=${item.thumbnail} alt="">
+            <img
+              class="thumbnail-image ${previewType === "wireframe" ? "wireframe" : ""}"
+              src=${item.thumbnail}
+              alt=${previewType === "wireframe" ? "Wireframe preview" : ""}
+            >
           ` : html`
             <div class="thumbnail-placeholder">→</div>
           `}
@@ -380,14 +386,28 @@ export class PageHistoryOverlay extends LitElement {
       aspect-ratio: 16 / 9;
       border-radius: 8px;
       background: #fff;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       overflow: hidden;
       box-shadow: var(--box-shadow-level-1-shadow-1-x, 0) var(--box-shadow-level-1-shadow-1-y, 0) var(--box-shadow-level-1-shadow-1-blur, 1px) var(--box-shadow-level-1-shadow-1-spread, 0) var(--box-shadow-level-1-shadow-1-color, rgba(0, 0, 0, 0.15)), var(--box-shadow-level-1-shadow-2-x, 0) var(--box-shadow-level-1-shadow-2-y, 1px) var(--box-shadow-level-1-shadow-2-blur, 2px) var(--box-shadow-level-1-shadow-2-spread, 0) var(--box-shadow-level-1-shadow-2-color, rgba(0, 0, 0, 0.20));
+    }
+
+    .item-thumbnail.is-wireframe {
+      background: #f4f4f5;
     }
 
     .thumbnail-image {
       width: 100%;
       height: 100%;
       object-fit: cover;
+    }
+
+    .thumbnail-image.wireframe {
+      object-fit: contain;
+      padding: 0.75rem;
+      background: transparent;
     }
 
     .thumbnail-placeholder {

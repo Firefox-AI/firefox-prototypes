@@ -1482,6 +1482,8 @@ pref("browser.sessionstore.cleanup.forget_closed_after", 1209600000);
 // temporary pref that will be removed in a future release, see bug 1836952
 pref("browser.sessionstore.persist_closed_tabs_between_sessions", true);
 
+pref("browser.history.collectWireframes", true);
+
 // Don't quit the browser when Ctrl + Q is pressed.
 pref("browser.quitShortcut.disabled", false);
 

@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { detectQueryType } from "./utils.mjs";
+import { detectQueryType, searchBrowserHistory } from "./utils.mjs";
 import { attachToElement } from "chrome://browser/content/smartwindow/smartbar.mjs";
 import {
   generateLiveSuggestions,
@@ -15,6 +15,18 @@ const { ChatHistory, ChatHistoryConversation } = ChromeUtils.importESModule(
   "resource:///modules/smartwindow/ChatHistory.sys.mjs"
 );
 
+const { PageThumbs, PageThumbsStorage } = ChromeUtils.importESModule(
+  "resource://gre/modules/PageThumbs.sys.mjs"
+);
+const { PageWireframes } = ChromeUtils.importESModule(
+  "resource:///modules/sessionstore/PageWireframes.sys.mjs"
+);
+const { SessionStore } = ChromeUtils.importESModule(
+  "resource:///modules/sessionstore/SessionStore.sys.mjs"
+);
+const { TabStateFlusher } = ChromeUtils.importESModule(
+  "resource:///modules/sessionstore/TabStateFlusher.sys.mjs"
+);
 const { embedderElement, topChromeWindow } = window.browsingContext;
 const gBrowser = topChromeWindow.gBrowser;
 
@@ -975,7 +987,182 @@ class SmartWindowPage {
     }
   }
 
-  handleSearchHistoryTool(historyItems) {
+  async #populateHistoryPreviews(historyItems) {
+    if (!Array.isArray(historyItems) || historyItems.length === 0) {
+      return historyItems ?? [];
+    }
+
+    const enhancedItems = [];
+    for (const rawItem of historyItems) {
+      if (!rawItem) {
+        enhancedItems.push(rawItem);
+        continue;
+      }
+
+      const item = { ...rawItem };
+
+      if (item.thumbnail && !item.previewType) {
+        item.previewType = "thumbnail";
+      }
+
+      if (!item.thumbnail && item.url) {
+        try {
+          if (await PageThumbsStorage.fileExistsForURL(item.url)) {
+            item.thumbnail = PageThumbs.getThumbnailURL(item.url);
+            item.previewType = "thumbnail";
+          }
+        } catch (error) {
+          console.warn(
+            "[SmartWindow] Unable to fetch thumbnail for history item:",
+            item.url,
+            error
+          );
+        }
+      }
+
+      enhancedItems.push(item);
+    }
+
+    const itemsNeedingWireframes = enhancedItems.filter(
+      item => item && !item.thumbnail && item.url
+    );
+
+    if (!itemsNeedingWireframes.length) {
+      return enhancedItems;
+    }
+
+    try {
+      const wireframeMap = await this.#buildWireframePreviewMap();
+      for (const item of itemsNeedingWireframes) {
+        const wireframeDataUrl = wireframeMap.get(item.url);
+        if (wireframeDataUrl) {
+          item.thumbnail = wireframeDataUrl;
+          item.previewType = "wireframe";
+        }
+      }
+    } catch (error) {
+      console.error(
+        "[SmartWindow] Failed to build wireframe previews:",
+        error
+      );
+    }
+
+    return enhancedItems;
+  }
+
+  async #buildWireframePreviewMap() {
+    if (!Services.appinfo?.fissionAutostart) {
+      return new Map();
+    }
+
+    const chromeWindow = window.browsingContext?.topChromeWindow;
+    if (!chromeWindow) {
+      return new Map();
+    }
+
+    const previewMap = new Map();
+    const doc = chromeWindow.document;
+    const serializer = new chromeWindow.XMLSerializer();
+
+    const collectEntries = entries => {
+      if (!Array.isArray(entries)) {
+        return;
+      }
+
+      for (const entry of entries) {
+        const url = entry?.url;
+        const wireframe = entry?.wireframe;
+        if (!url || !wireframe || previewMap.has(url)) {
+          continue;
+        }
+
+        try {
+          const svgElement = PageWireframes.getWireframeElement(
+            wireframe,
+            doc
+          );
+          if (!svgElement) {
+            continue;
+          }
+          const serialized = serializer.serializeToString(svgElement);
+          const dataUrl =
+            "data:image/svg+xml;charset=utf-8," +
+            encodeURIComponent(serialized);
+          previewMap.set(url, dataUrl);
+        } catch (error) {
+          console.warn(
+            "[SmartWindow] Unable to serialize wireframe for history item:",
+            url,
+            error
+          );
+        }
+      }
+    };
+
+    const gatherFromTab = async tab => {
+      try {
+        if (TabStateFlusher?.flush) {
+          await TabStateFlusher.flush(tab.linkedBrowser);
+        }
+      } catch (error) {
+        console.warn(
+          "[SmartWindow] Unable to flush tab state for wireframe capture:",
+          error
+        );
+      }
+
+      try {
+        const stateString = SessionStore.getTabState(tab);
+        if (!stateString) {
+          return;
+        }
+        const state = JSON.parse(stateString);
+        collectEntries(state?.entries);
+      } catch (error) {
+        console.warn(
+          "[SmartWindow] Unable to read tab state for wireframe capture:",
+          error
+        );
+      }
+    };
+
+    const chromeBrowser = chromeWindow.gBrowser;
+    if (chromeBrowser?.tabs?.length) {
+      for (const tab of chromeBrowser.tabs) {
+        await gatherFromTab(tab);
+      }
+    }
+
+    try {
+      const closedTabs = SessionStore.getClosedTabData({
+        sourceWindow: chromeWindow,
+      });
+      for (const tabData of closedTabs ?? []) {
+        let stateEntries = tabData?.state?.entries;
+        if (!stateEntries && typeof tabData?.state === "string") {
+          try {
+            const parsedState = JSON.parse(tabData.state);
+            stateEntries = parsedState?.entries;
+          } catch (error) {
+            console.warn(
+              "[SmartWindow] Unable to parse closed tab state for wireframes:",
+              error
+            );
+          }
+        }
+        collectEntries(stateEntries);
+      }
+    } catch (error) {
+      console.warn(
+        "[SmartWindow] Unable to inspect closed tabs for wireframes:",
+        error
+      );
+    }
+
+    return previewMap;
+  }
+
+  async handleSearchHistoryTool(historyItems) {
     console.log(
       "[SmartWindow] handleSearchHistoryTool - historyItems",
       historyItems,
@@ -993,11 +1180,13 @@ class SmartWindowPage {
       return;
     }
 
+    const itemsWithPreviews = await this.#populateHistoryPreviews(items);
+
     const topWindow = window.browsingContext?.topChromeWindow;
     if (topWindow?.SmartWindow) {
-      //this.showViewTab("history");
+      // this.showViewTab("history");
       // Call the method on the chrome window's SmartWindow object
-      topWindow.SmartWindow.showPageHistory(historyItems);
+      topWindow.SmartWindow.showPageHistory(itemsWithPreviews);
     } else {
       console.error("[SmartWindow] SmartWindow not available");
     }
@@ -1099,7 +1288,7 @@ class SmartWindowPage {
         this.performNavigation(query, "search", clickEvent, engineName);
       });
 
-      this.chatBot.addEventListener("tool-call", e => {
+      this.chatBot.addEventListener("tool-call", async e => {
         console.log("[SmartWindow] Tool call event:", e.detail);
         // Update the chat bot's internal log state
         if (this.chatBot.updateLogState) {
@@ -1112,7 +1301,7 @@ class SmartWindowPage {
             try {
               // FIXME: Sanitize JSON
               const parsedData = JSON.parse(e.detail.result);
-              this.handleSearchHistoryTool(parsedData?.results);
+              await this.handleSearchHistoryTool(parsedData?.results);
             } catch (error) {
               console.error("[SmartWindow] Failed to parse tool data", error);
             }
@@ -1129,35 +1318,21 @@ class SmartWindowPage {
         this.saveChatMessagesForCurrentContext();
       });
 
-      this.chatBot.addEventListener("show-page-history", () => {
+      this.chatBot.addEventListener("show-page-history", async () => {
         console.log("[SmartWindow] History button clicked");
-        // Show dummy history
-        this.handleSearchHistoryTool([
-          {
-            title: "GitHub - mozilla/firefox",
-            url: "https://github.com/mozilla/firefox",
-            visitDate: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-            visitCount: 5,
-            relevanceScore: 95,
-            favicon: "page-icon:https://github.com/mozilla/firefox",
-          },
-          {
-            title: "MDN Web Docs - JavaScript",
-            url: "https://developer.mozilla.org/en-US/docs/Web/JavaScript",
-            visitDate: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-            visitCount: 12,
-            relevanceScore: 92,
-            favicon: "page-icon:https://developer.mozilla.org/",
-          },
-          {
-            title: "Stack Overflow",
-            url: "https://stackoverflow.com/",
-            visitDate: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-            visitCount: 23,
-            relevanceScore: 88,
-            favicon: "page-icon:https://stackoverflow.com/",
-          },
-        ]);
+        try {
+          const rawHistory = await searchBrowserHistory({
+            search_term: "",
+            limit: 12,
+          });
+          const parsedHistory = JSON.parse(rawHistory);
+          await this.handleSearchHistoryTool(parsedHistory?.results);
+        } catch (error) {
+          console.error(
+            "[SmartWindow] Failed to fetch history for overlay",
+            error
+          );
+        }
       });
     }
 
