@@ -127,7 +127,8 @@ export const INTENTS = [
  * Static data serves as placeholder until user generates insights
  */
 const DEFAULT_INSIGHTS_DATA = {};
-const DEFAULT_INSIGHTS_SYSTEM_PROMPT = "[ NO INSIGHTS FOUND FOR THIS USER! We could not retrieve any insights for this user ]"
+const DEFAULT_INSIGHTS_SYSTEM_PROMPT =
+  "[ NO INSIGHTS FOUND FOR THIS USER! We could not retrieve any insights for this user ]";
 
 function getInsightsMeta() {
   const sw = getSmartWindow();
@@ -1113,14 +1114,15 @@ ${intentsList}
 - Dont repeat insights about entities that are already in related_insights.
 
 ## Insight rules (write 1 short, specific sentence)
-- Style = <who/what + action + constraint>, 4–10 words, no trailing period.
-- Must include at least 1 concrete entity (brand/site/product/event) OR a clear constraint (price, time, size, color).
-- Vary verbs; avoid repetitive "buys/watches" when not aligned with intent.
+- Insights are useful preferences about the user such as product, brands, preferences, behavior, etc that could be useful to personalize the conversation response in the future.
+- Dont imagine an action unless you see evidence for sure. E.g. use "shops for" unless you see an evidence of purchase or buy,
+  use "plans trip" unless you see a ticket was purchased,
+  use "looked for a tv show" unless sure if the user watched.
 - Dont include person name unless they are popular to avoid any PII.
 - Dont generate insight from just odd one visit.
 - The insights are generated based on a pattern of visits.
 - Don’t infer product relationships between unrelated domains unless both appear together in the same session evidence.
-- No vague phrasing like "various", "often".
+- AVOID collecting insights about personal, health related, or sensitive or anything user would like to keep it private.
 - Don't generate a new insight unless it is quite different from known items in related_insights.
 - If no safe, specific insight is supported by Inputs, set "insight_summary": null.
 - Examples of good form:
@@ -1730,7 +1732,7 @@ export function buildInsightsSystemPrompt() {
   const insightsData = getInsightsData();
 
   if (!insightsData || Object.keys(insightsData).length === 0) {
-    return DEFAULT_INSIGHTS_SYSTEM_PROMPT
+    return DEFAULT_INSIGHTS_SYSTEM_PROMPT;
   }
 
   // Use generated insights if available, otherwise fall back to defaults
