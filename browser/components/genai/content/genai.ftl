@@ -32,4 +32,4 @@ sidebar-menu-genai-smart-assist-label =
 
 genai-smart-assist-title = Smart Assist
 
-genai-welcome-onboarding-tos = Smart Window uses your open tabs and browsing history to make things more personal. Are you okay with the new Terms of Use?
+genai-welcome-onboarding-tos = Smart Window generates Signals—insights from your open tabs and browsing history (if available)—to personalize results from day one. Signals is enabled by default. Are you okay with the new Terms of Use?
