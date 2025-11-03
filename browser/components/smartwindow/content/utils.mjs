@@ -6,6 +6,8 @@ const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
+  PageThumbs: "resource://gre/modules/PageThumbs.sys.mjs",
+  PageThumbsStorage: "resource://gre/modules/PageThumbs.sys.mjs",
 });
 
 import { createEngine } from "chrome://global/content/ml/EngineProcess.sys.mjs";
@@ -141,7 +143,7 @@ const toolsConfig = [
   },
 ];
 
-const search_browser_history = async ({ search_term, limit = 10 }) => {
+export async function searchBrowserHistory({ search_term, limit = 10 }) {
   let root;
   let openedRoot = false;
 
@@ -183,6 +185,15 @@ const search_browser_history = async ({ search_term, limit = 10 }) => {
         console.warn("Could not get favicon for:", node.uri);
       }
 
+      let thumbnailUrl = null;
+      try {
+        if (await lazy.PageThumbsStorage.fileExistsForURL(node.uri)) {
+          thumbnailUrl = lazy.PageThumbs.getThumbnailURL(node.uri);
+        }
+      } catch (e) {
+        console.warn("Could not get thumbnail for:", node.uri, e);
+      }
+
       rows.push({
         title: node.title || node.uri,
         url: node.uri,
@@ -190,6 +201,7 @@ const search_browser_history = async ({ search_term, limit = 10 }) => {
         visitCount: node.accessCount || 0,
         relevanceScore: node.frecency || 0, // Use frecency as relevance score
         ...(faviconUrl && { favicon: faviconUrl }), // Only include favicon if available
+        ...(thumbnailUrl && { thumbnail: thumbnailUrl }),
       });
     }
 
@@ -219,7 +231,7 @@ const search_browser_history = async ({ search_term, limit = 10 }) => {
       root.containerOpen = false;
     }
   }
-};
+}
 
 const search_open_tabs = ({ type }) => {
   console.log("Searching open tabs for type:", type);
@@ -478,7 +490,7 @@ export async function* fetchWithHistory(messages) {
             result = await get_page_content(toolParams);
             break;
           case SEARCH_HISTORY:
-            result = await search_browser_history(toolParams);
+            result = await searchBrowserHistory(toolParams);
             break;
         }
 
