@@ -39,7 +39,7 @@ XPCOMUtils.defineLazyPreferenceGetter(
           text_color: "dark",
           subtitle: {
             fontWeight: 400,
-            raw: "Get answers when you need them. Keep your tabs tiday. Enjoy suggestions that feel made just for you. And because this is Firefox, your privacy always comes first.",
+            raw: "Get answers when you need them. Keep your tabs tidy. Enjoy suggestions that feel made just for you. And because this is Firefox, your privacy always comes first.",
           },
 
           cta_paragraph: {
