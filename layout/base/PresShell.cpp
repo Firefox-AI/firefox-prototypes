@@ -234,7 +234,7 @@ using namespace mozilla::layout;
 using PaintFrameFlags = nsLayoutUtils::PaintFrameFlags;
 typedef ScrollableLayerGuid::ViewID ViewID;
 
-MOZ_RUNINIT PresShell::CapturingContentInfo PresShell::sCapturingContentInfo;
+MOZ_CONSTINIT PresShell::CapturingContentInfo PresShell::sCapturingContentInfo;
 
 // RangePaintInfo is used to paint ranges to offscreen buffers
 struct RangePaintInfo {
@@ -11967,6 +11967,11 @@ void PresShell::UpdateAnchorPosForScroll(
       positioned->GetParent()->UpdateOverflow();
       referenceData.mDefaultScrollShift = offset;
       if (CheckOverflow(positioned, offset, referenceData)) {
+#ifdef ACCESSIBILITY
+        if (nsAccessibilityService* accService = GetAccService()) {
+          accService->NotifyAnchorPositionedScrollUpdate(this, positioned);
+        }
+#endif
         FrameNeedsReflow(positioned, IntrinsicDirty::None,
                          NS_FRAME_HAS_DIRTY_CHILDREN);
       }

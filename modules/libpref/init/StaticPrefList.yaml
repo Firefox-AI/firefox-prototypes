@@ -8990,6 +8990,13 @@
   mirror: always
   set_spidermonkey_pref: startup
 
+ # Experimental support for Iterator Chunking in JavaScript.
+- name: javascript.options.experimental.iterator_chunking
+  type: bool
+  value: false
+  mirror: always
+  set_spidermonkey_pref: startup
+
 #endif  // NIGHTLY_BUILD
 
 # Whether to Baseline-compile self-hosted functions the first time they are
@@ -10215,7 +10222,7 @@
 # Whether @scope rule is enabled
 - name: layout.css.at-scope.enabled
   type: RelaxedAtomicBool
-  value: @IS_NIGHTLY_BUILD@
+  value: true
   mirror: always
   rust: true
 
@@ -10458,7 +10465,7 @@
 
 - name: layout.css.text-decoration-inset.enabled
   type: RelaxedAtomicBool
-  value: false
+  value: true
   mirror: always
   rust: true
 
@@ -15543,6 +15550,12 @@
   value: false
   mirror: always
 
+# Disable cache purging temporarily to support cache tests
+- name: network.cache.purge_disable
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
+
 # The number of milliseconds after which a suspended channel writing
 # to a cache entry will notify all readers waiting for a callback to
 # continue without a cache entry.
@@ -19029,7 +19042,7 @@
 #ifdef MOZ_WAYLAND
 - name: widget.wayland.fractional-scale.enabled
   type: bool
-  value: @IS_EARLY_BETA_OR_EARLIER@
+  value: true
   mirror: always
 
 # Use opaque region for MozContainer wl_surface
