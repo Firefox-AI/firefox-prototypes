@@ -30,6 +30,8 @@ const { TabStateFlusher } = ChromeUtils.importESModule(
 const { embedderElement, topChromeWindow } = window.browsingContext;
 const gBrowser = topChromeWindow.gBrowser;
 
+const FIRST_RUN_PREF = "browser.smartwindow.firstrun.didSeeWelcome";
+
 /**
  *
  */
@@ -61,6 +63,8 @@ class SmartWindowPage {
     this.tabContextElements = {};
     this.currentTabPageText = "";
     this.quickActionButtons = {};
+
+    this.onboardingRendered = false;
 
     this.#chatHistory = new ChatHistory();
 
@@ -780,6 +784,7 @@ class SmartWindowPage {
 
     if (this.isSidebarMode) {
       this.updateTabStatus(this.lastTabInfo);
+      this.showOnboardingMessageIfNeeded();
     }
   }
 
@@ -1648,10 +1653,52 @@ class SmartWindowPage {
     }
   }
 
+  showOnboardingMessageIfNeeded() {
+    const hasSeen = Services.prefs.getBoolPref(FIRST_RUN_PREF, false);
+    if (hasSeen || this.onboardingRendered) {
+      return;
+    }
+
+    const container = document.getElementById("assistant-onboarding-message-container");
+
+    if (container.querySelector("#assistant-onboarding-message")) {
+      this.onboardingRendered = true;
+      return;
+    }
+
+    const msg = document.createElement("div");
+    msg.id = "assistant-onboarding-message";
+    msg.textContent = "Welcome to Smart Window!";
+
+    container.hidden = false;
+    container.replaceChildren(msg);
+
+    this.onboardingRendered = true;
+  }
+
+  hideOnboardingMesssage() {
+    const el = document.getElementById("assistant-onboarding-message");
+    if (!el || el.classList.contains("is-hiding")) {
+      return;
+    }
+
+    el.addEventListener(
+      "transitionend",
+      () => {
+        el.remove();
+        Services.prefs.setBoolPref(FIRST_RUN_PREF, true);
+      },
+      { once: true }
+    );
+
+    el.classList.add("is-hiding");
+  }
+
   async handleEnter(query, suggestionType = null) {
     if (!query.trim()) {
       return;
     }
+    this.hideOnboardingMesssage();
 
     const textFromBar = this.smartbar?.getText?.() || "";
     const htmlFromBar = this.smartbar?.getHTML?.() || null;

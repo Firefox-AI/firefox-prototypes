@@ -145,6 +145,7 @@ body {
   flex-direction: column;
   gap: 10px;
   padding-bottom: 20px;
+  position: relative;
 }
 
 /* Status bar styles */
@@ -1218,4 +1219,38 @@ body {
   align-items: center;
   cursor: pointer;
   color: #666;
+}
+
+#assistant-onboarding-message {
+  font: message-box;
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  text-align: center;
+  font-size: 38px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 40px;
+  background: linear-gradient(90deg, #8341CA 0%, #656FFF 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease,
+    visibility 0s linear 180ms;
+}
+
+#assistant-onboarding-message.is-hiding {
+  opacity: 0;
+  transform: translateY(6px);
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #assistant-onboarding-message { transition: none; }
 }
