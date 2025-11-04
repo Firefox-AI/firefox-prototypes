@@ -241,17 +241,30 @@ export async function generateLiveSuggestions(query, topChromeWindow) {
       const queryIntentType = await detectQueryType(query);
       const oppositeType = queryIntentType === "search" ? "chat" : "search";
       
-      // Process search results through detectQueryType to determine final type
+      // Process search results - preserve some as original type to ensure opposites
       const resultsToProcess = searchResults.slice(0, 6);
       const processedSuggestions = [];
       
+      // Keep at least one result as original "search" type to ensure we have opposites
+      let preservedSearchCount = 0;
+      const maxPreservedSearch = queryIntentType === "chat" ? 2 : 0; // Preserve search suggestions when intent is chat
+      
       for (const result of resultsToProcess) {
-        const detectedType = await detectQueryType(result.text);
+        let finalType;
+        
+        // If we need search suggestions for opposites, preserve some original search results
+        if (queryIntentType === "chat" && preservedSearchCount < maxPreservedSearch) {
+          finalType = "search";
+          preservedSearchCount++;
+        } else {
+          finalType = await detectQueryType(result.text);
+        }
+        
         processedSuggestions.push({
           title: result.title,
           text: result.text,
           icon: result.icon,
-          type: detectedType,
+          type: finalType,
         });
       }
       
@@ -260,28 +273,45 @@ export async function generateLiveSuggestions(query, topChromeWindow) {
       const oppositeSuggestions = processedSuggestions.filter(s => s.type === oppositeType);
       const otherSuggestions = processedSuggestions.filter(s => s.type !== queryIntentType && s.type !== oppositeType);
       
-      // Add in desired order: intent first, then opposite, then others
-      if (intentSuggestions.length > 0) {
+      // Add in desired order: intent first (always the original query for chat/search), then opposite, then others
+      // For chat or search intent, always put the original query as the first suggestion
+      if (queryIntentType === "chat" || queryIntentType === "search") {
+        suggestions.push({
+          title: "",
+          text: query,
+          icon: "",
+          type: queryIntentType
+        });
+      } else if (intentSuggestions.length > 0) {
         suggestions.push(intentSuggestions[0]); // First suggestion matches intent
-      }
-      
-      // Ensure we always have an opposite type as second suggestion
-      if (oppositeSuggestions.length > 0) {
-        suggestions.push(oppositeSuggestions[0]); // Second suggestion is opposite
+      } else if (processedSuggestions.length > 0) {
+        // If no intent matches, add the first available suggestion and ensure it has the right type
+        const firstSuggestion = { ...processedSuggestions[0], type: queryIntentType };
+        suggestions.push(firstSuggestion);
       } else {
-        // If no opposite suggestions from urlbar, create one using the original query
-        suggestions.push({ 
-          title: "", 
-          text: query, 
-          icon: "", 
-          type: oppositeType 
+        // Fallback: always add the original query with detected intent type
+        suggestions.push({
+          title: "",
+          text: query,
+          icon: "",
+          type: queryIntentType
         });
       }
       
-      // Add remaining suggestions
-      suggestions.push(...intentSuggestions.slice(1));
-      suggestions.push(...oppositeSuggestions.slice(1));
-      suggestions.push(...otherSuggestions);
+      // Ensure we always have an opposite type as second suggestion using the original query
+      // Always use the original query text for the opposite suggestion to maintain consistency
+      suggestions.push({ 
+        title: "", 
+        text: query, 
+        icon: "", 
+        type: oppositeType 
+      });
+      
+      // Add remaining suggestions (avoid duplicates)
+      const addedTexts = new Set(suggestions.map(s => s.text));
+      suggestions.push(...intentSuggestions.slice(1).filter(s => !addedTexts.has(s.text)));
+      suggestions.push(...oppositeSuggestions.slice(1).filter(s => !addedTexts.has(s.text)));
+      suggestions.push(...otherSuggestions.filter(s => !addedTexts.has(s.text)));
     }
 
     // Add navigate results as-is
