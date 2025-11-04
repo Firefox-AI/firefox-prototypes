@@ -1176,6 +1176,7 @@ pref("browser.smartwindow.key", "");
 pref("browser.smartwindow.model", "qwen3-235b-a22b-instruct-2507-maas");
 pref("browser.smartwindow.chatHistory.loglevel", "Warn");
 pref("browser.smartwindow.skipOnboarding", true);
+pref("browser.smartwindow.requireSignIn", false);
 
 // Scripts & Windows prefs
 pref("dom.disable_open_during_load",              true);
