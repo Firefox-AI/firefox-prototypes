@@ -327,10 +327,19 @@ export class OpenAIPipeline {
     lazy.console.debug("Running OpenAI pipeline");
     try {
       const { baseURL, apiKey, modelId } = this.#options;
+      let fxAccountToken = request.fxAccountToken
+        ? request.fxAccountToken
+        : null;
+
+      const defaultHeaders = fxAccountToken
+        ? { "authorization": `Bearer ${fxAccountToken}` }
+        : undefined;
+
       const client = new OpenAIPipeline.OpenAILib.OpenAI({
         baseURL: baseURL ? baseURL : "http://localhost:11434/v1",
         apiKey: apiKey || "ollama",
         maxRetries: 10,
+        ...(defaultHeaders ? { defaultHeaders } : {}),
       });
       const stream = request.streamOptions?.enabled || false;
       const tools = request.tools || [];

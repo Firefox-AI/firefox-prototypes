@@ -14,6 +14,11 @@ ChromeUtils.defineESModuleGetters(lazy, {
 
 import { createEngine } from "chrome://global/content/ml/EngineProcess.sys.mjs";
 import { SmartAssistEngine } from "moz-src:///browser/components/genai/SmartAssistEngine.sys.mjs";
+import { getFxAccountsSingleton } from "resource://gre/modules/FxAccounts.sys.mjs";
+import {
+  SCOPE_PROFILE,
+  OAUTH_CLIENT_ID,
+} from "resource://gre/modules/FxAccountsCommon.sys.mjs";
 
 const { ChatHistoryMessage } = ChromeUtils.importESModule(
   "resource:///modules/smartwindow/ChatHistory.sys.mjs"
@@ -382,6 +387,20 @@ const get_page_content = async ({ url, mode, page }, allowedUrls) => {
   }
 };
 
+const getFxAccountToken = async () => {
+  try {
+    const fxAccounts = getFxAccountsSingleton();
+    const token = await fxAccounts.getOAuthToken({
+      scope: SCOPE_PROFILE,
+      client_id: OAUTH_CLIENT_ID,
+    });
+    return token;
+  } catch (error) {
+    console.warn("Failed to obtain a valid FxA token:", error);
+    return null;
+  }
+};
+
 /**
  * @param {PageExtractor} pageExtractor
  * @param {string} mode
@@ -459,6 +478,7 @@ async function runExtraction(pageExtractor, mode, page, label) {
  */
 export async function* fetchWithHistory(messages, allowedUrls) {
   const engineInstance = await createOpenAIEngine();
+  const fxAccountToken = await getFxAccountToken();
 
   // Normalize roles to lowercase and handle system messages
   let convo = Array.isArray(messages)
@@ -512,6 +532,7 @@ export async function* fetchWithHistory(messages, allowedUrls) {
   const streamModelResponse = () =>
     engineInstance.runWithGenerator({
       streamOptions: { enabled: true },
+      fxAccountToken,
       tool_choice: "auto",
       tools: toolsConfig,
       args: convo,

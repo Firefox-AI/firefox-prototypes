@@ -128,6 +128,9 @@ var SmartWindow = {
                       type: "FXA_SMART_WINDOW_SIGNIN_FLOW",
                       data: {
                         entrypoint: "aimode",
+                        extraParams: {
+                          service: "aimode",
+                        }
                       },
                     },
                     gBrowser.selectedBrowser

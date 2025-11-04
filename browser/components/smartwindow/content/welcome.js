@@ -69,6 +69,9 @@ XPCOMUtils.defineLazyPreferenceGetter(
                   {
                     data: {
                       entrypoint: "aimode",
+                      extraParams: {
+                        service: "aimode",
+                      }
                     },
                     type: "FXA_SMART_WINDOW_SIGNIN_FLOW",
                     navigate: true,
