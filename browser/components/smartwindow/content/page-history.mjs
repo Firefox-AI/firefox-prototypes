@@ -15,7 +15,6 @@ export class PageHistoryOverlay extends LitElement {
   static properties = {
     isOpen: { type: Boolean },
     historyItems: { type: Array },
-    searchQuery: { type: String },
     isLoading: { type: Boolean },
     error: { type: String }
   };
@@ -23,45 +22,18 @@ export class PageHistoryOverlay extends LitElement {
   constructor() {
     super();
     this.isOpen = false;
-    this.historyItems = [];
-    this.searchQuery = "";
+    this._historyItems = [];
     this.error = null;
   }
 
-  get filteredItems() {
-    // Ensure historyItems is always an array
-    const items = Array.isArray(this.historyItems) ? this.historyItems : [];
-
-    console.warn("[PageHistory] filteredItems getter called", {
-      historyItemsLength: items.length,
-      searchQuery: this.searchQuery,
-      historyItemsType: typeof this.historyItems,
-      isArray: Array.isArray(this.historyItems)
-    });
-
-    if (!this.searchQuery || !this.searchQuery.trim()) {
-      return items;
-    }
-
-    const lowerQuery = this.searchQuery.toLowerCase();
-    const filtered = items.filter(item => {
-      return (
-        item.title?.toLowerCase().includes(lowerQuery) ||
-        item.url?.toLowerCase().includes(lowerQuery)
-      );
-    });
-
-    console.warn("[PageHistory] Filtered results:", {
-      originalCount: items.length,
-      filteredCount: filtered.length,
-      searchQuery: lowerQuery
-    });
-
-    return filtered;
+  set historyItems(value) {
+    const oldValue = this._historyItems;
+    this._historyItems = Array.isArray(value) ? [...value] : [];
+    this.requestUpdate("historyItems", oldValue);
   }
 
-  handleSearch(event) {
-    this.searchQuery = event.target.value;
+  get historyItems() {
+    return this._historyItems || [];
   }
 
   handleClose() {
@@ -156,25 +128,22 @@ export class PageHistoryOverlay extends LitElement {
       return html`<div class="error-message">Error: ${this.error}</div>`;
     }
 
-    const filteredItems = this.filteredItems;
+    const historyItems = Array.isArray(this.historyItems) ? this.historyItems : [];
 
-    // Safety check to ensure filteredItems is an array
-    if (!Array.isArray(filteredItems) || filteredItems.length === 0) {
+    if (historyItems.length === 0) {
       return html`
         <div class="empty-state">
-          ${this.searchQuery
-            ? html`<p>No history items match your search.</p>`
-            : html`<p>No history items found.</p>
-                <p class="empty-hint">
-                  Browse some websites to see your history here.
-                </p>`}
+          <p>No history items found.</p>
+          <p class="empty-hint">
+            Browse some websites to see your history here.
+          </p>
         </div>
       `;
     }
 
     return html`
       <div class="history-grid">
-        ${filteredItems.map(item => this.renderHistoryItem(item))}
+        ${historyItems.map(item => this.renderHistoryItem(item))}
       </div>
     `;
   }
@@ -190,15 +159,6 @@ export class PageHistoryOverlay extends LitElement {
           <div class="history-header">
             <h3>Pages from History (${this.historyItems.length})</h3>
             <button class="close-btn" @click=${this.handleClose}>×</button>
-          </div>
-          <div class="search-container">
-            <input
-              type="text"
-              class="search-input"
-              placeholder="Search history..."
-              @input=${this.handleSearch}
-              .value=${this.searchQuery}
-            />
           </div>
           <div class="history-content">
             ${this.renderContent()}
@@ -283,25 +243,6 @@ export class PageHistoryOverlay extends LitElement {
 
     .close-btn:hover {
       background: #e0e0e0;
-    }
-
-    .search-container {
-      padding: 1rem 1.5rem;
-    }
-
-    .search-input {
-      width: 100%;
-      padding: 0.75rem 1rem;
-      border: 1px solid #d0d0d0;
-      border-radius: 6px;
-      font-size: 0.875rem;
-      box-sizing: border-box;
-    }
-
-    .search-input:focus {
-      outline: none;
-      border-color: #0066cc;
-      box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
     }
 
     .history-content {
