@@ -1114,6 +1114,7 @@ ${intentsList}
 - Dont repeat insights about entities that are already in related_insights.
 
 ## Insight rules (write 1 short, specific sentence)
+- DO NOT generate or infer any insights related to personal medical information, pregnancy, or other sensitive life events.
 - Insights are useful preferences about the user such as product, brands, preferences, behavior, etc that could be useful to personalize the conversation response in the future.
 - Dont imagine an action unless you see evidence for sure. E.g. use "shops for" unless you see an evidence of purchase or buy,
   use "plans trip" unless you see a ticket was purchased,
@@ -1121,8 +1122,8 @@ ${intentsList}
 - Dont include person name unless they are popular to avoid any PII.
 - Dont generate insight from just odd one visit.
 - The insights are generated based on a pattern of visits.
+- The insights SHOULD NOT have any medical or health information about the user.
 - Don’t infer product relationships between unrelated domains unless both appear together in the same session evidence.
-- AVOID collecting insights about personal, health related, or sensitive or anything user would like to keep it private.
 - Don't generate a new insight unless it is quite different from known items in related_insights.
 - If no safe, specific insight is supported by Inputs, set "insight_summary": null.
 - Examples of good form:
@@ -1131,6 +1132,23 @@ ${intentsList}
     - “Streams new-release movies via Fandango”
     - “Cooks Mediterranean seafood from TasteAtlas recipes”
     - “Tracks minimalist fashion drops at Uniqlo”
+
+## Exclusion rules for insights
+- DO NOT include sensitive insights about revealing medical condition or health or race or ethnicity or gender or anything user would like to keep visits or searches PRIVATE.
+  Examples of BAD and sensitive insights to exclude:
+   - Researches treatment about arthritis
+   - searches about pregnancy tests online
+   - pediatrician in san francisco
+   - political leaning towards a party
+   - research about ethnicity demographics in a city
+   - Marie, female from ohio looking for rental apartments
+
+## Sensitive Information Handling
+- Immediately set "insight_summary": null if the insight or any evidence contains these keywords or their variants: "pregnancy", "pregnant", "cancer", "arthritis", "depression", "mental health", "treatment", "health condition".
+- Never infer sensitive personal health topics from browsing or search unless there is explicit strong evidence.
+- Examples of prohibited insights:
+   - "Looks for pregnancy meal delivery services"
+   - "Researches arthritis treatment options"
 
 ## Scoring priorities
 - Base "score" on *strength + recency*; boost multi-source corroboration.
@@ -1215,7 +1233,8 @@ async function generateInsightsWithLLM(profile, source) {
     args: [
       {
         role: "system",
-        content: "You are a precise data analyst. Return ONLY valid JSON.",
+        content:
+          "You are a privacy respecting data analyst who tries to generate useful insights about user preferences EXCLUDING personal, medical, health, financial, private and any sensitive activities of users. Return ONLY valid JSON.",
       },
       { role: "user", content: promptText },
     ],
