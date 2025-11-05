@@ -41,9 +41,12 @@ body {
   max-width: 700px;
   margin: 0 auto 20px;
   position: relative; /* Important for absolute positioning of suggestions */
-  background: white;
+  border: 1px solid transparent;
   border-radius: 18px;
-  border: 1px solid #eab2f7;
+  /* Rounded gradient border */
+  background-image: linear-gradient(white, white), linear-gradient(90deg, #9059ff 0%, #ff4aa2 52.08%, #ffbd4f 100%);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
   box-shadow:
     0 0.25px 0.75px 0 rgba(0, 0, 0, 0.05),
     0 2px 20px 0 rgba(255, 82, 255, 0.15);
@@ -51,7 +54,6 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--space-large);
-  backdrop-filter: blur(10px);
 }
 
 /* Suggestions popover visible */
@@ -380,7 +382,6 @@ body {
   background: rgb(255, 255, 255);
   border-radius: 0 0 18px 18px;
   padding: var(--space-medium) var(--space-small);
-  backdrop-filter: blur(10px);
   box-shadow:
     0 0.25px 0.75px 0 rgba(0, 0, 0, 0.05),
     0 2px 20px 0 rgba(255, 82, 255, 0.15);
@@ -572,7 +573,6 @@ body {
     width: calc(100% - 32px);
     max-width: 700px;
     margin: 0;
-    backdrop-filter: blur(20px);
   }
 
   /* Suggestions popover visible */
