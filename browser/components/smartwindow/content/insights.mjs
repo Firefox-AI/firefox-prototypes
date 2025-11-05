@@ -1300,7 +1300,7 @@ function addInsightsToData(payload) {
       upsertedByCategory += 1;
     }
 
-    // Legacy chips: keep the short text so UI shows tags today
+    // Legacy chips: keep the summary text so UI shows tags today
     const label = summary;
     if (category) {
       if (!insightsData[category]) {
@@ -1469,7 +1469,7 @@ export async function analyzeHistorySmart() {
     (meta.history?.lastMicros || 0) === 0;
 
   if (firstRun) {
-    return generateInsightsFromHistory({ days: 60, maxResults: 1000 }); // unchanged full run
+    return generateInsightsFromHistory({ days: 60, maxResults: 3000 }); // full run
   }
   return updateInsightsFromHistoryIncremental();
 }
@@ -1517,9 +1517,9 @@ export async function generateInsightsFromHistory(
     const [agg_domains, agg_titles, agg_searches] = aggregateSessions(prepared);
 
     const topk = topkAggregates(agg_domains, agg_titles, agg_searches, {
-      k_domains: 50,
+      k_domains: 100,
       k_titles: 60,
-      k_searches: 10,
+      k_searches: 25,
     });
 
     console.log(`[Insights] Generating insights with LLM...`);
