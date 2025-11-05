@@ -10,6 +10,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
   PageThumbs: "resource://gre/modules/PageThumbs.sys.mjs",
   PageThumbsStorage: "resource://gre/modules/PageThumbs.sys.mjs",
+  getPlacesSemanticHistoryManager: "resource://gre/modules/PlacesSemanticHistoryManager.sys.mjs",
 });
 
 import { createEngine } from "chrome://global/content/ml/EngineProcess.sys.mjs";
@@ -139,98 +140,191 @@ const toolsConfig = [
     function: {
       name: SEARCH_HISTORY,
       description:
-        "Search the user's browser history to find previously visited pages related to specific keywords or topics. This helps find relevant pages the user has visited before, even if they're not currently open. Returns pages ranked by relevance and visit frequency.",
+        "Search the user's browser history stored in sqlite-vec using an embedding model. If a search term is provided, performs vector search and ranks by semantic distance with frecency tie-breaks. If no search term is provided, returns the most relevant pages within a time window ranked by recency and frecency. Supports optional time range filtering using microsecond timestamps. This is to find previously visited pages related to specific keywords or topics. This helps find relevant pages the user has visited before, even if they're not currently open.",
       parameters: {
         type: "object",
         properties: {
           search_term: {
             type: "string",
             description:
-              "Keywords or phrases to search for in page titles and URLs from browser history. Use specific terms that are likely to appear in page titles. Examples: 'python tutorial', 'react documentation', 'news climate change', 'github repository'",
+              "Detailed phrases to search semantically (title/description) using embeddings, detailed related words are preferable. Leave empty or omit to return time-windowed recent pages without semantic filtering. Use specific terms that are likely to appear in page titles and descriptions. Examples: 'python tutorial', 'react documentation', 'news climate change', 'github repository'",
+          },
+          start_ts: {
+            type: ["integer", "null"],
+            description: "Inclusive lower bound of the time window as a Unix timestamp in MICROSECONDS. Use when the users ask for results within a time or range start, for examples: 'last week', 'since yesterday', 'last night'. Example value: 1751929200000000",
+            default: null
+          },
+          end_ts: {
+            type: ["integer", "null"],
+            description: "Inclusive upper bound of the time window as a Unix timestamp in MICROSECONDS. Use when the users ask for results within a time or range end, for examples: 'last week', 'between 2025-10-01 and 2025-10-31', 'this summer', 'before Monday'. Example value: 1751929200000000",
+            default: null
           },
         },
-        required: ["search_term"],
+        required: [],
       },
     },
   },
 ];
 
-export async function searchBrowserHistory({ search_term, limit = 10 }) {
+export async function searchBrowserHistory({ search_term = "", start_ts = null, end_ts = null, limit = 10 }) {
+
+  console.warn("[searchBrowserHistory]", "search_term:", search_term, "limit:", limit, "(hard limit for pre coarse search is 100)");
+  console.warn("[searchBrowserHistory]", "start_ts:", start_ts, "end_ts:", end_ts);
+  console.warn("[searchBrowserHistory]", "start_ts ISO:", new Date(Math.round(start_ts / 1000)).toISOString(), "end_ts ISO:", new Date(Math.round(end_ts / 1000)).toISOString());
   let root;
   let openedRoot = false;
 
+  let results;
+
   try {
-    const currentHistory = lazy.PlacesUtils.history;
-    const query = currentHistory.getNewQuery();
-    const opts = currentHistory.getNewQueryOptions();
-
-    // Use Places' built-in text filtering
-    query.searchTerms = search_term;
-
-    // Simple URI results, ranked by frecency
-    opts.resultType = Ci.nsINavHistoryQueryOptions.RESULTS_AS_URI;
-    opts.sortingMode = Ci.nsINavHistoryQueryOptions.SORT_BY_FRECENCY_DESCENDING;
-    opts.maxResults = limit;
-    opts.excludeQueries = false;
-    opts.queryType = Ci.nsINavHistoryQueryOptions.QUERY_TYPE_HISTORY;
-
-    const result = currentHistory.executeQuery(query, opts);
-    root = result.root;
-
-    if (!root.containerOpen) {
-      root.containerOpen = true;
-      openedRoot = true;
-    }
+    const distanceThreshold = Services.prefs.getFloatPref(
+        "places.semanticHistory.distanceThreshold",
+        0.6
+      );
+    const semanticManager = lazy.getPlacesSemanticHistoryManager({
+        rowLimit: 10000,
+        samplingAttrib: "frecency",
+        changeThresholdCount: 3,
+        distanceThreshold,
+      });
 
     const rows = [];
-    for (let i = 0; i < root.childCount && rows.length < limit; i++) {
-      const node = root.getChild(i);
-      const lastVisit = lazy.PlacesUtils.toDate(node.time);
+    if (semanticManager.canUseSemanticSearch && (await semanticManager.hasSufficientEntriesForSearching())) {
+        await semanticManager.embedder.ensureEngine();
 
-      // Get favicon URL for the page
-      let faviconUrl = null;
-      try {
-        const faviconURI = Services.io.newURI(node.uri);
-        faviconUrl = `page-icon:${faviconURI.spec}`;
-      } catch (e) {
-        // If favicon lookup fails, continue without it
-        console.warn("Could not get favicon for:", node.uri);
-      }
+        // handle case without search_term, time range query with no semantic
+        if (!search_term || !search_term.trim()) {
+            let conn = await semanticManager.getConnection();
+            results = await conn.executeCached(
+                `
+                  SELECT id,
+                         title,
+                         url,
+                         NULL AS distance,
+                         frecency,
+                         last_visit_date,
+                         preview_image_url
+                  FROM moz_places
+                  WHERE frecency <> 0
+                  AND (:start_ts IS NULL OR last_visit_date >= :start_ts)
+                  AND (:end_ts IS NULL OR last_visit_date <= :end_ts)
+                  ORDER BY last_visit_date DESC, frecency DESC
+                  LIMIT :limit
+                `,
+                {
+                    start_ts: start_ts,
+                    end_ts: end_ts,
+                    limit: limit,
+                }
+            );
+        } else {
+            let tensor = await semanticManager.embedder.embed(search_term);
+            let vec = null;
 
-      let thumbnailUrl = null;
-      try {
-        if (await lazy.PageThumbsStorage.fileExistsForURL(node.uri)) {
-          thumbnailUrl = lazy.PageThumbs.getThumbnailURL(node.uri);
+            // It may be a { metrics, output } object.
+            if (tensor.output) {
+              if (Array.isArray(tensor.output) && (Array.isArray(tensor.output[0]) || ArrayBuffer.isView(tensor.output[0]))) {
+                vec = tensor.output[0];
+              } else {
+                vec = tensor.output
+              }
+            } else {
+              // It may be a nested array, then we must extract it first.
+              if (
+                Array.isArray(tensor) &&
+                tensor.length === 1 &&
+                Array.isArray(tensor[0])
+              ) {
+                tensor = tensor[0];
+              }
+
+              // Then we check if it's an array of arrays or just a single value.
+              if (Array.isArray(tensor) && (Array.isArray(tensor[0]) || ArrayBuffer.isView(tensor[0]))) {
+                vec = tensor[0];
+              } else {
+                vec = tensor;
+              }
+            }
+
+            const vector = lazy.PlacesUtils.tensorToSQLBindable(vec);
+            let conn = await semanticManager.getConnection();
+            results = await conn.executeCached(
+              `
+              WITH coarse_matches AS (
+                SELECT rowid,
+                       embedding
+                FROM vec_history
+                WHERE embedding_coarse match vec_quantize_binary(:vector)
+                ORDER BY distance
+                LIMIT 100
+              ),
+              matches AS (
+                SELECT url_hash, vec_distance_cosine(embedding, :vector) AS distance
+                FROM vec_history_mapping
+                JOIN coarse_matches USING (rowid)
+                WHERE distance <= :distanceThreshold
+                ORDER BY distance
+                LIMIT :limit
+              )
+              SELECT id,
+                     title,
+                     url,
+                     distance,
+                     frecency,
+                     last_visit_date,
+                     preview_image_url
+              FROM moz_places
+              JOIN matches USING (url_hash)
+              WHERE frecency <> 0
+              AND (:start_ts IS NULL OR last_visit_date >= :start_ts)
+              AND (:end_ts IS NULL OR last_visit_date <= :end_ts)
+              ORDER BY distance
+              `,
+              {
+                vector: vector,
+                distanceThreshold: distanceThreshold,
+                limit: limit,
+                start_ts: start_ts,
+                end_ts: end_ts,
+              }
+            );
+
         }
-      } catch (e) {
-        console.warn("Could not get thumbnail for:", node.uri, e);
-      }
 
-      rows.push({
-        title: node.title || node.uri,
-        url: node.uri,
-        visitDate: lastVisit.toISOString(), // ISO timestamp format
-        visitCount: node.accessCount || 0,
-        relevanceScore: node.frecency || 0, // Use frecency as relevance score
-        ...(faviconUrl && { favicon: faviconUrl }), // Only include favicon if available
-        ...(thumbnailUrl && { thumbnail: thumbnailUrl }),
-      });
+        for (let row of results) {
+          const title = row.getResultByName("title");
+          const url = row.getResultByName("url");
+          const lastVisit = row.getResultByName("last_visit_date");
+          const relevanceScore = 1 - row.getResultByName("distance");
+          const previewImageURL = row.getResultByName("preview_image_url");
+
+          rows.push({
+            title: title || url,
+            url: url,
+            visitDate: new Date(Math.round(lastVisit / 1000)).toISOString(), // ISO timestamp format
+            visitCount: 0,
+            relevanceScore: relevanceScore || 0, // Use frecency as relevance score
+            ...(previewImageURL && { thumbnail: previewImageURL }), // Only include thumbnail if available
+          });
+        }
+
+        if (rows.length === 0) {
+          return JSON.stringify({
+            search_term,
+            results: [],
+            message: `No browser history found for "${search_term}".`,
+          });
+        }
+
+        // Return as JSON string with metadata
+        return JSON.stringify({
+          search_term,
+          count: rows.length,
+          results: rows,
+        });
+
     }
 
-    if (rows.length === 0) {
-      return JSON.stringify({
-        search_term,
-        results: [],
-        message: `No browser history found for "${search_term}".`,
-      });
-    }
-
-    // Return as JSON string with metadata
-    return JSON.stringify({
-      search_term,
-      count: rows.length,
-      results: rows,
-    });
   } catch (error) {
     console.error("Error searching browser history:", error);
     return JSON.stringify({

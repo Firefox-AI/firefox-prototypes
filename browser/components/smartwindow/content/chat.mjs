@@ -1375,6 +1375,7 @@ Format the title as follows: §title: title§`;
 
     systemPrompt += `\n\n# Real Time & User Information
 
+Current timestamp in ms: ${new Date().valueOf() * 1000}
 Today's date: ${currentDate}`;
 
     const contextTabs = this.currentTabContext || tabContext;
