@@ -85,18 +85,64 @@ var SmartWindow = {
         case "smart-window-switch-classic":
           this.toggleSmartWindow();
           break;
-        case "smart-window-switch-smart":
-          if (
-            Services.prefs.getBoolPref(
-              "browser.smartwindow.skipOnboarding",
-              true
-            )
-          ) {
+        case "smart-window-switch-smart": {
+          const skipOnboarding = Services.prefs.getBoolPref(
+            "browser.smartwindow.skipOnboarding",
+            true
+          );
+          const completedOnboarding = Services.prefs.getBoolPref(
+            "messaging-system-action.smart-window-tos",
+            false
+          );
+
+          if (skipOnboarding || completedOnboarding) {
+            const requireSignIn = Services.prefs.getBoolPref(
+              "browser.smartwindow.requireSignIn",
+              false
+            );
+
+            if (requireSignIn) {
+              const { UIState } = ChromeUtils.importESModule(
+                "resource://services-sync/UIState.sys.mjs"
+              );
+              const currentState = UIState.get();
+
+              if (currentState.status !== UIState.STATUS_SIGNED_IN) {
+                console.warn(
+                  "[Smart Window] User not authenticated, sign in with FxA"
+                );
+
+                try {
+                  const { SpecialMessageActions } = ChromeUtils.importESModule(
+                    "resource://messaging-system/lib/SpecialMessageActions.sys.mjs"
+                  );
+                  // FXA_SMART_WINDOW_SIGNIN_FLOW handles toggling smart window on success
+                  SpecialMessageActions.handleAction(
+                    {
+                      type: "FXA_SMART_WINDOW_SIGNIN_FLOW",
+                      data: {
+                        entrypoint: "aimode",
+                      },
+                    },
+                    gBrowser.selectedBrowser
+                  );
+                  break;
+                } catch (error) {
+                  console.error(
+                    "[Smart Window] Error during FxA sign-in:",
+                    error
+                  );
+                }
+              }
+            }
+
             this.toggleSmartWindow();
           } else {
             this.showOnboarding();
           }
+
           break;
+        }
         case "smart-window-dev-onboarding":
           this.showOnboarding();
           break;

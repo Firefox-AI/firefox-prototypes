@@ -68,7 +68,7 @@ XPCOMUtils.defineLazyPreferenceGetter(
                   },
                   {
                     data: {
-                      entrypoint: "activity-stream-firstrun",
+                      entrypoint: "aimode",
                     },
                     type: "FXA_SMART_WINDOW_SIGNIN_FLOW",
                     navigate: true,
