@@ -137,16 +137,16 @@ class SmartWindowPage {
       return await cachedPromise;
     }
 
-    const promptsPromise = this._generatePromptsInternal(contextTabs, tabTitle);
+    const promptsPromise = this._generatePromptsInternal(contextTabs);
     topChromeWindow.SmartWindow.setPromptsCache(cacheKey, promptsPromise);
 
     return await promptsPromise;
   }
 
   // Internal method to generate conversation starters
-  async _generatePromptsInternal(contextTabs, tabTitle) {
+  async _generatePromptsInternal(contextTabs, count = 6) {
     try {
-      const suggestions = await generateConversationStarters(contextTabs, 6);
+      const suggestions = await generateConversationStarters(contextTabs, count);
       if (suggestions && suggestions.length) {
         return suggestions;
       }
@@ -916,6 +916,11 @@ class SmartWindowPage {
       return;
     }
 
+    // Don't show regular quick prompts when onboarding info is displayed
+    if (document.querySelector(".onboarding-info-text-container")) {
+      return;
+    }
+
     // Don't overwrite followup prompts with conversation starters
     if (this.currentPromptsType === "followups") {
       return;
@@ -950,22 +955,6 @@ class SmartWindowPage {
     // Clear existing prompts
     this.quickPromptsContainer.innerHTML = "";
 
-    // Add emoji mapping for prompt types
-    const getEmoji = emojiType => {
-      switch (emojiType) {
-        case "chat":
-          return "💬";
-        case "search":
-          return "🔍";
-        case "navigate":
-          return "🌐";
-        case "action":
-          return "⚡";
-        default:
-          return "💡";
-      }
-    };
-
     // Create pill buttons for each prompt (limit to top 2)
     prompts.slice(0, 2).forEach(quickPrompt => {
       const pill = document.createElement("button");
@@ -973,7 +962,7 @@ class SmartWindowPage {
 
       const emoji = document.createElement("span");
       emoji.className = "quick-prompt-emoji";
-      emoji.textContent = getEmoji(quickPrompt.type);
+      emoji.textContent = this.getEmoji(quickPrompt.type);
 
       const text = document.createElement("span");
       text.className = "quick-prompt-text";
@@ -1565,6 +1554,8 @@ class SmartWindowPage {
     // Update quick prompts if user hasn't edited the query (skip for about:blank)
     if (!isAboutBlank && !this.userHasEditedQuery && !editorText.trim()) {
       this.showQuickPrompts().catch(console.error);
+      // Also update onboarding prompts if they're visible
+      this.updateOnboardingPrompts().catch(console.error);
     }
 
     // Get page text and display in status
@@ -1616,6 +1607,8 @@ class SmartWindowPage {
         this.smartbar.hideSuggestions();
       }
       this.showQuickPrompts().catch(console.error);
+      // Also update onboarding prompts if they're visible
+      this.updateOnboardingPrompts().catch(console.error);
       return;
     }
 
@@ -1659,26 +1652,157 @@ class SmartWindowPage {
       return;
     }
 
-    const container = document.getElementById("assistant-onboarding-message-container");
-
-    if (container.querySelector("#assistant-onboarding-message")) {
+    // Show the main onboarding message
+    if (document.getElementById("assistant-onboarding-message")) {
       this.onboardingRendered = true;
       return;
     }
 
-    const msg = document.createElement("div");
-    msg.id = "assistant-onboarding-message";
-    msg.textContent = "Welcome to Smart Window!";
+    // Create main onboarding message in results container
+    const wrap = document.createElement("div");
+    wrap.id = "assistant-onboarding-message";
+    wrap.textContent = "Welcome, meet Smart Window!";
 
-    container.hidden = false;
-    container.replaceChildren(msg);
+    this.resultsContainer.appendChild(wrap);
+
+    // Create onboarding info above the text input
+    this.showOnboardingInfo();
 
     this.onboardingRendered = true;
   }
 
+  getEmoji(emojiType) {
+    switch (emojiType) {
+      case "chat":
+        return "💬";
+      case "search":
+        return "🔍";
+      case "navigate":
+        return "🌐";
+      case "action":
+        return "⚡";
+      default:
+        return "💡";
+    }
+  }
+
+  async showOnboardingInfo() {
+    // Add info text before the quick-prompts-container
+    if (!this.quickPromptsContainer) {
+      return;
+    }
+
+    // Check if info text container already exists
+    if (document.querySelector(".onboarding-info-text-container")) {
+      // If it exists, just update the prompts
+      await this.updateOnboardingPrompts();
+      return;
+    }
+
+    // Create container for the info text
+    const infoTextContainer = document.createElement("div");
+    infoTextContainer.className = "onboarding-info-text-container";
+
+    // Create the info text element
+    const infoText = document.createElement("div");
+    infoText.className = "onboarding-info-text";
+    infoText.textContent = "Great! You’re all set to start using Smart Window.\n Would you like some help with getting started? Feel free to ask me anything — here are a few things I can help you with:";
+    // Add info text to container
+    infoTextContainer.appendChild(infoText);
+
+    // Add container before the quick prompts container
+    this.quickPromptsContainer.parentNode.insertBefore(infoTextContainer, this.quickPromptsContainer);
+
+    // Generate and display the initial prompts
+    await this.updateOnboardingPrompts();
+
+    // Show the container
+    this.quickPromptsContainer.classList.remove("hidden");
+  }
+
+  async updateOnboardingPrompts() {
+    const infoTextContainer = document.querySelector(".onboarding-info-text-container");
+    if (!infoTextContainer) {
+      return;
+    }
+
+    // Generate quick prompts for onboarding
+    const tabTitle = this.lastTabInfo?.title || "";
+    console.log("[Onboarding] Updating prompts for tab:", tabTitle);
+
+    // Get current tab context or create fallback context
+    let contextTabs = [];
+    if (this.lastTabInfo && this.isTabEligibleForContext(this.lastTabInfo)) {
+      // Use current tab as context if available and eligible
+      contextTabs = [this.lastTabInfo];
+    }
+
+    let prompts = [];
+    if (contextTabs.length > 0) {
+      prompts = await this._generatePromptsInternal(contextTabs, 2);
+    }
+    console.log("[Onboarding] Updated prompts:", prompts);
+
+    // If no prompts were generated, provide some default onboarding prompts
+    if (!prompts || prompts.length === 0) {
+      console.log("[Onboarding] Using default prompts");
+      prompts = [
+        { text: "How do I use Smart Window?", type: "chat" },
+        { text: "What can you help me with?", type: "chat" },
+      ];
+    }
+
+    // Remove existing prompts container if it exists
+    const existingPromptsContainer = infoTextContainer.querySelector(".onboarding-prompts-container");
+    if (existingPromptsContainer) {
+      existingPromptsContainer.remove();
+    }
+
+    // Create quick prompts suggestions within the container if we have prompts
+    if (prompts && prompts.length > 0) {
+      console.log("[Onboarding] Creating updated prompts container with", prompts.length, "prompts");
+      const promptsContainer = document.createElement("div");
+      promptsContainer.className = "onboarding-prompts-container";
+
+      // Create pill buttons for each prompt
+      prompts.forEach(quickPrompt => {
+        const pill = document.createElement("button");
+        pill.className = "quick-prompt-pill onboarding-prompt-pill";
+
+        const emoji = document.createElement("span");
+        emoji.className = "quick-prompt-emoji";
+        emoji.textContent = this.getEmoji(quickPrompt.type);
+
+        const text = document.createElement("span");
+        text.className = "quick-prompt-text";
+        text.textContent = quickPrompt.text;
+
+        pill.appendChild(emoji);
+        pill.appendChild(text);
+
+        // Add click handler
+        pill.addEventListener("click", () => {
+          if (this.smartbar) {
+            this.smartbar.setContent(quickPrompt.text);
+          }
+          this.handleEnter(quickPrompt.text);
+        });
+
+        promptsContainer.appendChild(pill);
+      });
+
+      infoTextContainer.appendChild(promptsContainer);
+    } else {
+      console.log("[Onboarding] No prompts generated or prompts array is empty");
+    }
+  }
+
   hideOnboardingMesssage() {
     const el = document.getElementById("assistant-onboarding-message");
+
     if (!el || el.classList.contains("is-hiding")) {
+      // Still try to hide the info text if it exists
+      this.hideOnboardingInfo();
       return;
     }
 
@@ -1692,6 +1816,17 @@ class SmartWindowPage {
     );
 
     el.classList.add("is-hiding");
+
+    // Also hide the onboarding info text
+    this.hideOnboardingInfo();
+  }
+
+  hideOnboardingInfo() {
+    // Remove the info text container from the DOM
+    const infoTextContainer = document.querySelector(".onboarding-info-text-container");
+    if (infoTextContainer) {
+      infoTextContainer.remove();
+    }
   }
 
   async handleEnter(query, suggestionType = null) {
