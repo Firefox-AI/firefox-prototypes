@@ -118,7 +118,7 @@ export const INTENTS = [
 // // Higher is better: user > chat > search > history
 //   user: 4,
 //   chat: 3,
-//   conversation: 3, // in case chat rows use "conversation"
+//   conversation: 3,
 //   search: 2,
 //   history: 1,
 
@@ -179,7 +179,17 @@ async function runInsights(
   source,
   caps = { maxPerCategory: 2, maxPerIntent: 2 }
 ) {
-  const listRaw = await generateInsightsWithLLM(profile_records, source);
+  const llm_pipeline = Services.prefs.getStringPref(
+    "browser.smartwindow.insightsPipeline",
+    "regular"
+  );
+  let listRaw;
+  if (llm_pipeline == "regular") {
+    listRaw = await generateInsightsWithLLM(profile_records, source);
+  } else {
+    listRaw = await generateInsightsWithCoVe(profile_records, source);
+  }
+
   const { validated, rejected } = partitionAndValidate(listRaw);
   if (rejected.length) {
     console.warn(
@@ -196,6 +206,215 @@ async function runInsights(
     `[Insights] Added ${addedCount}/${list.length} insights from ${source}`
   );
   return { addedCount };
+}
+
+// ===================== CoVe: Engine Runners =====================
+
+async function runCoVeQuestions({
+  engine,
+  insight,
+  profile_records,
+  related_insights,
+}) {
+  const resp = await engine.run({
+    args: [
+      {
+        role: "system",
+        content: "You generate verification questions. Return VALID JSON only.",
+      },
+      {
+        role: "user",
+        content: buildVerificationQuestionsPrompt({
+          insight,
+          profile_records,
+          related_insights,
+        }),
+      },
+    ],
+    // Lower temperature for stability
+    options: { temperature: 0.2 },
+    responseFormat: { type: "json_schema", schema: COVE_QUESTIONS_SCHEMA },
+  });
+  const raw = resp?.finalOutput ?? "{}";
+  const obj = extractJSON(raw);
+  return obj?.questions ?? [];
+}
+
+async function runCoVeAnswers({
+  engine,
+  insight,
+  profile_records,
+  related_insights,
+  questions,
+}) {
+  const resp = await engine.run({
+    args: [
+      {
+        role: "system",
+        content:
+          "You answer verification questions. Be strict, no invention. Return VALID JSON only.",
+      },
+      {
+        role: "user",
+        content: buildAnswerQuestionsPrompt({
+          insight,
+          profile_records,
+          related_insights,
+          questions,
+        }),
+      },
+    ],
+    options: { temperature: 0.1 },
+    responseFormat: { type: "json_schema", schema: COVE_ANSWERS_SCHEMA },
+  });
+  const raw = resp?.finalOutput ?? "{}";
+  console.log(`insight ===> ${JSON.stringify(insight)}`);
+  console.log(`cove answers ===> ${raw}`);
+  return extractJSON(raw);
+}
+
+// ===================== CoVe: Integration =====================
+
+function integrateCoVeDecision({
+  insight,
+  answersObj,
+  profile_records,
+  related_insights,
+}) {
+  // Hard, non-LLM guardrails first
+  const hasSensitiveText =
+    containsSensitive(insight?.insight_summary) ||
+    (Array.isArray(insight?.evidence) &&
+      insight.evidence.some(e => containsSensitive(e?.value)));
+
+  const evidenceOk = evidenceStringsExistInProfile(insight, profile_records);
+  const duplicate = isDuplicateOrSameEntity(insight, related_insights);
+
+  if (!evidenceOk) {
+    return { action: "reject", reason: "evidence_mismatch" };
+  }
+  if (duplicate) {
+    return { action: "reject", reason: "duplicate" };
+  }
+  if (hasSensitiveText) {
+    return { action: "reject", reason: "sensitive" };
+  }
+
+  // Use model verdict next
+  const v = answersObj?.verdict || "reject";
+  const suggestedScore =
+    typeof answersObj?.suggested_score === "number"
+      ? answersObj.suggested_score
+      : null;
+
+  if (v === "reject") {
+    return { action: "reject", reason: "model_verdict_reject" };
+  }
+
+  if (v === "soften") {
+    const replacement =
+      answersObj?.replacement_summary || softenSummary(insight.insight_summary);
+    const adjusted = { ...insight };
+    adjusted.insight_summary = replacement;
+    if (suggestedScore && Number.isInteger(suggestedScore)) {
+      adjusted.score = suggestedScore;
+    }
+    // Also lower score conservatively if none suggested and current > 3
+    if (!suggestedScore && adjusted.score > 3) {
+      adjusted.score = 3;
+    }
+    // Keep category/intent/evidence/why but do NOT add new claims
+    return { action: "soften", insight: adjusted };
+  }
+
+  // accept
+  const accepted = { ...insight };
+  if (suggestedScore && Number.isInteger(suggestedScore)) {
+    accepted.score = suggestedScore;
+  }
+  return { action: "accept", insight: accepted };
+}
+
+// ===================== CoVe: Batch Runner =====================
+
+/**
+ * Runs CoVe over the list of draft insights
+ *
+ * @param {Array<object>} draftInsights
+ * @param {Array<object>} profile_records
+ * @param {Array<string>} related_insights
+ * @returns {Promise<Array<object>>} filtered/softened final insights
+ */
+async function runCoVe(draftInsights, profile_records, related_insights) {
+  const engine = await createOpenAIEngine();
+
+  // Simple batching to avoid huge prompts; tune as needed
+  const MAX_PARALLEL = 6;
+  const results = [];
+
+  async function processOne(insight) {
+    // sanity: ensure evidence strings exist before spending tokens
+    if (!evidenceStringsExistInProfile(insight, profile_records)) {
+      return { drop: true, reason: "evidence_not_verbatim_in_profile" };
+    }
+    if (isDuplicateOrSameEntity(insight, related_insights)) {
+      return { drop: true, reason: "duplicate_vs_related" };
+    }
+    if (
+      containsSensitive(insight?.insight_summary) ||
+      (insight.evidence || []).some(e => containsSensitive(e?.value))
+    ) {
+      return { drop: true, reason: "sensitive" };
+    }
+
+    const questions = await runCoVeQuestions({
+      engine,
+      insight,
+      profile_records,
+      related_insights,
+    });
+    if (!questions?.length) {
+      return { drop: true, reason: "no_questions_generated" };
+    }
+
+    const answersObj = await runCoVeAnswers({
+      engine,
+      insight,
+      profile_records,
+      related_insights,
+      questions,
+    });
+
+    const decision = integrateCoVeDecision({
+      insight,
+      answersObj,
+      profile_records,
+      related_insights,
+    });
+
+    if (decision.action === "accept" || decision.action === "soften") {
+      return { keep: true, insight: decision.insight };
+    }
+    return { drop: true, reason: decision.reason || "model_reject" };
+  }
+
+  // Parallel with simple window
+  let i = 0;
+  while (i < draftInsights.length) {
+    const chunk = draftInsights.slice(i, i + MAX_PARALLEL);
+    const outs = await Promise.allSettled(chunk.map(processOne));
+    for (const r of outs) {
+      if (r.status === "fulfilled") {
+        if (r.value.keep) {
+          results.push(r.value.insight);
+        }
+      }
+      // swallowed rejections are fine; they drop the insight
+    }
+    i += MAX_PARALLEL;
+  }
+
+  return results;
 }
 
 /**
@@ -1063,6 +1282,220 @@ const LIVE_INSIGHTS_SCHEMA = {
   },
 };
 
+export const COVE_QUESTIONS_SCHEMA = {
+  name: "CoVeQuestions",
+  schema: {
+    type: "object",
+    properties: {
+      questions: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            qid: { type: "string" }, // stable id for tracing
+            question: { type: "string" },
+          },
+          required: ["qid", "question"],
+          additionalProperties: false,
+        },
+        minItems: 2,
+        maxItems: 8,
+      },
+    },
+    required: ["questions"],
+    additionalProperties: false,
+  },
+};
+
+export const COVE_ANSWERS_SCHEMA = {
+  name: "CoVeAnswers",
+  schema: {
+    type: "object",
+    properties: {
+      answers: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            qid: { type: "string" },
+            answer: { type: "string" },
+            // strict judgments we can aggregate automatically
+            support: {
+              type: "string",
+              enum: [
+                "supported",
+                "partially_supported",
+                "not_supported",
+                "inapplicable",
+              ],
+            },
+            // optional flags (model must never invent)
+            flags: {
+              type: "array",
+              items: {
+                type: "string",
+                enum: [
+                  "duplicate",
+                  "sensitive",
+                  "pii",
+                  "weak_pattern",
+                  "speculative_language",
+                ],
+              },
+            },
+            rationale: { type: "string" }, // short, 20–60 words
+          },
+          required: ["qid", "answer", "support"],
+          additionalProperties: false,
+        },
+        minItems: 2,
+      },
+      // Final model self-verdict for the insight:
+      verdict: { type: "string", enum: ["accept", "soften", "reject"] },
+      // If soften: a 4–10 word replacement summary consistent w/ evidence
+      replacement_summary: { type: ["string", "null"] },
+      // Optional: suggest a lower score if weak
+      suggested_score: { type: ["integer", "null"], minimum: 1, maximum: 5 },
+    },
+    required: ["answers", "verdict"],
+    additionalProperties: false,
+  },
+};
+
+// Sensitive keywords (mirror your prompt rules)
+const SENSITIVE_KEYWORDS = [
+  "pregnancy",
+  "pregnant",
+  "cancer",
+  "arthritis",
+  "depression",
+  "mental health",
+  "treatment",
+  "health condition",
+];
+
+function containsSensitive(str = "") {
+  const s = String(str).toLowerCase();
+  return SENSITIVE_KEYWORDS.some(k => s.includes(k.toLowerCase()));
+}
+
+// Ensures every evidence.value string appears verbatim in profile_records sources.
+function evidenceStringsExistInProfile(insight, profile_records = []) {
+  if (!Array.isArray(insight?.evidence)) {
+    return false;
+  }
+  const hay = JSON.stringify(profile_records ?? []);
+  return insight.evidence.every(e => {
+    if (!e?.value || typeof e.value !== "string") {
+      return false;
+    }
+    return hay.includes(e.value);
+  });
+}
+
+// Checks duplicate vs related_insights
+function isDuplicateOrSameEntity(insight, related_insights = []) {
+  if (!insight?.insight_summary) {
+    return false;
+  }
+  const sum = insight.insight_summary.toLowerCase().trim();
+  return related_insights.some(x =>
+    String(x || "")
+      .toLowerCase()
+      .includes(sum)
+  );
+}
+
+// Conservative language softener for partially supported claims
+function softenSummary(summary) {
+  if (!summary) {
+    return summary;
+  }
+  const s = summary.trim();
+  // Prefix with cautious verbs if not already
+  const hedges = ["Likely", "Often", "Appears to", "May", "Tends to"];
+  if (/^(likely|often|appears to|may|tends to)/i.test(s)) {
+    return s;
+  }
+  return `${hedges[Math.floor(Math.random() * hedges.length)]} ${s.charAt(0).toLowerCase()}${s.slice(1)}`;
+}
+
+// ===================== CoVe: Prompt Builders =====================
+
+function buildVerificationQuestionsPrompt({
+  insight,
+  profile_records,
+  related_insights,
+}) {
+  return `
+    You are verifying a single candidate "insight" about a user. You must NOT invent information.
+
+    Return ONLY JSON per schema. Write 1-2 pointed verification questions that, if answered strictly from the Inputs, can prove or disprove the insight.
+
+    ## Inputs
+    - insight object (draft):
+    ${JSON.stringify(insight, null, 2)}
+
+    - profile_records (ground truth, ONLY source of domains/titles/searches):
+    ${JSON.stringify(profile_records, null, 2)}
+
+    - related_insights (already-known items; avoid duplicates):
+    ${JSON.stringify(related_insights, null, 2)}
+
+    ## Rules
+    - Questions must be answerable using ONLY Inputs.
+    - Target factual cores: pattern strength, duplication, sensitivity.
+    - Avoid yes/no; ask for specific checks (e.g., "Does X has any sensitive or pii or medical information... Does X has good score").
+    - Avoid duration of time spent on a page question as we are not passing that data.
+
+    Return JSON matching the CoVeQuestions schema. No prose.
+  `.trim();
+}
+
+function buildAnswerQuestionsPrompt({
+  insight,
+  profile_records,
+  related_insights,
+  questions,
+}) {
+  return `
+    You must answer verification questions about the candidate insight STRICTLY from Inputs. Do not infer beyond evidence. If insufficient, mark "not_supported".
+
+    Return ONLY JSON per schema.
+
+    ## Inputs
+    - insight (draft):
+    ${JSON.stringify(insight, null, 2)}
+
+    - questions:
+    ${JSON.stringify(questions, null, 2)}
+
+    - profile_records:
+    ${JSON.stringify(profile_records, null, 2)}
+
+    - related_insights:
+    ${JSON.stringify(related_insights, null, 2)}
+
+    ## Judging
+    - "supported": clear, direct evidence from multiple items or strong recent pattern.
+    - "partially_supported": some signals but weak pattern/recency/corroboration.
+    - "not_supported": missing, contradictory, or single odd visit.
+    - Flag "duplicate" if substantially overlaps with related_insights.
+    - Flag "sensitive" / "pii" if violates the policy in Inputs.
+    - Flag "weak_pattern" if fewer than 2 corroborating items or only one-off visit.
+    - If speculative language ("probably", "maybe"), flag "speculative_language".
+
+    ## Final verdict
+    - "accept": mostly "supported", no sensitive/pii, not duplicate.
+    - "soften": mixed or weak support; suggest a hedged 4–10 word replacement_summary.
+    - "reject": mostly "not_supported" or sensitive/duplicate/pii.
+
+    You may suggest a lower "suggested_score" if weak.
+
+    Return JSON matching CoVeAnswers schema. No prose.
+  `.trim();
+}
+
 /**
  * Extracts JSON from LLM response (handles code blocks)
  *
@@ -1469,7 +1902,11 @@ export async function analyzeHistorySmart() {
     (meta.history?.lastMicros || 0) === 0;
 
   if (firstRun) {
-    return generateInsightsFromHistory({ days: 60, maxResults: 3000 }); // full run
+    const maxResults = Services.prefs.getIntPref(
+      "browser.smartwindow.insights.historyMaxResults",
+      3000
+    );
+    return generateInsightsFromHistory({ days: 60, maxResults }); // full run
   }
   return updateInsightsFromHistoryIncremental();
 }
@@ -1634,6 +2071,58 @@ export async function updateInsightsFromHistoryIncremental() {
     };
     setInsightsMeta(meta);
   });
+}
+
+// ===================== Public Entry: generateInsightsWithCoVe =====================
+
+/**
+ * CoVe-wrapped insights generator:
+ * 1) Draft insights
+ * 2) CoVe question+answer
+ * 3) Integrate verdicts, soften/reject as needed
+ *
+ * @param {Record<string, any> | Array<Record<string, any>> | {profile_summarized?: Array<Record<string, any>>}} profile -
+ *   Profile data to analyze. For "history", pass an object with optional `profile_summarized`;
+ *   for "custom", pass the records as-is; arrays are treated directly as records.
+ * @param {"history"|"conversation"|"custom"} source - Indicates how to interpret `profile` when generating insights.
+ */
+export async function generateInsightsWithCoVe(profile, source) {
+  // 1) Draft
+  const draftList = await generateInsightsWithLLM(profile, source);
+
+  // Prepare Inputs seen by the verifier:
+  let profile_records = [];
+  if (source === "history") {
+    profile_records = profile?.profile_summarized ?? profile ?? [];
+  } else if (source === "custom") {
+    profile_records = profile ?? [];
+  } else if (Array.isArray(profile)) {
+    profile_records = profile;
+  }
+
+  const related_insights = Object.values(getInsightsData())
+    .filter(Array.isArray)
+    .flat()
+    .slice(0, 300);
+
+  // 2–3) CoVe
+  const finalList = await runCoVe(draftList, profile_records, related_insights);
+
+  if (!Array.isArray(finalList) || finalList.length === 0) {
+    // If CoVe filtered everything, we return a single null object to match schema expectations
+    return [
+      {
+        category: null,
+        intent: null,
+        insight_summary: null,
+        score: 1,
+        why: "No safe, specific insight supported by inputs after verification.",
+        evidence: [],
+      },
+    ];
+  }
+
+  return finalList;
 }
 
 /**
