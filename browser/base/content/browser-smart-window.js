@@ -121,7 +121,7 @@ var SmartWindow = {
                     {
                       type: "FXA_SMART_WINDOW_SIGNIN_FLOW",
                       data: {
-                        entrypoint: "smart-window-menu",
+                        entrypoint: "aimode",
                       },
                     },
                     gBrowser.selectedBrowser
