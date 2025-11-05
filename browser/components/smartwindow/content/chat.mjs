@@ -270,7 +270,7 @@ class ChatBot extends MozLitElement {
       gap: 0.5rem;
       max-height: 18px;
       position: fixed;
-      right: 0;
+      left: 0;
       top: 0;
       z-index: 100;
 
@@ -575,6 +575,7 @@ class ChatBot extends MozLitElement {
       editingTitle: { type: Boolean },
       searchEngines: { type: Array },
       openDropdownQuery: { type: String },
+      useInsights: { type: Boolean, reflect: true },
     };
   }
 
@@ -651,6 +652,21 @@ class ChatBot extends MozLitElement {
     this._lastUserHTML = null;
   }
 
+  // Read useInsights from conversation when present; default ON if unset
+  #hydrateUseInsightsFromConversation() {
+    const saved = this.conversation?.settings?.useInsights;
+    if (typeof saved === "boolean") {
+      if (this.useInsights !== saved) {
+        this.useInsights = saved;
+      }
+      return;
+    }
+
+    if (typeof this.useInsights !== "boolean") {
+      this.useInsights = true;
+    }
+  }
+
   async connectedCallback() {
     super.connectedCallback();
     // Listen for insights-updated events to re-render the overlay
@@ -662,6 +678,8 @@ class ChatBot extends MozLitElement {
 
     // Load search engines with their icons
     await this.loadSearchEngines();
+
+    this.#hydrateUseInsightsFromConversation();
   }
 
   async loadSearchEngines() {
@@ -971,10 +989,7 @@ class ChatBot extends MozLitElement {
   }
 
   buildSystemPrompt(tabContext = [], includeTitleGeneration = false) {
-    const useInsights = Services.prefs.getBoolPref(
-      "browser.smartwindow.useInsights",
-      true
-    );
+    const useInsights = this.useInsights ?? true;
     const currentDate = new Date().toLocaleDateString("en-US", {
       weekday: "long",
       year: "numeric",
