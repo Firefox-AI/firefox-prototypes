@@ -701,6 +701,8 @@ class SmartWindowPage {
     this.initializeTabContextUI();
     this.initializeQuickActionButtons();
 
+    this.setupInsightsUI();
+
     await this.initializeTabInfo();
     if (isSmartMode) {
       // Don't await to avoid blocking initialization
@@ -891,17 +893,6 @@ class SmartWindowPage {
           "browser.smartwindow.model",
           this.modelPicker.value
         );
-      });
-    }
-
-    // Setup insights toggle
-    this.toggleInsights = document.getElementById("toggle-insights");
-    if (this.toggleInsights) {
-      const PREF = "browser.smartwindow.useInsights";
-      this.toggleInsights.checked = Services.prefs.getBoolPref(PREF, true);
-      // persist when changed
-      this.toggleInsights.addEventListener("change", e => {
-        Services.prefs.setBoolPref(PREF, e.target.checked);
       });
     }
   }
@@ -2000,6 +1991,106 @@ class SmartWindowPage {
     };
 
     this.setupQuickActionEventListeners();
+  }
+
+  setupInsightsUI() {
+    const btn = document.getElementById("toggle-insights-button");
+    const pop = document.getElementById("toggle-insights-popover");
+    const closeBtn = document.getElementById("toggle-insights-close");
+    const sw = document.getElementById("toggle-insights-switch");
+
+    if (!btn || !pop || !sw) {
+      return;
+    }
+
+    if (this.isSidebarMode) {
+      pop.hidden = true;
+      btn.hidden = true;
+      return;
+    }
+
+    btn.hidden = false;
+
+    // Keep state + element + UI in sync
+    const setOn = on => {
+      const val = !!on;
+      this.useInsightsState = val;
+      this.applyInsightsToChat();
+      sw.setAttribute("aria-checked", String(val));
+      sw.classList.toggle("on", val);
+    };
+
+    setOn(this.chatBot ? !!this.chatBot.useInsights : true);
+
+    const outsideClick = e => {
+      if (!pop.contains(e.target) && e.target !== btn) {
+        closePopover();
+      }
+    };
+    const esc = e => {
+      if (e.key === "Escape") {
+        closePopover();
+      }
+    };
+
+    const openPopover = () => {
+      pop.hidden = false;
+      btn.setAttribute("aria-expanded", "true");
+      document.addEventListener("pointerdown", outsideClick, { capture: true });
+      document.addEventListener("keydown", esc);
+      queueMicrotask(() => sw.focus());
+    };
+
+    const closePopover = () => {
+      pop.hidden = true;
+      btn.setAttribute("aria-expanded", "false");
+      document.removeEventListener("pointerdown", outsideClick, {
+        capture: true,
+      });
+      document.removeEventListener("keydown", esc);
+    };
+
+    const toggleOpen = () => (pop.hidden ? openPopover() : closePopover());
+
+    const onSwitch = () => {
+      const next = sw.getAttribute("aria-checked") !== "true";
+      setOn(next);
+      const conv =
+        this.chatBot?.conversation || gBrowser?.selectedTab?.conversation;
+
+      if (conv) {
+        if (!conv.settings) {
+          conv.settings = {};
+        }
+        // Persist per-conversation into sidebar mode
+        conv.settings.useInsights = next;
+
+        this.chatBot?.requestUpdate?.("conversation");
+      }
+    };
+
+    btn.addEventListener("click", toggleOpen);
+    closeBtn?.addEventListener("click", closePopover);
+    sw.addEventListener("click", onSwitch);
+  }
+
+  applyInsightsToChat() {
+    const val = !!this.useInsightsState;
+
+    if (!this.chatBot) {
+      return false;
+    }
+
+    if (this.chatBot.useInsights !== val) {
+      this.chatBot.useInsights = val;
+    }
+
+    const conv = this.chatBot.conversation || gBrowser?.selectedTab?.conversation;
+    if (conv) {
+      conv.settings = conv.settings || {};
+      conv.settings.useInsights = val;
+    }
+    return true;
   }
 }
 
