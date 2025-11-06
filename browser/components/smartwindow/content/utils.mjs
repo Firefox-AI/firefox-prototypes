@@ -262,9 +262,15 @@ ${tabList}`;
 };
 
 const MODE_HANDLERS = {
-  viewport: async pageExtractor => pageExtractor.getText({ justViewport: true }),
+  viewport: async pageExtractor => {
+    const result = await pageExtractor.getText({ justViewport: true });
+    return result.text;
+  },
   reader: async pageExtractor => pageExtractor.getReaderModeContent(),
-  full: async pageExtractor => pageExtractor.getText(),
+  full: async pageExtractor => {
+    const result = await pageExtractor.getText();
+    return result.text;
+  },
 };
 
 const DEFAULT_MODE = "viewport";

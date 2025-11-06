@@ -52,7 +52,10 @@ export class PageExtractorParent extends JSWindowActorParent {
       lazy.console.log("Getting content from pdf");
       return this.browsingContext.currentWindowGlobal
         .getActor("Pdfjs")
-        .getTextContent();
+        .getTextContent()
+        .then(text => ({
+          text: typeof text === "string" ? text.trim() : "",
+        }));
     }
     return this.sendQuery("PageExtractorParent:GetText", options);
   }
