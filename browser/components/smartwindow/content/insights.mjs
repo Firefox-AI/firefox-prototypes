@@ -231,8 +231,6 @@ async function runCoVeQuestions({
         }),
       },
     ],
-    // Lower temperature for stability
-    options: { temperature: 0.2 },
     responseFormat: { type: "json_schema", schema: COVE_QUESTIONS_SCHEMA },
   });
   const raw = resp?.finalOutput ?? "{}";
@@ -264,7 +262,6 @@ async function runCoVeAnswers({
         }),
       },
     ],
-    options: { temperature: 0.1 },
     responseFormat: { type: "json_schema", schema: COVE_ANSWERS_SCHEMA },
   });
   const raw = resp?.finalOutput ?? "{}";
@@ -1681,7 +1678,7 @@ export function buildLiveInsightPrompt({
 You are a JSON generator. Use ONLY the provided user profile records and past insights.
 
 # HARD CONSTRAINTS (apply before anything else)
-- Never include or infer: medical/health, pregnancy/fertility, financial, legal, political leaning, race/ethnicity, gender/sexual orientation, PII.
+- Never include or infer: medical/health, pregnancy/fertility, financial, legal, political leaning, religion, race/ethnicity, gender/sexual orientation, PII.
 - If any candidate insight or any evidence contains sensitive content (see lists below), you MUST set "insight_summary": null and still return a valid object.
 - Use ONLY verbatim strings from profile_records for evidence of type "domain"|"title"|"search". Do not paraphrase.
 
@@ -1721,7 +1718,7 @@ ${intentsList}
 - Medical/Health (exclude): diagnoses, symptoms, treatments, conditions, mental health, pregnancy, fertility, contraception.
 - Finance (exclude): income/salary/compensation, bank/credit card details, credit score, loans/mortgage, taxes/benefits, debt/collections, investments/brokerage.
 - Legal (exclude): lawsuits, settlements, subpoenas/warrants, arrests/convictions, immigration status/visas/asylum, divorce/custody, NDAs.
-- Politics/Demographics/PII (exclude): political leaning/affiliation, race/ethnicity, gender/sexual orientation, addresses/phones/emails/IDs.
+- Politics/Demographics/PII (exclude): political leaning/affiliation, religion, race/ethnicity, gender/sexual orientation, addresses/phones/emails/IDs.
 
 ### BAD/SENSITIVE (must exclude → set insight_summary = null)
 - “Researches treatment about arthritis”
@@ -1826,11 +1823,10 @@ async function generateInsightsWithLLM(profile, source) {
       {
         role: "system",
         content:
-          "You are a privacy respecting data analyst who tries to generate useful insights about user preferences EXCLUDING personal, medical, health, financial, private and any sensitive activities of users. Return ONLY valid JSON.",
+          "You are a privacy respecting data analyst who tries to generate useful insights about user preferences EXCLUDING personal, medical, health, financial, political, religion, private and any sensitive activities of users. Return ONLY valid JSON.",
       },
       { role: "user", content: promptText },
     ],
-    options: { temperature: 0.0 }, // avoid too much variations
     responseFormat: { type: "json_schema", schema: LIVE_INSIGHTS_SCHEMA },
   });
 
