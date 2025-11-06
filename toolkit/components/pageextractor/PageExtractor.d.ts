@@ -22,6 +22,8 @@ export type GetPageInfoOptions = Partial<{
   viewportPage: number;
 }>;
 
+export type GetSelectionTextOptions = Record<string, never>;
+
 export interface PageInfo {
   count: number;
   viewportHeight: number;

@@ -18,6 +18,7 @@
  * @property {typeof import("moz-src:///toolkit/components/reader/ReaderMode.sys.mjs").ReaderMode} ReaderMode
  * @property {typeof import("./DOMExtractor.sys.mjs").extractTextFromDOM} extractTextFromDOM
  * @property {typeof import("./DOMExtractor.sys.mjs").getPageInfoFromDOM} getPageInfoFromDOM
+ * @property {typeof import("./DOMExtractor.sys.mjs").getSelectionTextFromDOM} getSelectionTextFromDOM
  */
 
 /** @type {Lazy} */
@@ -35,6 +36,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   extractTextFromDOM:
     "moz-src:///toolkit/components/pageextractor/DOMExtractor.sys.mjs",
   getPageInfoFromDOM:
+    "moz-src:///toolkit/components/pageextractor/DOMExtractor.sys.mjs",
+  getSelectionTextFromDOM:
     "moz-src:///toolkit/components/pageextractor/DOMExtractor.sys.mjs",
   isProbablyReaderable: "resource://gre/modules/Readerable.sys.mjs",
 });
@@ -66,6 +69,8 @@ export class PageExtractorChild extends JSWindowActorChild {
         return this.getText(data);
       case "PageExtractorParent:GetPageInfo":
         return this.getPageInfo(data);
+      case "PageExtractorParent:GetSelectionText":
+        return this.getSelectionText();
       case "PageExtractorParent:GetFullPageBounds":
         return this.getFullPageBounds();
     }
@@ -216,5 +221,21 @@ export class PageExtractorChild extends JSWindowActorChild {
     }
 
     return lazy.getPageInfoFromDOM(document, options);
+  }
+
+  /**
+   * Returns the currently selected text within the document.
+   *
+   * @returns {string}
+   */
+  getSelectionText() {
+    const window = this.browsingContext?.window;
+    const document = window?.document;
+
+    if (!document) {
+      return "";
+    }
+
+    return lazy.getSelectionTextFromDOM(document) || "";
   }
 }

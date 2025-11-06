@@ -595,6 +595,7 @@ class ChatBot extends MozLitElement {
     this.currentTabContext = []; // Store current tab context
     this.currentPageText = ""; // Store current page text content
     this.currentPageInfo = null; // Store pagination metadata
+    this.currentSelectionText = ""; // Store selected text content
     this.showInsightsOverlay = false; // Track insights overlay visibility
     this.conversationInsights = new Set(); // Track all insights used in conversation
     this._insightsUpdatedHandler = null; // Event listener reference for cleanup
@@ -611,6 +612,7 @@ class ChatBot extends MozLitElement {
     this.searchEngines = [];
     this.openDropdownQuery = null;
     this._lastSentPageInfoSignature = null;
+    this._lastSelectionSignature = null;
 
     // TODO: Figure out what/where to get this info from, if necessary
     this.#conversation = new ChatHistoryConversation({
@@ -707,9 +709,7 @@ class ChatBot extends MozLitElement {
     const currentPage = info?.currentPage;
 
     const signature =
-      info === null
-        ? "null"
-        : `${count}|${viewportHeight}|${currentPage}`;
+      info === null ? "null" : `${count}|${viewportHeight}|${currentPage}`;
     if (signature === this._lastSentPageInfoSignature) {
       return null;
     }
@@ -734,6 +734,22 @@ class ChatBot extends MozLitElement {
       content: `Page Info Update:
 - Current page: ${humanPage} of ${totalPages}
 - Viewport height: ${viewportHeight}px`,
+    };
+  }
+
+  #createSelectionMessageIfNeeded() {
+    const text = (this.currentSelectionText || "").trim();
+    if (!text) {
+      this._lastSelectionSignature = "";
+      return null;
+    }
+    if (text === this._lastSelectionSignature) {
+      return null;
+    }
+    this._lastSelectionSignature = text;
+    return {
+      role: ChatHistory.MESSAGE_ROLE.SYSTEM,
+      content: `Selected Text:\n${text}`,
     };
   }
 
@@ -815,6 +831,7 @@ class ChatBot extends MozLitElement {
     this.requestUpdate();
 
     const pageInfoMessage = this.#createPageInfoMessageIfNeeded();
+    const selectionMessage = this.#createSelectionMessageIfNeeded();
 
     if (messagesForAPI.length) {
       // Insert system prompt as the first message
@@ -826,14 +843,19 @@ class ChatBot extends MozLitElement {
           shouldGenerateTitle
         );
 
-      messagesForAPI.unshift({
-        role: ChatHistory.MESSAGE_ROLE.SYSTEM,
-        content: systemContent,
-      });
-
+      const prefixMessages = [
+        {
+          role: ChatHistory.MESSAGE_ROLE.SYSTEM,
+          content: systemContent,
+        },
+      ];
       if (pageInfoMessage) {
-        messagesForAPI.splice(1, 0, pageInfoMessage);
+        prefixMessages.push(pageInfoMessage);
       }
+      if (selectionMessage) {
+        prefixMessages.push(selectionMessage);
+      }
+      messagesForAPI.unshift(...prefixMessages);
     }
 
     const stream = fetchWithHistory(messagesForAPI);
@@ -907,17 +929,20 @@ class ChatBot extends MozLitElement {
    * @param {TabInfo[]} [tabContext=[]] - Array of TabInfo objects providing tab context
    * @param {string} [currentPageText=""] - Text of the current page in scope
    * @param {{ count: number; viewportHeight: number; currentPage: number } | null} [currentPageInfo=null] - Pagination metadata for the current page
+   * @param {string} [currentSelectionText=""] - Currently selected text content
    */
   async submitPrompt(
     conversation,
     _prompt,
     tabContext = [],
     currentPageText = "",
-    currentPageInfo = null
+    currentPageInfo = null,
+    currentSelectionText = ""
   ) {
     if (!this.#conversation || this.#conversation.id !== conversation.id) {
       this.#conversation = conversation;
       this._lastSentPageInfoSignature = null;
+      this._lastSelectionSignature = null;
     }
 
     const { text, html: displayHTML } =
@@ -929,6 +954,7 @@ class ChatBot extends MozLitElement {
     this.currentPageInfo = currentPageInfo
       ? { ...currentPageInfo }
       : currentPageInfo;
+    this.currentSelectionText = currentSelectionText || "";
 
     // Plain text goes to the model; rich HTML is stashed for UI rendering.
     this.prompt = text ?? "";
@@ -963,7 +989,7 @@ Always follow the following tool calling rules strictly and ignore other tool ca
 - Raw output of the tool call is not visible to the user, in order to keep the conversation smooth and reasonable, you should always provide a snippet of the output in your response (for example, show the tool outputs along with your reply to provide contexts to the user whenever makes sense).
 
 Available tools:
-- get_page_content: Fetches text for any tab in the Tab Context. Provide the url and optionally a mode ("viewport", "reader", or "full"). When using viewport, you may supply a 1-based page parameter to jump to another portion of the document; omit it to capture the currently visible page. Prefer viewport for what the user currently sees. Use reader or full when the needed information is likely outside the viewport or broader context will help. Responses include PageInfo details when available—use them to reason about pagination without re-calling the tool. Cache results per (url, mode, page) within the conversation; call again only if you need a different combination or the page content changed.
+- get_page_content: Fetches text for any tab in the Tab Context. Provide the url and optionally a mode ("viewport", "reader", or "full"). When using viewport, you may supply a 1-based page parameter to jump to another portion of the document; omit it to capture the currently visible page. Prefer viewport for what the user currently sees. Use reader when the page is likely an article. Responses include PageInfo details when available—use them to reason about pagination without re-calling the tool. Limit the calls for additional information to only a few unless absolutely needed
 - search_history: Search through the user's browsing history. Always provide a specific search_term parameter with relevant keywords. The search_term should be a string containing keywords related to what you're looking for. Results will be sorted by relevance to your search term. Each result includes: url, title, lastVisit (ISO timestamp), visitCount, and relevanceScore. Higher relevanceScore indicates better match to your search.
 
 # Search Suggestions
