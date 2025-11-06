@@ -12,6 +12,20 @@ document.addEventListener(
       // eslint-disable-next-line complexity
       .addEventListener("command", event => {
         switch (event.target.id) {
+          case "View:Chats":
+            gBrowser.selectedTab = gBrowser.addTrustedTab(BROWSER_NEW_TAB_URL);
+
+            // NOTE: Needs a delay to give the chat-bot element time
+            // to be available, not sure if there's a better way to do this
+            setTimeout(() => {
+              const chatBot =
+                gBrowser?.selectedBrowser?.contentDocument?.querySelector?.(
+                  "#chat-bot"
+                );
+
+              chatBot.showChatHistoryOverlay();
+            }, 100);
+            break;
           case "cmd_newNavigator":
             OpenBrowserWindow();
             break;
