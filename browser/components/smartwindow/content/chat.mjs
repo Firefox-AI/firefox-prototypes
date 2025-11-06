@@ -17,6 +17,7 @@ import {
   createInsightsOverlay,
   insightsStyles,
   deleteInsight,
+  generateInsightsFromDirectChat,
 } from "chrome://browser/content/smartwindow/insights.mjs";
 
 import { showChatHistoryOverlay } from "chrome://browser/content/smartwindow/chat-history.mjs";
@@ -701,6 +702,8 @@ class ChatBot extends MozLitElement {
       return;
     }
 
+    const directChatTextForInsights = this.prompt.trim();
+
     if (this.#conversation.messages.length === 0) {
       this.conversationTitle = "";
     }
@@ -718,6 +721,47 @@ class ChatBot extends MozLitElement {
       this._uiMeta.set(userKey, meta);
       this._uiMeta.set(before, meta);
       this._lastUserHTML = null;
+    }
+
+    // create insights from the user's direct message.
+    try {
+      const useInsights = Services.prefs.getBoolPref(
+        "browser.smartwindow.useInsights",
+        true
+      );
+      const looksLikePreference =
+        directChatTextForInsights.length <= 280 &&
+        /\b(remember|save|store|note|add to memory|i (prefer|like|love|hate|avoid)|my preference|i'm|i am)\b/i.test(
+          directChatTextForInsights
+        );
+
+      if (useInsights && looksLikePreference) {
+        // Log start
+        this.updateLogState({
+          content: "Generate insights from direct chat",
+          result: { status: "started" },
+        });
+        // Fire-and-forget: don't block streaming
+        generateInsightsFromDirectChat(directChatTextForInsights)
+          .then(({ addedCount }) => {
+            this.updateLogState({
+              content: "Direct-chat insights",
+              result: { addedCount },
+            });
+          })
+          .catch(err => {
+            this.updateLogState({
+              content: "Direct-chat insights error",
+              result: { error: true, message: err?.message || String(err) },
+            });
+          });
+      }
+    } catch (e) {
+      // Never let insights errors impact chat UX
+      this.updateLogState({
+        content: "Direct-chat insights error (outer)",
+        result: { error: true, message: e?.message || String(e) },
+      });
     }
 
     // Prepare messages with system prompt for the API call
