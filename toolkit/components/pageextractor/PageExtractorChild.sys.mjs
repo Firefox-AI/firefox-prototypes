@@ -106,17 +106,17 @@ export class PageExtractorChild extends JSWindowActorChild {
    * @see PageExtractorParent#getText for docs
    *
    * @param {GetTextOptions} options
-   * @returns {string | import('./PageExtractor.d.ts').GetTextPageResult}
+   * @returns {import('./PageExtractor.d.ts').GetTextResult}
    */
   getText(options) {
+    const extractionOptions = options ?? {};
+
     const window = this.browsingContext?.window;
     const document = window?.document;
 
     if (!document) {
-      return "";
+      return { text: "" };
     }
-
-    const extractionOptions = options ?? {};
 
     if (extractionOptions.removeBoilerplate) {
       throw new Error("Boilerplate removal is not supported yet.");
@@ -127,12 +127,7 @@ export class PageExtractorChild extends JSWindowActorChild {
     lazy.console.log("GetText", extractionOptions);
     lazy.console.debug(extraction);
 
-    if (
-      extraction &&
-      typeof extraction === "object" &&
-      (extractionOptions.includePageInfo ||
-        extractionOptions.viewportPage !== undefined)
-    ) {
+    if (extraction && typeof extraction === "object") {
       const trimmedText =
         typeof extraction.text === "string" ? extraction.text.trim() : "";
       return {
@@ -141,14 +136,10 @@ export class PageExtractorChild extends JSWindowActorChild {
       };
     }
 
-    let text = "";
-    if (typeof extraction === "string") {
-      text = extraction;
-    } else if (extraction && typeof extraction.text === "string") {
-      text = extraction.text;
-    }
+    const text =
+      typeof extraction === "string" ? extraction.trim() : "";
 
-    return text.trim();
+    return { text };
   }
 
   /**

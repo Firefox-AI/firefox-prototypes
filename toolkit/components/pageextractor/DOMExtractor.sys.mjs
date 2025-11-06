@@ -88,24 +88,24 @@ class ExtractionContext {
   }
 
   /**
-   * @returns {string | import("./PageExtractor.d.ts").GetTextPageResult}
+   * @returns {import("./PageExtractor.d.ts").GetTextResult}
    */
   getResult() {
     const normalizedText = this.#textContent.trim();
+    /** @type {import("./PageExtractor.d.ts").GetTextResult} */
+    const result = {
+      text: normalizedText,
+    };
 
     if (this.#pageInfo) {
-      const result = {
-        text: normalizedText,
-        pageCount: this.#pageInfo.pageCount,
-        viewportHeight: this.#pageInfo.viewportHeight,
-      };
+      result.pageCount = this.#pageInfo.pageCount;
+      result.viewportHeight = this.#pageInfo.viewportHeight;
       if (this.#pageInfo.page !== undefined) {
         result.page = this.#pageInfo.page;
       }
-      return result;
     }
 
-    return normalizedText;
+    return result;
   }
 
   /**

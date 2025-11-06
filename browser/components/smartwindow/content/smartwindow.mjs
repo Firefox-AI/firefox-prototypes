@@ -1602,18 +1602,18 @@ class SmartWindowPage {
         await selectedBrowser.browsingContext.currentWindowContext.getActor(
           "PageExtractor"
         );
-      /** @type {{ text: string, method: string }} */
-      let text = await pageExtractor.getReaderModeContent();
+      let textContent = await pageExtractor.getReaderModeContent();
 
-      if (!text) {
-        text = await pageExtractor.getText();
+      if (!textContent) {
+        const extraction = await pageExtractor.getText();
+        textContent = extraction.text;
       }
 
-      if (!text) {
-        text = "No page text was present";
+      if (!textContent) {
+        textContent = "No page text was present";
       }
       // Store page text for use in chat system prompt
-      this.currentTabPageText = text;
+      this.currentTabPageText = textContent;
     } catch (error) {
       this.currentTabPageText = "Couldn't read page text.";
       console.error("Failed to get page text:", error);
