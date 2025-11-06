@@ -75,7 +75,35 @@ class SmartWindowPage {
       pageMeta: "",
     });
 
+    // Set up preference observer for onboarding
+    this.setupOnboardingPreferenceObserver();
+
     this.init();
+  }
+
+  setupOnboardingPreferenceObserver() {
+    // Listen for changes to the first run preference
+    this.onboardingPrefObserver = {
+      observe: (_subject, topic, data) => {
+        if (topic === "nsPref:changed" && data === FIRST_RUN_PREF) {
+          const hasSeen = Services.prefs.getBoolPref(FIRST_RUN_PREF, false);
+          if (hasSeen) {
+            // Hide onboarding in this instance
+            this.cleanupExistingOnboarding();
+            this.onboardingRendered = true;
+          }
+        }
+      }
+    };
+
+    Services.prefs.addObserver(FIRST_RUN_PREF, this.onboardingPrefObserver);
+  }
+
+  destructor() {
+    // Clean up preference observer
+    if (this.onboardingPrefObserver) {
+      Services.prefs.removeObserver(FIRST_RUN_PREF, this.onboardingPrefObserver);
+    }
   }
 
   getQueryTypeIcon(type) {
@@ -137,16 +165,16 @@ class SmartWindowPage {
       return await cachedPromise;
     }
 
-    const promptsPromise = this._generatePromptsInternal(contextTabs, tabTitle);
+    const promptsPromise = this._generatePromptsInternal(contextTabs);
     topChromeWindow.SmartWindow.setPromptsCache(cacheKey, promptsPromise);
 
     return await promptsPromise;
   }
 
   // Internal method to generate conversation starters
-  async _generatePromptsInternal(contextTabs, tabTitle) {
+  async _generatePromptsInternal(contextTabs, count = 6) {
     try {
-      const suggestions = await generateConversationStarters(contextTabs, 6);
+      const suggestions = await generateConversationStarters(contextTabs, count);
       if (suggestions && suggestions.length) {
         return suggestions;
       }
@@ -784,8 +812,10 @@ class SmartWindowPage {
 
     if (this.isSidebarMode) {
       this.updateTabStatus(this.lastTabInfo);
-      this.showOnboardingMessageIfNeeded();
     }
+
+    // Show onboarding for both sidebar and main window
+    await this.showOnboardingMessageIfNeeded();
   }
 
   #createStatusBar() {
@@ -916,6 +946,11 @@ class SmartWindowPage {
       return;
     }
 
+    // Don't show regular quick prompts when onboarding info is displayed
+    if (document.querySelector(".onboarding-info-text-container")) {
+      return;
+    }
+
     // Don't overwrite followup prompts with conversation starters
     if (this.currentPromptsType === "followups") {
       return;
@@ -950,22 +985,6 @@ class SmartWindowPage {
     // Clear existing prompts
     this.quickPromptsContainer.innerHTML = "";
 
-    // Add emoji mapping for prompt types
-    const getEmoji = emojiType => {
-      switch (emojiType) {
-        case "chat":
-          return "💬";
-        case "search":
-          return "🔍";
-        case "navigate":
-          return "🌐";
-        case "action":
-          return "⚡";
-        default:
-          return "💡";
-      }
-    };
-
     // Create pill buttons for each prompt (limit to top 2)
     prompts.slice(0, 2).forEach(quickPrompt => {
       const pill = document.createElement("button");
@@ -973,7 +992,7 @@ class SmartWindowPage {
 
       const emoji = document.createElement("span");
       emoji.className = "quick-prompt-emoji";
-      emoji.textContent = getEmoji(quickPrompt.type);
+      emoji.textContent = this.getEmoji(quickPrompt.type);
 
       const text = document.createElement("span");
       text.className = "quick-prompt-text";
@@ -1297,15 +1316,20 @@ class SmartWindowPage {
       },
       { capture: true }
     );
-    if (this.isSidebarMode) {
-      window.addEventListener("SmartWindowMessage", async e => {
-        if (e.detail.type === "TabUpdate") {
+
+    // Listen for tab updates in both sidebar and main window modes
+    window.addEventListener("SmartWindowMessage", async e => {
+      if (e.detail.type === "TabUpdate") {
+        if (this.isSidebarMode) {
           this.updateTabStatus(e.detail.data);
-        } else if (e.detail.type === "SubmitPrompt") {
-          await this.handleGenAIPrompt(e.detail.data);
+        } else {
+          // For main window, just update the onboarding prompts if they're visible
+          this.updateOnboardingPrompts().catch(console.error);
         }
-      });
-    }
+      } else if (e.detail.type === "SubmitPrompt") {
+        await this.handleGenAIPrompt(e.detail.data);
+      }
+    });
 
     if (this.chatBot) {
       this.chatBot.addEventListener("search-suggested", e => {
@@ -1565,6 +1589,8 @@ class SmartWindowPage {
     // Update quick prompts if user hasn't edited the query (skip for about:blank)
     if (!isAboutBlank && !this.userHasEditedQuery && !editorText.trim()) {
       this.showQuickPrompts().catch(console.error);
+      // Also update onboarding prompts if they're visible
+      this.updateOnboardingPrompts().catch(console.error);
     }
 
     // Get page text and display in status
@@ -1616,6 +1642,8 @@ class SmartWindowPage {
         this.smartbar.hideSuggestions();
       }
       this.showQuickPrompts().catch(console.error);
+      // Also update onboarding prompts if they're visible
+      this.updateOnboardingPrompts().catch(console.error);
       return;
     }
 
@@ -1653,52 +1681,229 @@ class SmartWindowPage {
     }
   }
 
-  showOnboardingMessageIfNeeded() {
+  async showOnboardingMessageIfNeeded() {
     const hasSeen = Services.prefs.getBoolPref(FIRST_RUN_PREF, false);
-    if (hasSeen || this.onboardingRendered) {
+    if (hasSeen || this.onboardingRendered || !this.quickPromptsContainer) {
+      // If user has seen the welcome message, ensure any existing onboarding elements are removed
+      if (hasSeen) {
+        this.cleanupExistingOnboarding();
+      }
       return;
     }
 
-    const container = document.getElementById("assistant-onboarding-message-container");
+    let infoTextContainer = document.querySelector(".onboarding-info-text-container");
 
-    if (container.querySelector("#assistant-onboarding-message")) {
-      this.onboardingRendered = true;
-      return;
+    if (!infoTextContainer) {
+      infoTextContainer = this.createOnboardingContainer();
+      this.insertOnboardingContainer(infoTextContainer);
     }
 
-    const msg = document.createElement("div");
-    msg.id = "assistant-onboarding-message";
-    msg.textContent = "Welcome to Smart Window!";
-
-    container.hidden = false;
-    container.replaceChildren(msg);
-
+    await this.updateOnboardingPrompts();
+    this.quickPromptsContainer.classList.remove("hidden");
     this.onboardingRendered = true;
   }
 
-  hideOnboardingMesssage() {
-    const el = document.getElementById("assistant-onboarding-message");
-    if (!el || el.classList.contains("is-hiding")) {
+  cleanupExistingOnboarding() {
+    // Remove the welcome message from results container (sidebar mode)
+    const existingWelcomeMessage = document.getElementById("assistant-onboarding-message");
+    if (existingWelcomeMessage) {
+      existingWelcomeMessage.remove();
+    }
+
+    // Remove the onboarding info text container (both modes)
+    const infoTextContainer = document.querySelector(".onboarding-info-text-container");
+    if (infoTextContainer) {
+      infoTextContainer.remove();
+    }
+  }
+
+  createOnboardingContainer() {
+    const container = document.createElement("div");
+    container.className = "onboarding-info-text-container";
+
+    // Create welcome message
+    const welcomeMessage = this.createWelcomeMessage();
+
+    // Create info text
+    const infoText = document.createElement("div");
+    infoText.className = "onboarding-info-text";
+    infoText.textContent = "Great! You’re all set to start using Smart Window.\nWould you like some help with getting started? Feel free to ask me anything — here are a few things I can help you with:";
+
+    // Add content based on mode
+    if (this.isSidebarMode) {
+      // In sidebar mode, place welcome message in results container
+      this.resultsContainer.appendChild(welcomeMessage);
+    } else {
+      // In main window mode, create container and add welcome message
+      const messageContainer = document.createElement("div");
+      messageContainer.id = "assistant-onboarding-message-container";
+      messageContainer.appendChild(welcomeMessage);
+      container.appendChild(messageContainer);
+    }
+
+    container.appendChild(infoText);
+    return container;
+  }
+
+  createWelcomeMessage() {
+    const welcomeMessage = document.createElement("div");
+    welcomeMessage.id = "assistant-onboarding-message";
+    welcomeMessage.textContent = "Welcome to Smart Window!";
+
+    if (!this.isSidebarMode) {
+      welcomeMessage.className = "main-window-welcome";
+    }
+
+    return welcomeMessage;
+  }
+
+  insertOnboardingContainer(container) {
+    const searchBox = document.querySelector(".search-box");
+    const targetParent = searchBox?.parentNode || this.quickPromptsContainer.parentNode;
+    const targetSibling = searchBox || this.quickPromptsContainer;
+
+    if (targetParent && targetSibling) {
+      targetParent.insertBefore(container, targetSibling);
+    }
+  }
+
+  getEmoji(emojiType) {
+    switch (emojiType) {
+      case "chat":
+        return "💬";
+      case "search":
+        return "🔍";
+      case "navigate":
+        return "🌐";
+      case "action":
+        return "⚡";
+      default:
+        return "💡";
+    }
+  }
+
+  async updateOnboardingPrompts() {
+    const infoTextContainer = document.querySelector(".onboarding-info-text-container");
+    if (!infoTextContainer) {
       return;
     }
 
-    el.addEventListener(
-      "transitionend",
-      () => {
-        el.remove();
-        Services.prefs.setBoolPref(FIRST_RUN_PREF, true);
-      },
-      { once: true }
-    );
+    const prompts = await this.generateOnboardingPrompts();
+    this.renderOnboardingPrompts(infoTextContainer, prompts);
+  }
 
-    el.classList.add("is-hiding");
+  async generateOnboardingPrompts() {
+    const tabTitle = this.lastTabInfo?.title || "";
+    console.log("[Onboarding] Updating prompts for tab:", tabTitle);
+
+    // Try to generate context-aware prompts
+    if (this.lastTabInfo && this.isTabEligibleForContext(this.lastTabInfo)) {
+      const contextTabs = [this.lastTabInfo];
+      const prompts = await this._generatePromptsInternal(contextTabs, 3);
+      if (prompts && prompts.length > 0) {
+        console.log("[Onboarding] Generated context-aware prompts:", prompts);
+        return prompts;
+      }
+    }
+
+    // Fallback to default prompts
+    console.log("[Onboarding] Using default prompts");
+    return [
+      { text: "How do I use Smart Window?", type: "chat" },
+      { text: "What can you help me with?", type: "chat" },
+      { text: "Get to know me", type: "chat" },
+    ];
+  }
+
+  renderOnboardingPrompts(container, prompts) {
+    // Remove existing prompts container
+    const existingContainer = container.querySelector(".onboarding-prompts-container");
+    if (existingContainer) {
+      existingContainer.remove();
+    }
+
+    if (!prompts || prompts.length === 0) {
+      console.log("[Onboarding] No prompts to render");
+      return;
+    }
+
+    console.log("[Onboarding] Rendering", prompts.length, "prompts");
+    const promptsContainer = document.createElement("div");
+    promptsContainer.className = "onboarding-prompts-container";
+
+    prompts.forEach(prompt => {
+      const pill = this.createPromptPill(prompt);
+      promptsContainer.appendChild(pill);
+    });
+
+    container.appendChild(promptsContainer);
+  }
+
+  createPromptPill(prompt) {
+    const pill = document.createElement("button");
+    pill.className = "quick-prompt-pill onboarding-prompt-pill";
+
+    const text = document.createElement("span");
+    text.className = "quick-prompt-text";
+    text.textContent = prompt.text;
+
+    pill.appendChild(text);
+
+    pill.addEventListener("click", () => {
+      if (this.smartbar) {
+        this.smartbar.setContent(prompt.text);
+      }
+      this.handleEnter(prompt.text);
+    });
+
+    return pill;
+  }
+
+  hideOnboardingMessage() {
+    const el = document.getElementById("assistant-onboarding-message");
+
+    if (!el || el.classList.contains("is-hiding")) {
+      // Still try to hide the info text if it exists
+      this.hideOnboardingInfo();
+      return;
+    }
+
+    // Set preference to hide onboarding across all tabs
+    Services.prefs.setBoolPref(FIRST_RUN_PREF, true);
+
+    // In sidebar mode, the welcome message is in resultsContainer and can be animated
+    if (this.isSidebarMode) {
+      el.addEventListener(
+        "transitionend",
+        () => {
+          el.remove();
+          // Hide the onboarding info text after animation
+          this.hideOnboardingInfo();
+        },
+        { once: true }
+      );
+
+      el.classList.add("is-hiding");
+    } else {
+      // In main window mode, just hide everything immediately since the welcome message
+      // is inside the onboarding container that will be removed
+      this.hideOnboardingInfo();
+    }
+  }
+
+  hideOnboardingInfo() {
+    // Remove the info text container from the DOM
+    const infoTextContainer = document.querySelector(".onboarding-info-text-container");
+    if (infoTextContainer) {
+      infoTextContainer.remove();
+    }
   }
 
   async handleEnter(query, suggestionType = null) {
     if (!query.trim()) {
       return;
     }
-    this.hideOnboardingMesssage();
+    this.hideOnboardingMessage();
 
     const textFromBar = this.smartbar?.getText?.() || "";
     const htmlFromBar = this.smartbar?.getHTML?.() || null;
