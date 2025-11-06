@@ -1595,7 +1595,7 @@ function buildVerificationQuestionsPrompt({
     ## Rules
     - Questions must be answerable using ONLY Inputs.
     - Target factual cores: pattern strength, duplication, sensitivity.
-    - Avoid yes/no; ask for specific checks (e.g., "Does X has any sensitive or pii or medical information... Does X has good score").
+    - Avoid yes/no; ask for specific checks (e.g., "Does X has any sensitive or pii or medical or financial or legal information... Does X has good score").
     - Avoid duration of time spent on a page question as we are not passing that data.
 
     Return JSON matching the CoVeQuestions schema. No prose.
