@@ -1785,6 +1785,8 @@ async function generateInsightsWithLLM(profile, source) {
     profile_records = profile?.profile_summarized ?? profile ?? [];
   } else if (source === "custom") {
     profile_records = profile;
+  } else if (source === "user") {
+    profile_records = profile;
   } else if (Array.isArray(profile)) {
     profile_records = profile;
   }
@@ -2422,6 +2424,56 @@ export async function generateInsightsFromCustomText(inputText) {
     }
 
     await runInsights(text, "custom", { maxPerCategory: 2, maxPerIntent: 2 });
+  });
+}
+
+/**
+ * Uses the LLM (and CoVe when enabled) to turn a direct user statement
+ * (e.g., "Remember I'm a vegan") into a single safe insight.
+ *
+ * - Deterministic guardrails first: reject sensitive content.
+ * - Calls the same runInsights() path as history/conversation, but with
+ *   source="custom" so the LLM sees our structured record verbatim.
+ * - The record embeds the raw text so CoVe's evidence check passes.
+ *
+ * @param {string} inputText
+ * @returns {Promise<{addedCount:number}>}
+ * @throws {Error} if input is empty or sensitive
+ */
+export async function generateInsightsFromDirectChat(inputText) {
+  console.log(`inputText => ${inputText}`);
+  return withGenerationLock(async () => {
+    const text = (inputText || "").trim();
+    if (!text) {
+      throw new Error("No input text provided");
+    }
+    if (containsSensitive(text)) {
+      throw new Error("Refusing to store sensitive content as an insight");
+    }
+
+    // Minimal but explicit “profile” so the LLM/CoVe can quote it verbatim.
+    // Keeping keys human-readable helps the model follow our schema prompt.
+    const profile_records = [
+      {
+        source: "user",
+        kind: "explicit_preference",
+        message: text, // ← CoVe evidenceStringsExistInProfile will see this
+        timestamp_iso: new Date().toISOString(),
+      },
+    ];
+
+    // Reuse the same pipeline selector (regular vs CoVe) and storage path.
+    const { addedCount } = await runInsights(profile_records, "user", {
+      maxPerCategory: 5,
+      maxPerIntent: 2,
+    });
+
+    // Notify UI (overlay) to refresh.
+    try {
+      window.dispatchEvent(new CustomEvent("insights-updated"));
+    } catch {}
+
+    return { addedCount };
   });
 }
 
