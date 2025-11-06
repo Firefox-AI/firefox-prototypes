@@ -63,18 +63,25 @@ class ExtractionContext {
     this.#options = options;
     this.#pageWindow = document.defaultView ?? null;
 
-    if (options.justViewport) {
-      if (this.#pageWindow) {
-        this.#viewportRect = getViewportRect(this.#pageWindow);
-      }
-    }
-
     if (options.includePageInfo || options.viewportPage !== undefined) {
       this.#initializeViewportPagination(
         document,
         options.viewportPage,
         Boolean(options.includePageInfo)
       );
+    }
+
+    if (options.justViewport) {
+      if (
+        options.viewportPage !== undefined &&
+        this.#viewportPageRange &&
+        this.#pageWindow
+      ) {
+        // When requesting a specific virtual page, rely on the computed range instead of the current viewport.
+        this.#viewportRect = null;
+      } else if (this.#pageWindow) {
+        this.#viewportRect = getViewportRect(this.#pageWindow);
+      }
     }
   }
 
