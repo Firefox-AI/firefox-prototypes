@@ -348,9 +348,7 @@ const get_page_content = async ({ url, mode, page }) => {
       );
 
     const selectedMode =
-      typeof mode === "string" && MODE_HANDLERS[mode]
-        ? mode
-        : DEFAULT_MODE;
+      typeof mode === "string" && MODE_HANDLERS[mode] ? mode : DEFAULT_MODE;
     const handler = MODE_HANDLERS[selectedMode];
     let extraction = null;
 

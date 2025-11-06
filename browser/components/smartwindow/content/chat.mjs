@@ -594,6 +594,7 @@ class ChatBot extends MozLitElement {
     this.marked = window.marked.marked; // Use the global marked instance for markdown rendering
     this.currentTabContext = []; // Store current tab context
     this.currentPageText = ""; // Store current page text content
+    this.currentPageInfo = null; // Store pagination metadata
     this.showInsightsOverlay = false; // Track insights overlay visibility
     this.conversationInsights = new Set(); // Track all insights used in conversation
     this._insightsUpdatedHandler = null; // Event listener reference for cleanup
@@ -609,6 +610,7 @@ class ChatBot extends MozLitElement {
     this.editingTitle = false;
     this.searchEngines = [];
     this.openDropdownQuery = null;
+    this._lastSentPageInfoSignature = null;
 
     // TODO: Figure out what/where to get this info from, if necessary
     this.#conversation = new ChatHistoryConversation({
@@ -698,6 +700,43 @@ class ChatBot extends MozLitElement {
     } catch {}
   }
 
+  #createPageInfoMessageIfNeeded() {
+    const info = this.currentPageInfo;
+    const count = info?.count;
+    const viewportHeight = info?.viewportHeight;
+    const currentPage = info?.currentPage;
+
+    const signature =
+      info === null
+        ? "null"
+        : `${count}|${viewportHeight}|${currentPage}`;
+    if (signature === this._lastSentPageInfoSignature) {
+      return null;
+    }
+    const previousSignature = this._lastSentPageInfoSignature;
+    this._lastSentPageInfoSignature = signature;
+
+    if (!info) {
+      if (previousSignature === null) {
+        return null;
+      }
+      return {
+        role: ChatHistory.MESSAGE_ROLE.SYSTEM,
+        content: "Page Info Update: Page information is currently unavailable.",
+      };
+    }
+
+    const humanPage = currentPage + 1;
+    const totalPages = count || humanPage;
+
+    return {
+      role: ChatHistory.MESSAGE_ROLE.SYSTEM,
+      content: `Page Info Update:
+- Current page: ${humanPage} of ${totalPages}
+- Viewport height: ${viewportHeight}px`,
+    };
+  }
+
   async sendPrompt() {
     if (!this.prompt.trim()) {
       return;
@@ -775,6 +814,8 @@ class ChatBot extends MozLitElement {
     this.#conversation.addAssistantMessage("");
     this.requestUpdate();
 
+    const pageInfoMessage = this.#createPageInfoMessageIfNeeded();
+
     if (messagesForAPI.length) {
       // Insert system prompt as the first message
       const shouldGenerateTitle = this.conversationTitle === "";
@@ -786,9 +827,13 @@ class ChatBot extends MozLitElement {
         );
 
       messagesForAPI.unshift({
-        role: "System",
+        role: ChatHistory.MESSAGE_ROLE.SYSTEM,
         content: systemContent,
       });
+
+      if (pageInfoMessage) {
+        messagesForAPI.splice(1, 0, pageInfoMessage);
+      }
     }
 
     const stream = fetchWithHistory(messagesForAPI);
@@ -861,15 +906,18 @@ class ChatBot extends MozLitElement {
    * @param {string} _prompt - The new prompt for this conversation
    * @param {TabInfo[]} [tabContext=[]] - Array of TabInfo objects providing tab context
    * @param {string} [currentPageText=""] - Text of the current page in scope
+   * @param {{ count: number; viewportHeight: number; currentPage: number } | null} [currentPageInfo=null] - Pagination metadata for the current page
    */
   async submitPrompt(
     conversation,
     _prompt,
     tabContext = [],
-    currentPageText = ""
+    currentPageText = "",
+    currentPageInfo = null
   ) {
     if (!this.#conversation || this.#conversation.id !== conversation.id) {
       this.#conversation = conversation;
+      this._lastSentPageInfoSignature = null;
     }
 
     const { text, html: displayHTML } =
@@ -878,6 +926,9 @@ class ChatBot extends MozLitElement {
     // Store tab context and page text for use in system prompt
     this.currentTabContext = tabContext || [];
     this.currentPageText = currentPageText || "";
+    this.currentPageInfo = currentPageInfo
+      ? { ...currentPageInfo }
+      : currentPageInfo;
 
     // Plain text goes to the model; rich HTML is stashed for UI rendering.
     this.prompt = text ?? "";
