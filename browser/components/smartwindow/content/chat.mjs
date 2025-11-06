@@ -738,10 +738,16 @@ class ChatBot extends MozLitElement {
   }
 
   #createSelectionMessageIfNeeded() {
-    const text = (this.currentSelectionText || "").trim();
+    let text = (this.currentSelectionText || "").trim();
     if (!text) {
       this._lastSelectionSignature = "";
       return null;
+    }
+    const MAX_SELECTION_LENGTH = 1000;
+    let truncated = false;
+    if (text.length > MAX_SELECTION_LENGTH) {
+      text = text.slice(0, MAX_SELECTION_LENGTH);
+      truncated = true;
     }
     if (text === this._lastSelectionSignature) {
       return null;
@@ -749,7 +755,7 @@ class ChatBot extends MozLitElement {
     this._lastSelectionSignature = text;
     return {
       role: ChatHistory.MESSAGE_ROLE.SYSTEM,
-      content: `Selected Text:\n${text}`,
+      content: `Selected Text${truncated ? " (truncated)" : ""}:\n${text}`,
     };
   }
 
