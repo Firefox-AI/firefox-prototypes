@@ -108,7 +108,7 @@ const toolsConfig = [
     function: {
       name: GET_PAGE_CONTENT,
       description:
-        "Retrieve the text content from a specific browser tab by its URL. Use this when you need to read, analyze, or reference the actual content of a webpage that the user has mentioned or that appears in their open tabs. The content is cleaned and structured for easy analysis.",
+        "Retrieve text from a specific browser tab. Choose whether to read the current viewport, Reader Mode, or full page content. The content is cleaned for analysis.",
       parameters: {
         type: "object",
         properties: {
@@ -116,6 +116,17 @@ const toolsConfig = [
             type: "string",
             description:
               "The complete URL of the tab to fetch content from. This must exactly match a URL from the user's open tabs. Use the full URL including protocol (http/https). Example: 'https://www.example.com/article'",
+          },
+          modes: {
+            type: "array",
+            items: {
+              type: "string",
+              enum: ["viewport", "reader", "full"],
+            },
+            description:
+              "Ordered list of extraction modes to attempt. Supported values: viewport, reader, full. Defaults to viewport → reader → full.",
+            minItems: 1,
+            maxItems: 3,
           },
         },
         required: ["url"],
@@ -255,7 +266,34 @@ const search_open_tabs = ({ type }) => {
 ${tabList}`;
 };
 
-const get_page_content = async ({ url }) => {
+const MODE_HANDLERS = {
+  viewport: async pageExtractor => pageExtractor.getText({ justViewport: true }),
+  reader: async pageExtractor => pageExtractor.getReaderModeContent(),
+  full: async pageExtractor => pageExtractor.getText(),
+};
+
+const NORMALIZED_MODES = ["viewport", "reader", "full"];
+
+function resolveModes(modes) {
+  if (!Array.isArray(modes) || modes.length === 0) {
+    return NORMALIZED_MODES;
+  }
+  const seen = new Set();
+  const result = [];
+  for (const mode of modes) {
+    if (typeof mode !== "string") {
+      continue;
+    }
+    const key = mode.toLowerCase();
+    if (NORMALIZED_MODES.includes(key) && !seen.has(key)) {
+      seen.add(key);
+      result.push(key);
+    }
+  }
+  return result.length ? result : NORMALIZED_MODES;
+}
+
+const get_page_content = async ({ url, modes }) => {
   try {
     let win = lazy.BrowserWindowTracker.getTopWindow();
     let gBrowser = win.gBrowser;
@@ -318,10 +356,29 @@ const get_page_content = async ({ url }) => {
         "PageExtractor"
       );
 
-    // Try reader mode content first, then fall back to text content
-    let pageContent = await pageExtractor.getReaderModeContent();
-    if (!pageContent) {
-      pageContent = await pageExtractor.getText();
+    const modeSequence = resolveModes(modes);
+    let pageContent = "";
+    let modeUsed = "";
+
+    for (const mode of modeSequence) {
+      const handler = MODE_HANDLERS[mode];
+      if (!handler) {
+        continue;
+      }
+      try {
+        const content = await handler(pageExtractor);
+        if (content && content.trim()) {
+          pageContent = content;
+          modeUsed = mode;
+          break;
+        }
+      } catch (err) {
+        console.warn(
+          "[SmartWindow] get_page_content mode failed",
+          mode,
+          err
+        );
+      }
     }
 
     if (!pageContent) {
@@ -345,7 +402,14 @@ const get_page_content = async ({ url }) => {
       }
     }
 
-    return `Content from "${targetTab.label}" (${url}):
+    const modeLabels = {
+      viewport: "current viewport",
+      reader: "reader mode",
+      full: "full page",
+    };
+    const modeLabel = modeLabels[modeUsed] || "selected mode";
+
+    return `Content (${modeLabel}) from "${targetTab.label}" (${url}):
 
 ${cleanContent}`;
   } catch (error) {

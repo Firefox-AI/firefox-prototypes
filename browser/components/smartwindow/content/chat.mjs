@@ -375,11 +375,12 @@ class ChatBot extends MozLitElement {
 
     .log-entries {
       padding: 0.75rem;
-      max-height: 300px;
+      height: 300px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
       gap: 0.75rem;
+      resize: vertical;
     }
 
     .log-empty {
@@ -911,7 +912,7 @@ Always follow the following tool calling rules strictly and ignore other tool ca
 - Raw output of the tool call is not visible to the user, in order to keep the conversation smooth and reasonable, you should always provide a snippet of the output in your response (for example, show the tool outputs along with your reply to provide contexts to the user whenever makes sense).
 
 Available tools:
-- get_page_content: Fetches the actual page content for any of the tabs in the Tab Context. Use this tool when the user's query would benefit from specific page content analysis. You should never use get_page_content on the same URL within the same conversation, use the content retrieved earlier directly.
+- get_page_content: Fetches text for any tab in the Tab Context. Provide the url and, when useful, a modes array to choose the order of extraction (viewport, reader, full). Prefer viewport when answering about what the user sees right now. Fall back to reader or full page content when the answer likely lives outside the viewport or when the user would benefit from broader context. Reuse previously retrieved content instead of calling the tool again with the same url and mode unless the page has changed.
 - search_history: Search through the user's browsing history. Always provide a specific search_term parameter with relevant keywords. The search_term should be a string containing keywords related to what you're looking for. Results will be sorted by relevance to your search term. Each result includes: url, title, lastVisit (ISO timestamp), visitCount, and relevanceScore. Higher relevanceScore indicates better match to your search.
 
 # Search Suggestions
