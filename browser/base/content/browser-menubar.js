@@ -3,6 +3,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+const { ChatHistory } = ChromeUtils.importESModule(
+  "resource:///modules/smartwindow/ChatHistory.sys.mjs"
+);
+
+// NOTE: Is this the best place for this, or where should this instance exist
+const chatHistory = new ChatHistory();
+
 document.addEventListener(
   "DOMContentLoaded",
   () => {
@@ -181,6 +188,8 @@ document.addEventListener(
           if (!event.target.parentNode._placesView) {
             new HistoryMenu(event);
           }
+
+          addSmartWindowOptions(event.target);
           break;
         case "historyUndoPopup":
           document
@@ -242,3 +251,147 @@ document.addEventListener(
   },
   { once: true }
 );
+
+function addSmartWindowOptions(menu) {
+  addChatsOption(menu);
+  addRecentChats(menu);
+}
+
+async function addChatsOption(menu) {
+  removeChatsOption();
+
+  const smartWindowActive = SmartWindow?.isSmartWindowActive?.();
+  if (smartWindowActive) {
+    await addChatsOptionMenuItem(menu);
+  }
+}
+
+function removeChatsOption() {
+  const chatsOption = document.getElementById("menu_chats");
+  chatsOption?.remove?.();
+}
+
+async function addChatsOptionMenuItem(menu) {
+  const clearRecentHistory = document.getElementById("sanitizeItem");
+
+  const menuItem = document.createXULElement("menuitem");
+  menuItem.classList.add("chat-history-option");
+
+  menuItem.setAttribute("id", "menu_chats");
+  menuItem.setAttribute("key", "chats");
+  menuItem.setAttribute("command", "View:Chats");
+  menuItem.setAttribute("data-l10n-id", "menu-history-chats");
+
+  menu.insertBefore(menuItem, clearRecentHistory);
+}
+
+async function addRecentChats(menu) {
+  const startMarker = document.getElementById("startChatHistorySeparator");
+  const endMarker = document.getElementById("endChatHistorySeparator");
+  removeChatsMenuOptions(startMarker, endMarker);
+
+  const smartWindowActive = SmartWindow?.isSmartWindowActive?.();
+  if (smartWindowActive) {
+    await addRecentChatsHeader(menu, endMarker);
+
+    const items = await chatHistory.findRecentConversations(4);
+
+    if (items.length === 0) {
+      removeChatsMenuOptions(startMarker, endMarker);
+      return;
+    }
+
+    addRecentChatItems(menu, items, endMarker);
+  }
+}
+
+async function addRecentChatsHeader(menu, endMarker) {
+  const menuItem = document.createXULElement("menuitem");
+  menuItem.classList.add("recent-chat-header");
+
+  menuItem.setAttribute("data-l10n-id", "menu-history-chats-recent");
+  menuItem.setAttribute("disabled", true);
+
+  menu.insertBefore(menuItem, endMarker);
+}
+
+function removeChatsMenuOptions(startMarker, endMarker) {
+  clearRecentChats(startMarker, endMarker);
+}
+
+function addRecentChatItems(menu, items, endMarker) {
+  for (const item of items) {
+    const menuItem = document.createXULElement("menuitem");
+    menuItem.classList.add("recent-chat-item");
+    menuItem.setAttribute("label", item.title);
+
+    // NOTE: what attribute should I use for this ID
+    menuItem.setAttribute("targetURI", item.id);
+
+    menuItem.addEventListener("command", async event => {
+      const conv_id = event.target.getAttribute("targetURI");
+      const conversation = await chatHistory.findConversationById(conv_id);
+
+      if (!conversation) {
+        return;
+      }
+
+      // TODO: Switch this from using conversation.pageUrl to getting the
+      // URL from the latest message with a pageUrl once per message page url
+      // tracking is added to the ChatHistory so that the chat opens to the
+      // page that the user was looking at last at the end of the conversation
+      if (
+        conversation?.pageUrl?.href &&
+        isValidUrl(conversation.pageUrl.href)
+      ) {
+        gBrowser.selectedTab = gBrowser.addTrustedTab(BROWSER_NEW_TAB_URL);
+        openUILink(conversation.pageUrl.href, event, {
+          triggeringPrincipal:
+            Services.scriptSecurityManager.createNullPrincipal({}),
+        });
+      } else {
+        gBrowser.selectedTab = gBrowser.addTrustedTab(BROWSER_NEW_TAB_URL);
+      }
+
+      // NOTE: This will need to change for prod as we manage
+      // the conversation object somewhere else that is not
+      // gBrowser.selectedTab
+      gBrowser.selectedTab.conversation = conversation;
+
+      setTimeout(() => {
+        const chatBot =
+          gBrowser?.selectedBrowser?.contentDocument?.querySelector?.(
+            "#chat-bot"
+          );
+
+        if (chatBot.conversation.id !== conversation.id) {
+          chatBot.conversation = conversation;
+        }
+
+        chatBot.scrollToBottom();
+        chatBot.requestUpdate();
+      }, 100);
+    });
+
+    menu.insertBefore(menuItem, endMarker);
+  }
+}
+
+function isValidUrl(url) {
+  return (
+    (!url.startsWith("about:") || url.startsWith("about:reader?")) &&
+    !url.startsWith("chrome:") &&
+    !url.startsWith("moz-extension:") &&
+    !url.startsWith("resource:") &&
+    url !== "about:blank"
+  );
+}
+
+function clearRecentChats(startMarker, endMarker) {
+  let next = startMarker?.nextSibling;
+  while (next && next !== endMarker) {
+    const toRemove = next;
+    next = next.nextSibling;
+    toRemove.remove();
+  }
+}

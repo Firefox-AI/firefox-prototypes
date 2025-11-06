@@ -381,6 +381,13 @@ export class ChatHistory {
   async updateConversation(conversation) {
     await this.ensureDatabase();
 
+    let pageUrl;
+    try {
+      pageUrl = new URL(conversation.pageUrl);
+    } catch (e) {
+      pageUrl = null;
+    }
+
     await this.#conn.executeTransaction(async () => {
       lazy.logConsole.debug(`inserting conversation ${conversation.id}`);
       await this.#conn.executeCached(
@@ -402,7 +409,7 @@ export class ChatHistory {
           conv_id: conversation.id,
           title: conversation.title,
           description: conversation.description,
-          page_url: conversation.pageUrl?.href ?? null,
+          page_url: pageUrl?.href ?? null,
           page_meta: conversation.pageMeta
             ? JSON.stringify(conversation.pageMeta)
             : null,
@@ -484,6 +491,39 @@ export class ChatHistory {
       }
     );
     // TODO: Delete TTL content.
+  }
+
+  /**
+   * Gets a list of most recent conversations
+   *
+   * @param {number} numberOfConversations - How many convos to retrieve
+   * @returns {Array<RecentChatEntry>} - List of RecentChatEntry items
+   */
+  async findRecentConversations(numberOfConversations) {
+    try {
+      await this.ensureDatabase();
+
+      let rows = await this.#conn.executeCached(
+        `
+        SELECT conv_id, title
+        FROM conversation
+        ORDER BY updated_date DESC
+        LIMIT :limit
+      `,
+        { limit: numberOfConversations }
+      );
+
+      return rows.map(row => {
+        return new RecentChatEntry({
+          conv_id: row.getResultByName("conv_id"),
+          title: row.getResultByName("title"),
+        });
+      });
+    } catch (error) {
+      console.error("Error:", error);
+
+      return [];
+    }
   }
 
   async findConversationById(conversationId) {
@@ -597,6 +637,29 @@ export class ChatHistory {
         pad: false,
       }
     );
+  }
+}
+
+class RecentChatEntry {
+  #id;
+  #title;
+
+  /**
+   * @param {object} params
+   * @param {string} params.id
+   * @param {string} params.title
+   */
+  constructor({ conv_id, title }) {
+    this.#id = conv_id;
+    this.#title = title;
+  }
+
+  get id() {
+    return this.#id;
+  }
+
+  get title() {
+    return this.#title;
   }
 }
 

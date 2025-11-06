@@ -255,8 +255,13 @@
                 </menu>
                 <menuseparator id="startHistorySeparator"
                                class="hide-if-empty-places-result"/>
+
+                <menuseparator id="startChatHistorySeparator"/>
+                  # Chat history menu items are added dynamically in browser-menubar.js
+                <menuseparator id="endChatHistorySeparator"/>
               </menupopup>
             </menu>
+
 
   <menu id="bookmarksMenu"
         data-l10n-id="menu-bookmarks-menu">

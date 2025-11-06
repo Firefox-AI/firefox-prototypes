@@ -67,7 +67,7 @@ class SmartWindowPage {
     gBrowser.selectedTab.conversation = new ChatHistoryConversation({
       title: "",
       description: "",
-      pageUrl: "",
+      pageUrl: this.getCurrentTabUrl(),
       pageMeta: "",
     });
 
@@ -651,7 +651,19 @@ class SmartWindowPage {
     this.searchInput = editorDiv;
 
     this.resultsContainer = document.getElementById("results-container");
+
     this.chatBot = document.getElementById("chat-bot");
+    document.addEventListener("chatbot-conversation-updated", event => {
+      const conversation = event.detail.conversation;
+      gBrowser.selectedTab.conversation = conversation;
+
+      if (conversation.messages.length) {
+        this.showChatMode();
+      } else {
+        this.hideChatMode();
+      }
+    });
+
     this.quickPromptsContainer = document.getElementById(
       "quick-prompts-container"
     );
@@ -1041,10 +1053,7 @@ class SmartWindowPage {
         }
       }
     } catch (error) {
-      console.error(
-        "[SmartWindow] Failed to build wireframe previews:",
-        error
-      );
+      console.error("[SmartWindow] Failed to build wireframe previews:", error);
     }
 
     return enhancedItems;
@@ -1077,10 +1086,7 @@ class SmartWindowPage {
         }
 
         try {
-          const svgElement = PageWireframes.getWireframeElement(
-            wireframe,
-            doc
-          );
+          const svgElement = PageWireframes.getWireframeElement(wireframe, doc);
           if (!svgElement) {
             continue;
           }
@@ -1192,6 +1198,15 @@ class SmartWindowPage {
     }
   }
 
+  getCurrentTabUrl(aUrl) {
+    const url = aUrl || gBrowser?.selectedTab?.url;
+    try {
+      return new URL(url);
+    } catch (e) {
+      return "";
+    }
+  }
+
   /**
    * Handle prompt submitted from GenAI (text selection shortcuts, context menus, etc.)
    *
@@ -1217,7 +1232,7 @@ class SmartWindowPage {
         gBrowser.selectedTab.conversation = new ChatHistoryConversation({
           title: "",
           description: "",
-          pageUrl: tabContext[0]?.url || "",
+          pageUrl: this.getCurrentTabUrl(tabContext[0]?.url || ""),
           pageMeta: "",
         });
       }
@@ -1231,6 +1246,13 @@ class SmartWindowPage {
       // Store page text if provided
       if (pageText) {
         this.currentTabPageText = pageText;
+      }
+
+      if (
+        gBrowser.selectedTab.conversation &&
+        !gBrowser.selectedTab.conversation.pageUrl
+      ) {
+        gBrowser.selectedTab.conversation.pageUrl = this.getCurrentTabUrl();
       }
 
       // Submit the pre-built prompt to chatBot
@@ -1405,7 +1427,7 @@ class SmartWindowPage {
                   {
                     title: "",
                     description: "",
-                    pageUrl: newLocation,
+                    pageUrl: this.getCurrentTabUrl(newLocation),
                     pageMeta: "",
                   }
                 );
@@ -1661,6 +1683,15 @@ class SmartWindowPage {
 
         const text = textFromBar || (typeof query === "string" ? query : "");
         const html = htmlFromBar;
+
+        // NOTE: Why would there not be a conversation here
+        // TODO: Resolve missing conversation
+        if (
+          gBrowser.selectedTab.conversation &&
+          !gBrowser.selectedTab.conversation.pageUrl
+        ) {
+          gBrowser.selectedTab.conversation.pageUrl = this.getCurrentTabUrl();
+        }
 
         await this.chatBot.submitPrompt(
           gBrowser.selectedTab.conversation,

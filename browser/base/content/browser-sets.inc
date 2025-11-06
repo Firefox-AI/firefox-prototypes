@@ -43,6 +43,7 @@
     <command id="cmd_toggleOfflineStatus" />
     <command id="cmd_quitApplication" />
 
+    <command id="View:Chats" />
     <command id="View:AboutProcesses" />
     <command id="View:PageSource" />
     <command id="View:PageInfo" />
