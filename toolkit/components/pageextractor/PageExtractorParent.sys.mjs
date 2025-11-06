@@ -7,6 +7,7 @@
 /**
  * @import {
  *   GetPageInfoOptions,
+ *   GetSelectionTextOptions,
  *   GetTextOptions,
  * } from './PageExtractor.d.ts'
  * @import { PageExtractorChild } from './PageExtractorChild.sys.mjs'
@@ -74,6 +75,19 @@ export class PageExtractorParent extends JSWindowActorParent {
       return Promise.resolve(null);
     }
     return this.sendQuery("PageExtractorParent:GetPageInfo", options);
+  }
+
+  /**
+   * Returns the currently selected text on the page.
+   *
+   * @param {GetSelectionTextOptions} [options]
+   * @returns {Promise<string>}
+   */
+  getSelectionText(options = {}) {
+    if (this.#isPDF()) {
+      return Promise.resolve("");
+    }
+    return this.sendQuery("PageExtractorParent:GetSelectionText", options);
   }
 
   #isPDF() {

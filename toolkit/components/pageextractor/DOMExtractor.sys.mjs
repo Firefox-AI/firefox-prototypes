@@ -5,7 +5,7 @@
 // @ts-check
 
 /**
- * @import { GetPageInfoOptions, GetTextOptions } from './PageExtractor.js'
+ * @import { GetPageInfoOptions, GetSelectionTextOptions, GetTextOptions } from './PageExtractor.js'
  */
 
 /**
@@ -262,6 +262,29 @@ export function getPageInfoFromDOM(document, options = {}) {
   );
 
   return pagination?.info ?? null;
+}
+
+/**
+ * Retrieves the currently selected text within the document.
+ *
+ * @param {Document} document
+ * @param {GetSelectionTextOptions} [options]
+ * @returns {string}
+ */
+export function getSelectionTextFromDOM(document, options = {}) {
+  const window = document.defaultView;
+  if (!window) {
+    return "";
+  }
+  try {
+    const selection = window.getSelection();
+    if (!selection) {
+      return "";
+    }
+    return selection.toString().trim();
+  } catch {
+    return "";
+  }
 }
 
 /**

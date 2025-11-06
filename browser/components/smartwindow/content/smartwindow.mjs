@@ -1281,6 +1281,7 @@ class SmartWindowPage {
       }
 
       const pageInfo = await this.fetchCurrentPageInfo();
+      const selectionText = await this.fetchCurrentSelectionText();
 
       // Submit the pre-built prompt to chatBot
       await this.chatBot.submitPrompt(
@@ -1288,7 +1289,8 @@ class SmartWindowPage {
         { text: promptText },
         tabContext,
         pageText,
-        pageInfo
+        pageInfo,
+        selectionText
       );
 
       // Show chat mode
@@ -1619,9 +1621,12 @@ class SmartWindowPage {
       // Store page text for use in chat system prompt
       this.currentTabPageText = textContent;
       this.currentTabPageInfo = (await pageExtractor.getPageInfo()) || null;
+      this.currentTabSelectionText =
+        (await pageExtractor.getSelectionText()) || "";
     } catch (error) {
       this.currentTabPageText = "Couldn't read page text.";
       this.currentTabPageInfo = null;
+      this.currentTabSelectionText = "";
       console.error("Failed to get page text:", error);
     }
 
@@ -1648,6 +1653,27 @@ class SmartWindowPage {
       this.currentTabPageInfo = null;
       console.warn("[SmartWindow] Failed to get page info:", error);
       return null;
+    }
+  }
+
+  async fetchCurrentSelectionText() {
+    try {
+      const selectedBrowser = topChromeWindow.gBrowser.selectedBrowser;
+      if (!selectedBrowser?.browsingContext?.currentWindowContext) {
+        this.currentTabSelectionText = "";
+        return "";
+      }
+      const pageExtractor =
+        await selectedBrowser.browsingContext.currentWindowContext.getActor(
+          "PageExtractor"
+        );
+      const selection = await pageExtractor.getSelectionText();
+      this.currentTabSelectionText = selection || "";
+      return this.currentTabSelectionText;
+    } catch (error) {
+      this.currentTabSelectionText = "";
+      console.warn("[SmartWindow] Failed to get selection text:", error);
+      return "";
     }
   }
 
@@ -1973,13 +1999,15 @@ class SmartWindowPage {
         }
 
         const pageInfo = await this.fetchCurrentPageInfo();
+        const selectionText = await this.fetchCurrentSelectionText();
 
         await this.chatBot.submitPrompt(
           gBrowser.selectedTab.conversation,
           { text, html },
           contextTabs,
           includePageText ? this.currentTabPageText : "",
-          pageInfo
+          pageInfo,
+          selectionText
         );
 
         await this.saveChatMessagesForCurrentContext();
