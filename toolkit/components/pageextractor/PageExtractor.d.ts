@@ -17,9 +17,13 @@ export type GetTextOptions = Partial<{
   includePageInfo: boolean;
 }>;
 
+export interface PageInfo {
+  count: number;
+  viewportHeight: number;
+  currentPage: number;
+}
+
 export type GetTextResult = {
   text: string;
-  pageCount?: number;
-  viewportHeight?: number;
-  page?: number;
+  pageInfo?: PageInfo;
 };
