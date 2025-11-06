@@ -1362,16 +1362,166 @@ export const COVE_ANSWERS_SCHEMA = {
   },
 };
 
-// Sensitive keywords (mirror your prompt rules)
+// Sensitive keywords (mirror prompt rules) for cove
 const SENSITIVE_KEYWORDS = [
+  // medical & health keywords
   "pregnancy",
   "pregnant",
+  "prenatal",
+  "miscarriage",
+  "fertility",
+  "ivf",
+  "abortion",
+  "contraception",
+  "birth control",
+  "menopause",
+  "period tracking",
   "cancer",
+  "chemotherapy",
+  "radiation therapy",
   "arthritis",
+  "diabetes",
+  "hiv",
+  "aids",
+  "std",
+  "sti",
   "depression",
+  "anxiety",
+  "bipolar",
+  "adhd",
+  "ptsd",
   "mental health",
+  "therapy",
+  "counseling",
+  "addiction",
+  "substance use",
+  "rehab",
+  "detox",
+  "overdose",
+  "disability",
+  "chronic pain",
+  "terminal illness",
   "treatment",
+  "diagnosis",
+  "symptoms",
+  "lab results",
+  "medical record",
   "health condition",
+  "pediatrician",
+  "pediatric",
+  "oncology",
+  "psychiatry",
+  "psychology",
+  "cardiology",
+  "gynecology",
+  // finance related keywords
+  "salary",
+  "income",
+  "compensation",
+  "paystub",
+  "w2",
+  "t4",
+  "tax return",
+  "irs",
+  "cra",
+  "taxes",
+  "bank account",
+  "routing number",
+  "account number",
+  "account balance",
+  "wire transfer",
+  "credit card",
+  "debit card",
+  "cvc",
+  "cvv",
+  "credit score",
+  "fico",
+  "equifax",
+  "transunion",
+  "loan",
+  "mortgage",
+  "refinance",
+  "foreclosure",
+  "repo",
+  "collections",
+  "bankruptcy",
+  "insolvency",
+  "investment account",
+  "brokerage",
+  "401k",
+  "rrsp",
+  "pension",
+  "benefits",
+
+  // legal related keywords
+  "lawsuit",
+  "settlement",
+  "subpoena",
+  "warrant",
+  "indictment",
+  "conviction",
+  "arrest",
+  "criminal record",
+  "divorce",
+  "custody",
+  "restraining order",
+  "nd a",
+  "non-disclosure",
+  "plea deal",
+  "parole",
+  "probation",
+  "immigration status",
+  "visa overstay",
+  "asylum",
+  "deportation",
+  "citizenship interview",
+  "green card",
+  "work permit",
+  // PII
+  "social security number",
+  "ssn",
+  "sin",
+  "passport number",
+  "driver's license",
+  "drivers license",
+  "national id",
+  "date of birth",
+  "dob",
+  "mother's maiden name",
+  "security question",
+  "2fa backup codes",
+  "home address",
+  "street address",
+  "apartment number",
+  "phone number",
+  "email address",
+  "personal email",
+  // Demographics
+  "race",
+  "ethnicity",
+  "religion",
+  "religious",
+  "faith",
+  "church",
+  "mosque",
+  "synagogue",
+  "temple",
+  "political leaning",
+  "political affiliation",
+  "republican",
+  "democrat",
+  "conservative",
+  "liberal",
+  "socialist",
+  "sexual orientation",
+  "lgbt",
+  "lgbtq",
+  "gay",
+  "lesbian",
+  "bisexual",
+  "transgender",
+  "nonbinary",
+  "gender identity",
 ];
 
 function containsSensitive(str = "") {
@@ -1530,6 +1680,11 @@ export function buildLiveInsightPrompt({
   return `
 You are a JSON generator. Use ONLY the provided user profile records and past insights.
 
+# HARD CONSTRAINTS (apply before anything else)
+- Never include or infer: medical/health, pregnancy/fertility, financial, legal, political leaning, race/ethnicity, gender/sexual orientation, PII.
+- If any candidate insight or any evidence contains sensitive content (see lists below), you MUST set "insight_summary": null and still return a valid object.
+- Use ONLY verbatim strings from profile_records for evidence of type "domain"|"title"|"search". Do not paraphrase.
+
 ## Inputs
 - profile_records: ${profile_snip}
 - related_insights: ${insights_hint}
@@ -1546,42 +1701,46 @@ ${intentsList}
 - Dont add duplicate insights that are already in related_insights.
 - Dont repeat insights about entities that are already in related_insights.
 
-## Insight rules (write 1 short, specific sentence)
-- DO NOT generate or infer any insights related to personal medical information, pregnancy, or other sensitive life events.
-- Insights are useful preferences about the user such as product, brands, preferences, behavior, etc that could be useful to personalize the conversation response in the future.
-- Dont imagine an action unless you see evidence for sure. E.g. use "shops for" unless you see an evidence of purchase or buy,
-  use "plans trip" unless you see a ticket was purchased,
-  use "looked for a tv show" unless sure if the user watched.
-- Dont include person name unless they are popular to avoid any PII.
-- Dont generate insight from just odd one visit.
-- The insights are generated based on a pattern of visits.
-- The insights SHOULD NOT have any medical or health information about the user.
-- Don’t infer product relationships between unrelated domains unless both appear together in the same session evidence.
-- Don't generate a new insight unless it is quite different from known items in related_insights.
+- DO NOT generate or infer insights related to personal medical/health, pregnancy/fertility, financial, or legal information, or other sensitive life events.
+- Insights are non-sensitive user preferences (products, brands, behaviors) useful for future personalization.
+- Do not imagine actions without evidence. Prefer “shops for / plans / looked for” over “bought / booked / watched” unless explicit.
+- Do not include personal names unless widely public (avoid PII).
+- Do not create an insight from a single odd visit; prefer patterns.
+- Do not infer product relationships across unrelated domains unless co-occurring in the same session.
+- Do not generate a new insight if it’s not meaningfully different from items in related_insights.
 - If no safe, specific insight is supported by Inputs, set "insight_summary": null.
-- Examples of good form:
-    - “Prefers LLBean & Nordstrom formalwear collections”
-    - “Compares white jeans under $80 at Target”
-    - “Streams new-release movies via Fandango”
-    - “Cooks Mediterranean seafood from TasteAtlas recipes”
-    - “Tracks minimalist fashion drops at Uniqlo”
 
-## Exclusion rules for insights
-- DO NOT include sensitive insights about revealing medical condition or health or race or ethnicity or gender or anything user would like to keep visits or searches PRIVATE.
-  Examples of BAD and sensitive insights to exclude:
-   - Researches treatment about arthritis
-   - searches about pregnancy tests online
-   - pediatrician in san francisco
-   - political leaning towards a party
-   - research about ethnicity demographics in a city
-   - Marie, female from ohio looking for rental apartments
+### Examples of good form
+- “Prefers LLBean & Nordstrom formalwear collections”
+- “Compares white jeans under $80 at Target”
+- “Streams new-release movies via Fandango”
+- “Cooks Mediterranean seafood from TasteAtlas recipes”
+- “Tracks minimalist fashion drops at Uniqlo”
+
+## Exclusion rules (non-exhaustive)
+- Medical/Health (exclude): diagnoses, symptoms, treatments, conditions, mental health, pregnancy, fertility, contraception.
+- Finance (exclude): income/salary/compensation, bank/credit card details, credit score, loans/mortgage, taxes/benefits, debt/collections, investments/brokerage.
+- Legal (exclude): lawsuits, settlements, subpoenas/warrants, arrests/convictions, immigration status/visas/asylum, divorce/custody, NDAs.
+- Politics/Demographics/PII (exclude): political leaning/affiliation, race/ethnicity, gender/sexual orientation, addresses/phones/emails/IDs.
+
+### BAD/SENSITIVE (must exclude → set insight_summary = null)
+- “Researches treatment about arthritis”
+- “Searches about pregnancy tests online”
+- “Pediatrician in San Francisco”
+- “Political leaning towards a party”
+- “Research about ethnicity demographics in a city”
+- “Negotiates debt settlement with bank”
+- “Prepares documents for divorce hearing”
+- “Tracks mortgage refinance rates”
+- “Applies for work visa extension”
+- “Marie, female from Ohio looking for rental apartments”
 
 ## Sensitive Information Handling
-- Immediately set "insight_summary": null if the insight or any evidence contains these keywords or their variants: "pregnancy", "pregnant", "cancer", "arthritis", "depression", "mental health", "treatment", "health condition".
-- Never infer sensitive personal health topics from browsing or search unless there is explicit strong evidence.
-- Examples of prohibited insights:
-   - "Looks for pregnancy meal delivery services"
-   - "Researches arthritis treatment options"
+- Immediately set "insight_summary": null if the insight or any evidence contains these or close variants (case-insensitive):
+  Medical/Health: “pregnancy”, “pregnant”, “fertility”, “ivf”, “abortion”, “contraception”, “cancer”, “arthritis”, “depression”, “anxiety”, “mental health”, “therapy”, “treatment”, “diagnosis”, “health condition”.
+  Finance: “salary”, “income”, “paystub”, “tax return”, “irs”, “cra”, “credit score”, “credit card”, “bank account”, “routing number”, “loan”, “mortgage”, “refinance”, “collections”, “bankruptcy”, “investment account”, “401k”, “rrsp”.
+  Legal: “lawsuit”, “settlement”, “warrant”, “arrest”, “indictment”, “conviction”, “probation”, “parole”, “immigration status”, “deportation”, “asylum”, “visa”, “green card”, “citizenship interview”, “divorce”, “custody”, “restraining order”, “nda”.
+- Never infer sensitive topics even if they seem likely; absence of explicit, non-sensitive evidence → set summary to null.
 
 ## Scoring priorities
 - Base "score" on *strength + recency*; boost multi-source corroboration.
@@ -1676,16 +1835,13 @@ async function generateInsightsWithLLM(profile, source) {
   });
 
   const rawContent = response?.finalOutput ?? "";
-  let list = extractJSON(rawContent);
-  if (!Array.isArray(list)) {
-    // Sometimes models wrap with an object; try to unwrap common patterns
-    if (list && Array.isArray(list.items)) {
-      list = list.items;
-    }
-  }
+  const parsed = extractJSON(rawContent);
+  const list = normalizeInsightList(parsed);
 
-  if (!Array.isArray(list) || list.length === 0) {
-    throw new Error("Failed to generate valid insight list: " + rawContent);
+  if (!list) {
+    // Expected when everything is sensitive or model returns a lone object
+    console.warn("No valid insights; returning placeholder.");
+    return [placeholderInsight()];
   }
 
   return list; // array of insights
@@ -1812,6 +1968,77 @@ function synthWhyFromEvidence(ev = []) {
   return bits.length
     ? `Supported by ${bits.join("; ")}`
     : "Supported by recent ranked signals";
+}
+
+function placeholderInsight() {
+  return {
+    category: null,
+    intent: null,
+    insight_summary: null,
+    score: 1,
+    why: "No safe, specific insight supported by inputs after verification.",
+    evidence: [],
+  };
+}
+
+function sanitizeInsight(x) {
+  if (!x || typeof x !== "object") {
+    return null;
+  }
+
+  // clamp score to [1,5]; treat missing/invalid as 1
+  let score = Number.isFinite(x.score) ? Math.round(x.score) : 1;
+  if (score < 1) {
+    score = 1;
+  }
+  if (score > 5) {
+    score = 5;
+  }
+
+  // ensure evidence array shape and cap to 4
+  const evidence = Array.isArray(x.evidence)
+    ? x.evidence
+        .filter(e => e && typeof e.value === "string" && e.value.trim())
+        .slice(0, 4)
+    : [];
+
+  return {
+    category: x.category ?? null,
+    intent: x.intent ?? null,
+    insight_summary: x.insight_summary ?? null,
+    score,
+    why:
+      typeof x.why === "string" && x.why.trim()
+        ? x.why
+        : "Suppressed due to sensitive content or insufficient support.",
+    evidence,
+  };
+}
+
+function normalizeInsightList(parsed) {
+  let list = parsed;
+  // Common wraps: object or { items: [...] }
+  if (!Array.isArray(list)) {
+    if (list && Array.isArray(list.items)) {
+      list = list.items;
+    } else if (list && typeof list === "object") {
+      // If it looks like a single insight object, wrap it
+      const looksLikeInsight =
+        "category" in list ||
+        "intent" in list ||
+        "insight_summary" in list ||
+        "evidence" in list;
+      if (looksLikeInsight) {
+        list = [list];
+      }
+    }
+  }
+  if (!Array.isArray(list)) {
+    return null;
+  }
+
+  const sanitized = list.map(sanitizeInsight).filter(Boolean);
+  return sanitized.length ? sanitized : null;
 }
 
 function rankAndDiversify(
