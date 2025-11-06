@@ -19,6 +19,8 @@ import {
   deleteInsight,
 } from "chrome://browser/content/smartwindow/insights.mjs";
 
+import { showChatHistoryOverlay } from "chrome://browser/content/smartwindow/chat-history.mjs";
+
 const PROMPT_PREF = "browser.smartwindow.systemPromptOverride";
 const { ChatHistory, ChatHistoryConversation, ChatHistoryMessage } =
   ChromeUtils.importESModule(
@@ -32,6 +34,8 @@ class ChatBot extends MozLitElement {
    * @type {null | import("../ChatHistory.sys.mjs").ChatHistoryConversation}
    */
   #conversation;
+
+  #chatHistory = new ChatHistory();
 
   static styles = css`
     :host {
@@ -552,6 +556,8 @@ class ChatBot extends MozLitElement {
     }
   `;
 
+  showChatHistoryOverlay = showChatHistoryOverlay;
+
   static get properties() {
     return {
       prompt: { type: String },
@@ -695,6 +701,10 @@ class ChatBot extends MozLitElement {
       return;
     }
 
+    if (this.#conversation.messages.length === 0) {
+      this.conversationTitle = "";
+    }
+
     // Conversation holds string-only {role, content}; keep render-only data in _uiMeta so it never reaches the backend.
     const before = this.#conversation.messages.length;
     this.#conversation.addUserMessage(this.prompt);
@@ -828,6 +838,8 @@ class ChatBot extends MozLitElement {
     this.prompt = text ?? "";
     this._lastUserHTML = displayHTML || null;
     await this.sendPrompt();
+
+    await this.#chatHistory.updateConversation(this.#conversation);
   }
 
   buildSystemPrompt(tabContext = [], includeTitleGeneration = false) {
@@ -1039,7 +1051,7 @@ Today's date: ${currentDate}`;
   /**
    * Escape HTML special characters
    *
-   * @param str
+   * @param {string} str
    */
   escapeHTML(str) {
     const div = document.createElement("div");
@@ -1702,8 +1714,17 @@ Today's date: ${currentDate}`;
     `;
   }
 
-  set conversation(convo) {
-    this.#conversation = convo;
+  set conversation(conversation) {
+    this.#conversation = conversation;
+    this.conversationTitle = conversation.title;
+
+    this.dispatchEvent(
+      new CustomEvent("chatbot-conversation-updated", {
+        detail: { conversation },
+        bubbles: true,
+      })
+    );
+
     this.requestUpdate();
   }
 

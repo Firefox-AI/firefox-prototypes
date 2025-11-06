@@ -255,8 +255,13 @@
                 </menu>
                 <menuseparator id="startHistorySeparator"
                                class="hide-if-empty-places-result"/>
+
+                <menuseparator id="startChatHistorySeparator"/>
+                  # <menuitem id="chatHistorySectionMenu" data-l10n-id="menu-history-chats-recent" disabled="true" />
+                <menuseparator id="endChatHistorySeparator"/>
               </menupopup>
             </menu>
+
 
   <menu id="bookmarksMenu"
         data-l10n-id="menu-bookmarks-menu">
