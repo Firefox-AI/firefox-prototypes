@@ -5,7 +5,10 @@
 // @ts-check
 
 /**
- * @import { GetTextOptions } from './PageExtractor.d.ts'
+ * @import {
+ *   GetPageInfoOptions,
+ *   GetTextOptions,
+ * } from './PageExtractor.d.ts'
  * @import { PageExtractorChild } from './PageExtractorChild.sys.mjs'
  */
 
@@ -58,6 +61,19 @@ export class PageExtractorParent extends JSWindowActorParent {
         }));
     }
     return this.sendQuery("PageExtractorParent:GetText", options);
+  }
+
+  /**
+   * Computes pagination information for the current page.
+   *
+   * @param {GetPageInfoOptions} options
+   * @returns {Promise<import('./PageExtractor.d.ts').PageInfo | null>}
+   */
+  getPageInfo(options = {}) {
+    if (this.#isPDF()) {
+      return Promise.resolve(null);
+    }
+    return this.sendQuery("PageExtractorParent:GetPageInfo", options);
   }
 
   #isPDF() {

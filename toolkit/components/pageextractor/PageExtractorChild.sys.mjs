@@ -5,7 +5,7 @@
 // @ts-check
 
 /**
- * @import { GetTextOptions } from './PageExtractor.js'
+ * @import { GetPageInfoOptions, GetTextOptions } from './PageExtractor.js'
  * @import { PageExtractorParent } from './PageExtractorParent.sys.mjs'
  */
 
@@ -17,6 +17,7 @@
  * @property {typeof import("resource://gre/modules/Readerable.sys.mjs").isProbablyReaderable} isProbablyReaderable
  * @property {typeof import("moz-src:///toolkit/components/reader/ReaderMode.sys.mjs").ReaderMode} ReaderMode
  * @property {typeof import("./DOMExtractor.sys.mjs").extractTextFromDOM} extractTextFromDOM
+ * @property {typeof import("./DOMExtractor.sys.mjs").getPageInfoFromDOM} getPageInfoFromDOM
  */
 
 /** @type {Lazy} */
@@ -32,6 +33,8 @@ ChromeUtils.defineLazyGetter(lazy, "console", () => {
 ChromeUtils.defineESModuleGetters(lazy, {
   ReaderMode: "moz-src:///toolkit/components/reader/ReaderMode.sys.mjs",
   extractTextFromDOM:
+    "moz-src:///toolkit/components/pageextractor/DOMExtractor.sys.mjs",
+  getPageInfoFromDOM:
     "moz-src:///toolkit/components/pageextractor/DOMExtractor.sys.mjs",
   isProbablyReaderable: "resource://gre/modules/Readerable.sys.mjs",
 });
@@ -61,6 +64,10 @@ export class PageExtractorChild extends JSWindowActorChild {
           return this.getAboutReaderContent();
         }
         return this.getText(data);
+      case "PageExtractorParent:GetPageInfo":
+        return this.getPageInfo(data);
+      case "PageExtractorParent:GetFullPageBounds":
+        return this.getFullPageBounds();
     }
     return Promise.reject(new Error("Unknown message: " + name));
   }
@@ -187,3 +194,19 @@ export class PageExtractorChild extends JSWindowActorChild {
     return url.schemeIs("about") && url.pathQueryRef.startsWith("reader?");
   }
 }
+  /**
+   * Computes pagination information for the current document.
+   *
+   * @param {GetPageInfoOptions} options
+   * @returns {import('./PageExtractor.d.ts').PageInfo | null}
+   */
+  getPageInfo(options) {
+    const window = this.browsingContext?.window;
+    const document = window?.document;
+
+    if (!document) {
+      return null;
+    }
+
+    return lazy.getPageInfoFromDOM(document, options ?? {});
+  }

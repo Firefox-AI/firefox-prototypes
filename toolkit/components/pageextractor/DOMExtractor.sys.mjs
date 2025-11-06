@@ -5,7 +5,7 @@
 // @ts-check
 
 /**
- * @import { GetTextOptions } from './PageExtractor.js'
+ * @import { GetPageInfoOptions, GetTextOptions } from './PageExtractor.js'
  */
 
 /**
@@ -238,6 +238,30 @@ export function extractTextFromDOM(document, options) {
   subdivideAndExtractText(document.body, context);
 
   return context.getResult();
+}
+
+/**
+ * Computes pagination metadata for the current document viewport.
+ *
+ * @param {Document} document
+ * @param {GetPageInfoOptions} [options]
+ *
+ * @returns {import('./PageExtractor.d.ts').PageInfo | null}
+ */
+export function getPageInfoFromDOM(document, options = {}) {
+  const window = document.defaultView;
+  if (!window) {
+    return null;
+  }
+
+  const pagination = computeViewportPagination(
+    document,
+    window,
+    options.viewportPage,
+    true
+  );
+
+  return pagination?.info ?? null;
 }
 
 /**

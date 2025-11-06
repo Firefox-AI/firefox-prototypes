@@ -17,6 +17,11 @@ export type GetTextOptions = Partial<{
   includePageInfo: boolean;
 }>;
 
+export type GetPageInfoOptions = Partial<{
+  // Index of the virtual page (0-based) defined by the viewport height.
+  viewportPage: number;
+}>;
+
 export interface PageInfo {
   count: number;
   viewportHeight: number;
