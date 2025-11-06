@@ -257,7 +257,7 @@
                                class="hide-if-empty-places-result"/>
 
                 <menuseparator id="startChatHistorySeparator"/>
-                  # <menuitem id="chatHistorySectionMenu" data-l10n-id="menu-history-chats-recent" disabled="true" />
+                  # Chat history menu items are added dynamically in browser-menubar.js
                 <menuseparator id="endChatHistorySeparator"/>
               </menupopup>
             </menu>
