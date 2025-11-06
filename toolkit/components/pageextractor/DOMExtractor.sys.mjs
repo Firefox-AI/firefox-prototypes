@@ -39,6 +39,21 @@ class ExtractionContext {
   #viewportRect = null;
 
   /**
+   * @type {{ top: number; bottom: number } | null}
+   */
+  #viewportPageRange = null;
+
+  /**
+   * @type {{ pageCount: number; viewportHeight: number; page?: number } | null}
+   */
+  #pageInfo = null;
+
+  /**
+   * @type {Window | null}
+   */
+  #pageWindow = null;
+
+  /**
    * Constructs a new extraction context with the provided options.
    *
    * @param {Document} document
@@ -46,11 +61,20 @@ class ExtractionContext {
    */
   constructor(document, options) {
     this.#options = options;
+    this.#pageWindow = document.defaultView ?? null;
+
     if (options.justViewport) {
-      const window = document.defaultView;
-      if (window) {
-        this.#viewportRect = getViewportRect(window);
+      if (this.#pageWindow) {
+        this.#viewportRect = getViewportRect(this.#pageWindow);
       }
+    }
+
+    if (options.includePageInfo || options.viewportPage !== undefined) {
+      this.#initializeViewportPagination(
+        document,
+        options.viewportPage,
+        Boolean(options.includePageInfo)
+      );
     }
   }
 
@@ -61,6 +85,27 @@ class ExtractionContext {
    */
   get textContent() {
     return this.#textContent;
+  }
+
+  /**
+   * @returns {string | import("./PageExtractor.d.ts").GetTextPageResult}
+   */
+  getResult() {
+    const normalizedText = this.#textContent.trim();
+
+    if (this.#pageInfo) {
+      const result = {
+        text: normalizedText,
+        pageCount: this.#pageInfo.pageCount,
+        viewportHeight: this.#pageInfo.viewportHeight,
+      };
+      if (this.#pageInfo.page !== undefined) {
+        result.page = this.#pageInfo.page;
+      }
+      return result;
+    }
+
+    return normalizedText;
   }
 
   /**
@@ -122,6 +167,14 @@ class ExtractionContext {
       return;
     }
 
+    if (
+      this.#viewportPageRange &&
+      this.#pageWindow &&
+      !isNodeInViewportPage(node, this.#viewportPageRange, this.#pageWindow)
+    ) {
+      return;
+    }
+
     const element = asHTMLElement(node);
     const text = asTextNode(node);
     let innerText = "";
@@ -136,6 +189,31 @@ class ExtractionContext {
       this.#textContent += "\n" + innerText;
     }
   }
+
+  /**
+   * @param {Document} document
+   * @param {number | undefined} requestedPage
+   * @param {boolean} includePageInfo
+   */
+  #initializeViewportPagination(document, requestedPage, includePageInfo) {
+    if (!this.#pageWindow) {
+      return;
+    }
+
+    const pagination = computeViewportPagination(
+      document,
+      this.#pageWindow,
+      requestedPage,
+      includePageInfo
+    );
+
+    if (!pagination) {
+      return;
+    }
+
+    this.#pageInfo = pagination.info;
+    this.#viewportPageRange = pagination.range;
+  }
 }
 
 /**
@@ -149,14 +227,14 @@ class ExtractionContext {
  * @param {Document} document
  * @param {GetTextOptions} options
  *
- * @returns {string}
+ * @returns {import('./PageExtractor.d.ts').GetTextResult}
  */
 export function extractTextFromDOM(document, options) {
   const context = new ExtractionContext(document, options);
 
   subdivideAndExtractText(document.body, context);
 
-  return context.textContent;
+  return context.getResult();
 }
 
 /**
@@ -396,6 +474,31 @@ function isNodeInViewport(node, viewportRect) {
     rect.top < viewportRect.bottom &&
     rect.right > viewportRect.left &&
     rect.left < viewportRect.right
+  );
+}
+
+/**
+ * @param {Node} node
+ * @param {{ top: number; bottom: number }} viewportPageRange
+ * @param {Window} window
+ */
+function isNodeInViewportPage(node, viewportPageRange, window) {
+  const element = getHTMLElementForStyle(node);
+  if (!element) {
+    return false;
+  }
+
+  const rect = element.getBoundingClientRect();
+  if (!rect) {
+    return false;
+  }
+
+  const absoluteTop = rect.top + window.scrollY;
+  const absoluteBottom = rect.bottom + window.scrollY;
+
+  return (
+    absoluteBottom > viewportPageRange.top &&
+    absoluteTop < viewportPageRange.bottom
   );
 }
 
@@ -698,4 +801,62 @@ function getViewportRect(window) {
     right: window.innerWidth,
     bottom: window.innerHeight,
   };
+}
+
+/**
+ * @param {Document} document
+ * @param {Window} window
+ * @param {number | undefined} requestedPage
+ * @param {boolean} includePageInfo
+ * @returns {{
+ *   info: { pageCount: number; viewportHeight: number; page?: number };
+ *   range: { top: number; bottom: number } | null;
+ * } | null}
+ */
+function computeViewportPagination(
+  document,
+  window,
+  requestedPage,
+  includePageInfo
+) {
+  const viewportHeight =
+    window.visualViewport?.height ?? window.innerHeight ?? 0;
+
+  if (!viewportHeight || viewportHeight <= 0) {
+    return null;
+  }
+
+  const scrollingElement =
+    document.scrollingElement ??
+    document.documentElement ??
+    document.body ??
+    null;
+
+  const totalHeight = Math.max(
+    viewportHeight,
+    scrollingElement?.scrollHeight ?? document.body?.scrollHeight ?? 0
+  );
+
+  const pageCount = Math.max(1, Math.ceil(totalHeight / viewportHeight));
+
+  const info = {
+    pageCount,
+    viewportHeight,
+  };
+
+  let range = null;
+  if (requestedPage !== undefined) {
+    let pageIndex = Number.isFinite(requestedPage)
+      ? Math.floor(requestedPage)
+      : 0;
+    pageIndex = Math.max(0, Math.min(pageIndex, pageCount - 1));
+    const top = pageIndex * viewportHeight;
+    const bottom = Math.min(totalHeight, top + viewportHeight);
+    range = { top, bottom };
+    info.page = pageIndex;
+  } else if (!includePageInfo) {
+    return null;
+  }
+
+  return { info, range };
 }
