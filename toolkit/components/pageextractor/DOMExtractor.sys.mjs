@@ -44,7 +44,7 @@ class ExtractionContext {
   #viewportPageRange = null;
 
   /**
-   * @type {{ pageCount: number; viewportHeight: number; page?: number } | null}
+   * @type {import("./PageExtractor.d.ts").PageInfo | null}
    */
   #pageInfo = null;
 
@@ -98,11 +98,7 @@ class ExtractionContext {
     };
 
     if (this.#pageInfo) {
-      result.pageCount = this.#pageInfo.pageCount;
-      result.viewportHeight = this.#pageInfo.viewportHeight;
-      if (this.#pageInfo.page !== undefined) {
-        result.page = this.#pageInfo.page;
-      }
+      result.pageInfo = this.#pageInfo;
     }
 
     return result;
@@ -809,7 +805,7 @@ function getViewportRect(window) {
  * @param {number | undefined} requestedPage
  * @param {boolean} includePageInfo
  * @returns {{
- *   info: { pageCount: number; viewportHeight: number; page?: number };
+ *   info: import("./PageExtractor.d.ts").PageInfo;
  *   range: { top: number; bottom: number } | null;
  * } | null}
  */
@@ -839,21 +835,30 @@ function computeViewportPagination(
 
   const pageCount = Math.max(1, Math.ceil(totalHeight / viewportHeight));
 
+  let currentPage = 0;
+  if (requestedPage !== undefined) {
+    currentPage = Number.isFinite(requestedPage)
+      ? Math.floor(requestedPage)
+      : 0;
+  } else {
+    const scrollY = window.scrollY ?? 0;
+    const maxScroll = Math.max(0, totalHeight - viewportHeight);
+    const clampedScroll = Math.min(Math.max(scrollY, 0), maxScroll);
+    currentPage = Math.floor(clampedScroll / viewportHeight);
+  }
+  currentPage = Math.max(0, Math.min(currentPage, pageCount - 1));
+
   const info = {
-    pageCount,
+    count: pageCount,
     viewportHeight,
+    currentPage,
   };
 
   let range = null;
   if (requestedPage !== undefined) {
-    let pageIndex = Number.isFinite(requestedPage)
-      ? Math.floor(requestedPage)
-      : 0;
-    pageIndex = Math.max(0, Math.min(pageIndex, pageCount - 1));
-    const top = pageIndex * viewportHeight;
+    const top = currentPage * viewportHeight;
     const bottom = Math.min(totalHeight, top + viewportHeight);
     range = { top, bottom };
-    info.page = pageIndex;
   } else if (!includePageInfo) {
     return null;
   }
