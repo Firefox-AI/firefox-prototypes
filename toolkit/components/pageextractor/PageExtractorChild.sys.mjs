@@ -143,8 +143,7 @@ export class PageExtractorChild extends JSWindowActorChild {
       };
     }
 
-    const text =
-      typeof extraction === "string" ? extraction.trim() : "";
+    const text = typeof extraction === "string" ? extraction.trim() : "";
 
     return { text };
   }
@@ -193,14 +192,22 @@ export class PageExtractorChild extends JSWindowActorChild {
     let url = this.manager.contentWindow.document.documentURIObject;
     return url.schemeIs("about") && url.pathQueryRef.startsWith("reader?");
   }
-}
+
+  /**
+   * Returns a page rect for the full size of the page.
+   */
+  getFullPageBounds() {
+    const win = this.manager.contentWindow;
+    const { width, height } = win.document.body.getBoundingClientRect();
+    return { width, height, devicePixelRatio: win.devicePixelRatio };
+  }
   /**
    * Computes pagination information for the current document.
    *
    * @param {GetPageInfoOptions} options
    * @returns {import('./PageExtractor.d.ts').PageInfo | null}
    */
-  getPageInfo(options) {
+  getPageInfo(options = {}) {
     const window = this.browsingContext?.window;
     const document = window?.document;
 
@@ -208,5 +215,6 @@ export class PageExtractorChild extends JSWindowActorChild {
       return null;
     }
 
-    return lazy.getPageInfoFromDOM(document, options ?? {});
+    return lazy.getPageInfoFromDOM(document, options);
   }
+}
