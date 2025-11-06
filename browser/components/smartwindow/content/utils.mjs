@@ -123,6 +123,12 @@ const toolsConfig = [
             description:
               "Extraction mode to use. Choose viewport for what is visible, reader for distilled content, or full for entire page. Defaults to viewport.",
           },
+          page: {
+            type: "integer",
+            minimum: 1,
+            description:
+              "When using viewport mode, the 1-based page index to capture. Defaults to the page currently in view.",
+          },
         },
         required: ["url"],
       },
@@ -262,20 +268,23 @@ ${tabList}`;
 };
 
 const MODE_HANDLERS = {
-  viewport: async pageExtractor => {
-    const result = await pageExtractor.getText({ justViewport: true });
-    return result.text;
+  viewport: async (pageExtractor, { page }) => {
+    const options = { justViewport: true, includePageInfo: true };
+    if (Number.isInteger(page) && page > 0) {
+      options.viewportPage = page - 1;
+    }
+    return pageExtractor.getText(options);
   },
-  reader: async pageExtractor => pageExtractor.getReaderModeContent(),
-  full: async pageExtractor => {
-    const result = await pageExtractor.getText();
-    return result.text;
+  reader: async pageExtractor => {
+    const text = await pageExtractor.getReaderModeContent();
+    return { text: typeof text === "string" ? text : "" };
   },
+  full: async pageExtractor => pageExtractor.getText({ includePageInfo: true }),
 };
 
 const DEFAULT_MODE = "viewport";
 
-const get_page_content = async ({ url, mode }) => {
+const get_page_content = async ({ url, mode, page }) => {
   try {
     let win = lazy.BrowserWindowTracker.getTopWindow();
     let gBrowser = win.gBrowser;
@@ -343,10 +352,10 @@ const get_page_content = async ({ url, mode }) => {
         ? mode
         : DEFAULT_MODE;
     const handler = MODE_HANDLERS[selectedMode];
-    let pageContent = "";
+    let extraction = null;
 
     try {
-      pageContent = await handler(pageExtractor);
+      extraction = await handler(pageExtractor, { page });
     } catch (err) {
       console.warn(
         "[SmartWindow] get_page_content mode failed",
@@ -354,6 +363,9 @@ const get_page_content = async ({ url, mode }) => {
         err
       );
     }
+
+    const pageContent =
+      typeof extraction?.text === "string" ? extraction.text.trim() : "";
 
     if (!pageContent) {
       return `get_page_content(${selectedMode}) returned no content for "${targetTab.label}" (${url}). Try another mode if you still need information.`;
@@ -383,9 +395,18 @@ const get_page_content = async ({ url, mode }) => {
     };
     const modeLabel = modeLabels[selectedMode] || "selected mode";
 
+    let pageInfoText = "";
+    const pageInfo = extraction?.pageInfo;
+    if (pageInfo) {
+      const humanPage = pageInfo.currentPage + 1;
+      const totalPages = pageInfo.count;
+      const viewportHeight = Math.round(pageInfo.viewportHeight);
+      pageInfoText = `\n\nPageInfo: page ${humanPage} of ${totalPages} (viewport height ≈ ${viewportHeight}px)`;
+    }
+
     return `Content (${modeLabel}) from "${targetTab.label}" (${url}):
 
-${cleanContent}`;
+${cleanContent}${pageInfoText}`;
   } catch (error) {
     return `Error retrieving content from ${url}: ${error.message}. Try refreshing the tab or checking if it's accessible.`;
   }
