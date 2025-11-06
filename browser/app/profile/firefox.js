@@ -905,6 +905,10 @@ pref("browser.dataFeatureRecommendations.enabled", false);
 // sets darkTheme data.
 pref("browser.theme.dark-private-windows", true);
 
+// Whether to override themes in forced-colors mode and just use the
+// system theme and forced-colors palette to style the chrome.
+pref("browser.theme.forced-colors-override.enabled", true);
+
 // Pref to control whether or not Private Browsing windows show up
 // as separate icons in the Windows taskbar.
 pref("browser.privateWindowSeparation.enabled", true);
@@ -3477,6 +3481,9 @@ pref("browser.backup.disabled-on-idle-backup-retry", false);
 // removing for any reason.
 pref("browser.backup.max-num-unremovable-staging-items", 5);
 pref("browser.backup.scheduled.user-disabled", false);
+// How many milliseconds to wait for tab state to flush before continuing the
+// backup process.
+pref("browser.backup.tab-flush-timeout", 5000);
 
 #ifdef NIGHTLY_BUILD
   // Pref to enable the new profiles
@@ -3518,6 +3525,8 @@ pref("browser.ipProtection.autoStartPrivateEnabled", false);
 pref("browser.ipProtection.userEnabled", false);
 // Pref to track which experiment version the user is enrolled in
 pref("browser.ipProtection.variant", "");
+// Pref to track number of times the VPN panel is opened
+pref("browser.ipProtection.panelOpenCount", 0);
 pref("browser.ipProtection.exceptionsMode", "all");
 pref("browser.ipProtection.domainExclusions", "");
 pref("browser.ipProtection.domainInclusions", "");

@@ -312,8 +312,8 @@ extern const char gToolkitBuildID[];
 
 static nsIProfileLock* gProfileLock;
 #if defined(MOZ_HAS_REMOTE)
-MOZ_RUNINIT static RefPtr<nsRemoteService> gRemoteService;
-MOZ_RUNINIT static RefPtr<nsStartupLock> gStartupLock;
+MOZ_CONSTINIT static RefPtr<nsRemoteService> gRemoteService;
+MOZ_CONSTINIT static RefPtr<nsStartupLock> gStartupLock;
 #endif
 
 int gRestartArgc;
@@ -350,7 +350,7 @@ MOZ_CONSTINIT nsString gProcessStartupShortcut;
 #endif
 
 #if defined(MOZ_WAYLAND)
-MOZ_RUNINIT std::unique_ptr<WaylandProxy> gWaylandProxy;
+MOZ_CONSTINIT std::unique_ptr<WaylandProxy> gWaylandProxy;
 #endif
 
 #include "BinaryPath.h"
