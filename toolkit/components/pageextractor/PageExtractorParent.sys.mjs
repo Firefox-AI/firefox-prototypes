@@ -45,7 +45,7 @@ export class PageExtractorParent extends JSWindowActorParent {
    * @see PageExtractorChild#getText
    *
    * @param {Partial<GetTextOptions>} options
-   * @returns {Promise<string | null>}
+   * @returns {Promise<import('./PageExtractor.d.ts').GetTextResult | null>}
    */
   getText(options = {}) {
     if (this.#isPDF()) {

@@ -106,7 +106,7 @@ export class PageExtractorChild extends JSWindowActorChild {
    * @see PageExtractorParent#getText for docs
    *
    * @param {GetTextOptions} options
-   * @returns {string}
+   * @returns {string | import('./PageExtractor.d.ts').GetTextPageResult}
    */
   getText(options) {
     const window = this.browsingContext?.window;
@@ -116,14 +116,37 @@ export class PageExtractorChild extends JSWindowActorChild {
       return "";
     }
 
-    if (options.removeBoilerplate) {
+    const extractionOptions = options ?? {};
+
+    if (extractionOptions.removeBoilerplate) {
       throw new Error("Boilerplate removal is not supported yet.");
     }
 
-    const text = lazy.extractTextFromDOM(document, options);
+    const extraction = lazy.extractTextFromDOM(document, extractionOptions);
 
-    lazy.console.log("GetText", options);
-    lazy.console.debug(text);
+    lazy.console.log("GetText", extractionOptions);
+    lazy.console.debug(extraction);
+
+    if (
+      extraction &&
+      typeof extraction === "object" &&
+      (extractionOptions.includePageInfo ||
+        extractionOptions.viewportPage !== undefined)
+    ) {
+      const trimmedText =
+        typeof extraction.text === "string" ? extraction.text.trim() : "";
+      return {
+        ...extraction,
+        text: trimmedText,
+      };
+    }
+
+    let text = "";
+    if (typeof extraction === "string") {
+      text = extraction;
+    } else if (extraction && typeof extraction.text === "string") {
+      text = extraction.text;
+    }
 
     return text.trim();
   }
