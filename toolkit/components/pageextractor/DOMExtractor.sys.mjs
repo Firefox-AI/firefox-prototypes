@@ -34,12 +34,24 @@ class ExtractionContext {
   #textContent = "";
 
   /**
+   * @type {{ top: number; left: number; right: number; bottom: number } | null}
+   */
+  #viewportRect = null;
+
+  /**
    * Constructs a new extraction context with the provided options.
    *
+   * @param {Document} document
    * @param {GetTextOptions} options
    */
-  constructor(options) {
+  constructor(document, options) {
     this.#options = options;
+    if (options.justViewport) {
+      const window = document.defaultView;
+      if (window) {
+        this.#viewportRect = getViewportRect(window);
+      }
+    }
   }
 
   /**
@@ -106,6 +118,10 @@ class ExtractionContext {
       return;
     }
 
+    if (this.#viewportRect && !isNodeInViewport(node, this.#viewportRect)) {
+      return;
+    }
+
     const element = asHTMLElement(node);
     const text = asTextNode(node);
     let innerText = "";
@@ -136,7 +152,7 @@ class ExtractionContext {
  * @returns {string}
  */
 export function extractTextFromDOM(document, options) {
-  const context = new ExtractionContext(options);
+  const context = new ExtractionContext(document, options);
 
   subdivideAndExtractText(document.body, context);
 
@@ -357,6 +373,29 @@ function isNodeHidden(node) {
     visibility === "hidden" ||
     visibility === "collapse" ||
     opacity === "0"
+  );
+}
+
+/**
+ * @param {Node} node
+ * @param {{ top: number; left: number; right: number; bottom: number }} viewportRect
+ */
+function isNodeInViewport(node, viewportRect) {
+  const element = getHTMLElementForStyle(node);
+  if (!element) {
+    return false;
+  }
+
+  const rect = element.getBoundingClientRect();
+  if (!rect) {
+    return false;
+  }
+
+  return (
+    rect.bottom > viewportRect.top &&
+    rect.top < viewportRect.bottom &&
+    rect.right > viewportRect.left &&
+    rect.left < viewportRect.right
   );
 }
 
@@ -638,4 +677,25 @@ function getHTMLElementForStyle(node) {
 
   // If the text node is not connected or doesn't have a frame.
   return null;
+}
+
+/**
+ * @param {Window} window
+ */
+function getViewportRect(window) {
+  const { visualViewport } = window;
+  if (visualViewport) {
+    return {
+      top: visualViewport.offsetTop,
+      left: visualViewport.offsetLeft,
+      right: visualViewport.offsetLeft + visualViewport.width,
+      bottom: visualViewport.offsetTop + visualViewport.height,
+    };
+  }
+  return {
+    top: 0,
+    left: 0,
+    right: window.innerWidth,
+    bottom: window.innerHeight,
+  };
 }
