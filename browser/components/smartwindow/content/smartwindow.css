@@ -67,9 +67,19 @@ body {
   flex-direction: column;
   font-size: 15px;
   gap: var(--space-large);
-  margin-left: var(--space-xlarge);
-  order: 1;
+  margin: var(--space-xlarge) auto;
+  max-width: 700px;
   padding: 0 var(--space-large);
+}
+
+.onboarding-info-text {
+  white-space: break-spaces;
+}
+
+.sidebar-mode .onboarding-info-text-container {
+  margin: 0 0 0 var(--space-xlarge);
+  max-width: auto;
+  order: 1;
 }
 
 .onboarding-prompts-container {
@@ -78,7 +88,7 @@ body {
   gap: var(--space-small);
 }
 
-.sidebar-mode .quick-prompt-pill.onboarding-prompt-pill {
+.quick-prompt-pill.onboarding-prompt-pill {
   min-height: auto;
   padding: var(--space-small) var(--space-medium);
 }
@@ -1271,6 +1281,11 @@ body {
   opacity: 0;
   transform: translateY(6px);
   visibility: hidden;
+}
+
+#assistant-onboarding-message.main-window-welcome {
+  position: relative;
+  place-items: flex-start;
 }
 
 @media (prefers-reduced-motion: reduce) {
