@@ -1671,6 +1671,7 @@ async function generateInsightsWithLLM(profile, source) {
       },
       { role: "user", content: promptText },
     ],
+    options: { temperature: 0.0 }, // avoid too much variations
     responseFormat: { type: "json_schema", schema: LIVE_INSIGHTS_SCHEMA },
   });
 
