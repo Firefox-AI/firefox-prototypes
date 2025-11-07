@@ -513,6 +513,7 @@ class ChatBot extends MozLitElement {
 
     .message-footer {
       justify-content: flex-start;
+      position: relative;
     }
 
     .insights-applied-trigger {
@@ -556,6 +557,40 @@ class ChatBot extends MozLitElement {
         opacity 0.2s ease;
       white-space: nowrap;
     }
+
+    .insights-applied-popup {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+      padding: 12px;
+      pointer-events: none;
+      position: absolute;
+      bottom: 24px;
+      left: 0;
+      opacity: 0;
+      overflow: hidden;
+      transform: translateY(6px);
+      transform-origin: bottom center;
+      transition:
+        opacity 0.2s ease-out,
+        transform 0.2s ease-out;
+      width: 280px;
+      z-index: 10;
+
+      &.is-open {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .insights-applied-popup,
+      .insights-applied-popup.is-open {
+        transition: none;
+      }
+    }
   `;
 
   showChatHistoryOverlay = showChatHistoryOverlay;
@@ -576,6 +611,7 @@ class ChatBot extends MozLitElement {
       searchEngines: { type: Array },
       openDropdownQuery: { type: String },
       useInsights: { type: Boolean, reflect: true },
+      openInsightsFor: { type: String },
     };
   }
 
@@ -614,6 +650,7 @@ class ChatBot extends MozLitElement {
     this.openDropdownQuery = null;
     this._lastSentPageInfoSignature = null;
     this._lastSelectionSignature = null;
+    this.openInsightsFor = false;
 
     // TODO: Figure out what/where to get this info from, if necessary
     this.#conversation = new ChatHistoryConversation({
@@ -676,6 +713,14 @@ class ChatBot extends MozLitElement {
     window.addEventListener("insights-updated", this._insightsUpdatedHandler);
     Services.prefs.addObserver(PROMPT_PREF, this._prefObserver);
 
+    this._closeInsightsPopoverOnWindow = e => {
+      if (!this.renderRoot.contains(e.target)) {
+        this.openInsightsFor = null;
+        this.requestUpdate();
+      }
+    };
+    document.addEventListener("click", this._closeInsightsPopoverOnWindow);
+
     // Load search engines with their icons
     await this.loadSearchEngines();
 
@@ -718,6 +763,10 @@ class ChatBot extends MozLitElement {
     try {
       Services.prefs.removeObserver(PROMPT_PREF, this._prefObserver);
     } catch {}
+    if (this._closeInsightsPopoverOnWindow) {
+      document.removeEventListener("click", this._closeInsightsPopoverOnWindow);
+      this._closeInsightsPopoverOnWindow = null;
+    }
   }
 
   #createPageInfoMessageIfNeeded() {
@@ -1368,6 +1417,12 @@ Today's date: ${currentDate}`;
     this.handleSearchQuery(query, engineName, e);
   }
 
+  toggleInsightsPopup(key, e) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.openInsightsFor = this.openInsightsFor === key ? null : key;
+  }
+
   render() {
     // Count total insights for the badge
     const insightsData =
@@ -1577,7 +1632,11 @@ Today's date: ${currentDate}`;
                     <div class="message-body">${bodyHTML}</div>
                     ${msg.role === ChatHistory.MESSAGE_ROLE.ASSISTANT
                       ? html`<div class="message-footer">
-                          <button class="insights-applied-trigger">
+                          <button
+                            class="insights-applied-trigger"
+                            aria-expanded=${this.openInsightsFor === key}
+                            @click=${e => this.toggleInsightsPopup(key, e)}
+                          >
                             <div class="insights-applied-trigger-inner">
                               <svg
                                 alt="Insights Applied Icon"
@@ -1603,6 +1662,68 @@ Today's date: ${currentDate}`;
                               </span>
                             </div>
                           </button>
+                          <div
+                            class="insights-applied-popup ${this
+                              .openInsightsFor === key
+                              ? "is-open"
+                              : ""}"
+                          >
+                            <div class="insights-applied-popup-body">
+                              <ul class="insights-applied-list">
+                                ${usedInsights.map(
+                                  insight =>
+                                    html`<li class="insights-applied-list-item">
+                                      ${insight}
+                                    </li>`
+                                )}
+                              </ul>
+                              <div class="insights-applied-popup-footer">
+                                <button
+                                  class="insights-applied-popup-manage-button"
+                                >
+                                  <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 16 16"
+                                    fill="none"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                  >
+                                    <path
+                                      fill-rule="evenodd"
+                                      clip-rule="evenodd"
+                                      d="M8.00062 5C9.65745 5.00021 11.0006 6.34313 11.0006 8C11.0006 9.65687 9.65745 10.9998 8.00062 11C6.34362 11 5.00062 9.657 5.00062 8C5.00062 6.343 6.34362 5 8.00062 5ZM8.00062 6.5C7.17362 6.5 6.50062 7.173 6.50062 8C6.50062 8.827 7.17362 9.5 8.00062 9.5C8.82745 9.49979 9.50062 8.82687 9.50062 8C9.50062 7.17313 8.82745 6.50021 8.00062 6.5Z"
+                                      fill="black"
+                                    />
+                                    <path
+                                      fill-rule="evenodd"
+                                      clip-rule="evenodd"
+                                      d="M8.60512 0C9.38005 0.000123806 10.0634 0.509557 10.2838 1.25293L10.6813 2.59668C10.9079 2.71301 11.1206 2.84341 11.3209 2.98047L12.7028 2.65039C13.4551 2.46931 14.2384 2.80521 14.6256 3.47656L15.2282 4.51855C15.618 5.19352 15.5152 6.04704 14.9723 6.60938L14.0084 7.60645C14.0225 7.7304 14.0348 7.86663 14.0348 8C14.0348 8.12482 14.0225 8.25253 14.0094 8.36914L14.985 9.39648C15.5193 9.95889 15.617 10.8049 15.2311 11.4756L14.6286 12.5186C14.2627 13.1515 13.5449 13.4862 12.8327 13.3701L12.6901 13.3408L11.3395 13.0039C11.1342 13.1456 10.915 13.28 10.6813 13.4004L10.2829 14.7461C10.0625 15.4895 9.37907 15.9989 8.60414 15.999H7.40199C6.62197 15.999 5.93491 15.483 5.71937 14.7324L5.33949 13.4102C5.09855 13.2878 4.87239 13.1502 4.6598 13.0039L3.31019 13.3408C2.55258 13.5298 1.76109 13.194 1.37074 12.5186L0.769179 11.4766C0.382393 10.8062 0.482072 9.95868 1.01625 9.39648L1.98988 8.36816C1.97696 8.25158 1.96644 8.12369 1.96644 8C1.96644 7.86567 1.97765 7.72947 1.99183 7.60547L1.02992 6.60938C0.487719 6.04793 0.382456 5.19373 0.773085 4.51758L1.37465 3.47559C1.76172 2.80422 2.5452 2.46855 3.2975 2.64941L4.68031 2.98047C4.88757 2.83934 5.10706 2.70619 5.34047 2.58789L5.72035 1.2666C5.93588 0.515979 6.62294 0 7.40297 0H8.60512ZM7.40297 1.5C7.29129 1.5 7.19348 1.57374 7.16273 1.68066L6.68812 3.33105C6.62531 3.54968 6.46631 3.72859 6.25648 3.81641C5.92137 3.95657 5.60457 4.1514 5.28969 4.38867C5.11097 4.52335 4.88134 4.57159 4.66371 4.51953L2.94887 4.1084H2.94691C2.84046 4.08274 2.72921 4.13057 2.67445 4.22559L2.67348 4.22656L2.07191 5.26855C2.01674 5.36436 2.0313 5.48691 2.10902 5.56738L3.32289 6.82422C3.48107 6.98813 3.55613 7.21548 3.52699 7.44141C3.49253 7.70841 3.46644 7.83997 3.46644 8C3.46644 8.15506 3.49162 8.26729 3.52406 8.53711C3.55069 8.75871 3.47743 8.98159 3.32387 9.14355L2.10316 10.4287C2.02755 10.5084 2.01319 10.6301 2.06801 10.7256L2.66957 11.7676C2.72526 11.8639 2.83872 11.9126 2.94691 11.8857L4.63637 11.4639L4.71937 11.4482C4.91415 11.4226 5.11289 11.4745 5.27113 11.5947C5.51276 11.7785 5.75452 11.9376 6.00355 12.0654L6.25551 12.1826L6.33168 12.2197C6.50369 12.3156 6.63214 12.4765 6.68715 12.668L7.16176 14.3184L7.19594 14.3916C7.24157 14.4575 7.31816 14.499 7.40199 14.499H8.60414C8.71498 14.4989 8.81282 14.4258 8.84437 14.3193L9.33851 12.6533L9.36683 12.5752C9.4422 12.3969 9.58412 12.2533 9.7643 12.1768C10.0952 12.0364 10.4101 11.8368 10.7291 11.5947L10.7995 11.5469C10.9682 11.4467 11.1713 11.4159 11.3639 11.4639L13.0534 11.8857C13.1614 11.9124 13.2741 11.8638 13.3297 11.7676L13.9313 10.7266C13.987 10.6295 13.9724 10.5092 13.8971 10.4297L13.8961 10.4287L12.6764 9.14355C12.5219 8.98072 12.4484 8.75689 12.4762 8.53418C12.5094 8.2688 12.5348 8.15278 12.5348 8C12.5348 7.83788 12.508 7.70904 12.4743 7.4375C12.4463 7.21255 12.5219 6.98727 12.6793 6.82422L13.8932 5.56738C13.9699 5.48788 13.985 5.36635 13.9293 5.26953L13.3268 4.22754C13.2721 4.13246 13.1598 4.08375 13.0534 4.10938L11.3366 4.51953C11.119 4.57144 10.8892 4.52332 10.7106 4.38867C10.3992 4.15379 10.0901 3.96049 9.76527 3.82324C9.55858 3.73586 9.40221 3.5599 9.33851 3.34473L8.84535 1.67871C8.81365 1.57252 8.71579 1.50012 8.60512 1.5H7.40297Z"
+                                      fill="black"
+                                    />
+                                  </svg>
+
+                                  Manage Insights
+                                </button>
+                                <button
+                                  class="insights-applied-popup-retry-button"
+                                >
+                                  <svg
+                                    width="16"
+                                    height="15"
+                                    viewBox="0 0 16 15"
+                                    fill="none"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                  >
+                                    <path
+                                      d="M7.5 0C10.0599 0 12.3193 1.29042 13.6709 3.25391L14.8037 2.12109C15.1007 1.82409 15.6094 2.0341 15.6094 2.4541V6.0293C15.6092 6.28916 15.3976 6.5 15.1377 6.5H11.5635C11.1435 6.5 10.9335 5.99229 11.2305 5.69629L12.5889 4.33594C11.5304 2.63507 9.6472 1.5 7.5 1.5C4.191 1.5 1.5 4.191 1.5 7.5C1.5 10.809 4.191 13.5 7.5 13.5C10.468 13.5 12.9322 11.333 13.4102 8.5H14.9248C14.4338 12.163 11.296 15 7.5 15C3.364 15 0 11.636 0 7.5C0 3.364 3.364 0 7.5 0Z"
+                                      fill="black"
+                                    />
+                                  </svg>
+                                  Retry without insights
+                                </button>
+                              </div>
+                            </div>
+                          </div>
                         </div>`
                       : ""}
                     ${searchQueries.length && this.searchEngines.length
