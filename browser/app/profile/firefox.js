@@ -597,6 +597,12 @@ pref("browser.urlbar.quicksuggest.settingsUi", 1);
 // Whether unit conversion is enabled.
 pref("browser.urlbar.unitConversion.enabled", true);
 
+// Whether Smart Window chat suggestions are enabled.
+pref("browser.urlbar.smartWindowChat.enabled", true);
+
+// Preferred placement index for Smart Window chat suggestions.
+pref("browser.urlbar.smartWindowChat.suggestedIndex", 1);
+
 // Whether to show search suggestions before general results like history and
 // bookmarks.
 pref("browser.urlbar.showSearchSuggestionsFirst", true);

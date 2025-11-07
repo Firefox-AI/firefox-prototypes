@@ -49,6 +49,7 @@ MOZ_SRC_FILES += [
     "UrlbarProviderSearchTips.sys.mjs",
     "UrlbarProviderSemanticHistorySearch.sys.mjs",
     "UrlbarProvidersManager.sys.mjs",
+    "UrlbarProviderSmartWindowChat.sys.mjs",
     "UrlbarProviderTabToSearch.sys.mjs",
     "UrlbarProviderTokenAliasEngines.sys.mjs",
     "UrlbarProviderTopSites.sys.mjs",
