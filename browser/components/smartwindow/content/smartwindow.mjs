@@ -1006,7 +1006,7 @@ class SmartWindowPage {
         if (this.smartbar) {
           this.smartbar.setContent(quickPrompt.text);
         }
-        this.handleEnter(quickPrompt.text);
+        this.handleEnter(quickPrompt.text, quickPrompt.type || "chat");
       });
 
       this.quickPromptsContainer.appendChild(pill);
@@ -1853,7 +1853,7 @@ class SmartWindowPage {
       if (this.smartbar) {
         this.smartbar.setContent(prompt.text);
       }
-      this.handleEnter(prompt.text);
+      this.handleEnter(prompt.text, prompt.type || "chat");
     });
 
     return pill;
