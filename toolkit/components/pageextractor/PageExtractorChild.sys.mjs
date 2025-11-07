@@ -9,29 +9,18 @@
  * @import { PageExtractorParent } from './PageExtractorParent.sys.mjs'
  */
 
-/* eslint-disable jsdoc/require-property-description */
+const READY_DELAY = 500;
 
-/**
- * @typedef {object} Lazy
- * @property {typeof console} console
- * @property {typeof import("resource://gre/modules/Readerable.sys.mjs").isProbablyReaderable} isProbablyReaderable
- * @property {typeof import("moz-src:///toolkit/components/reader/ReaderMode.sys.mjs").ReaderMode} ReaderMode
- * @property {typeof import("./DOMExtractor.sys.mjs").extractTextFromDOM} extractTextFromDOM
- * @property {typeof import("./DOMExtractor.sys.mjs").getPageInfoFromDOM} getPageInfoFromDOM
- * @property {typeof import("./DOMExtractor.sys.mjs").getSelectionTextFromDOM} getSelectionTextFromDOM
- */
+import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
-/** @type {Lazy} */
-const lazy = /** @type {any} */ ({});
-
-ChromeUtils.defineLazyGetter(lazy, "console", () => {
-  return console.createInstance({
-    prefix: "PageExtractorChild",
-    maxLogLevelPref: "browser.ml.logLevel",
-  });
-});
-
-ChromeUtils.defineESModuleGetters(lazy, {
+const lazy = XPCOMUtils.declareLazy({
+  console: () =>
+    console.createInstance({
+      prefix: "PageExtractorChild",
+      maxLogLevelPref: "browser.ml.logLevel",
+    }),
+  setTimeout: "resource://gre/modules/Timer.sys.mjs",
+  clearTimeout: "resource://gre/modules/Timer.sys.mjs",
   ReaderMode: "moz-src:///toolkit/components/reader/ReaderMode.sys.mjs",
   extractTextFromDOM:
     "moz-src:///toolkit/components/pageextractor/DOMExtractor.sys.mjs",
@@ -46,6 +35,13 @@ ChromeUtils.defineESModuleGetters(lazy, {
  * Extract a variety of content from pages for use in a smart window.
  */
 export class PageExtractorChild extends JSWindowActorChild {
+  /**
+   * Used to debounce notifications about a page being ready.
+   *
+   * @type {number | null}
+   */
+  #contentLoadedTimeout = null;
+
   /**
    * Route the messages coming from the parent process.
    *
@@ -75,6 +71,23 @@ export class PageExtractorChild extends JSWindowActorChild {
         return this.getFullPageBounds();
     }
     return Promise.reject(new Error("Unknown message: " + name));
+  }
+
+  /**
+   *
+   * @see ActorManagerParent.sys.mjs
+   *
+   * @param {Event} event
+   *   The DOM event.
+   */
+  handleEvent(event) {
+    switch (event.type) {
+      case "DOMContentLoaded":
+        this.#contentLoadedTimeout = lazy.setTimeout(() => {
+          this.sendAsyncMessage("PageExtractor:DocumentReady");
+        }, READY_DELAY);
+        break;
+    }
   }
 
   /**
@@ -237,5 +250,14 @@ export class PageExtractorChild extends JSWindowActorChild {
     }
 
     return lazy.getSelectionTextFromDOM(document) || "";
+  }
+
+  /**
+   * Called when the page is destroyed.
+   */
+  didDestroy() {
+    if (this.#contentLoadedTimeout) {
+      lazy.clearTimeout(this.#contentLoadedTimeout);
+    }
   }
 }
