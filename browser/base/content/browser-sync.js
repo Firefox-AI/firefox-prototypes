@@ -709,7 +709,54 @@ var gSync = {
     }
   },
 
+  addChatsOption() {
+    // NOTE: This is not loading appmenu-chats even tho its added to browser/locales/en-US/browser/appmenu.ftl:46
+    // [fluent] Missing message in locale en-US: appmenu-chats
+    // [fluent] Couldn't find a message: appmenu-chats
+    const chats_label =
+      this.fluentStrings.formatValueSync("appmenu-chats") || "Chats";
+
+    const toolbarItem = document.createXULElement("toolbarbutton");
+    toolbarItem.classList.add("subviewbutton");
+    toolbarItem.setAttribute("id", "btn_openChatsHistory");
+    toolbarItem.setAttribute("key", "key_openChatsHistory");
+    toolbarItem.setAttribute("command", "Tools:ChatsHistory");
+    toolbarItem.setAttribute("label", chats_label);
+
+    const downloadsButton = PanelUI.mainView.querySelector(
+      "#appMenu-downloads-button"
+    );
+    downloadsButton.parentNode.insertBefore(toolbarItem, downloadsButton);
+
+    toolbarItem.addEventListener("click", () => {
+      gBrowser.selectedTab = gBrowser.addTrustedTab(BROWSER_NEW_TAB_URL);
+
+      // NOTE: Needs a delay to give the chat-bot element time
+      // to be available, not sure if there's a better way to do this
+      setTimeout(() => {
+        const chatBot =
+          gBrowser?.selectedBrowser?.contentDocument?.querySelector?.(
+            "#chat-bot"
+          );
+
+        chatBot.showChatHistoryOverlay();
+      }, 100);
+    });
+  },
+
+  removeChatsOption() {
+    const chatsOption = PanelUI.mainView.querySelector("#btn_openChatsHistory");
+    chatsOption?.remove?.();
+  },
+
   onAppMenuShowing() {
+    this.removeChatsOption();
+
+    const smartWindowActive = SmartWindow?.isSmartWindowActive?.();
+    if (smartWindowActive) {
+      this.addChatsOption();
+    }
+
     const appMenuHeaderText = PanelMultiView.getViewNode(
       document,
       "appMenu-fxa-text"
