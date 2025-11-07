@@ -555,6 +555,12 @@ const PREF_URLBAR_DEFAULTS = /** @type {PreferenceDefinition[]} */ ([
   // Yelp realtime suggestions are turned on.
   ["suggest.yelpRealtime", true],
 
+  // Feature gate pref for Smart Window chat suggestions in the urlbar.
+  ["smartWindowChat.enabled", true],
+
+  // Suggested index for Smart Window chat suggestions.
+  ["smartWindowChat.suggestedIndex", 1],
+
   // Whether history results with the same title and URL excluding the ref
   // will be deduplicated.
   ["deduplication.enabled", true],

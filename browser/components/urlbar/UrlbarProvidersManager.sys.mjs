@@ -181,6 +181,12 @@ var localProviderModules = [
     supportedInputTypes: ["urlbar"],
   },
   {
+    name: "UrlbarProviderSmartWindowChat",
+    module:
+      "moz-src:///browser/components/urlbar/UrlbarProviderSmartWindowChat.sys.mjs",
+    supportedInputTypes: ["urlbar"],
+  },
+  {
     name: "UrlbarProviderTabToSearch",
     module:
       "moz-src:///browser/components/urlbar/UrlbarProviderTabToSearch.sys.mjs",

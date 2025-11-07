@@ -165,6 +165,21 @@
 }
 
 /**
+ * Smart Window chat
+ */
+
+.urlbarView-dynamic-smartWindowChat-action {
+  font-size: var(--urlbarView-small-font-size);
+  color: var(--urlbarView-secondary-text-color);
+
+  &::before {
+    content: "\2014";
+    margin: 0 0.4em;
+    opacity: 0.6;
+  }
+}
+
+/**
  * Actions
  */
 

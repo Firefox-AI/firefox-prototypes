@@ -804,6 +804,8 @@ urlbar-result-action-search-bookmarks = Search Bookmarks
 urlbar-result-action-search-history = Search History
 urlbar-result-action-search-tabs = Search Tabs
 urlbar-result-action-search-actions = Search Actions
+# Action appended to urlbar result rows that send the query to Smart Window chat.
+urlbar-result-action-send-to-smart-window = Ask in Smart Window
 
 # Label for a quickaction result used to switch to an open tab group.
 #  $group (String): the name of the tab group to switch to
