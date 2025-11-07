@@ -5,7 +5,7 @@
 // @ts-check
 
 /**
- * @import { GetTextOptions } from './PageExtractor.js'
+ * @import { GetPageInfoOptions, GetTextOptions } from './PageExtractor.js'
  * @import { PageExtractorParent } from './PageExtractorParent.sys.mjs'
  */
 
@@ -17,6 +17,8 @@
  * @property {typeof import("resource://gre/modules/Readerable.sys.mjs").isProbablyReaderable} isProbablyReaderable
  * @property {typeof import("moz-src:///toolkit/components/reader/ReaderMode.sys.mjs").ReaderMode} ReaderMode
  * @property {typeof import("./DOMExtractor.sys.mjs").extractTextFromDOM} extractTextFromDOM
+ * @property {typeof import("./DOMExtractor.sys.mjs").getPageInfoFromDOM} getPageInfoFromDOM
+ * @property {typeof import("./DOMExtractor.sys.mjs").getSelectionTextFromDOM} getSelectionTextFromDOM
  */
 
 /** @type {Lazy} */
@@ -32,6 +34,10 @@ ChromeUtils.defineLazyGetter(lazy, "console", () => {
 ChromeUtils.defineESModuleGetters(lazy, {
   ReaderMode: "moz-src:///toolkit/components/reader/ReaderMode.sys.mjs",
   extractTextFromDOM:
+    "moz-src:///toolkit/components/pageextractor/DOMExtractor.sys.mjs",
+  getPageInfoFromDOM:
+    "moz-src:///toolkit/components/pageextractor/DOMExtractor.sys.mjs",
+  getSelectionTextFromDOM:
     "moz-src:///toolkit/components/pageextractor/DOMExtractor.sys.mjs",
   isProbablyReaderable: "resource://gre/modules/Readerable.sys.mjs",
 });
@@ -61,6 +67,12 @@ export class PageExtractorChild extends JSWindowActorChild {
           return this.getAboutReaderContent();
         }
         return this.getText(data);
+      case "PageExtractorParent:GetPageInfo":
+        return this.getPageInfo(data);
+      case "PageExtractorParent:GetSelectionText":
+        return this.getSelectionText();
+      case "PageExtractorParent:GetFullPageBounds":
+        return this.getFullPageBounds();
     }
     return Promise.reject(new Error("Unknown message: " + name));
   }
@@ -106,30 +118,39 @@ export class PageExtractorChild extends JSWindowActorChild {
    * @see PageExtractorParent#getText for docs
    *
    * @param {GetTextOptions} options
-   * @returns {string}
+   * @returns {import('./PageExtractor.d.ts').GetTextResult}
    */
   getText(options) {
+    const extractionOptions = options ?? {};
+
     const window = this.browsingContext?.window;
     const document = window?.document;
 
     if (!document) {
-      return "";
+      return { text: "" };
     }
 
-    if (options.removeBoilerplate) {
+    if (extractionOptions.removeBoilerplate) {
       throw new Error("Boilerplate removal is not supported yet.");
     }
 
-    if (options.justViewport) {
-      throw new Error("Just getting the viewport is not supported yet.");
+    const extraction = lazy.extractTextFromDOM(document, extractionOptions);
+
+    lazy.console.log("GetText", extractionOptions);
+    lazy.console.debug(extraction);
+
+    if (extraction && typeof extraction === "object") {
+      const trimmedText =
+        typeof extraction.text === "string" ? extraction.text.trim() : "";
+      return {
+        ...extraction,
+        text: trimmedText,
+      };
     }
 
-    const text = lazy.extractTextFromDOM(document, options);
+    const text = typeof extraction === "string" ? extraction.trim() : "";
 
-    lazy.console.log("GetText", options);
-    lazy.console.debug(text);
-
-    return text.trim();
+    return { text };
   }
 
   /**
@@ -175,5 +196,46 @@ export class PageExtractorChild extends JSWindowActorChild {
     // `window.location.href` and should be a cheaper check here.
     let url = this.manager.contentWindow.document.documentURIObject;
     return url.schemeIs("about") && url.pathQueryRef.startsWith("reader?");
+  }
+
+  /**
+   * Returns a page rect for the full size of the page.
+   */
+  getFullPageBounds() {
+    const win = this.manager.contentWindow;
+    const { width, height } = win.document.body.getBoundingClientRect();
+    return { width, height, devicePixelRatio: win.devicePixelRatio };
+  }
+  /**
+   * Computes pagination information for the current document.
+   *
+   * @param {GetPageInfoOptions} options
+   * @returns {import('./PageExtractor.d.ts').PageInfo | null}
+   */
+  getPageInfo(options = {}) {
+    const window = this.browsingContext?.window;
+    const document = window?.document;
+
+    if (!document) {
+      return null;
+    }
+
+    return lazy.getPageInfoFromDOM(document, options);
+  }
+
+  /**
+   * Returns the currently selected text within the document.
+   *
+   * @returns {string}
+   */
+  getSelectionText() {
+    const window = this.browsingContext?.window;
+    const document = window?.document;
+
+    if (!document) {
+      return "";
+    }
+
+    return lazy.getSelectionTextFromDOM(document) || "";
   }
 }

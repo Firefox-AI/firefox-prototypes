@@ -108,7 +108,7 @@ const toolsConfig = [
     function: {
       name: GET_PAGE_CONTENT,
       description:
-        "Retrieve the text content from a specific browser tab by its URL. Use this when you need to read, analyze, or reference the actual content of a webpage that the user has mentioned or that appears in their open tabs. The content is cleaned and structured for easy analysis.",
+        "Retrieve text from a specific browser tab. Choose whether to read the current viewport, Reader Mode, or full page content. The content is cleaned for analysis.",
       parameters: {
         type: "object",
         properties: {
@@ -116,6 +116,18 @@ const toolsConfig = [
             type: "string",
             description:
               "The complete URL of the tab to fetch content from. This must exactly match a URL from the user's open tabs. Use the full URL including protocol (http/https). Example: 'https://www.example.com/article'",
+          },
+          mode: {
+            type: "string",
+            enum: ["viewport", "reader", "full"],
+            description:
+              "Extraction mode to use. Choose viewport for what is visible, reader for distilled content, or full for entire page. Defaults to viewport.",
+          },
+          page: {
+            type: "integer",
+            minimum: 1,
+            description:
+              "When using viewport mode, the 1-based page index to capture. Defaults to the page currently in view.",
           },
         },
         required: ["url"],
@@ -255,7 +267,24 @@ const search_open_tabs = ({ type }) => {
 ${tabList}`;
 };
 
-const get_page_content = async ({ url }) => {
+const MODE_HANDLERS = {
+  viewport: async (pageExtractor, { page }) => {
+    const options = { justViewport: true, includePageInfo: true };
+    if (Number.isInteger(page) && page > 0) {
+      options.viewportPage = page - 1;
+    }
+    return pageExtractor.getText(options);
+  },
+  reader: async pageExtractor => {
+    const text = await pageExtractor.getReaderModeContent();
+    return { text: typeof text === "string" ? text : "" };
+  },
+  full: async pageExtractor => pageExtractor.getText({ includePageInfo: true }),
+};
+
+const DEFAULT_MODE = "viewport";
+
+const get_page_content = async ({ url, mode, page }) => {
   try {
     let win = lazy.BrowserWindowTracker.getTopWindow();
     let gBrowser = win.gBrowser;
@@ -318,14 +347,26 @@ const get_page_content = async ({ url }) => {
         "PageExtractor"
       );
 
-    // Try reader mode content first, then fall back to text content
-    let pageContent = await pageExtractor.getReaderModeContent();
-    if (!pageContent) {
-      pageContent = await pageExtractor.getText();
+    const selectedMode =
+      typeof mode === "string" && MODE_HANDLERS[mode] ? mode : DEFAULT_MODE;
+    const handler = MODE_HANDLERS[selectedMode];
+    let extraction = null;
+
+    try {
+      extraction = await handler(pageExtractor, { page });
+    } catch (err) {
+      console.warn(
+        "[SmartWindow] get_page_content mode failed",
+        selectedMode,
+        err
+      );
     }
 
+    const pageContent =
+      typeof extraction?.text === "string" ? extraction.text.trim() : "";
+
     if (!pageContent) {
-      return `No readable content found on "${targetTab.label}" at ${url}. The page may be empty or contain mostly media content.`;
+      return `get_page_content(${selectedMode}) returned no content for "${targetTab.label}" (${url}). Try another mode if you still need information.`;
     }
 
     // Clean and truncate content for better LLM consumption
@@ -345,9 +386,25 @@ const get_page_content = async ({ url }) => {
       }
     }
 
-    return `Content from "${targetTab.label}" (${url}):
+    const modeLabels = {
+      viewport: "current viewport",
+      reader: "reader mode",
+      full: "full page",
+    };
+    const modeLabel = modeLabels[selectedMode] || "selected mode";
 
-${cleanContent}`;
+    let pageInfoText = "";
+    const pageInfo = extraction?.pageInfo;
+    if (pageInfo) {
+      const humanPage = pageInfo.currentPage + 1;
+      const totalPages = pageInfo.count;
+      const viewportHeight = Math.round(pageInfo.viewportHeight);
+      pageInfoText = `\n\nPageInfo: page ${humanPage} of ${totalPages} (viewport height ≈ ${viewportHeight}px)`;
+    }
+
+    return `Content (${modeLabel}) from "${targetTab.label}" (${url}):
+
+${cleanContent}${pageInfoText}`;
   } catch (error) {
     return `Error retrieving content from ${url}: ${error.message}. Try refreshing the tab or checking if it's accessible.`;
   }

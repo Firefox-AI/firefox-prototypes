@@ -11,4 +11,26 @@ export type GetTextOptions = Partial<{
   removeBoilerplate: boolean;
   // Just include the viewport content.
   justViewport: boolean;
+  // Index of the virtual page (0-based) defined by the viewport height.
+  viewportPage: number;
+  // When true, include page metadata with the response.
+  includePageInfo: boolean;
 }>;
+
+export type GetPageInfoOptions = Partial<{
+  // Index of the virtual page (0-based) defined by the viewport height.
+  viewportPage: number;
+}>;
+
+export type GetSelectionTextOptions = Record<string, never>;
+
+export interface PageInfo {
+  count: number;
+  viewportHeight: number;
+  currentPage: number;
+}
+
+export type GetTextResult = {
+  text: string;
+  pageInfo?: PageInfo;
+};

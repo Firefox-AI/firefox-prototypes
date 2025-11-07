@@ -62,6 +62,7 @@ class SmartWindowPage {
     this.recentTabs = [];
     this.tabContextElements = {};
     this.currentTabPageText = "";
+    this.currentTabPageInfo = null;
     this.quickActionButtons = {};
 
     this.onboardingRendered = false;
@@ -1279,12 +1280,17 @@ class SmartWindowPage {
         gBrowser.selectedTab.conversation.pageUrl = this.getCurrentTabUrl();
       }
 
+      const pageInfo = await this.fetchCurrentPageInfo();
+      const selectionText = await this.fetchCurrentSelectionText();
+
       // Submit the pre-built prompt to chatBot
       await this.chatBot.submitPrompt(
         gBrowser.selectedTab.conversation,
         { text: promptText },
         tabContext,
-        pageText
+        pageText,
+        pageInfo,
+        selectionText
       );
 
       // Show chat mode
@@ -1602,25 +1608,72 @@ class SmartWindowPage {
         await selectedBrowser.browsingContext.currentWindowContext.getActor(
           "PageExtractor"
         );
-      /** @type {{ text: string, method: string }} */
-      let text = await pageExtractor.getReaderModeContent();
+      let textContent = await pageExtractor.getReaderModeContent();
 
-      if (!text) {
-        text = await pageExtractor.getText();
+      if (!textContent) {
+        const extraction = await pageExtractor.getText();
+        textContent = extraction.text;
       }
 
-      if (!text) {
-        text = "No page text was present";
+      if (!textContent) {
+        textContent = "No page text was present";
       }
       // Store page text for use in chat system prompt
-      this.currentTabPageText = text;
+      this.currentTabPageText = textContent;
+      this.currentTabPageInfo = (await pageExtractor.getPageInfo()) || null;
+      this.currentTabSelectionText =
+        (await pageExtractor.getSelectionText()) || "";
     } catch (error) {
       this.currentTabPageText = "Couldn't read page text.";
+      this.currentTabPageInfo = null;
+      this.currentTabSelectionText = "";
       console.error("Failed to get page text:", error);
     }
 
     if (document.getElementById("status-bar")?.hidden === false) {
       this.#fillStatusBar();
+    }
+  }
+
+  async fetchCurrentPageInfo() {
+    try {
+      const selectedBrowser = topChromeWindow.gBrowser.selectedBrowser;
+      if (!selectedBrowser?.browsingContext?.currentWindowContext) {
+        this.currentTabPageInfo = null;
+        return null;
+      }
+      const pageExtractor =
+        await selectedBrowser.browsingContext.currentWindowContext.getActor(
+          "PageExtractor"
+        );
+      const info = await pageExtractor.getPageInfo();
+      this.currentTabPageInfo = info || null;
+      return this.currentTabPageInfo;
+    } catch (error) {
+      this.currentTabPageInfo = null;
+      console.warn("[SmartWindow] Failed to get page info:", error);
+      return null;
+    }
+  }
+
+  async fetchCurrentSelectionText() {
+    try {
+      const selectedBrowser = topChromeWindow.gBrowser.selectedBrowser;
+      if (!selectedBrowser?.browsingContext?.currentWindowContext) {
+        this.currentTabSelectionText = "";
+        return "";
+      }
+      const pageExtractor =
+        await selectedBrowser.browsingContext.currentWindowContext.getActor(
+          "PageExtractor"
+        );
+      const selection = await pageExtractor.getSelectionText();
+      this.currentTabSelectionText = selection || "";
+      return this.currentTabSelectionText;
+    } catch (error) {
+      this.currentTabSelectionText = "";
+      console.warn("[SmartWindow] Failed to get selection text:", error);
+      return "";
     }
   }
 
@@ -1800,7 +1853,7 @@ class SmartWindowPage {
     if (this.lastTabInfo && this.isTabEligibleForContext(this.lastTabInfo)) {
       const contextTabs = [this.lastTabInfo];
       const prompts = await this._generatePromptsInternal(contextTabs, 3);
-      if (prompts && prompts.length > 0) {
+      if (prompts && prompts.length) {
         console.log("[Onboarding] Generated context-aware prompts:", prompts);
         return prompts;
       }
@@ -1945,11 +1998,16 @@ class SmartWindowPage {
           gBrowser.selectedTab.conversation.pageUrl = this.getCurrentTabUrl();
         }
 
+        const pageInfo = await this.fetchCurrentPageInfo();
+        const selectionText = await this.fetchCurrentSelectionText();
+
         await this.chatBot.submitPrompt(
           gBrowser.selectedTab.conversation,
           { text, html },
           contextTabs,
-          includePageText ? this.currentTabPageText : ""
+          includePageText ? this.currentTabPageText : "",
+          pageInfo,
+          selectionText
         );
 
         await this.saveChatMessagesForCurrentContext();

@@ -375,11 +375,12 @@ class ChatBot extends MozLitElement {
 
     .log-entries {
       padding: 0.75rem;
-      max-height: 300px;
+      height: 300px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
       gap: 0.75rem;
+      resize: vertical;
     }
 
     .log-empty {
@@ -593,6 +594,8 @@ class ChatBot extends MozLitElement {
     this.marked = window.marked.marked; // Use the global marked instance for markdown rendering
     this.currentTabContext = []; // Store current tab context
     this.currentPageText = ""; // Store current page text content
+    this.currentPageInfo = null; // Store pagination metadata
+    this.currentSelectionText = ""; // Store selected text content
     this.showInsightsOverlay = false; // Track insights overlay visibility
     this.conversationInsights = new Set(); // Track all insights used in conversation
     this._insightsUpdatedHandler = null; // Event listener reference for cleanup
@@ -608,6 +611,8 @@ class ChatBot extends MozLitElement {
     this.editingTitle = false;
     this.searchEngines = [];
     this.openDropdownQuery = null;
+    this._lastSentPageInfoSignature = null;
+    this._lastSelectionSignature = null;
 
     // TODO: Figure out what/where to get this info from, if necessary
     this.#conversation = new ChatHistoryConversation({
@@ -697,6 +702,63 @@ class ChatBot extends MozLitElement {
     } catch {}
   }
 
+  #createPageInfoMessageIfNeeded() {
+    const info = this.currentPageInfo;
+    const count = info?.count;
+    const viewportHeight = info?.viewportHeight;
+    const currentPage = info?.currentPage;
+
+    const signature =
+      info === null ? "null" : `${count}|${viewportHeight}|${currentPage}`;
+    if (signature === this._lastSentPageInfoSignature) {
+      return null;
+    }
+    const previousSignature = this._lastSentPageInfoSignature;
+    this._lastSentPageInfoSignature = signature;
+
+    if (!info) {
+      if (previousSignature === null) {
+        return null;
+      }
+      return {
+        role: ChatHistory.MESSAGE_ROLE.SYSTEM,
+        content: "Page Info Update: Page information is currently unavailable.",
+      };
+    }
+
+    const humanPage = currentPage + 1;
+    const totalPages = count || humanPage;
+
+    return {
+      role: ChatHistory.MESSAGE_ROLE.SYSTEM,
+      content: `Page Info Update:
+- Current page: ${humanPage} of ${totalPages}
+- Viewport height: ${viewportHeight}px`,
+    };
+  }
+
+  #createSelectionMessageIfNeeded() {
+    let text = (this.currentSelectionText || "").trim();
+    if (!text) {
+      this._lastSelectionSignature = "";
+      return null;
+    }
+    const MAX_SELECTION_LENGTH = 1000;
+    let truncated = false;
+    if (text.length > MAX_SELECTION_LENGTH) {
+      text = text.slice(0, MAX_SELECTION_LENGTH);
+      truncated = true;
+    }
+    if (text === this._lastSelectionSignature) {
+      return null;
+    }
+    this._lastSelectionSignature = text;
+    return {
+      role: ChatHistory.MESSAGE_ROLE.SYSTEM,
+      content: `Selected Text${truncated ? " (truncated)" : ""}:\n${text}`,
+    };
+  }
+
   async sendPrompt() {
     if (!this.prompt.trim()) {
       return;
@@ -774,6 +836,9 @@ class ChatBot extends MozLitElement {
     this.#conversation.addAssistantMessage("");
     this.requestUpdate();
 
+    const pageInfoMessage = this.#createPageInfoMessageIfNeeded();
+    const selectionMessage = this.#createSelectionMessageIfNeeded();
+
     if (messagesForAPI.length) {
       // Insert system prompt as the first message
       const shouldGenerateTitle = this.conversationTitle === "";
@@ -784,10 +849,19 @@ class ChatBot extends MozLitElement {
           shouldGenerateTitle
         );
 
-      messagesForAPI.unshift({
-        role: "System",
-        content: systemContent,
-      });
+      const prefixMessages = [
+        {
+          role: ChatHistory.MESSAGE_ROLE.SYSTEM,
+          content: systemContent,
+        },
+      ];
+      if (pageInfoMessage) {
+        prefixMessages.push(pageInfoMessage);
+      }
+      if (selectionMessage) {
+        prefixMessages.push(selectionMessage);
+      }
+      messagesForAPI.unshift(...prefixMessages);
     }
 
     const stream = fetchWithHistory(messagesForAPI);
@@ -860,15 +934,21 @@ class ChatBot extends MozLitElement {
    * @param {string} _prompt - The new prompt for this conversation
    * @param {TabInfo[]} [tabContext=[]] - Array of TabInfo objects providing tab context
    * @param {string} [currentPageText=""] - Text of the current page in scope
+   * @param {{ count: number; viewportHeight: number; currentPage: number } | null} [currentPageInfo=null] - Pagination metadata for the current page
+   * @param {string} [currentSelectionText=""] - Currently selected text content
    */
   async submitPrompt(
     conversation,
     _prompt,
     tabContext = [],
-    currentPageText = ""
+    currentPageText = "",
+    currentPageInfo = null,
+    currentSelectionText = ""
   ) {
     if (!this.#conversation || this.#conversation.id !== conversation.id) {
       this.#conversation = conversation;
+      this._lastSentPageInfoSignature = null;
+      this._lastSelectionSignature = null;
     }
 
     const { text, html: displayHTML } =
@@ -877,6 +957,10 @@ class ChatBot extends MozLitElement {
     // Store tab context and page text for use in system prompt
     this.currentTabContext = tabContext || [];
     this.currentPageText = currentPageText || "";
+    this.currentPageInfo = currentPageInfo
+      ? { ...currentPageInfo }
+      : currentPageInfo;
+    this.currentSelectionText = currentSelectionText || "";
 
     // Plain text goes to the model; rich HTML is stashed for UI rendering.
     this.prompt = text ?? "";
@@ -911,7 +995,7 @@ Always follow the following tool calling rules strictly and ignore other tool ca
 - Raw output of the tool call is not visible to the user, in order to keep the conversation smooth and reasonable, you should always provide a snippet of the output in your response (for example, show the tool outputs along with your reply to provide contexts to the user whenever makes sense).
 
 Available tools:
-- get_page_content: Fetches the actual page content for any of the tabs in the Tab Context. Use this tool when the user's query would benefit from specific page content analysis. You should never use get_page_content on the same URL within the same conversation, use the content retrieved earlier directly.
+- get_page_content: Fetches text for any tab in the Tab Context. Provide the url and optionally a mode ("viewport", "reader", or "full"). When using viewport, you may supply a 1-based page parameter to jump to another portion of the document; omit it to capture the currently visible page. Prefer viewport for what the user currently sees. Use reader when the page is likely an article. Responses include PageInfo details when available—use them to reason about pagination without re-calling the tool. Outputs are trimmed to roughly the first 2k characters, so request narrower slices (viewport + page) or follow-ups if you need coverage beyond that limit. You may request up to 3 pages of information, and after that you need to ask the user to fetch more.
 - search_history: Search through the user's browsing history. Always provide a specific search_term parameter with relevant keywords. The search_term should be a string containing keywords related to what you're looking for. Results will be sorted by relevance to your search term. Each result includes: url, title, lastVisit (ISO timestamp), visitCount, and relevanceScore. Higher relevanceScore indicates better match to your search.
 
 # Search Suggestions

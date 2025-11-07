@@ -5,7 +5,11 @@
 // @ts-check
 
 /**
- * @import { GetTextOptions } from './PageExtractor.d.ts'
+ * @import {
+ *   GetPageInfoOptions,
+ *   GetSelectionTextOptions,
+ *   GetTextOptions,
+ * } from './PageExtractor.d.ts'
  * @import { PageExtractorChild } from './PageExtractorChild.sys.mjs'
  */
 
@@ -45,16 +49,45 @@ export class PageExtractorParent extends JSWindowActorParent {
    * @see PageExtractorChild#getText
    *
    * @param {Partial<GetTextOptions>} options
-   * @returns {Promise<string | null>}
+   * @returns {Promise<import('./PageExtractor.d.ts').GetTextResult | null>}
    */
   getText(options = {}) {
     if (this.#isPDF()) {
       lazy.console.log("Getting content from pdf");
       return this.browsingContext.currentWindowGlobal
         .getActor("Pdfjs")
-        .getTextContent();
+        .getTextContent()
+        .then(text => ({
+          text: typeof text === "string" ? text.trim() : "",
+        }));
     }
     return this.sendQuery("PageExtractorParent:GetText", options);
+  }
+
+  /**
+   * Computes pagination information for the current page.
+   *
+   * @param {GetPageInfoOptions} options
+   * @returns {Promise<import('./PageExtractor.d.ts').PageInfo | null>}
+   */
+  getPageInfo(options = {}) {
+    if (this.#isPDF()) {
+      return Promise.resolve(null);
+    }
+    return this.sendQuery("PageExtractorParent:GetPageInfo", options);
+  }
+
+  /**
+   * Returns the currently selected text on the page.
+   *
+   * @param {GetSelectionTextOptions} [options]
+   * @returns {Promise<string>}
+   */
+  getSelectionText(options = {}) {
+    if (this.#isPDF()) {
+      return Promise.resolve("");
+    }
+    return this.sendQuery("PageExtractorParent:GetSelectionText", options);
   }
 
   #isPDF() {

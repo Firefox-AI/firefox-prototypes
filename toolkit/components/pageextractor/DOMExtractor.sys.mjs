@@ -5,7 +5,7 @@
 // @ts-check
 
 /**
- * @import { GetTextOptions } from './PageExtractor.js'
+ * @import { GetPageInfoOptions, GetSelectionTextOptions, GetTextOptions } from './PageExtractor.js'
  */
 
 /**
@@ -34,12 +34,55 @@ class ExtractionContext {
   #textContent = "";
 
   /**
+   * @type {{ top: number; left: number; right: number; bottom: number } | null}
+   */
+  #viewportRect = null;
+
+  /**
+   * @type {{ top: number; bottom: number } | null}
+   */
+  #viewportPageRange = null;
+
+  /**
+   * @type {import("./PageExtractor.d.ts").PageInfo | null}
+   */
+  #pageInfo = null;
+
+  /**
+   * @type {Window | null}
+   */
+  #pageWindow = null;
+
+  /**
    * Constructs a new extraction context with the provided options.
    *
+   * @param {Document} document
    * @param {GetTextOptions} options
    */
-  constructor(options) {
+  constructor(document, options) {
     this.#options = options;
+    this.#pageWindow = document.defaultView ?? null;
+
+    if (options.includePageInfo || options.viewportPage !== undefined) {
+      this.#initializeViewportPagination(
+        document,
+        options.viewportPage,
+        Boolean(options.includePageInfo)
+      );
+    }
+
+    if (options.justViewport) {
+      if (
+        options.viewportPage !== undefined &&
+        this.#viewportPageRange &&
+        this.#pageWindow
+      ) {
+        // When requesting a specific virtual page, rely on the computed range instead of the current viewport.
+        this.#viewportRect = null;
+      } else if (this.#pageWindow) {
+        this.#viewportRect = getViewportRect(this.#pageWindow);
+      }
+    }
   }
 
   /**
@@ -49,6 +92,23 @@ class ExtractionContext {
    */
   get textContent() {
     return this.#textContent;
+  }
+
+  /**
+   * @returns {import("./PageExtractor.d.ts").GetTextResult}
+   */
+  getResult() {
+    const normalizedText = this.#textContent.trim();
+    /** @type {import("./PageExtractor.d.ts").GetTextResult} */
+    const result = {
+      text: normalizedText,
+    };
+
+    if (this.#pageInfo) {
+      result.pageInfo = this.#pageInfo;
+    }
+
+    return result;
   }
 
   /**
@@ -106,6 +166,18 @@ class ExtractionContext {
       return;
     }
 
+    if (this.#viewportRect && !isNodeInViewport(node, this.#viewportRect)) {
+      return;
+    }
+
+    if (
+      this.#viewportPageRange &&
+      this.#pageWindow &&
+      !isNodeInViewportPage(node, this.#viewportPageRange, this.#pageWindow)
+    ) {
+      return;
+    }
+
     const element = asHTMLElement(node);
     const text = asTextNode(node);
     let innerText = "";
@@ -120,6 +192,31 @@ class ExtractionContext {
       this.#textContent += "\n" + innerText;
     }
   }
+
+  /**
+   * @param {Document} document
+   * @param {number | undefined} requestedPage
+   * @param {boolean} includePageInfo
+   */
+  #initializeViewportPagination(document, requestedPage, includePageInfo) {
+    if (!this.#pageWindow) {
+      return;
+    }
+
+    const pagination = computeViewportPagination(
+      document,
+      this.#pageWindow,
+      requestedPage,
+      includePageInfo
+    );
+
+    if (!pagination) {
+      return;
+    }
+
+    this.#pageInfo = pagination.info;
+    this.#viewportPageRange = pagination.range;
+  }
 }
 
 /**
@@ -133,14 +230,61 @@ class ExtractionContext {
  * @param {Document} document
  * @param {GetTextOptions} options
  *
- * @returns {string}
+ * @returns {import('./PageExtractor.d.ts').GetTextResult}
  */
 export function extractTextFromDOM(document, options) {
-  const context = new ExtractionContext(options);
+  const context = new ExtractionContext(document, options);
 
   subdivideAndExtractText(document.body, context);
 
-  return context.textContent;
+  return context.getResult();
+}
+
+/**
+ * Computes pagination metadata for the current document viewport.
+ *
+ * @param {Document} document
+ * @param {GetPageInfoOptions} [options]
+ *
+ * @returns {import('./PageExtractor.d.ts').PageInfo | null}
+ */
+export function getPageInfoFromDOM(document, options = {}) {
+  const window = document.defaultView;
+  if (!window) {
+    return null;
+  }
+
+  const pagination = computeViewportPagination(
+    document,
+    window,
+    options.viewportPage,
+    true
+  );
+
+  return pagination?.info ?? null;
+}
+
+/**
+ * Retrieves the currently selected text within the document.
+ *
+ * @param {Document} document
+ * @param {GetSelectionTextOptions} [options]
+ * @returns {string}
+ */
+export function getSelectionTextFromDOM(document, options = {}) {
+  const window = document.defaultView;
+  if (!window) {
+    return "";
+  }
+  try {
+    const selection = window.getSelection();
+    if (!selection) {
+      return "";
+    }
+    return selection.toString().trim();
+  } catch {
+    return "";
+  }
 }
 
 /**
@@ -357,6 +501,54 @@ function isNodeHidden(node) {
     visibility === "hidden" ||
     visibility === "collapse" ||
     opacity === "0"
+  );
+}
+
+/**
+ * @param {Node} node
+ * @param {{ top: number; left: number; right: number; bottom: number }} viewportRect
+ */
+function isNodeInViewport(node, viewportRect) {
+  const element = getHTMLElementForStyle(node);
+  if (!element) {
+    return false;
+  }
+
+  const rect = element.getBoundingClientRect();
+  if (!rect) {
+    return false;
+  }
+
+  return (
+    rect.bottom > viewportRect.top &&
+    rect.top < viewportRect.bottom &&
+    rect.right > viewportRect.left &&
+    rect.left < viewportRect.right
+  );
+}
+
+/**
+ * @param {Node} node
+ * @param {{ top: number; bottom: number }} viewportPageRange
+ * @param {Window} window
+ */
+function isNodeInViewportPage(node, viewportPageRange, window) {
+  const element = getHTMLElementForStyle(node);
+  if (!element) {
+    return false;
+  }
+
+  const rect = element.getBoundingClientRect();
+  if (!rect) {
+    return false;
+  }
+
+  const absoluteTop = rect.top + window.scrollY;
+  const absoluteBottom = rect.bottom + window.scrollY;
+
+  return (
+    absoluteBottom > viewportPageRange.top &&
+    absoluteTop < viewportPageRange.bottom
   );
 }
 
@@ -638,4 +830,92 @@ function getHTMLElementForStyle(node) {
 
   // If the text node is not connected or doesn't have a frame.
   return null;
+}
+
+/**
+ * @param {Window} window
+ */
+function getViewportRect(window) {
+  const { visualViewport } = window;
+  if (visualViewport) {
+    return {
+      top: visualViewport.offsetTop,
+      left: visualViewport.offsetLeft,
+      right: visualViewport.offsetLeft + visualViewport.width,
+      bottom: visualViewport.offsetTop + visualViewport.height,
+    };
+  }
+  return {
+    top: 0,
+    left: 0,
+    right: window.innerWidth,
+    bottom: window.innerHeight,
+  };
+}
+
+/**
+ * @param {Document} document
+ * @param {Window} window
+ * @param {number | undefined} requestedPage
+ * @param {boolean} includePageInfo
+ * @returns {{
+ *   info: import("./PageExtractor.d.ts").PageInfo;
+ *   range: { top: number; bottom: number } | null;
+ * } | null}
+ */
+function computeViewportPagination(
+  document,
+  window,
+  requestedPage,
+  includePageInfo
+) {
+  const viewportHeight =
+    window.visualViewport?.height ?? window.innerHeight ?? 0;
+
+  if (!viewportHeight || viewportHeight <= 0) {
+    return null;
+  }
+
+  const scrollingElement =
+    document.scrollingElement ??
+    document.documentElement ??
+    document.body ??
+    null;
+
+  const totalHeight = Math.max(
+    viewportHeight,
+    scrollingElement?.scrollHeight ?? document.body?.scrollHeight ?? 0
+  );
+
+  const pageCount = Math.max(1, Math.ceil(totalHeight / viewportHeight));
+
+  let currentPage = 0;
+  if (requestedPage !== undefined) {
+    currentPage = Number.isFinite(requestedPage)
+      ? Math.floor(requestedPage)
+      : 0;
+  } else {
+    const scrollY = window.scrollY ?? 0;
+    const maxScroll = Math.max(0, totalHeight - viewportHeight);
+    const clampedScroll = Math.min(Math.max(scrollY, 0), maxScroll);
+    currentPage = Math.floor(clampedScroll / viewportHeight);
+  }
+  currentPage = Math.max(0, Math.min(currentPage, pageCount - 1));
+
+  const info = {
+    count: pageCount,
+    viewportHeight,
+    currentPage,
+  };
+
+  let range = null;
+  if (requestedPage !== undefined) {
+    const top = currentPage * viewportHeight;
+    const bottom = Math.min(totalHeight, top + viewportHeight);
+    range = { top, bottom };
+  } else if (!includePageInfo) {
+    return null;
+  }
+
+  return { info, range };
 }
