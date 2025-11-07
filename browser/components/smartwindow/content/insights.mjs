@@ -41,6 +41,24 @@ function getInsightsData() {
   return stored || {};
 }
 
+function normalizeKey(summary = "", intent = "") {
+  return `${summary.trim().toLowerCase()}::${intent.trim().toLowerCase()}`;
+}
+
+// Ensure insightsData.insightsDataByCategory exists and is { [cat]: Array<RichInsight> }
+function ensureRichIndex(insightsData) {
+  const idx = (insightsData.insightsDataByCategory =
+    insightsData.insightsDataByCategory || {});
+
+  // Migrate any { [cat]: object } entries to arrays, once.
+  for (const [cat, val] of Object.entries(idx)) {
+    if (val && !Array.isArray(val) && typeof val === "object") {
+      idx[cat] = [val];
+    }
+  }
+  return idx;
+}
+
 /**
  * Gets the current custom prompt (null means use default)
  *
@@ -1865,9 +1883,8 @@ function addInsightsToData(payload) {
 
   const items = Array.isArray(payload) ? payload : [payload];
 
-  // NEW: rich index
-  insightsData.insightsDataByCategory =
-    insightsData.insightsDataByCategory || {};
+  // NEW: rich index (array per category) + migration
+  const richIndex = ensureRichIndex(insightsData);
 
   let addedCount = 0;
   let upsertedByCategory = 0;
@@ -1879,28 +1896,66 @@ function addInsightsToData(payload) {
     const score = Number.isFinite(obj?.score) ? Number(obj.score) : null;
     const evidence = Array.isArray(obj?.evidence) ? obj.evidence : [];
     const why = typeof obj?.why === "string" ? obj.why : "";
+    const ts = Date.now();
 
     if (category) {
-      const prev = insightsData.insightsDataByCategory[category];
-      const next = {
-        insight_summary: summary || prev?.insight_summary || "",
-        category: category || prev?.category || "",
-        intent: intent || prev?.intent || "",
-        score: Number.isFinite(score) ? score : (prev?.score ?? null),
-        evidence: evidence.length ? evidence : (prev?.evidence ?? []),
-        why: why || prev?.why || "",
-      };
-      insightsData.insightsDataByCategory[category] = next;
+      // // Ensure array for this category
+      const existing = richIndex[category];
+      let arr;
+      if (Array.isArray(existing)) {
+        arr = existing;
+      } else if (existing != null) {
+        arr = [existing];
+      } else {
+        arr = [];
+      }
+      richIndex[category] = arr;
+      const key = normalizeKey(summary, intent);
+
+      // Try to upsert by (summary,intent)
+      let found = false;
+      for (let i = 0; i < richIndex[category].length; i++) {
+        const cur = richIndex[category][i];
+        const curKey = normalizeKey(cur?.insight_summary, cur?.intent);
+        if (curKey === key) {
+          // Update-in-place, prefer new fields if provided
+          richIndex[category][i] = {
+            ...cur,
+            insight_summary: summary || cur.insight_summary || "",
+            category: category || cur.category || "",
+            intent: intent || cur.intent || "",
+            score: Number.isFinite(score) ? score : (cur?.score ?? null),
+            evidence: evidence.length ? evidence : (cur?.evidence ?? []),
+            why: why || cur?.why || "",
+            updated_at: ts,
+          };
+          found = true;
+          break;
+        }
+      }
+
+      if (!found && summary) {
+        // Insert newest at the front
+        richIndex[category].unshift({
+          insight_summary: summary,
+          category,
+          intent,
+          score,
+          evidence,
+          why,
+          updated_at: ts,
+        });
+      }
       upsertedByCategory += 1;
     }
 
-    // Legacy chips: keep the summary text so UI shows tags today
+    // ---- Legacy chips: unchanged ----
     const label = summary;
     if (category) {
       if (!insightsData[category]) {
         insightsData[category] = [];
       }
-      if (!insightsData[category].includes(label)) {
+      if (label && !insightsData[category].includes(label)) {
         insightsData[category].push(label);
         addedCount += 1;
       }
@@ -1959,7 +2014,8 @@ function extractBrandsFromEvidence(ev = []) {
     const v = normalizeBrand(e?.value);
     if (v) {
       const brandHead = v.split(/\s+/)[0];
-      if (brandHead.length > 1) { // Make sure a single letter isn't counted as a "brand"
+      if (brandHead.length > 1) {
+        // Make sure a single letter isn't counted as a "brand"
         bag.add(brandHead);
       }
     } // rough head token
@@ -2049,10 +2105,7 @@ function normalizeInsightList(parsed) {
   return sanitized.length ? sanitized : null;
 }
 
-function rankAndDiversify(
-  insights,
-  { maxPerCategory = 2, maxPerIntent = 2 } = {}
-) {
+function rankAndDiversify(insights, { maxPerCategory = 2 } = {}) {
   // score ↑ with specificity + multi-source corroboration
   for (const x of insights) {
     const base = Math.max(1, Math.min(5, Number(x.score) || 1)) / 5;
@@ -2565,15 +2618,29 @@ export function deleteInsight(insight, category) {
   const smartWindow = getSmartWindow();
   const insightsData = getInsightsData();
 
+  let changed = false;
+
   if (insightsData[category]) {
-    const index = insightsData[category].indexOf(insight);
-    if (index > -1) {
-      insightsData[category].splice(index, 1);
-      smartWindow?.setInsightsData(insightsData);
-      return true;
+    const i = insightsData[category].indexOf(insight);
+    if (i > -1) {
+      insightsData[category].splice(i, 1);
+      changed = true;
     }
   }
-  return false;
+
+  const richIndex = ensureRichIndex(insightsData);
+  if (Array.isArray(richIndex[category])) {
+    const before = richIndex[category].length;
+    richIndex[category] = richIndex[category].filter(
+      r => (r?.insight_summary || "") !== insight
+    );
+    changed = changed || richIndex[category].length !== before;
+  }
+
+  if (changed) {
+    smartWindow?.setInsightsData(insightsData);
+  }
+  return changed;
 }
 
 /**
@@ -2655,9 +2722,19 @@ export function copyInsightsToClipboard() {
     });
 }
 
-function getRichInsight(category) {
+function getRichInsights(category) {
   const data = getInsightsData();
-  return data?.insightsDataByCategory?.[category] || null;
+  const val = data?.insightsDataByCategory?.[category];
+  if (!val) {
+    return [];
+  }
+  return Array.isArray(val) ? val : [val]; // compat with any pre-migration state
+}
+
+// Back-compat: first item, if callers still use singular
+function getRichInsight(category) {
+  const list = getRichInsights(category);
+  return list[0] || null;
 }
 
 /**
