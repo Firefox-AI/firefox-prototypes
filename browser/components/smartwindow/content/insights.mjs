@@ -747,7 +747,7 @@ function normalizeEpochSeconds(ts) {
   return Math.round(x * 1000) / 1000;
 }
 
-// deep “to_native” sanitizer: stringify keys, drop NaN/Infinity -> null
+// deep "to_native" sanitizer: stringify keys, drop NaN/Infinity -> null
 function toNative(o) {
   if (Array.isArray(o)) {
     return o.map(toNative);
@@ -1340,7 +1340,7 @@ export const COVE_ANSWERS_SCHEMA = {
                 ],
               },
             },
-            rationale: { type: "string" }, // short, 20–60 words
+            rationale: { type: "string" }, // short, 20-60 words
           },
           required: ["qid", "answer", "support"],
           additionalProperties: false,
@@ -1349,7 +1349,7 @@ export const COVE_ANSWERS_SCHEMA = {
       },
       // Final model self-verdict for the insight:
       verdict: { type: "string", enum: ["accept", "soften", "reject"] },
-      // If soften: a 4–10 word replacement summary consistent w/ evidence
+      // If soften: a 4-10 word replacement summary consistent w/ evidence
       replacement_summary: { type: ["string", "null"] },
       // Optional: suggest a lower score if weak
       suggested_score: { type: ["integer", "null"], minimum: 1, maximum: 5 },
@@ -1634,7 +1634,7 @@ function buildAnswerQuestionsPrompt({
 
     ## Final verdict
     - "accept": mostly "supported", no sensitive/pii, not duplicate.
-    - "soften": mixed or weak support; suggest a hedged 4–10 word replacement_summary.
+    - "soften": mixed or weak support; suggest a hedged 4-10 word replacement_summary.
     - "reject": mostly "not_supported" or sensitive/duplicate/pii.
 
     You may suggest a lower "suggested_score" if weak.
@@ -1695,24 +1695,24 @@ Choose ONLY one from this list; if none fits, use null:
 ${intentsList}
 
 ## Duplicate insight rules (must follow)
-- Dont add duplicate insights that are already in related_insights.
-- Dont repeat insights about entities that are already in related_insights.
+- Do not add duplicate insights that are already in related_insights.
+- Do not repeat insights about entities that are already in related_insights.
 
 - DO NOT generate or infer insights related to personal medical/health, pregnancy/fertility, financial, or legal information, or other sensitive life events.
 - Insights are non-sensitive user preferences (products, brands, behaviors) useful for future personalization.
-- Do not imagine actions without evidence. Prefer “shops for / plans / looked for” over “bought / booked / watched” unless explicit.
+- Do not imagine actions without evidence. Prefer "shops for / plans / looked for" over "bought / booked / watched" unless explicit.
 - Do not include personal names unless widely public (avoid PII).
 - Do not create an insight from a single odd visit; prefer patterns.
 - Do not infer product relationships across unrelated domains unless co-occurring in the same session.
-- Do not generate a new insight if it’s not meaningfully different from items in related_insights.
+- Do not generate a new insight if it's not meaningfully different from items in related_insights.
 - If no safe, specific insight is supported by Inputs, set "insight_summary": null.
 
 ### Examples of good form
-- “Prefers LLBean & Nordstrom formalwear collections”
-- “Compares white jeans under $80 at Target”
-- “Streams new-release movies via Fandango”
-- “Cooks Mediterranean seafood from TasteAtlas recipes”
-- “Tracks minimalist fashion drops at Uniqlo”
+- "Prefers LLBean & Nordstrom formalwear collections"
+- "Compares white jeans under $80 at Target"
+- "Streams new-release movies via Fandango"
+- "Cooks Mediterranean seafood from TasteAtlas recipes"
+- "Tracks minimalist fashion drops at Uniqlo"
 
 ## Exclusion rules (non-exhaustive)
 - Medical/Health (exclude): diagnoses, symptoms, treatments, conditions, mental health, pregnancy, fertility, contraception.
@@ -1721,50 +1721,56 @@ ${intentsList}
 - Politics/Demographics/PII (exclude): political leaning/affiliation, religion, race/ethnicity, gender/sexual orientation, addresses/phones/emails/IDs.
 
 ### BAD/SENSITIVE (must exclude → set insight_summary = null)
-- “Researches treatment about arthritis”
-- “Searches about pregnancy tests online”
-- “Pediatrician in San Francisco”
-- “Political leaning towards a party”
-- “Research about ethnicity demographics in a city”
-- “Negotiates debt settlement with bank”
-- “Prepares documents for divorce hearing”
-- “Tracks mortgage refinance rates”
-- “Applies for work visa extension”
-- “Marie, female from Ohio looking for rental apartments”
+- "Researches treatment about arthritis"
+- "Searches about pregnancy tests online"
+- "Pediatrician in San Francisco"
+- "Political leaning towards a party"
+- "Research about ethnicity demographics in a city"
+- "Negotiates debt settlement with bank"
+- "Prepares documents for divorce hearing"
+- "Tracks mortgage refinance rates"
+- "Applies for work visa extension"
+- "Marie, female from Ohio looking for rental apartments"
 
 ## Sensitive Information Handling
 - Immediately set "insight_summary": null if the insight or any evidence contains these or close variants (case-insensitive):
-  Medical/Health: “pregnancy”, “pregnant”, “fertility”, “ivf”, “abortion”, “contraception”, “cancer”, “arthritis”, “depression”, “anxiety”, “mental health”, “therapy”, “treatment”, “diagnosis”, “health condition”.
-  Finance: “salary”, “income”, “paystub”, “tax return”, “irs”, “cra”, “credit score”, “credit card”, “bank account”, “routing number”, “loan”, “mortgage”, “refinance”, “collections”, “bankruptcy”, “investment account”, “401k”, “rrsp”.
-  Legal: “lawsuit”, “settlement”, “warrant”, “arrest”, “indictment”, “conviction”, “probation”, “parole”, “immigration status”, “deportation”, “asylum”, “visa”, “green card”, “citizenship interview”, “divorce”, “custody”, “restraining order”, “nda”.
+  Medical/Health: "pregnancy", "pregnant", "fertility", "ivf", "abortion", "contraception", "cancer", "arthritis", "depression", "anxiety", "mental health", "therapy", "treatment", "diagnosis", "health condition".
+  Finance: "salary", "income", "paystub", "tax return", "irs", "cra", "credit score", "credit card", "bank account", "routing number", "loan", "mortgage", "refinance", "collections", "bankruptcy", "investment account", "401k", "rrsp".
+  Legal: "lawsuit", "settlement", "warrant", "arrest", "indictment", "conviction", "probation", "parole", "immigration status", "deportation", "asylum", "visa", "green card", "citizenship interview", "divorce", "custody", "restraining order", "nda".
 - Never infer sensitive topics even if they seem likely; absence of explicit, non-sensitive evidence → set summary to null.
+
+## Reason ("why")
+Add "why": 12-40 words that briefly explains the rationale, referencing the cited evidence (no new claims or invented entities). Give exact evidence why the new insight does not violate the sensitivity restrictions. Also provide the closest existing insight and state why the new insight is or is not a duplicate.
 
 ## Scoring priorities
 - Base "score" on *strength + recency*; boost multi-source corroboration.
 - Source priority: user (highest) > chat > search > history (lowest).
-- Typical caps: recent history ≤1; search up to 2; multi-source 2–3; recent chat 4; explicit user 5.
+- Typical caps: recent history ≤1; search up to 2; multi-source 2-3; recent chat 4; explicit user 5.
 - Do not assign 5 unless pattern is strong and recent.
 
 ## Evidence (REQUIRED)
-For each insight, include 1–4 items in "evidence". Each item:
+For each insight, include 1-4 items in "evidence". Each item:
 - "type": one of ["domain","title","search","chat","user"].
 - "value": a **verbatim** string copied from profile_records (for domain/title/search) or a short user/chat quote.
 - "session_ids": optional array of session ids (if available from inputs).
-- "weight": optional 0–1 indicating contribution strength.
+- "weight": optional 0-1 indicating contribution strength.
 The evidence strings MUST be directly copyable from profile_records for domain/title/search. Do not paraphrase these.
 
-## Reason ("why")
-Add "why": 12–40 words that briefly explains the rationale, referencing the cited evidence (no new claims or invented entities).
-
 Return ONLY a JSON array of objects, no prose, no code fences. Each object must have:
-{
-  "category": "<one of the categories or null>",
-  "intent": "<one of the intents or null>",
-  "insight_summary": "<4–10 words, crisp and specific or null>",
-  "score": <integer 1-5>,
-  "why": "<12–40 words>",
-  "evidence": [ { "type":"domain|title|search|chat|user", "value":"...", "session_ids":[...], "weight":0.0–1.0 }, ... ]
-}
+\`\`\`json
+[
+  {
+    "why": "<12-40 words>",
+    "category": "<one of the categories or null>",
+    "intent": "<one of the intents or null>",
+    "insight_summary": "<4-10 words, crisp and specific or null>",
+    "score": <integer 1-5>,
+    "evidence": [ { "type":"domain|title|search|chat|user", "value":"...", "session_ids":[...], "weight":0.0-1.0 }, ... ]
+  }
+]
+\`\`\`
+
+** CREATE AS MANY UNIQUE INSIGHTS AS POSSIBLE WITHOUT VIOLATING THE RULES ABOVE **
 `.trim();
 }
 
@@ -1941,6 +1947,7 @@ function normalizeBrand(str) {
   return (str || "")
     .toLowerCase()
     .replace(/https?:\/\/(www\.)?/g, "")
+    .replace(/www\./g, "")
     .replace(/\.(com|ca|org|net|io|ai)\b/g, "")
     .replace(/[^\w\s]/g, " ")
     .trim();
@@ -1951,7 +1958,10 @@ function extractBrandsFromEvidence(ev = []) {
   for (const e of ev || []) {
     const v = normalizeBrand(e?.value);
     if (v) {
-      bag.add(v.split(/\s+/)[0]);
+      const brandHead = v.split(/\s+/)[0];
+      if (brandHead.length > 1) { // Make sure a single letter isn't counted as a "brand"
+        bag.add(brandHead);
+      }
     } // rough head token
   }
   return bag;
@@ -2085,9 +2095,6 @@ function rankAndDiversify(
     }
 
     if ((byCat.get(c) || 0) >= maxPerCategory) {
-      continue;
-    }
-    if ((byIntent.get(i) || 0) >= maxPerIntent) {
       continue;
     }
 
@@ -2331,7 +2338,7 @@ export async function generateInsightsWithCoVe(profile, source) {
     .flat()
     .slice(0, 300);
 
-  // 2–3) CoVe
+  // 2-3) CoVe
   const finalList = await runCoVe(draftList, profile_records, related_insights);
 
   if (!Array.isArray(finalList) || finalList.length === 0) {
@@ -2451,7 +2458,7 @@ export async function generateInsightsFromDirectChat(inputText) {
       throw new Error("Refusing to store sensitive content as an insight");
     }
 
-    // Minimal but explicit “profile” so the LLM/CoVe can quote it verbatim.
+    // Minimal but explicit "profile" so the LLM/CoVe can quote it verbatim.
     // Keeping keys human-readable helps the model follow our schema prompt.
     const profile_records = [
       {
