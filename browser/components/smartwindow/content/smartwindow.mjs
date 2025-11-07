@@ -94,7 +94,7 @@ class SmartWindowPage {
             this.onboardingRendered = true;
           }
         }
-      }
+      },
     };
 
     Services.prefs.addObserver(FIRST_RUN_PREF, this.onboardingPrefObserver);
@@ -103,7 +103,10 @@ class SmartWindowPage {
   destructor() {
     // Clean up preference observer
     if (this.onboardingPrefObserver) {
-      Services.prefs.removeObserver(FIRST_RUN_PREF, this.onboardingPrefObserver);
+      Services.prefs.removeObserver(
+        FIRST_RUN_PREF,
+        this.onboardingPrefObserver
+      );
     }
   }
 
@@ -175,7 +178,10 @@ class SmartWindowPage {
   // Internal method to generate conversation starters
   async _generatePromptsInternal(contextTabs, count = 6) {
     try {
-      const suggestions = await generateConversationStarters(contextTabs, count);
+      const suggestions = await generateConversationStarters(
+        contextTabs,
+        count
+      );
       if (suggestions && suggestions.length) {
         return suggestions;
       }
@@ -1273,10 +1279,7 @@ class SmartWindowPage {
         this.currentTabPageText = pageText;
       }
 
-      if (
-        gBrowser.selectedTab.conversation &&
-        !gBrowser.selectedTab.conversation.pageUrl
-      ) {
+      if (!gBrowser.selectedTab.conversation.pageUrl) {
         gBrowser.selectedTab.conversation.pageUrl = this.getCurrentTabUrl();
       }
 
@@ -1744,7 +1747,9 @@ class SmartWindowPage {
       return;
     }
 
-    let infoTextContainer = document.querySelector(".onboarding-info-text-container");
+    let infoTextContainer = document.querySelector(
+      ".onboarding-info-text-container"
+    );
 
     if (!infoTextContainer) {
       infoTextContainer = this.createOnboardingContainer();
@@ -1758,13 +1763,17 @@ class SmartWindowPage {
 
   cleanupExistingOnboarding() {
     // Remove the welcome message from results container (sidebar mode)
-    const existingWelcomeMessage = document.getElementById("assistant-onboarding-message");
+    const existingWelcomeMessage = document.getElementById(
+      "assistant-onboarding-message"
+    );
     if (existingWelcomeMessage) {
       existingWelcomeMessage.remove();
     }
 
     // Remove the onboarding info text container (both modes)
-    const infoTextContainer = document.querySelector(".onboarding-info-text-container");
+    const infoTextContainer = document.querySelector(
+      ".onboarding-info-text-container"
+    );
     if (infoTextContainer) {
       infoTextContainer.remove();
     }
@@ -1780,7 +1789,8 @@ class SmartWindowPage {
     // Create info text
     const infoText = document.createElement("div");
     infoText.className = "onboarding-info-text";
-    infoText.textContent = "Great! You’re all set to start using Smart Window.\nWould you like some help with getting started? Feel free to ask me anything — here are a few things I can help you with:";
+    infoText.textContent =
+      "Great! You’re all set to start using Smart Window.\nWould you like some help with getting started? Feel free to ask me anything — here are a few things I can help you with:";
 
     // Add content based on mode
     if (this.isSidebarMode) {
@@ -1812,7 +1822,8 @@ class SmartWindowPage {
 
   insertOnboardingContainer(container) {
     const searchBox = document.querySelector(".search-box");
-    const targetParent = searchBox?.parentNode || this.quickPromptsContainer.parentNode;
+    const targetParent =
+      searchBox?.parentNode || this.quickPromptsContainer.parentNode;
     const targetSibling = searchBox || this.quickPromptsContainer;
 
     if (targetParent && targetSibling) {
@@ -1836,7 +1847,9 @@ class SmartWindowPage {
   }
 
   async updateOnboardingPrompts() {
-    const infoTextContainer = document.querySelector(".onboarding-info-text-container");
+    const infoTextContainer = document.querySelector(
+      ".onboarding-info-text-container"
+    );
     if (!infoTextContainer) {
       return;
     }
@@ -1870,7 +1883,9 @@ class SmartWindowPage {
 
   renderOnboardingPrompts(container, prompts) {
     // Remove existing prompts container
-    const existingContainer = container.querySelector(".onboarding-prompts-container");
+    const existingContainer = container.querySelector(
+      ".onboarding-prompts-container"
+    );
     if (existingContainer) {
       existingContainer.remove();
     }
@@ -1946,7 +1961,9 @@ class SmartWindowPage {
 
   hideOnboardingInfo() {
     // Remove the info text container from the DOM
-    const infoTextContainer = document.querySelector(".onboarding-info-text-container");
+    const infoTextContainer = document.querySelector(
+      ".onboarding-info-text-container"
+    );
     if (infoTextContainer) {
       infoTextContainer.remove();
     }
@@ -1976,8 +1993,18 @@ class SmartWindowPage {
       // Show chat component and submit the prompt with tab context
       this.showChatMode();
 
-      // Make sure the tab info is updated
-      if (gBrowser.selectedTab.conversation.pageUrl === "") {
+      if (!gBrowser.selectedTab.conversation) {
+        gBrowser.selectedTab.conversation = new ChatHistoryConversation({
+          title: "",
+          description: "",
+          pageUrl: this.getCurrentTabUrl(),
+          pageMeta: "",
+        });
+      }
+
+      // Make sure the tab info is updated && the pageUrl is set on conversation
+      if (!gBrowser.selectedTab.conversation.pageUrl) {
+        gBrowser.selectedTab.conversation.pageUrl = this.getCurrentTabUrl();
         await this.initializeTabInfo();
       }
 
@@ -1989,12 +2016,7 @@ class SmartWindowPage {
         const text = textFromBar || (typeof query === "string" ? query : "");
         const html = htmlFromBar;
 
-        // NOTE: Why would there not be a conversation here
-        // TODO: Resolve missing conversation
-        if (
-          gBrowser.selectedTab.conversation &&
-          !gBrowser.selectedTab.conversation.pageUrl
-        ) {
+        if (!gBrowser.selectedTab.conversation.pageUrl) {
           gBrowser.selectedTab.conversation.pageUrl = this.getCurrentTabUrl();
         }
 
@@ -2053,22 +2075,11 @@ class SmartWindowPage {
       // For chat on smart window page (not sidebar), don't open sidebar
       // The sidebar logic is handled by performNavigation for search/navigate types
     } else if (type === "action") {
-      if (this.isSidebarMode) {
-        // NOTE: Can we remove this isSidebarMode? ask @mardak
-        // Handle actions in sidebar
-        // this.handleAction(query);
-      } else {
-        // In full page mode, convert actions to search
-        this.hideChatMode();
-        this.performNavigation(query, type);
-      }
+      this.hideChatMode();
+      this.performNavigation(query, type);
     } else {
       // For navigate and search, hide chat mode and show regular messages
       this.hideChatMode();
-      if (this.isSidebarMode) {
-        // NOTE: does this still exist? ask @mardak
-        // this.addMessage(`Navigating: ${query}`, "user");
-      }
       this.performNavigation(query, type);
 
       // Open sidebar for search queries when not in sidebar mode and not on a new tab
