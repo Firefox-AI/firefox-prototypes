@@ -7,7 +7,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Ask</title>
+    <title>New Tab</title>
     <link
       rel="stylesheet"
       href="chrome://browser/content/smartwindow/smartwindow.css"
@@ -36,38 +36,63 @@
         </div>
       </div>
       <div class="smart-window-container">
-      <button id="toggle-insights-button"
-              class="insights-icon-btn"
-              aria-label="Insights menu"
-              aria-haspopup="dialog"
-              aria-expanded="false">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M8 0C12.4184 0 16 3.5816 16 8C16.0024 10.083 15.1898 12.0843 13.736 13.576C12.9913 14.3441 12.0998 14.9545 11.1143 15.3709C10.1289 15.7873 9.06979 16.0013 8 16C6.93021 16.0013 5.87108 15.7873 4.88567 15.3709C3.90025 14.9545 3.00868 14.3441 2.264 13.576C0.810183 12.0843 -0.0023873 10.083 5.2686e-06 8C5.2686e-06 3.5816 3.5816 0 8 0ZM8 11.2C7.2401 11.1994 6.48807 11.3539 5.78996 11.6541C5.09185 11.9542 4.46235 12.3937 3.94 12.9456C5.08299 13.8878 6.5187 14.4022 8 14.4C9.48102 14.402 10.9164 13.8877 12.0592 12.9456C11.5369 12.3938 10.9076 11.9544 10.2096 11.6542C9.51164 11.3541 8.75977 11.1995 8 11.2ZM8 1.6C6.81736 1.59999 5.65784 1.92766 4.65013 2.54666C3.64243 3.16566 2.82594 4.05178 2.29129 5.10666C1.75663 6.16155 1.52473 7.34395 1.62131 8.52264C1.71788 9.70133 2.13917 10.8302 2.8384 11.784C3.50823 11.0923 4.31041 10.5425 5.19717 10.1672C6.08393 9.79204 7.03713 9.59912 8 9.6C8.96274 9.59923 9.91579 9.7922 10.8024 10.1674C11.689 10.5426 12.4911 11.0924 13.1608 11.784C13.86 10.8303 14.2813 9.70146 14.3779 8.52284C14.4745 7.34422 14.2427 6.16188 13.7081 5.10702C13.1735 4.05216 12.3572 3.16603 11.3496 2.54698C10.342 1.92792 9.18257 1.60013 8 1.6ZM7.624 2.656C7.654 2.58079 7.70586 2.5163 7.77289 2.47087C7.83992 2.42544 7.91903 2.40116 8 2.40116C8.08097 2.40116 8.16008 2.42544 8.22711 2.47087C8.29414 2.5163 8.346 2.58079 8.376 2.656L8.5792 3.144C8.91879 3.97206 9.56303 4.63834 10.3792 5.0056L10.9536 5.26C11.2816 5.4064 11.2816 5.8848 10.9536 6.0312L10.3456 6.3016C9.5499 6.65866 8.91683 7.30086 8.5712 8.1016L8.3736 8.5544C8.34284 8.62813 8.29096 8.69111 8.22448 8.73542C8.15799 8.77972 8.07989 8.80336 8 8.80336C7.92011 8.80336 7.84201 8.77972 7.77552 8.73542C7.70904 8.69111 7.65716 8.62813 7.6264 8.5544L7.4296 8.1024C7.08375 7.30107 6.45005 6.65853 5.6536 6.3016L5.0456 6.0312C4.97198 5.99717 4.90964 5.94277 4.86595 5.87444C4.82226 5.80611 4.79904 5.7267 4.79904 5.6456C4.79904 5.56449 4.82226 5.48508 4.86595 5.41675C4.90964 5.34842 4.97198 5.29403 5.0456 5.26L5.62 5.0056C6.43632 4.6387 7.08085 3.9727 7.4208 3.1448L7.624 2.656Z" fill="#5B5B66"/>
-        </svg>
-        <span class="toggle-insights-label">Insights</span>
-      </button>
-      <div id="toggle-insights-popover"
-            class="toggle-insights-popover"
-            role="dialog"
-            aria-modal="false"
-            aria-labelledby="toggle-insights-popover-title"
-            hidden>
-        <div class="toggle-insights-popover-header">
-          <h4 id="toggle-insights-popover-title">Insights</h4>
-          <button id="toggle-insights-close" class="toggle-insights-close-btn" aria-label="Close">✕</button>
-        </div>
-        <div class="toggle-insights-body">
-          <p class="toggle-insights-help">Insights will be applied to responses in this chat.
-            <a href="#" tabindex="-1">Learn more</a>
-          </p>
-          <div class="toggle-insights-switch-row">
-            <span>On</span>
-            <button id="toggle-insights-switch" role="switch" aria-checked="true" class="toggle-insights-switch on">
-              <span class="knob" aria-hidden="true"></span>
+        <button
+          id="toggle-insights-button"
+          class="insights-icon-btn"
+          aria-label="Insights menu"
+          aria-haspopup="dialog"
+          aria-expanded="false"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M8 0C12.4184 0 16 3.5816 16 8C16.0024 10.083 15.1898 12.0843 13.736 13.576C12.9913 14.3441 12.0998 14.9545 11.1143 15.3709C10.1289 15.7873 9.06979 16.0013 8 16C6.93021 16.0013 5.87108 15.7873 4.88567 15.3709C3.90025 14.9545 3.00868 14.3441 2.264 13.576C0.810183 12.0843 -0.0023873 10.083 5.2686e-06 8C5.2686e-06 3.5816 3.5816 0 8 0ZM8 11.2C7.2401 11.1994 6.48807 11.3539 5.78996 11.6541C5.09185 11.9542 4.46235 12.3937 3.94 12.9456C5.08299 13.8878 6.5187 14.4022 8 14.4C9.48102 14.402 10.9164 13.8877 12.0592 12.9456C11.5369 12.3938 10.9076 11.9544 10.2096 11.6542C9.51164 11.3541 8.75977 11.1995 8 11.2ZM8 1.6C6.81736 1.59999 5.65784 1.92766 4.65013 2.54666C3.64243 3.16566 2.82594 4.05178 2.29129 5.10666C1.75663 6.16155 1.52473 7.34395 1.62131 8.52264C1.71788 9.70133 2.13917 10.8302 2.8384 11.784C3.50823 11.0923 4.31041 10.5425 5.19717 10.1672C6.08393 9.79204 7.03713 9.59912 8 9.6C8.96274 9.59923 9.91579 9.7922 10.8024 10.1674C11.689 10.5426 12.4911 11.0924 13.1608 11.784C13.86 10.8303 14.2813 9.70146 14.3779 8.52284C14.4745 7.34422 14.2427 6.16188 13.7081 5.10702C13.1735 4.05216 12.3572 3.16603 11.3496 2.54698C10.342 1.92792 9.18257 1.60013 8 1.6ZM7.624 2.656C7.654 2.58079 7.70586 2.5163 7.77289 2.47087C7.83992 2.42544 7.91903 2.40116 8 2.40116C8.08097 2.40116 8.16008 2.42544 8.22711 2.47087C8.29414 2.5163 8.346 2.58079 8.376 2.656L8.5792 3.144C8.91879 3.97206 9.56303 4.63834 10.3792 5.0056L10.9536 5.26C11.2816 5.4064 11.2816 5.8848 10.9536 6.0312L10.3456 6.3016C9.5499 6.65866 8.91683 7.30086 8.5712 8.1016L8.3736 8.5544C8.34284 8.62813 8.29096 8.69111 8.22448 8.73542C8.15799 8.77972 8.07989 8.80336 8 8.80336C7.92011 8.80336 7.84201 8.77972 7.77552 8.73542C7.70904 8.69111 7.65716 8.62813 7.6264 8.5544L7.4296 8.1024C7.08375 7.30107 6.45005 6.65853 5.6536 6.3016L5.0456 6.0312C4.97198 5.99717 4.90964 5.94277 4.86595 5.87444C4.82226 5.80611 4.79904 5.7267 4.79904 5.6456C4.79904 5.56449 4.82226 5.48508 4.86595 5.41675C4.90964 5.34842 4.97198 5.29403 5.0456 5.26L5.62 5.0056C6.43632 4.6387 7.08085 3.9727 7.4208 3.1448L7.624 2.656Z"
+              fill="#5B5B66"
+            />
+          </svg>
+          <span class="toggle-insights-label">Insights</span>
+        </button>
+        <div
+          id="toggle-insights-popover"
+          class="toggle-insights-popover"
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby="toggle-insights-popover-title"
+          hidden
+        >
+          <div class="toggle-insights-popover-header">
+            <h4 id="toggle-insights-popover-title">Insights</h4>
+            <button
+              id="toggle-insights-close"
+              class="toggle-insights-close-btn"
+              aria-label="Close"
+            >
+              ✕
             </button>
           </div>
+          <div class="toggle-insights-body">
+            <p class="toggle-insights-help">
+              Insights will be applied to responses in this chat.
+              <a href="#" tabindex="-1">Learn more</a>
+            </p>
+            <div class="toggle-insights-switch-row">
+              <span>On</span>
+              <button
+                id="toggle-insights-switch"
+                role="switch"
+                aria-checked="true"
+                class="toggle-insights-switch on"
+              >
+                <span class="knob" aria-hidden="true"></span>
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
         <div id="results-container">
           <chat-bot id="chat-bot"></chat-bot>
         </div>

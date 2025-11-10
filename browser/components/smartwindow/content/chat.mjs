@@ -1657,9 +1657,6 @@ Today's date: ${currentDate}`;
                       ? "user"
                       : "assistant"}"
                   >
-                    <div class="message-title">
-                      ${ChatHistoryMessage.getRoleLabel(msg.role)}
-                    </div>
                     <div class="message-body">${bodyHTML}</div>
                     ${msg.role === ChatHistory.MESSAGE_ROLE.ASSISTANT &&
                     usedInsights.length
