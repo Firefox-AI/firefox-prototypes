@@ -13,6 +13,8 @@ var SmartWindow = {
   _viewInitialized: false,
   _sidebarVisible: false,
   _tabAttrObserver: null,
+  _historyProgressListener: null,
+  _historyOverlayContext: null,
 
   // Shared prompt cache across all smart window instances
   _promptsCache: new Map(),
@@ -45,6 +47,7 @@ var SmartWindow = {
     this.setupTabAttrObserver();
     this.reconcileUIToSmartWindowState();
     this.setupTabEventListeners();
+    this._ensureHistoryOverlayProgressListener();
 
     window
       .matchMedia(`-moz-pref("sidebar.verticalTabs")`)
@@ -651,6 +654,8 @@ var SmartWindow = {
       this._tabAttrObserver = null;
     }
 
+    this._teardownHistoryOverlayProgressListener();
+
     console.log("Smart Window shutdown complete");
   },
 
@@ -704,13 +709,24 @@ var SmartWindow = {
       }
     }
 
-    overlayContainer.appendChild(historyOverlay);
-    console.log(
-      "[SmartWindow] History overlay added to",
-      overlayContainer.classList?.contains("browserStack")
-        ? "current browserStack"
-        : "tabbrowser-tabbox"
-    );
+    if (!overlayContainer) {
+      overlayContainer = document.getElementById("tabbrowser-tabbox");
+    }
+
+    if (overlayContainer) {
+      overlayContainer.appendChild(historyOverlay);
+      console.log(
+        "[SmartWindow] History overlay added to",
+        overlayContainer.classList?.contains("browserStack")
+          ? "current browserStack"
+          : "tabbrowser-tabbox"
+      );
+    } else {
+      console.error("[SmartWindow] Unable to find container for history overlay");
+      return;
+    }
+
+    this._setHistoryOverlayContext(targetBrowser);
 
     // Force a render update
     requestAnimationFrame(() => {
@@ -727,6 +743,63 @@ var SmartWindow = {
         historyOverlay.remove();
         console.log("[SmartWindow] History overlay removed");
       }, 300);
+    }
+    this._clearHistoryOverlayContext();
+  },
+  _ensureHistoryOverlayProgressListener() {
+    if (this._historyProgressListener || !gBrowser) {
+      return;
+    }
+
+    this._historyProgressListener = {
+      onLocationChange: (_browser, _webProgress, _request, location) => {
+        this._onHistoryOverlayLocationChange(_browser, location);
+      },
+    };
+
+    gBrowser.addTabsProgressListener(this._historyProgressListener);
+  },
+
+  _onHistoryOverlayLocationChange(browser, location) {
+    const context = this._historyOverlayContext;
+    if (!context || browser !== context.browser) {
+      return;
+    }
+
+    const newSpec = location?.spec ?? "";
+    if (!newSpec || newSpec === context.url) {
+      return;
+    }
+
+    console.log(
+      "[Smart Window] Navigation detected, hiding history overlay",
+      context.url,
+      "→",
+      newSpec
+    );
+    this.hidePageHistory();
+  },
+
+  _setHistoryOverlayContext(browser) {
+    if (!browser) {
+      this._historyOverlayContext = null;
+      return;
+    }
+
+    this._historyOverlayContext = {
+      browser,
+      url: browser.currentURI?.spec ?? "",
+    };
+  },
+
+  _clearHistoryOverlayContext() {
+    this._historyOverlayContext = null;
+  },
+
+  _teardownHistoryOverlayProgressListener() {
+    if (this._historyProgressListener && gBrowser) {
+      gBrowser.removeTabsProgressListener(this._historyProgressListener);
+      this._historyProgressListener = null;
     }
   },
 };
