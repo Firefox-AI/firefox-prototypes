@@ -77,7 +77,7 @@ ChromeUtils.defineLazyGetter(lazy, "logConsole", function () {
 // In practice, schema changes should be additive, allowing newer versions to
 // operate on older schemas, albeit with potentially reduced functionality.
 
-const CURRENT_SCHEMA_VERSION = 2;
+const CURRENT_SCHEMA_VERSION = 3;
 
 const DB_FOLDER_PATH = PathUtils.profileDir;
 const DB_FILE_NAME = "chat-history.sqlite";
@@ -278,6 +278,7 @@ export class ChatHistory {
       }
 
       // Put migrations here with a brief description of what they do.
+      await this.applyV3(version);
 
       /* Example:
       if (version < 2) {
@@ -287,6 +288,26 @@ export class ChatHistory {
 
       await this.#conn.setSchemaVersion(CURRENT_SCHEMA_VERSION);
     });
+  }
+
+  async applyV3(version) {
+    if (version < 3) {
+      // Drop the summary table, it is no longer needed
+      await this.#conn.execute(`DROP TABLE IF EXISTS summary;`);
+
+      // Add a page_url column to the message table to keep track
+      // of the pages visitedjduring a conversation and when they
+      // were visited
+      await this.#conn.execute(`
+          ALTER TABLE message ADD COLUMN page_url TEXT;
+        `);
+
+      // Add a turn_index column to group all types of messages into a
+      // particular turn, ex: prompt -> response would be a single turn.
+      await this.#conn.execute(`
+          ALTER TABLE message ADD COLUMN turn_index INTEGER;
+        `);
+    }
   }
 
   async #createDatabaseEntities() {
@@ -457,43 +478,6 @@ export class ChatHistory {
   }
 
   /**
-   * TODO: summaries are not yet used, even if saved.
-   *
-   * @param {ChatHistorySummary} summary
-   */
-  async saveConversationSummary(summary) {
-    await this.ensureDatabase();
-
-    await this.#conn.executeCached(
-      `
-        INSERT INTO summary (
-          summary_id, conv_id, start_ordinal, end_ordinal, content,
-          model_id, prompt_version, created_date, updated_date
-        ) VALUES (
-          :summary_id, :conv_id, :start_ordinal, :end_ordinal, :content,
-          :model_id, :prompt_version, :created_date, :updated_date
-        )
-        ON CONFLICT(message_id) UPDATE SET
-          end_ordinal = :end_ordinal,
-          content = :content,
-          updated_date = :updated_date
-        `,
-      {
-        summary_id: summary.id,
-        conv_id: summary.convId,
-        start_ordinal: summary.startOrdinal,
-        end_ordinal: summary.endOrdinal,
-        content: summary.content,
-        model_id: summary.modelId,
-        prompt_version: summary.promptVersion,
-        created_date: summary.createdDate,
-        updated_date: summary.updatedDate,
-      }
-    );
-    // TODO: Delete TTL content.
-  }
-
-  /**
    * Gets a list of most recent conversations
    *
    * @param {number} numberOfConversations - How many convos to retrieve
@@ -605,7 +589,8 @@ export class ChatHistory {
         SELECT
           message_id, created_date, parent_message_id, revision_root_message_id,
           ordinal, is_active_branch, role, model_id, conv_id,
-          json(params_jsonb) As params, content, json(usage_jsonb) AS usage
+          json(params_jsonb) As params, content, json(usage_jsonb) AS usage,
+          page_url, turn_index
           FROM message
           WHERE conv_id IN(${new Array(conversations.length).fill("?").join(",")})
           ORDER BY ordinal ASC
@@ -640,13 +625,16 @@ export class ChatHistory {
   }
 }
 
+/**
+ * Used to retrieve chat entries for the History app menu
+ */
 class RecentChatEntry {
   #id;
   #title;
 
   /**
    * @param {object} params
-   * @param {string} params.id
+   * @param {string} params.conv_id
    * @param {string} params.title
    */
   constructor({ conv_id, title }) {
@@ -782,6 +770,8 @@ export class ChatHistoryMessage {
   usage;
   content;
   conv_id;
+  page_url;
+  turn_index;
 
   /**
    * @param {object} param
@@ -797,6 +787,8 @@ export class ChatHistoryMessage {
    * @param {object} [param.usage]
    * @param {string} param.content
    * @param {string} param.conv_id
+   * @param {string} param.page_url
+   * @param {number} param.turn_index
    */
   constructor({
     id = ChatHistory.makeGuid(),
@@ -811,6 +803,8 @@ export class ChatHistoryMessage {
     usage = null,
     content,
     conv_id = null,
+    page_url,
+    turn_index,
   }) {
     this.id = id;
     this.createdDate = createdDate;
@@ -824,6 +818,8 @@ export class ChatHistoryMessage {
     this.usage = usage;
     this.content = content;
     this.conv_id = conv_id;
+    this.page_url = page_url;
+    this.turn_index = turn_index;
   }
 
   static getRoleLabel(role) {
@@ -842,56 +838,6 @@ export class ChatHistoryMessage {
     }
 
     return "";
-  }
-}
-
-/**
- * A summary of a conversation, covering messages from start_ordinal to
- * end_ordinal (inclusive).
- */
-export class ChatHistorySummary {
-  id;
-  conv_id;
-  start_ordinal;
-  end_ordinal;
-  content;
-  model_id;
-  prompt_version;
-  created_date;
-  updated_date;
-
-  /**
-   * @param {object} params
-   * @param {string} [params.id]
-   * @param {string} params.convId
-   * @param {number} params.startOrdinal
-   * @param {number} params.endOrdinal
-   * @param {string} params.content
-   * @param {string} [params.modelId]
-   * @param {string} params.promptVersion
-   * @param {number} [params.createdDate]
-   * @param {number} [params.updatedDate]
-   */
-  constructor({
-    id = ChatHistory.makeGuid(),
-    convId,
-    startOrdinal,
-    endOrdinal,
-    content,
-    modelId,
-    promptVersion,
-    createdDate = Date.now(),
-    updatedDate = Date.now(),
-  }) {
-    this.id = id;
-    this.convId = convId;
-    this.startOrdinal = startOrdinal;
-    this.endOrdinal = endOrdinal;
-    this.content = content;
-    this.modelId = modelId;
-    this.promptVersion = promptVersion;
-    this.createdDate = createdDate;
-    this.updatedDate = updatedDate;
   }
 }
 
@@ -971,6 +917,8 @@ function parseMessageRows(rows) {
       usage: parseJSONOrNull(row.getResultByName("usage")),
       content: row.getResultByName("content"),
       conv_id: row.getResultByName("conv_id"),
+      page_url: row.getResultByName("page_url"),
+      turn_index: row.getResultByName("turn_index"),
     });
   });
 }
