@@ -695,15 +695,22 @@ var SmartWindow = {
       this.hidePageHistory();
     });
 
-    // Add to tabbrowser-tabbox
-    const tabbox = document.getElementById("tabbrowser-tabbox");
-    if (tabbox) {
-      tabbox.appendChild(historyOverlay);
-      console.log("[SmartWindow] History overlay added to tabbrowser-tabbox");
-    } else {
-      console.error("[SmartWindow] tabbrowser-tabbox not found");
-      return;
+    let overlayContainer = null;
+    const targetBrowser = gBrowser?.selectedBrowser;
+    if (targetBrowser) {
+      const browserParent = targetBrowser.parentElement;
+      if (browserParent?.classList?.contains("browserStack")) {
+        overlayContainer = browserParent;
+      }
     }
+
+    overlayContainer.appendChild(historyOverlay);
+    console.log(
+      "[SmartWindow] History overlay added to",
+      overlayContainer.classList?.contains("browserStack")
+        ? "current browserStack"
+        : "tabbrowser-tabbox"
+    );
 
     // Force a render update
     requestAnimationFrame(() => {
