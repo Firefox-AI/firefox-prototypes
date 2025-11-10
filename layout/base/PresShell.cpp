@@ -709,7 +709,6 @@ PresShell::PresShell(Document* aDocument)
       mResizeEventPending(false),
       mVisualViewportResizeEventPending(false),
       mFontSizeInflationForceEnabled(false),
-      mFontSizeInflationDisabledInMasterProcess(false),
       mFontSizeInflationEnabled(false),
       mIsNeverPainting(false),
       mResolutionUpdated(false),
@@ -909,8 +908,6 @@ void PresShell::Init(nsPresContext* aPresContext, nsViewManager* aViewManager) {
       StaticPrefs::font_size_inflation_lineThreshold();
   mFontSizeInflationForceEnabled =
       StaticPrefs::font_size_inflation_forceEnabled();
-  mFontSizeInflationDisabledInMasterProcess =
-      StaticPrefs::font_size_inflation_disabledInMasterProcess();
   // We'll compute the font size inflation state in Initialize(), when we know
   // the document type.
 
@@ -11831,31 +11828,23 @@ static nsTArray<AffectedAnchorGroup> FindAnchorsAffectedByScroll(
   return affectedAnchors;
 }
 
-struct FindScrollCompensatedAnchorResult {
-  const AffectedAnchor& mAnchorInfo;
-  AnchorPosReferenceData& mReferenceData;
-};
-
 // Given a list of anchors affected by scrolling, find one that the given
 // positioned frame need to compensate scroll for.
-static Maybe<FindScrollCompensatedAnchorResult> FindScrollCompensatedAnchor(
+static Maybe<const AffectedAnchor&> FindScrollCompensatedAnchor(
     const PresShell* aPresShell,
     const nsTArray<AffectedAnchorGroup>& aAffectedAnchors,
-    const nsIFrame* aPositioned) {
+    const nsIFrame* aPositioned, const AnchorPosReferenceData& aReferenceData) {
   MOZ_ASSERT(aPositioned->IsAbsolutelyPositioned(),
              "Anchor positioned frame is not absolutely positioned?");
-  auto* referencedAnchors =
-      aPositioned->GetProperty(nsIFrame::AnchorPosReferences());
-  if (!referencedAnchors || referencedAnchors->IsEmpty()) {
+  if (aReferenceData.IsEmpty()) {
     return Nothing{};
   }
 
-  if (!referencedAnchors->mDefaultAnchorName) {
+  if (!aReferenceData.mDefaultAnchorName) {
     return Nothing{};
   }
 
-  const auto compensatingForScroll =
-      referencedAnchors->CompensatingForScrollAxes();
+  const auto compensatingForScroll = aReferenceData.CompensatingForScrollAxes();
   if (compensatingForScroll.isEmpty()) {
     return Nothing{};
   }
@@ -11895,13 +11884,13 @@ static Maybe<FindScrollCompensatedAnchorResult> FindScrollCompensatedAnchor(
       break;
     }
     const auto& info = anchors.ElementAt(idx);
-    return Some(FindScrollCompensatedAnchorResult{info, *referencedAnchors});
+    return SomeRef(info);
   }
 
   return Nothing{};
 }
 
-static bool CheckOverflow(nsIFrame* aPositioned, const nsPoint& aOffset,
+static bool CheckOverflow(nsIFrame* aPositioned,
                           const AnchorPosReferenceData& aData) {
   const auto* stylePos = aPositioned->StylePosition();
   const auto hasFallbacks = !stylePos->mPositionTryFallbacks._0.IsEmpty();
@@ -11910,11 +11899,9 @@ static bool CheckOverflow(nsIFrame* aPositioned, const nsPoint& aOffset,
   if (!hasFallbacks && !visibilityDependsOnOverflow) {
     return false;
   }
-  const auto* cb = aPositioned->GetParent();
-  MOZ_ASSERT(cb);
   const auto overflows = !AnchorPositioningUtils::FitsInContainingBlock(
-      aData.mContainingBlockRect - aOffset, cb->GetPaddingRect(),
-      aPositioned->GetRect());
+      AnchorPositioningUtils::ContainingBlockInfo::UseCBFrameSize(aPositioned),
+      aPositioned, &aData);
   aPositioned->AddOrRemoveStateBits(NS_FRAME_POSITION_VISIBILITY_HIDDEN,
                                     visibilityDependsOnOverflow && overflows);
   return hasFallbacks && overflows;
@@ -11941,24 +11928,36 @@ void PresShell::UpdateAnchorPosForScroll(
 
   // Now, update all affected positioned elements' scroll offsets.
   for (auto* positioned : mAnchorPosPositioned) {
-    const auto scrollDependency =
-        FindScrollCompensatedAnchor(this, affectedAnchors, positioned);
-    if (!scrollDependency) {
+    auto* referenceData =
+        positioned->GetProperty(nsIFrame::AnchorPosReferences());
+    if (!referenceData) {
       continue;
     }
-    const auto& info = scrollDependency->mAnchorInfo;
-    auto& referenceData = scrollDependency->mReferenceData;
-    const auto offset = AnchorPositioningUtils::GetScrollOffsetFor(
-        referenceData.CompensatingForScrollAxes(), positioned, info);
-    if (referenceData.mDefaultScrollShift != offset) {
+    const auto scrollDependency = FindScrollCompensatedAnchor(
+        this, affectedAnchors, positioned, *referenceData);
+    const bool offsetChanged = [&]() {
+      if (!scrollDependency) {
+        return false;
+      }
+      const auto offset = AnchorPositioningUtils::GetScrollOffsetFor(
+          referenceData->CompensatingForScrollAxes(), positioned,
+          *scrollDependency);
+      if (referenceData->mDefaultScrollShift == offset) {
+        return false;
+      }
       positioned->SetPosition(positioned->GetNormalPosition() - offset);
       // Update positioned frame's overflow, then the absolute containing
       // block's.
       positioned->UpdateOverflow();
       nsContainerFrame::PlaceFrameView(positioned);
       positioned->GetParent()->UpdateOverflow();
-      referenceData.mDefaultScrollShift = offset;
-      if (CheckOverflow(positioned, offset, referenceData)) {
+      referenceData->mDefaultScrollShift = offset;
+      return true;
+    }();
+    const bool cbScrolls =
+        positioned->GetParent() == aScrollContainer->GetScrolledFrame();
+    if (offsetChanged || cbScrolls) {
+      if (CheckOverflow(positioned, *referenceData)) {
 #ifdef ACCESSIBILITY
         if (nsAccessibilityService* accService = GetAccService()) {
           accService->NotifyAnchorPositionedScrollUpdate(this, positioned);
@@ -12564,12 +12563,6 @@ bool PresShell::DetermineFontSizeInflationState() {
       // We're in a child process.  Cancel inflation if we're not
       // async-pan zoomed.
       if (!tab->AsyncPanZoomEnabled()) {
-        return false;
-      }
-    } else if (XRE_IsParentProcess()) {
-      // We're in the master process.  Cancel inflation if it's been
-      // explicitly disabled.
-      if (FontSizeInflationDisabledInMasterProcess()) {
         return false;
       }
     }

@@ -613,6 +613,12 @@ urlbar:
         pref: browser.urlbar.showDebuggingIcons
       description: >-
         Whether or not to show debugging badges on urlbar results favicons.
+    sportsFeatureGate:
+      type: boolean
+      fallbackPref: browser.urlbar.sports.featureGate
+      description: >-
+        Feature gate that controls whether all aspects of the sports suggestions
+        feature are exposed to the user.
     suggestSemanticHistoryMinLength:
       type: int
       setPref:
@@ -1142,21 +1148,6 @@ newtabCustomWallpaper:
         pref: browser.newtabpage.activity-stream.newtabWallpapers.customWallpaper.fileSize
       description: >-
         Maximum file size (in MB) a user can upload
-
-newtabGroupedSponsoredControls:
-  description: >-
-    Adjust sponsored content controls on newtab.
-  owner: mcrawford@mozilla.com
-  hasExposure: false
-  variables:
-    enabled:
-      type: boolean
-      setPref:
-        branch: user
-        pref: browser.newtabpage.activity-stream.system.showSponsoredCheckboxes
-      description: >-
-        When true, checkboxes for sponsored results in top sites and recommended stories are grouped separately
-        on about:preferences#home
 
 newtabInlineTopicSelection:
   description: >-

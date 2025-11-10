@@ -75,16 +75,11 @@ async function runTest(aTestFile) {
   await promiseApzFlushedRepaints();
   await waitUntilApzStable();
 
+  let loaded = BrowserTestUtils.browserLoaded(browser);
   const url_of_test_file = getRootDirectory(gTestPath) + aTestFile;
-  await SpecialPowers.spawn(
-    browser,
-    [url_of_test_file],
-    async function (_url_of_test_file) {
-      content.location = _url_of_test_file;
-    }
-  );
+  BrowserTestUtils.startLoadingURIString(browser, url_of_test_file);
 
-  await BrowserTestUtils.browserLoaded(browser);
+  await loaded;
 
   // Make sure the document gets loaded in the parent process and is a top
   // level content document.
@@ -134,6 +129,13 @@ async function runTest(aTestFile) {
   await ensureApzReadyForPopup(popup, contentWin);
   await promiseApzFlushedRepaints(popup);
 
+  // We are just testing the platform event coord calculation code to not hit
+  // an assert, rather than clicking on any specific button. Disable a11y
+  // checks for this portion.
+  AccessibilityUtils.setEnv({
+    mustHaveAccessibleRule: false,
+  });
+
   // Do a mouse click in the popup.
   const popupRect = popup.getBoundingClientRect();
   ok(popupRect.width > 10, "non-zero popup width");
@@ -147,6 +149,8 @@ async function runTest(aTestFile) {
 
   // Just wait to make sure that's processed without hitting an assert.
   await twoRafsInContent(browser);
+
+  AccessibilityUtils.resetEnv();
 
   // Close the popup.
   const popuphiddenPromise = new Promise(resolve => {
