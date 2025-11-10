@@ -652,8 +652,8 @@ class SmartWindowPage {
       this.chatBot.conversationTitle = conversation?.title || "";
       this.chatBot.requestUpdate();
       this.showChatMode();
-      // Scroll to bottom after messages are loaded
-      setTimeout(() => this.chatBot.scrollToBottom(), 0);
+      // Auto-scrolling disabled
+      // setTimeout(() => this.chatBot.scrollToBottom(), 0);
     }
 
     // Replace an empty conversation with the conversation that was loaded from SQLite
@@ -2243,8 +2243,8 @@ class SmartWindowPage {
       // Show chat mode
       this.showChatMode();
 
-      // Scroll to bottom after messages are loaded
-      setTimeout(() => this.chatBot.scrollToBottom(), 0);
+      // Auto-scrolling disabled
+      // setTimeout(() => this.chatBot.scrollToBottom(), 0);
 
       console.log(
         `[SmartWindow] Loaded conversation from history: ${conversation.id}`

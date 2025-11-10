@@ -1008,7 +1008,8 @@ class ChatBot extends MozLitElement {
         const lastIdx = this.#conversation.messages.length - 1;
         // Store raw content WITH tokens for later rendering
         this.#conversation.messages[lastIdx].content = fullResponse;
-        this.scrollToBottom();
+        // Auto-scrolling disabled during streaming
+        // this.scrollToBottom();
         this.requestUpdate();
       }
     } catch (err) {
@@ -1036,10 +1037,11 @@ class ChatBot extends MozLitElement {
   }
 
   scrollToBottom() {
-    const bottomAnchor = this.shadowRoot.getElementById("bottom-anchor");
-    if (bottomAnchor) {
-      bottomAnchor.scrollIntoView({ behavior: "smooth" });
-    }
+    // Auto-scrolling disabled
+    // const bottomAnchor = this.shadowRoot.getElementById("bottom-anchor");
+    // if (bottomAnchor) {
+    //   bottomAnchor.scrollIntoView({ behavior: "smooth" });
+    // }
   }
 
   /**
