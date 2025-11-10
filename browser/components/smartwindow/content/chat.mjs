@@ -49,8 +49,9 @@ class ChatBot extends MozLitElement {
     .chat {
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
+      gap: 2.5rem;
       margin-bottom: 1rem;
+      max-height: 700px;
     }
 
     .conversation-title-container {
@@ -108,7 +109,6 @@ class ChatBot extends MozLitElement {
     }
 
     .message {
-      max-width: 70%;
       padding: 0.75rem;
       border-radius: 10px;
       line-height: 1.4;
