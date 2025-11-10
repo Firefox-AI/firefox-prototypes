@@ -13,7 +13,6 @@ import { fetchWithHistory } from "chrome://browser/content/smartwindow/utils.mjs
 import {
   buildInsightsSystemPrompt,
   detectInsightTokens,
-  createClickableInsightToken,
   createInsightsOverlay,
   insightsStyles,
   deleteInsight,
@@ -516,7 +515,7 @@ class ChatBot extends MozLitElement {
       position: relative;
     }
 
-    .insights-applied-trigger {
+    .insights-applied-trigger-chat-popover {
       appearance: none;
       background: transparent;
       border-radius: 8px;
@@ -528,10 +527,10 @@ class ChatBot extends MozLitElement {
         fill: #3b2279;
       }
 
-      &:hover {
+      &:is(:hover, [aria-expanded="true"]) {
         background: #bf8fcc33;
 
-        .insights-applied-trigger-hover-text {
+        .insights-applied-trigger-chat-popover-hover-text {
           margin-left: 6px;
           max-width: 160px;
           opacity: 1;
@@ -539,14 +538,14 @@ class ChatBot extends MozLitElement {
       }
     }
 
-    .insights-applied-trigger-inner {
+    .insights-applied-trigger-chat-popover-inner {
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 5px 4px;
     }
 
-    .insights-applied-trigger-hover-text {
+    .insights-applied-trigger-chat-popover-hover-text {
       color: #3b2279;
       max-width: 0;
       opacity: 0;
@@ -558,15 +557,15 @@ class ChatBot extends MozLitElement {
       white-space: nowrap;
     }
 
-    .insights-applied-popup {
+    .insights-applied-chat-popover {
       background: #fff;
-      border: 1px solid #ddd;
+      border: 1px solid #f0f0f4;
       border-radius: 8px;
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-      padding: 12px;
+      padding: 16px;
       pointer-events: none;
       position: absolute;
-      bottom: 24px;
+      bottom: 32px;
       left: 0;
       opacity: 0;
       overflow: hidden;
@@ -585,9 +584,37 @@ class ChatBot extends MozLitElement {
       }
     }
 
+    ul.insights-applied-chat-popover-list {
+      display: grid;
+      gap: 4px;
+      list-style-type: none;
+      margin: 0;
+      padding: 0;
+
+      li {
+        background-color: #f9f9fb;
+        border-radius: 8px;
+        font-weight: 600;
+        padding: 8px;
+      }
+    }
+
+    .insights-applied-chat-popover-footer {
+      button {
+        appearance: none;
+        background: transparent;
+        color: #15141a;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 8px;
+      }
+    }
+
     @media (prefers-reduced-motion: reduce) {
-      .insights-applied-popup,
-      .insights-applied-popup.is-open {
+      .insights-applied-chat-popover,
+      .insights-applied-chat-popover.is-open {
         transition: none;
       }
     }
@@ -611,7 +638,7 @@ class ChatBot extends MozLitElement {
       searchEngines: { type: Array },
       openDropdownQuery: { type: String },
       useInsights: { type: Boolean, reflect: true },
-      openInsightsFor: { type: String },
+      openChatInsights: { type: Boolean },
     };
   }
 
@@ -650,7 +677,7 @@ class ChatBot extends MozLitElement {
     this.openDropdownQuery = null;
     this._lastSentPageInfoSignature = null;
     this._lastSelectionSignature = null;
-    this.openInsightsFor = false;
+    this.openChatInsights = false;
 
     // TODO: Figure out what/where to get this info from, if necessary
     this.#conversation = new ChatHistoryConversation({
@@ -713,13 +740,32 @@ class ChatBot extends MozLitElement {
     window.addEventListener("insights-updated", this._insightsUpdatedHandler);
     Services.prefs.addObserver(PROMPT_PREF, this._prefObserver);
 
-    this._closeInsightsPopoverOnWindow = e => {
-      if (!this.renderRoot.contains(e.target)) {
-        this.openInsightsFor = null;
-        this.requestUpdate();
+    this._closeChatInsights = e => {
+      const path = e.composedPath();
+      const popover = this.renderRoot?.querySelector(
+        ".insights-applied-chat-popover.is-open"
+      );
+      const trigger = this.renderRoot?.querySelector(
+        '.insights-applied-trigger-chat-popover[aria-expanded="true"]'
+      );
+
+      if (
+        (popover && path.includes(popover)) ||
+        (trigger && path.includes(trigger))
+      ) {
+        return;
       }
+
+      if (path.includes(this)) {
+        this.openChatInsights = null;
+        this.requestUpdate();
+        return;
+      }
+
+      this.openChatInsights = null;
+      this.requestUpdate();
     };
-    document.addEventListener("click", this._closeInsightsPopoverOnWindow);
+    document.addEventListener("click", this._closeChatInsights);
 
     // Load search engines with their icons
     await this.loadSearchEngines();
@@ -763,9 +809,9 @@ class ChatBot extends MozLitElement {
     try {
       Services.prefs.removeObserver(PROMPT_PREF, this._prefObserver);
     } catch {}
-    if (this._closeInsightsPopoverOnWindow) {
-      document.removeEventListener("click", this._closeInsightsPopoverOnWindow);
-      this._closeInsightsPopoverOnWindow = null;
+    if (this._closeChatInsights) {
+      document.removeEventListener("click", this._closeChatInsights);
+      this._closeChatInsights = null;
     }
   }
 
@@ -1420,7 +1466,7 @@ Today's date: ${currentDate}`;
   toggleInsightsPopup(key, e) {
     e.preventDefault();
     e.stopPropagation();
-    this.openInsightsFor = this.openInsightsFor === key ? null : key;
+    this.openChatInsights = this.openChatInsights === key ? null : key;
   }
 
   render() {
@@ -1614,30 +1660,19 @@ Today's date: ${currentDate}`;
                     <div class="message-title">
                       ${ChatHistoryMessage.getRoleLabel(msg.role)}
                     </div>
-                    ${usedInsights.length
-                      ? html`
-                          <div class="used-insights">
-                            <span class="insights-label"
-                              >Referenced insights:</span
-                            >
-                            ${usedInsights.map(insight =>
-                              createClickableInsightToken(
-                                insight,
-                                this.handleInsightClick.bind(this)
-                              )
-                            )}
-                          </div>
-                        `
-                      : ""}
                     <div class="message-body">${bodyHTML}</div>
-                    ${msg.role === ChatHistory.MESSAGE_ROLE.ASSISTANT
+                    ${msg.role === ChatHistory.MESSAGE_ROLE.ASSISTANT &&
+                    usedInsights.length
                       ? html`<div class="message-footer">
                           <button
-                            class="insights-applied-trigger"
-                            aria-expanded=${this.openInsightsFor === key}
+                            class="insights-applied-trigger-chat-popover"
+                            aria-expanded=${this.openChatInsights === key}
+                            aria-controls=${`insights-applied-chat-popover-${key}`}
                             @click=${e => this.toggleInsightsPopup(key, e)}
                           >
-                            <div class="insights-applied-trigger-inner">
+                            <div
+                              class="insights-applied-trigger-chat-popover-inner"
+                            >
                               <svg
                                 alt="Insights Applied Icon"
                                 width="16"
@@ -1657,29 +1692,37 @@ Today's date: ${currentDate}`;
                                   </clipPath>
                                 </defs>
                               </svg>
-                              <span class="insights-applied-trigger-hover-text">
+                              <span
+                                class="insights-applied-trigger-chat-popover-hover-text"
+                              >
                                 Insights applied
                               </span>
                             </div>
                           </button>
                           <div
-                            class="insights-applied-popup ${this
-                              .openInsightsFor === key
+                            id=${`insights-applied-chat-popover-${key}`}
+                            class="insights-applied-chat-popover ${this
+                              .openChatInsights === key
                               ? "is-open"
                               : ""}"
+                            role="region"
+                            aria-labelledby=${`insights-applied-chat-popover-title-${key}`}
+                            ?hidden=${this.openChatInsights !== key}
                           >
-                            <div class="insights-applied-popup-body">
-                              <ul class="insights-applied-list">
+                            <div class="insights-applied-chat-popover-body">
+                              <ul class="insights-applied-chat-popover-list">
                                 ${usedInsights.map(
                                   insight =>
-                                    html`<li class="insights-applied-list-item">
+                                    html`<li
+                                      class="insights-applied-chat-popover-list-item"
+                                    >
                                       ${insight}
                                     </li>`
                                 )}
                               </ul>
-                              <div class="insights-applied-popup-footer">
+                              <div class="insights-applied-chat-popover-footer">
                                 <button
-                                  class="insights-applied-popup-manage-button"
+                                  class="insights-applied-chat-popover-manage-button"
                                 >
                                   <svg
                                     width="16"
@@ -1705,7 +1748,7 @@ Today's date: ${currentDate}`;
                                   Manage Insights
                                 </button>
                                 <button
-                                  class="insights-applied-popup-retry-button"
+                                  class="insights-applied-chat-popover-retry-button"
                                 >
                                   <svg
                                     width="16"
