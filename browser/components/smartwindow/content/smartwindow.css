@@ -1265,6 +1265,16 @@ body {
   position: absolute;
   top: 0;
   right: 12px;
+  cursor: pointer;
+}
+
+#toggle-insights-button.insights-button--sidebar {
+  left: 12px;
+  right: auto;
+  top: 20px;
+  padding: 0;
+  background: transparent;
+  z-index: 2;
 }
 
 .toggle-insights-label {
@@ -1272,6 +1282,10 @@ body {
   font-style: normal;
   font-weight: 590;
   line-height: normal;
+}
+
+.insights-button--sidebar .toggle-insights-label {
+  display: none;
 }
 
 .toggle-insights-popover {
@@ -1285,9 +1299,47 @@ body {
   border-radius: 12px;
   border: 1px solid var(--Prompt-Bubble-Background-Color-AI, #f4f0ff);
   background: rgba(255, 255, 255);
-  display: flex;
+  display: none;
   flex-direction: column;
   gap: 8px;
+}
+
+.toggle-insights-popover .toggle-insights-back-btn {
+  display: none;
+}
+
+.toggle-insights-popover.is-open {
+  display: flex;
+}
+
+.toggle-insights-popover.insights--sidebar {
+  background-color: #f4f0ff;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: auto;
+  height: 100%;
+  border-radius: 0;
+  z-index: 10000;
+  transform: translateX(-100%);
+  transition: transform 240ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  will-change: transform;
+}
+
+.toggle-insights-popover.insights--sidebar.is-open {
+  transform: translateX(0);
+}
+
+.toggle-insights-popover.insights--sidebar .toggle-insights-back-btn {
+  display: flex;
+  min-height: var(--button-min-height, 32px);
+  gap: var(--space-small, 8px);
+  margin-bottom: var(--space-small, 8px);
+  cursor: pointer;
+}
+
+.toggle-insights-popover.insights--sidebar .toggle-insights-close-btn {
+  display: none;
 }
 
 .toggle-insights-popover-header {
@@ -1319,6 +1371,11 @@ body {
 .toggle-insights-help {
   font-size: 13px;
   max-width: 220px;
+  color: #3b2279;
+}
+
+.toggle-insights-help :where(:any-link, :any-link:focus, :any-link:hover, :any-link:active) {
+  color: inherit;
 }
 
 .toggle-insights-switch-row {

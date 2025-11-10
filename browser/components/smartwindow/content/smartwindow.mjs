@@ -2317,7 +2317,9 @@ class SmartWindowPage {
   setupInsightsUI() {
     const btn = document.getElementById("toggle-insights-button");
     const pop = document.getElementById("toggle-insights-popover");
-    const closeBtn = document.getElementById("toggle-insights-close");
+    const closeBtn = document.getElementById(
+      this.isSidebarMode ? "toggle-insights-back" : "toggle-insights-close"
+    );
     const sw = document.getElementById("toggle-insights-switch");
 
     if (!btn || !pop || !sw) {
@@ -2325,9 +2327,11 @@ class SmartWindowPage {
     }
 
     if (this.isSidebarMode) {
-      pop.hidden = true;
-      btn.hidden = true;
-      return;
+      pop.classList.add("insights--sidebar");
+      btn.classList.add("insights-button--sidebar");
+    } else {
+      pop.classList.remove("insights--sidebar");
+      btn.classList.remove("insights-button--sidebar");
     }
 
     btn.hidden = false;
@@ -2357,21 +2361,58 @@ class SmartWindowPage {
     const openPopover = () => {
       pop.hidden = false;
       btn.setAttribute("aria-expanded", "true");
-      document.addEventListener("pointerdown", outsideClick, { capture: true });
+
       document.addEventListener("keydown", esc);
-      queueMicrotask(() => sw.focus());
+      if (!this.isSidebarMode) {
+        document.addEventListener("pointerdown", outsideClick, {
+          capture: true,
+        });
+      }
+
+      requestAnimationFrame(() => {
+        pop.classList.add("is-open");
+      });
+
+      queueMicrotask(() => {
+        sw?.focus();
+      });
     };
 
     const closePopover = () => {
-      pop.hidden = true;
-      btn.setAttribute("aria-expanded", "false");
-      document.removeEventListener("pointerdown", outsideClick, {
-        capture: true,
-      });
+      if (!this.isSidebarMode) {
+        document.removeEventListener("pointerdown", outsideClick, {
+          capture: true,
+        });
+      }
       document.removeEventListener("keydown", esc);
+      btn.setAttribute("aria-expanded", "false");
+
+      const isSidebarVariant = pop.classList.contains("insights--sidebar");
+      const cs = getComputedStyle(pop);
+      const hasTransformTransition =
+        cs.transitionProperty.includes("transform") &&
+        parseFloat(cs.transitionDuration) > 0;
+
+      if (isSidebarVariant && hasTransformTransition) {
+        const onEnd = e => {
+          if (e.propertyName !== "transform") {
+            return;
+          }
+          pop.removeEventListener("transitionend", onEnd);
+          pop.hidden = true;
+        };
+        pop.addEventListener("transitionend", onEnd, { once: true });
+        pop.classList.remove("is-open");
+      } else {
+        pop.classList.remove("is-open");
+        pop.hidden = true;
+      }
     };
 
-    const toggleOpen = () => (pop.hidden ? openPopover() : closePopover());
+    const toggleOpen = () =>
+      btn.getAttribute("aria-expanded") === "true"
+        ? closePopover()
+        : openPopover();
 
     const onSwitch = () => {
       const next = sw.getAttribute("aria-checked") !== "true";
@@ -2406,7 +2447,8 @@ class SmartWindowPage {
       this.chatBot.useInsights = val;
     }
 
-    const conv = this.chatBot.conversation || gBrowser?.selectedTab?.conversation;
+    const conv =
+      this.chatBot.conversation || gBrowser?.selectedTab?.conversation;
     if (conv) {
       conv.settings = conv.settings || {};
       conv.settings.useInsights = val;

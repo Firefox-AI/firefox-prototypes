@@ -39,7 +39,6 @@
       <div class="smart-window-container">
         <button
           id="toggle-insights-button"
-          class="insights-icon-btn"
           aria-label="Insights menu"
           aria-haspopup="dialog"
           aria-expanded="false"
@@ -66,6 +65,21 @@
           aria-labelledby="toggle-insights-popover-title"
           hidden
         >
+          <div id="toggle-insights-back" class="toggle-insights-back-btn">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M6.68967 2.25L1.21967 7.72C1.07901 7.86066 0.999991 8.05144 1 8.25036C1.00001 8.44929 1.07904 8.64006 1.21972 8.78071L6.68972 14.2497L7.75028 13.189L3.5609 9.00034H15V7.50034H3.56066L7.75033 3.31066L6.68967 2.25Z"
+                fill="black"
+              />
+            </svg>
+            <span>Chat</span>
+          </div>
           <div class="toggle-insights-popover-header">
             <h4 id="toggle-insights-popover-title">Insights</h4>
             <button
@@ -73,13 +87,26 @@
               class="toggle-insights-close-btn"
               aria-label="Close"
             >
-              ✕
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M7.11606 7.99994L4 11.116L4.88388 11.9999L7.99994 8.88383L11.116 11.9999L11.9999 11.116L8.88383 7.99994L11.9999 4.88388L11.116 4L7.99994 7.11606L4.88388 4L4 4.88388L7.11606 7.99994Z"
+                  fill="#5B5B66"
+                />
+              </svg>
             </button>
           </div>
           <div class="toggle-insights-body">
             <p class="toggle-insights-help">
               Insights will be applied to responses in this chat.
-              <a href="#" tabindex="-1">Learn more</a>
+              <a href="https://support.mozilla.org/" tabindex="-1"
+                >Learn more</a
+              >
             </p>
             <div class="toggle-insights-switch-row">
               <span>On</span>
