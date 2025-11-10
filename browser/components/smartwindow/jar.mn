@@ -19,6 +19,7 @@ browser.jar:
     content/browser/smartwindow/smartwindow.html             (content/smartwindow.html)
     content/browser/smartwindow/smartwindow.mjs              (content/smartwindow.mjs)
     content/browser/smartwindow/smart-fx-icon.svg            (content/smart-fx-icon.svg)
+    content/browser/smartwindow/favicon.svg                  (content/favicon.svg)
     content/browser/smartwindow/utils.mjs                    (content/utils.mjs)
     content/browser/smartwindow/welcome.html                 (content/welcome.html)
     content/browser/smartwindow/welcome.js                   (content/welcome.js)

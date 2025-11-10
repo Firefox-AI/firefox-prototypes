@@ -49,8 +49,9 @@ class ChatBot extends MozLitElement {
     .chat {
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
+      gap: 2.5rem;
       margin-bottom: 1rem;
+      max-height: 700px;
     }
 
     .conversation-title-container {
@@ -108,7 +109,6 @@ class ChatBot extends MozLitElement {
     }
 
     .message {
-      max-width: 70%;
       padding: 0.75rem;
       border-radius: 10px;
       line-height: 1.4;
@@ -1008,7 +1008,8 @@ class ChatBot extends MozLitElement {
         const lastIdx = this.#conversation.messages.length - 1;
         // Store raw content WITH tokens for later rendering
         this.#conversation.messages[lastIdx].content = fullResponse;
-        this.scrollToBottom();
+        // Auto-scrolling disabled during streaming
+        // this.scrollToBottom();
         this.requestUpdate();
       }
     } catch (err) {
@@ -1036,10 +1037,11 @@ class ChatBot extends MozLitElement {
   }
 
   scrollToBottom() {
-    const bottomAnchor = this.shadowRoot.getElementById("bottom-anchor");
-    if (bottomAnchor) {
-      bottomAnchor.scrollIntoView({ behavior: "smooth" });
-    }
+    // Auto-scrolling disabled
+    // const bottomAnchor = this.shadowRoot.getElementById("bottom-anchor");
+    // if (bottomAnchor) {
+    //   bottomAnchor.scrollIntoView({ behavior: "smooth" });
+    // }
   }
 
   /**
@@ -1657,9 +1659,6 @@ Today's date: ${currentDate}`;
                       ? "user"
                       : "assistant"}"
                   >
-                    <div class="message-title">
-                      ${ChatHistoryMessage.getRoleLabel(msg.role)}
-                    </div>
                     <div class="message-body">${bodyHTML}</div>
                     ${msg.role === ChatHistory.MESSAGE_ROLE.ASSISTANT &&
                     usedInsights.length

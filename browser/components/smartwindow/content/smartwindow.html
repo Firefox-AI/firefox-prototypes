@@ -7,14 +7,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Ask</title>
+    <title>New Tab</title>
     <link
       rel="stylesheet"
       href="chrome://browser/content/smartwindow/smartwindow.css"
     />
     <link
       rel="icon"
-      href="chrome://browser/skin/notification-icons/desktop-notification.svg"
+      href="chrome://browser/content/smartwindow/favicon.svg"
+      type="image/svg+xml"
     />
   </head>
   <body>
@@ -103,7 +104,9 @@
           <div class="toggle-insights-body">
             <p class="toggle-insights-help">
               Insights will be applied to responses in this chat.
-              <a href="https://support.mozilla.org/" tabindex="-1">Learn more</a>
+              <a href="https://support.mozilla.org/" tabindex="-1"
+                >Learn more</a
+              >
             </p>
             <div class="toggle-insights-switch-row">
               <span>On</span>
@@ -118,8 +121,10 @@
             </div>
           </div>
         </div>
-        <div id="results-container">
-          <chat-bot id="chat-bot"></chat-bot>
+        <div class="results-wrapper">
+          <div id="results-container">
+            <chat-bot id="chat-bot"></chat-bot>
+          </div>
         </div>
         <div class="search-box">
           <div class="current-tab-button" id="current-tab-button">
