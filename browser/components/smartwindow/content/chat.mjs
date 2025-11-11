@@ -11,7 +11,6 @@ import {
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
 import { fetchWithHistory } from "chrome://browser/content/smartwindow/utils.mjs";
 import {
-  buildInsightsSystemPrompt,
   detectInsightTokens,
   createInsightsOverlay,
   insightsStyles,
@@ -1357,6 +1356,9 @@ Available tools:
   1. Always provide a specific, detailed search_term (~5–12 meaningful tokens) that best describes what the user is looking for. Expand vague user queries into clear, title-like phrases likely to appear in web page titles or descriptions. Include relevant entities, library names, or context words (e.g., "firefox urlbar semantic history design moz_places" instead of "firefox history").
   2. Always look for user's temporal intent, if it exists. Then use that to extract a time window range (in ISO 8601 datetime format) for the function input.
   3. Now you found the temporal phrase, given the locale: ${locale}, and datetime: ${localIso}, give a specific time window range. For example "last week", calculate the last week's time window range in ISO 8601 format for the input start_ts and end_ts.
+- get_relevant_insights: Fetches preferences to personalize responses to user queries. Use this tool if the user's message contains hints that personalization would improve your response (i.e. "for me", "that I like", etc.). Provide the user message and limit where limit is a maximum number of relevant insights. Keep "limit" small (e.g., 3–8). Results will be sorted by selected relevant insights
+
+# Use User Insights List from "get_relevant_insights tool call", If insights data is present, only use it when "available" is true or personalization is relevant. Otherwise, ignore it.
 
 # Search Suggestions
 
@@ -1376,12 +1378,7 @@ Example response format:
 - User: "help me find a flight to Boston"
 - Response: "I'd be happy to help you find a flight to Boston. Let me search for available options. §search: flights sjc to boston§"
 
-${
-  useInsights
-    ? `# Insights and Personalization Rules
-${buildInsightsSystemPrompt()}`
-    : ""
-}`;
+`;
 
     if (includeTitleGeneration) {
       systemPrompt += `\n\n# Title Generation Rules
