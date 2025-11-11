@@ -752,6 +752,7 @@ class ChatBot extends MozLitElement {
     this.currentPageText = ""; // Store current page text content
     this.currentPageInfo = null; // Store pagination metadata
     this.currentSelectionText = ""; // Store selected text content
+    this.mentions = [];
     this.showInsightsOverlay = false; // Track insights overlay visibility
     this.conversationInsights = new Set(); // Track all insights used in conversation
     this._insightsUpdatedHandler = null; // Event listener reference for cleanup
@@ -1069,7 +1070,12 @@ class ChatBot extends MozLitElement {
       messagesForAPI.unshift(...prefixMessages);
     }
 
-    const stream = fetchWithHistory(messagesForAPI);
+    const allowedRemoteUrls = new Set(
+      this.mentions
+        .filter(mention => mention.source == "history")
+        .map(mention => mention.id)
+    );
+    const stream = fetchWithHistory(messagesForAPI, allowedRemoteUrls);
     let fullResponse = "";
     try {
       // Append chunks as they arrive
@@ -1150,6 +1156,7 @@ class ChatBot extends MozLitElement {
    * @param {string} [currentPageText=""] - Text of the current page in scope
    * @param {{ count: number; viewportHeight: number; currentPage: number } | null} [currentPageInfo=null] - Pagination metadata for the current page
    * @param {string} [currentSelectionText=""] - Currently selected text content
+   * @param {{ id: string; label?: string; source?: string }[]} mentions - Mentions included in the prompt
    */
   async submitPrompt(
     conversation,
@@ -1157,7 +1164,8 @@ class ChatBot extends MozLitElement {
     tabContext = [],
     currentPageText = "",
     currentPageInfo = null,
-    currentSelectionText = ""
+    currentSelectionText = "",
+    mentions
   ) {
     if (!this.#conversation || this.#conversation.id !== conversation.id) {
       this.#conversation = conversation;
@@ -1175,6 +1183,7 @@ class ChatBot extends MozLitElement {
       ? { ...currentPageInfo }
       : currentPageInfo;
     this.currentSelectionText = currentSelectionText || "";
+    this.mentions = mentions;
 
     // Plain text goes to the model; rich HTML is stashed for UI rendering.
     this.prompt = text ?? "";

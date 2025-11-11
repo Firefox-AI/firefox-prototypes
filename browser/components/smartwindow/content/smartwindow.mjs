@@ -1312,7 +1312,8 @@ class SmartWindowPage {
         tabContext,
         pageText,
         pageInfo,
-        selectionText
+        selectionText,
+        [] // mentions
       );
 
       // Show chat mode
@@ -2003,6 +2004,7 @@ class SmartWindowPage {
 
     const textFromBar = this.smartbar?.getText?.() || "";
     const htmlFromBar = this.smartbar?.getHTML?.() || null;
+    const mentionsFromBar = this.smartbar?.getMentions?.() || [];
 
     document.documentElement.setAttribute("haschat", "true");
 
@@ -2055,7 +2057,8 @@ class SmartWindowPage {
           contextTabs,
           includePageText ? this.currentTabPageText : "",
           pageInfo,
-          selectionText
+          selectionText,
+          mentionsFromBar
         );
 
         await this.saveChatMessagesForCurrentContext();

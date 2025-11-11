@@ -153,17 +153,24 @@ export function attachToElement(element, options = {}) {
           parseHTML: el => el.getAttribute("data-icon"),
           renderHTML: attrs => (attrs.icon ? { "data-icon": attrs.icon } : {}),
         },
+        source: {
+          default: null,
+          parseHTML: el => el.getAttribute("data-source"),
+          renderHTML: attrs =>
+            attrs.source ? { "data-source": attrs.source } : {},
+        },
       };
     },
 
     renderHTML({ node, HTMLAttributes }) {
-      const { id, label, icon } = node.attrs;
+      const { id, label, icon, source } = node.attrs;
       const iconSrc = icon || (id ? `page-icon:${id}` : "");
       const attrs = {
         ...HTMLAttributes,
         class: `${HTMLAttributes.class ?? ""} mention`.trim(),
         "data-id": id,
         "data-icon": icon || "",
+        ...(source ? { "data-source": source } : {}),
       };
       return [
         "span",
@@ -221,12 +228,15 @@ export function attachToElement(element, options = {}) {
           },
           // Replace @-query with mention(id/label/icon) + trailing space so caret exits the chip
           command: ({ range, props }) => {
-            const { id, label, favicon } = props;
+            const { id, label, favicon, source } = props;
             editor
               .chain()
               .focus()
               .insertContentAt(range, [
-                { type: "mention", attrs: { id, label, icon: favicon } },
+                {
+                  type: "mention",
+                  attrs: { id, label, icon: favicon, source },
+                },
                 { type: "text", text: " " },
               ])
               .run();
@@ -246,6 +256,7 @@ export function attachToElement(element, options = {}) {
                     id: item.id,
                     label: item.label,
                     icon: item.icon ?? item.favicon ?? `page-icon:${item.url}`,
+                    source: item.type || null,
                   });
                 });
                 dropdown.updatePosition(props.clientRect());
@@ -669,6 +680,30 @@ export function attachToElement(element, options = {}) {
 
     getHTML() {
       return editor.getHTML();
+    },
+
+    getMentions() {
+      const mentions = [];
+      function collectMentions(node) {
+        if (!node) {
+          return;
+        }
+        if (node.type === "mention") {
+          mentions.push({
+            id: node.attrs?.id || "",
+            label: node.attrs?.label || "",
+            source: node.attrs?.source || null,
+          });
+        }
+        if (Array.isArray(node.content)) {
+          node.content.forEach(collectMentions);
+        }
+      }
+      const json = editor.getJSON();
+      if (Array.isArray(json?.content)) {
+        json.content.forEach(collectMentions);
+      }
+      return mentions;
     },
 
     setContent(content) {

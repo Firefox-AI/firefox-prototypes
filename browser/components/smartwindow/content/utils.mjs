@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* eslint-disable no-console */
+
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
@@ -15,6 +17,10 @@ import { SmartAssistEngine } from "moz-src:///browser/components/genai/SmartAssi
 
 const { ChatHistoryMessage } = ChromeUtils.importESModule(
   "resource:///modules/smartwindow/ChatHistory.sys.mjs"
+);
+
+const { PageExtractorParent } = ChromeUtils.importESModule(
+  "resource://gre/actors/PageExtractorParent.sys.mjs"
 );
 
 /**
@@ -284,7 +290,14 @@ const MODE_HANDLERS = {
 
 const DEFAULT_MODE = "viewport";
 
-const get_page_content = async ({ url, mode, page }) => {
+/**
+ * @param {object} toolParams
+ * @param {string} toolParams.url
+ * @param {string} toolParams.mode
+ * @param {string} toolParams.page
+ * @param {Set<string>} allowedUrls
+ */
+const get_page_content = async ({ url, mode, page }, allowedUrls) => {
   try {
     let win = lazy.BrowserWindowTracker.getTopWindow();
     let gBrowser = win.gBrowser;
@@ -326,11 +339,22 @@ const get_page_content = async ({ url, mode, page }) => {
     }
 
     if (!targetTab) {
-      const availableUrls = tabs
-        .slice(0, 3)
-        .map(tab => `"${tab.label}" at ${tab.linkedBrowser.currentURI.spec}`)
-        .join(", ");
-      return `No tab found with URL: ${url}. Available tabs include: ${availableUrls}`;
+      // Search through the allowed URLs, and extract content headlessy.
+      if (!allowedUrls.has(url)) {
+        const availableUrls = tabs
+          .slice(0, 3)
+          .map(tab => `"${tab.label}" at ${tab.linkedBrowser.currentURI.spec}`)
+          .join(", ");
+        return `No tab found with URL: ${url}. Available tabs include: ${availableUrls}`;
+      }
+
+      // This will load the page headlessly, and then extract the content. It might
+      // be a better idea to have the lifetime of the page be tied to the chat while
+      // it's open, and with a "keep alive" timeout. For now it's simpler to just
+      // load the page fresh every time.
+      return PageExtractorParent.getHeadlessExtractor(url, pageExtractor =>
+        runExtraction(pageExtractor, mode, page, url)
+      );
     }
 
     // Get the browser for the target tab
@@ -347,78 +371,93 @@ const get_page_content = async ({ url, mode, page }) => {
         "PageExtractor"
       );
 
-    const selectedMode =
-      typeof mode === "string" && MODE_HANDLERS[mode] ? mode : DEFAULT_MODE;
-    const handler = MODE_HANDLERS[selectedMode];
-    let extraction = null;
-
-    try {
-      extraction = await handler(pageExtractor, { page });
-    } catch (err) {
-      console.warn(
-        "[SmartWindow] get_page_content mode failed",
-        selectedMode,
-        err
-      );
-    }
-
-    const pageContent =
-      typeof extraction?.text === "string" ? extraction.text.trim() : "";
-
-    if (!pageContent) {
-      return `get_page_content(${selectedMode}) returned no content for "${targetTab.label}" (${url}). Try another mode if you still need information.`;
-    }
-
-    // Clean and truncate content for better LLM consumption
-    let cleanContent = pageContent
-      .replace(/\s+/g, " ") // Normalize whitespace
-      .replace(/\n\s*\n/g, "\n") // Clean up line breaks
-      .trim();
-
-    // Limit content length but be more generous for LLM processing
-    if (cleanContent.length > 2000) {
-      // Try to cut at a sentence boundary
-      const truncatePoint = cleanContent.lastIndexOf(".", 2000);
-      if (truncatePoint > 1500) {
-        cleanContent = cleanContent.substring(0, truncatePoint + 1);
-      } else {
-        cleanContent = cleanContent.substring(0, 2000) + "...";
-      }
-    }
-
-    const modeLabels = {
-      viewport: "current viewport",
-      reader: "reader mode",
-      full: "full page",
-    };
-    const modeLabel = modeLabels[selectedMode] || "selected mode";
-
-    let pageInfoText = "";
-    const pageInfo = extraction?.pageInfo;
-    if (pageInfo) {
-      const humanPage = pageInfo.currentPage + 1;
-      const totalPages = pageInfo.count;
-      const viewportHeight = Math.round(pageInfo.viewportHeight);
-      pageInfoText = `\n\nPageInfo: page ${humanPage} of ${totalPages} (viewport height ≈ ${viewportHeight}px)`;
-    }
-
-    return `Content (${modeLabel}) from "${targetTab.label}" (${url}):
-
-${cleanContent}${pageInfoText}`;
+    return runExtraction(
+      pageExtractor,
+      mode,
+      page,
+      `"${targetTab.label}" (${url})`
+    );
   } catch (error) {
     return `Error retrieving content from ${url}: ${error.message}. Try refreshing the tab or checking if it's accessible.`;
   }
 };
 
 /**
+ * @param {PageExtractor} pageExtractor
+ * @param {string} mode
+ * @param {string} page
+ * @param {string} label
+ */
+async function runExtraction(pageExtractor, mode, page, label) {
+  const selectedMode =
+    typeof mode === "string" && MODE_HANDLERS[mode] ? mode : DEFAULT_MODE;
+  const handler = MODE_HANDLERS[selectedMode];
+  let extraction = null;
+
+  try {
+    extraction = await handler(pageExtractor, { page });
+  } catch (err) {
+    console.warn(
+      "[SmartWindow] get_page_content mode failed",
+      selectedMode,
+      err
+    );
+  }
+
+  const pageContent =
+    typeof extraction?.text === "string" ? extraction.text.trim() : "";
+
+  if (!pageContent) {
+    return `get_page_content(${selectedMode}) returned no content for ${label}. Try another mode if you still need information.`;
+  }
+
+  // Clean and truncate content for better LLM consumption
+  let cleanContent = pageContent
+    .replace(/\s+/g, " ") // Normalize whitespace
+    .replace(/\n\s*\n/g, "\n") // Clean up line breaks
+    .trim();
+
+  // Limit content length but be more generous for LLM processing
+  if (cleanContent.length > 2000) {
+    // Try to cut at a sentence boundary
+    const truncatePoint = cleanContent.lastIndexOf(".", 2000);
+    if (truncatePoint > 1500) {
+      cleanContent = cleanContent.substring(0, truncatePoint + 1);
+    } else {
+      cleanContent = cleanContent.substring(0, 2000) + "...";
+    }
+  }
+
+  const modeLabels = {
+    viewport: "current viewport",
+    reader: "reader mode",
+    full: "full page",
+  };
+  const modeLabel = modeLabels[selectedMode] || "selected mode";
+
+  let pageInfoText = "";
+  const pageInfo = extraction?.pageInfo;
+  if (pageInfo) {
+    const humanPage = pageInfo.currentPage + 1;
+    const totalPages = pageInfo.count;
+    const viewportHeight = Math.round(pageInfo.viewportHeight);
+    pageInfoText = `\n\nPageInfo: page ${humanPage} of ${totalPages} (viewport height ≈ ${viewportHeight}px)`;
+  }
+
+  return `Content (${modeLabel}) from ${label}:
+
+  ${cleanContent}${pageInfoText}`;
+}
+
+/**
  * Fetches a response from the OpenAI engine with message history.
  *
  * @param {Array} messages - Array of message objects with role and content
+ * @param {Set<string>} allowedUrls - URLs that the user has explicitly added to the conversation.
  * @returns {AsyncGenerator<string>} Stream of response chunks this can be a string or a tool call log object
  * @yields {string}
  */
-
-export async function* fetchWithHistory(messages) {
+export async function* fetchWithHistory(messages, allowedUrls) {
   const engineInstance = await createOpenAIEngine();
 
   // Normalize roles to lowercase and handle system messages
@@ -544,7 +583,7 @@ export async function* fetchWithHistory(messages) {
             result = search_open_tabs(toolParams);
             break;
           case GET_PAGE_CONTENT:
-            result = await get_page_content(toolParams);
+            result = await get_page_content(toolParams, allowedUrls);
             break;
           case SEARCH_HISTORY:
             result = await searchBrowserHistory(toolParams);
@@ -587,7 +626,7 @@ export async function* fetchWithHistory(messages) {
 export async function sendPrompt(content, previousMessages = []) {
   const messages = [...previousMessages, { role: "user", content }];
 
-  const stream = fetchWithHistory(messages);
+  const stream = fetchWithHistory(messages, new Set());
   let response = "";
 
   try {
