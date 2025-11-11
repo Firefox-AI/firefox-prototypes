@@ -2,11 +2,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+/* eslint-disable no-console */
+
 import { html, css, render } from "chrome://global/content/vendor/lit.all.mjs";
 import { createOpenAIEngine } from "./utils.mjs";
 
 const { ChatHistory, ChatHistoryMessage } = ChromeUtils.importESModule(
   "resource:///modules/smartwindow/ChatHistory.sys.mjs"
+);
+const { PlacesUtils } = ChromeUtils.importESModule(
+  "resource://gre/modules/PlacesUtils.sys.mjs"
 );
 
 /**
@@ -444,10 +449,6 @@ async function runCoVe(draftInsights, profile_records, related_insights) {
 async function getRecentHistory(opts = {}) {
   const days = opts.days ?? 60;
   const maxResults = opts.maxResults ?? 500;
-
-  const { PlacesUtils } = ChromeUtils.importESModule(
-    "resource://gre/modules/PlacesUtils.sys.mjs"
-  );
 
   // Places stores visit_date in microseconds since epoch.
   const cutoffMicros = Math.max(0, (Date.now() - days * 86400000) * 1000);
@@ -2208,6 +2209,108 @@ export async function analyzeConversationsSmart() {
   }
   return updateInsightsFromConversationsIncremental();
 }
+
+const INSIGHTS_SCHEDULER_PAGES_THRESHOLD = 10;
+const INSIGHTS_SCHEDULER_INTERVAL_MS = 60 * 60 * 1000; // One hour
+
+/**
+ * Runs history-based insight generation after enough visits have accumulated, and on
+ * a timer.
+ *
+ * TODO - This runs once per browser window, and should be consolidated into some
+ * kind of singleton. For instance, if you have 5 browser windows open, there will
+ * be 5 schedulers running at the same time racing to control the insights.
+ */
+export class InsightsScheduler {
+  /** @type {number} */
+  #pagesVisited = 0;
+  /** @type {number} */
+  #intervalHandle = 0;
+  #destroyed = false;
+
+  /**
+   * TODO - This should be initialized inside of browser/base/content/browser-smart-window.js
+   * but this file can't be loaded as in ESM module from that context because it loads
+   * lit which expects a window object to be available.
+   */
+  static initialize() {
+    const sw = getSmartWindow();
+    if (sw && !sw.insightsScheduler) {
+      sw.insightsScheduler = new InsightsScheduler();
+    }
+  }
+
+  constructor() {
+    this.startInterval();
+    PlacesUtils.observers.addListener(["page-visited"], this.#onPageVisited);
+    console.log(`[InsightsScheduler] Initialized`);
+  }
+
+  startInterval() {
+    if (this.#intervalHandle) {
+      throw new Error(
+        "Attempting to start an interval when one already existed."
+      );
+    }
+    this.#intervalHandle = setInterval(
+      this.#onInterval,
+      INSIGHTS_SCHEDULER_INTERVAL_MS
+    );
+  }
+
+  stopInterval() {
+    clearInterval(this.#intervalHandle);
+    this.#intervalHandle = 0;
+  }
+
+  #onPageVisited = () => {
+    this.#pagesVisited++;
+  };
+
+  #onInterval = async () => {
+    if (this.#destroyed) {
+      throw new Error(
+        "The interval timer ran when the component was already destroyed."
+      );
+    }
+    if (
+      this.#pagesVisited < INSIGHTS_SCHEDULER_PAGES_THRESHOLD ||
+      getSmartWindow()?.isGeneratingInsights()
+    ) {
+      console.log(
+        `[InsightsScheduler] Analysis not run because ${this.#pagesVisited}/${INSIGHTS_SCHEDULER_PAGES_THRESHOLD} pages were visited.`
+      );
+      return;
+    }
+
+    this.stopInterval();
+
+    try {
+      console.log(
+        `[InsightsScheduler] Analyzing history with ${this.#pagesVisited} new pages`
+      );
+      await analyzeHistorySmart();
+      this.#pagesVisited = 0;
+      window.dispatchEvent(new CustomEvent("insights-updated"));
+
+      console.log(`[InsightsScheduler] Analysis complete.`);
+    } catch (error) {
+      console.error("[InsightsScheduler] Failed to analyze history", error);
+    } finally {
+      if (!this.#destroyed) {
+        this.startInterval();
+      }
+    }
+  };
+
+  destroy() {
+    this.stopInterval();
+    PlacesUtils.observers.removeListener(["page-visited"], this.#onPageVisited);
+    this.#destroyed = true;
+  }
+}
+
+InsightsScheduler.initialize();
 
 /**
  * Generates insights from browsing history using an LLM.

@@ -28,6 +28,9 @@ var SmartWindow = {
   _isGeneratingInsights: false,
   _insightsGenerationError: null,
 
+  // This gets set by insights.mjs.
+  insightsScheduler: null,
+
   init() {
     if (this._initialized) {
       return;
@@ -655,6 +658,9 @@ var SmartWindow = {
     }
 
     this._teardownHistoryOverlayProgressListener();
+
+    this.insightsScheduler?.destroy();
+    this.insightsScheduler = null;
 
     console.log("Smart Window shutdown complete");
   },
