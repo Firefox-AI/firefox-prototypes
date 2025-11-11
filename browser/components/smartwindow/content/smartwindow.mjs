@@ -64,6 +64,7 @@ class SmartWindowPage {
     this.currentTabPageText = "";
     this.currentTabPageInfo = null;
     this.quickActionButtons = {};
+    this._lastSearchHistoryItems = null;
 
     this.onboardingRendered = false;
 
@@ -1209,6 +1210,7 @@ class SmartWindowPage {
     }
 
     const itemsWithPreviews = await this.#populateHistoryPreviews(items);
+    this._lastSearchHistoryItems = itemsWithPreviews.map(item => ({ ...item }));
 
     const topWindow = window.browsingContext?.topChromeWindow;
     if (topWindow?.SmartWindow) {
@@ -1218,6 +1220,32 @@ class SmartWindowPage {
     } else {
       console.error("[SmartWindow] SmartWindow not available");
     }
+  }
+
+  toggleCachedHistoryOverlay() {
+    const topWindow = window.browsingContext?.topChromeWindow;
+    if (!topWindow?.SmartWindow) {
+      console.error("[SmartWindow] SmartWindow not available for toggle");
+      return;
+    }
+
+    const existingOverlay = topWindow.document?.getElementById(
+      "page-history-overlay-instance"
+    );
+    if (existingOverlay) {
+      topWindow.SmartWindow.hidePageHistory();
+      return;
+    }
+
+    if (!this._lastSearchHistoryItems?.length) {
+      console.warn(
+        "[SmartWindow] No cached search history results to reopen overlay"
+      );
+      return;
+    }
+
+    const cachedItems = this._lastSearchHistoryItems.map(item => ({ ...item }));
+    topWindow.SmartWindow.showPageHistory(cachedItems);
   }
 
   getCurrentTabUrl(aUrl) {
@@ -1385,6 +1413,13 @@ class SmartWindowPage {
           );
         }
       });
+
+      this.chatBot.addEventListener(
+        "reopen-search-history-overlay",
+        () => {
+          this.toggleCachedHistoryOverlay();
+        }
+      );
     }
 
     if (topChromeWindow) {

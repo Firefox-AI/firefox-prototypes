@@ -174,6 +174,98 @@ class ChatBot extends MozLitElement {
       gap: 0.5rem;
     }
 
+    .history-overlay-section {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xsmall);
+    }
+
+    .history-overlay-actions {
+      display: flex;
+      justify-content: flex-start;
+    }
+
+    .history-overlay-label {
+      align-items: center;
+      color: var(--text-color-deemphasized, rgba(21, 20, 26, 0.69));
+      display: inline-flex;
+      font-size: 13px;
+      font-weight: 600;
+      gap: var(--space-xsmall);
+    }
+
+    button.history-overlay-button {
+      align-items: center;
+      background: #ffffff;
+      background: rgba(191, 143, 204, 0.10);
+      border-radius: 12px;
+      border: 1px solid rgba(125, 32, 124, 0.05);
+      box-shadow: 0 1px 2px rgba(17, 24, 39, 0.08);
+      color: var(--text-color, #15141A);
+      cursor: pointer;
+      display: inline-flex;
+      font-size: 0.85rem;
+      font-size: 14px;
+      font-weight: 500;
+      gap: var(--space-medium);
+      justify-content: space-between;
+      margin-top: 0;
+      min-width: 150px;
+      padding: 0.45rem 0.85rem;
+    }
+
+    button.history-overlay-button:hover {
+      background: rgba(24, 19, 25, 0.2);
+      border: 1px solid rgba(125, 32, 124, 0.25);
+    }
+
+    .history-overlay-button-content {
+      align-items: flex-start;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .history-overlay-button-icons {
+      display: inline-flex;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .history-overlay-button-icon {
+      background: #fff;
+      border-radius: 50%;
+      border: 1px solid var(--border-color-overlay, #f0f0f4);
+      box-shadow: -1px 1px 4px 0 rgba(132, 106, 65, 0.17);
+      height: 16px;
+      width: 16px;
+      overflow: hidden;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: rgba(21, 20, 26, 0.69);
+    }
+
+    .history-overlay-button-icon + .history-overlay-button-icon {
+      margin-left: -4px;
+    }
+
+    .history-overlay-button-more {
+      background: rgba(21, 20, 26, 0.05);
+      border-color: rgba(21, 20, 26, 0.15);
+    }
+
+    .history-overlay-button-count {
+      color: var(--text-color-deemphasized, rgba(21, 20, 26, 0.69));
+      gap: var(--space-medium);
+      font-weight: 400;
+      font-size: 13px;
+    }
+
+    .history-overlay-button-term {
+    }
+
     .search-button {
       display: flex;
       align-items: center;
@@ -984,11 +1076,18 @@ class ChatBot extends MozLitElement {
       for await (const chunk of stream) {
         // Specifically handle tool call log messages so it does not end up in the chat bubble
         if (chunk.type === "tool_call_log") {
+          const historyMeta =
+            chunk.tool === "search_history"
+              ? this.#extractSearchHistoryMeta(chunk.result)
+              : null;
           this.handleLogToolCall({
             tool: chunk.tool,
             content: chunk.content,
             result: chunk.result || "no result",
           });
+          if (chunk.tool === "search_history") {
+            this.#flagHistoryOverlayForCurrentResponse(historyMeta);
+          }
           continue;
         }
         fullResponse += chunk;
@@ -1299,6 +1398,86 @@ Today's date: ${currentDate}`;
     return div.innerHTML;
   }
 
+  #extractSearchHistoryMeta(resultPayload) {
+    if (resultPayload === null || typeof resultPayload === "undefined") {
+      return {
+        hasItems: false,
+        favicons: [],
+        count: 0,
+        searchTerm: "",
+      };
+    }
+    try {
+      const parsed =
+        typeof resultPayload === "string"
+          ? JSON.parse(resultPayload)
+          : resultPayload;
+      const results = Array.isArray(parsed?.results)
+        ? parsed.results
+        : Array.isArray(parsed)
+          ? parsed
+          : [];
+      const favicons = results
+        .map(item => item?.favicon || (item?.url ? `page-icon:${item.url}` : null))
+        .filter(Boolean)
+        .slice(0, 3);
+      const count =
+        typeof parsed?.count === "number" ? parsed.count : results.length;
+      const searchTerm = parsed?.search_term || parsed?.searchTerm || "";
+      return {
+        hasItems: results.length > 0,
+        favicons,
+        count,
+        searchTerm,
+      };
+    } catch (err) {
+      console.warn("[ChatBot] Unable to parse search_history payload", err);
+      return {
+        hasItems: false,
+        favicons: [],
+        count: 0,
+        searchTerm: "",
+      };
+    }
+  }
+
+  #flagHistoryOverlayForCurrentResponse(historyMeta = null) {
+    if (!this.#conversation?.messages?.length) {
+      return;
+    }
+    const lastIdx = this.#conversation.messages.length - 1;
+    if (lastIdx < 0) {
+      return;
+    }
+    const lastMessage = this.#conversation.messages[lastIdx];
+    if (!lastMessage) {
+      return;
+    }
+    if (lastMessage.role !== ChatHistory.MESSAGE_ROLE.ASSISTANT) {
+      return;
+    }
+    const messageKey =
+      (lastMessage.id ?? lastMessage.messageId ?? lastIdx) ?? lastIdx;
+    const existingMeta =
+      this._uiMeta.get(messageKey) ||
+      this._uiMeta.get(lastIdx) ||
+      {};
+    const metaWithHistory = {
+      ...existingMeta,
+      searchHistoryAvailable: true,
+      searchHistoryHasItems: !!historyMeta?.hasItems,
+      searchHistoryCount:
+        typeof historyMeta?.count === "number" ? historyMeta.count : 0,
+      searchHistoryTerm: historyMeta?.searchTerm || "",
+      searchHistoryFavicons: Array.isArray(historyMeta?.favicons)
+        ? historyMeta.favicons
+        : [],
+    };
+    this._uiMeta.set(messageKey, metaWithHistory);
+    this._uiMeta.set(lastIdx, metaWithHistory);
+    this.requestUpdate();
+  }
+
   handleSearchQuery(query, engineName, clickEvent) {
     // Dispatch custom event to be handled by smartwindow.mjs
     const event = new CustomEvent("search-suggested", {
@@ -1329,6 +1508,15 @@ Today's date: ${currentDate}`;
   handleHistoryClick() {
     // Dispatch a custom event that will bubble up to parent components
     const event = new CustomEvent("show-page-history", {
+      bubbles: true,
+      composed: true,
+    });
+    this.dispatchEvent(event);
+  }
+
+  handleHistoryOverlayReopen(messageKey) {
+    const event = new CustomEvent("reopen-search-history-overlay", {
+      detail: { messageKey },
       bubbles: true,
       composed: true,
     });
@@ -1653,6 +1841,54 @@ Today's date: ${currentDate}`;
                   bodyHTML = unsafeHTML(this.marked(cleanContent));
                 }
 
+                const historyFavicons = meta?.searchHistoryFavicons || [];
+                const historyCount = meta?.searchHistoryCount || 0;
+                const historyTerm = meta?.searchHistoryTerm || "";
+                const faviconElements = (() => {
+                  if (historyFavicons.length === 0) {
+                    return [
+                      html`<span class="history-overlay-button-icon">
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 16 16"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M13 4H11.98L11.34 2.58C11 1.82 10.23 1.33 9.39 1.33H6.61C5.77 1.33 5 1.82 4.66 2.58L4.02 4H3C1.9 4 1 4.9 1 6V12C1 13.1 1.9 14 3 14H13C14.1 14 15 13.1 15 12V6C15 4.9 14.1 4 13 4ZM7 11C5.9 11 5 10.1 5 9C5 7.9 5.9 7 7 7C8.1 7 9 7.9 9 9C9 10.1 8.1 11 7 11ZM11 7H10V6H11V7Z"
+                            fill="currentColor"
+                          />
+                        </svg>
+                      </span>`,
+                    ];
+                  }
+
+                  const icons = historyFavicons.slice(0, 3).map(icon => {
+                    return html`<img
+                      class="history-overlay-button-icon"
+                      src=${icon}
+                      alt=""
+                      width="16"
+                      height="16"
+                    />`;
+                  });
+
+                  if (historyFavicons.length > 3 || historyCount > 3) {
+                    const remaining = Math.max(historyCount - 3, 1);
+                    icons.push(html`<span class="history-overlay-button-icon history-overlay-button-more">
+                      +${remaining}
+                    </span>`);
+                  }
+
+                  return icons;
+                })();
+                const historyCountLabel =
+                  historyCount === 1 ? "1 page" : `${historyCount} pages`;
+                const historyButtonTitle = historyTerm
+                  ? `Show ${historyCountLabel} for "${historyTerm}"`
+                  : `Show ${historyCountLabel}`;
+
                 return html`
                   <div
                     class="message ${msg.role === ChatHistory.MESSAGE_ROLE.USER
@@ -1660,6 +1896,68 @@ Today's date: ${currentDate}`;
                       : "assistant"}"
                   >
                     <div class="message-body">${bodyHTML}</div>
+                    ${msg.role === ChatHistory.MESSAGE_ROLE.ASSISTANT &&
+                    meta?.searchHistoryAvailable
+                      ? html`
+                          <div class="history-overlay-section">
+                            <div class="history-overlay-label">
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 16 16"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                                aria-hidden="true"
+                              >
+                                <path
+                                  d="M8.75 7.56641L11.8389 9.35059L11.0889 10.6494L7.625 8.64941C7.39298 8.51543 7.25 8.26793 7.25 8V4H8.75V7.56641Z"
+                                  fill="currentColor"
+                                />
+                                <path
+                                  fill-rule="evenodd"
+                                  clip-rule="evenodd"
+                                  d="M8 0C12.4183 0 16 3.58172 16 8C16 12.4183 12.4183 16 8 16C3.58172 16 0 12.4183 0 8C0 3.58172 3.58172 0 8 0ZM8 1.5C4.41015 1.5 1.5 4.41015 1.5 8C1.5 11.5899 4.41015 14.5 8 14.5C11.5899 14.5 14.5 11.5899 14.5 8C14.5 4.41015 11.5899 1.5 8 1.5Z"
+                                  fill="currentColor"
+                                />
+                              </svg>
+                              <span>From history</span>
+                            </div>
+                            <div class="history-overlay-actions">
+                              ${meta.searchHistoryHasItems
+                                ? html`
+                                    <button
+                                      class="history-overlay-button"
+                                      title=${historyButtonTitle}
+                                      @click=${() =>
+                                        this.handleHistoryOverlayReopen(key)}
+                                    >
+                                      <span class="history-overlay-button-content">
+                                        ${historyTerm
+                                          ? html`
+                                              <span
+                                                class="history-overlay-button-term"
+                                                title=${historyTerm}
+                                              >
+                                                ${historyTerm}
+                                              </span>
+                                            `
+                                          : ""}
+                                        <span
+                                          class="history-overlay-button-count"
+                                        >
+                                          ${historyCountLabel}
+                                        </span>
+                                      </span>
+                                      <span class="history-overlay-button-icons">
+                                        ${faviconElements}
+                                      </span>
+                                    </button>
+                                  `
+                                : ""}
+                            </div>
+                          </div>
+                        `
+                      : ""}
                     ${msg.role === ChatHistory.MESSAGE_ROLE.ASSISTANT &&
                     usedInsights.length
                       ? html`<div class="message-footer">
