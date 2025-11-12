@@ -2358,6 +2358,7 @@ class SmartWindowPage {
     const closeBtn = document.getElementById(
       this.isSidebarMode ? "toggle-insights-back" : "toggle-insights-close"
     );
+    const txt = document.getElementById('toggle-insights-text')
     const sw = document.getElementById("toggle-insights-switch");
 
     if (!btn || !pop || !sw) {
@@ -2380,6 +2381,7 @@ class SmartWindowPage {
       this.useInsightsState = val;
       this.applyInsightsToChat();
       sw.setAttribute("aria-checked", String(val));
+      txt.innerText = val ? "On" : "Off";
       sw.classList.toggle("on", val);
     };
 
