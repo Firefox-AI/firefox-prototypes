@@ -2049,8 +2049,8 @@ Today's date: ${currentDate}`;
                           >
                             <div class="insights-applied-chat-popover-body">
                               <ul class="insights-applied-chat-popover-list">
-                                ${usedInsights.map(
-                                  insight =>
+                                ${usedInsights.slice(0, 5).map(
+                                  (insight) =>
                                     html`<li
                                       class="insights-applied-chat-popover-list-item"
                                     >
