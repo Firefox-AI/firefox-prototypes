@@ -2381,8 +2381,8 @@ export async function analyzeConversationsSmart() {
   return updateInsightsFromConversationsIncremental();
 }
 
-const INSIGHTS_SCHEDULER_PAGES_THRESHOLD = 10;
-const INSIGHTS_SCHEDULER_INTERVAL_MS = 60 * 60 * 1000; // One hour
+const INSIGHTS_SCHEDULER_PAGES_THRESHOLD = 5;
+const INSIGHTS_SCHEDULER_INTERVAL_MS = 15 * 60 * 1000; // 15 mins
 
 /**
  * Runs history-based insight generation after enough visits have accumulated, and on
