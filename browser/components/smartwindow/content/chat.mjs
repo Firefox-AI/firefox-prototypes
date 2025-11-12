@@ -133,9 +133,19 @@ class ChatBot extends MozLitElement {
     .user {
       align-self: flex-end;
       border-radius: 12px;
-      border: 1px solid rgba(189, 137, 213, 0.30);
+      border: 1px solid rgba(189, 137, 213, 0.3);
       background: rgba(255, 255, 255, 0.75);
-      box-shadow: var(--box-shadow-level-2-shadow-1-x, 0) var(--box-shadow-level-2-shadow-1-y, 0.25px) var(--box-shadow-level-2-shadow-1-blur, 0.75px) var(--box-shadow-level-2-shadow-1-spread, 0) var(--box-shadow-level-2-shadow-1-color, rgba(0, 0, 0, 0.05)), var(--box-shadow-level-2-shadow-2-x, 0) var(--box-shadow-level-2-shadow-2-y, 2px) var(--box-shadow-level-2-shadow-2-blur, 6px) var(--box-shadow-level-2-shadow-2-spread, 0) var(--box-shadow-level-2-shadow-2-color, rgba(0, 0, 0, 0.10));
+      box-shadow:
+        var(--box-shadow-level-2-shadow-1-x, 0)
+          var(--box-shadow-level-2-shadow-1-y, 0.25px)
+          var(--box-shadow-level-2-shadow-1-blur, 0.75px)
+          var(--box-shadow-level-2-shadow-1-spread, 0)
+          var(--box-shadow-level-2-shadow-1-color, rgba(0, 0, 0, 0.05)),
+        var(--box-shadow-level-2-shadow-2-x, 0)
+          var(--box-shadow-level-2-shadow-2-y, 2px)
+          var(--box-shadow-level-2-shadow-2-blur, 6px)
+          var(--box-shadow-level-2-shadow-2-spread, 0)
+          var(--box-shadow-level-2-shadow-2-color, rgba(0, 0, 0, 0.1));
     }
 
     .assistant {
@@ -211,11 +221,11 @@ class ChatBot extends MozLitElement {
     button.history-overlay-button {
       align-items: center;
       background: #ffffff;
-      background: rgba(191, 143, 204, 0.10);
+      background: rgba(191, 143, 204, 0.1);
       border-radius: 12px;
       border: 1px solid rgba(125, 32, 124, 0.05);
       box-shadow: 0 1px 2px rgba(17, 24, 39, 0.08);
-      color: var(--text-color, #15141A);
+      color: var(--text-color, #15141a);
       cursor: pointer;
       display: inline-flex;
       font-size: 0.85rem;
@@ -1441,14 +1451,16 @@ Today's date: ${currentDate}`;
           ? parsed
           : [];
       const favicons = results
-        .map(item => item?.favicon || (item?.url ? `page-icon:${item.url}` : null))
+        .map(
+          item => item?.favicon || (item?.url ? `page-icon:${item.url}` : null)
+        )
         .filter(Boolean)
         .slice(0, 3);
       const count =
         typeof parsed?.count === "number" ? parsed.count : results.length;
       const searchTerm = parsed?.search_term || parsed?.searchTerm || "";
       return {
-        hasItems: results.length > 0,
+        hasItems: !!results.length,
         favicons,
         count,
         searchTerm,
@@ -1480,11 +1492,9 @@ Today's date: ${currentDate}`;
       return;
     }
     const messageKey =
-      (lastMessage.id ?? lastMessage.messageId ?? lastIdx) ?? lastIdx;
+      lastMessage.id ?? lastMessage.messageId ?? lastIdx ?? lastIdx;
     const existingMeta =
-      this._uiMeta.get(messageKey) ||
-      this._uiMeta.get(lastIdx) ||
-      {};
+      this._uiMeta.get(messageKey) || this._uiMeta.get(lastIdx) || {};
     const metaWithHistory = {
       ...existingMeta,
       searchHistoryAvailable: true,
@@ -1899,9 +1909,13 @@ Today's date: ${currentDate}`;
 
                   if (historyFavicons.length > 3 || historyCount > 3) {
                     const remaining = Math.max(historyCount - 3, 1);
-                    icons.push(html`<span class="history-overlay-button-icon history-overlay-button-more">
-                      +${remaining}
-                    </span>`);
+                    icons.push(
+                      html`<span
+                        class="history-overlay-button-icon history-overlay-button-more"
+                      >
+                        +${remaining}
+                      </span>`
+                    );
                   }
 
                   return icons;
@@ -1954,7 +1968,9 @@ Today's date: ${currentDate}`;
                                       @click=${() =>
                                         this.handleHistoryOverlayReopen(key)}
                                     >
-                                      <span class="history-overlay-button-content">
+                                      <span
+                                        class="history-overlay-button-content"
+                                      >
                                         ${historyTerm
                                           ? html`
                                               <span
@@ -1971,7 +1987,9 @@ Today's date: ${currentDate}`;
                                           ${historyCountLabel}
                                         </span>
                                       </span>
-                                      <span class="history-overlay-button-icons">
+                                      <span
+                                        class="history-overlay-button-icons"
+                                      >
                                         ${faviconElements}
                                       </span>
                                     </button>
