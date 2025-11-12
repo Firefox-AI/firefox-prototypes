@@ -109,9 +109,21 @@ class ChatBot extends MozLitElement {
     }
 
     .message {
-      padding: 0.75rem;
-      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-large);
       line-height: 1.4;
+      padding: 0.75rem 1rem;
+    }
+
+    .message .message-body > *:first-child {
+      margin-block-start: 0;
+      padding-block-start: 0;
+    }
+
+    .message .message-body > *:last-child {
+      margin-block-end: 0;
+      padding-block-end: 0;
     }
 
     .message-title {
@@ -120,13 +132,15 @@ class ChatBot extends MozLitElement {
 
     .user {
       align-self: flex-end;
-      background-color: #f0f0f0;
-      min-width: 200px;
+      border-radius: 12px;
+      border: 1px solid rgba(189, 137, 213, 0.30);
+      background: rgba(255, 255, 255, 0.75);
+      box-shadow: var(--box-shadow-level-2-shadow-1-x, 0) var(--box-shadow-level-2-shadow-1-y, 0.25px) var(--box-shadow-level-2-shadow-1-blur, 0.75px) var(--box-shadow-level-2-shadow-1-spread, 0) var(--box-shadow-level-2-shadow-1-color, rgba(0, 0, 0, 0.05)), var(--box-shadow-level-2-shadow-2-x, 0) var(--box-shadow-level-2-shadow-2-y, 2px) var(--box-shadow-level-2-shadow-2-blur, 6px) var(--box-shadow-level-2-shadow-2-spread, 0) var(--box-shadow-level-2-shadow-2-color, rgba(0, 0, 0, 0.10));
     }
 
     .assistant {
       align-self: flex-start;
-      border: 1px solid #d8d8d8;
+      border-left: 2px solid #d6b4fd;
       ul {
         display: block;
       }
@@ -177,7 +191,7 @@ class ChatBot extends MozLitElement {
     .history-overlay-section {
       display: flex;
       flex-direction: column;
-      gap: var(--space-xsmall);
+      gap: var(--space-small);
     }
 
     .history-overlay-actions {
@@ -191,7 +205,7 @@ class ChatBot extends MozLitElement {
       display: inline-flex;
       font-size: 13px;
       font-weight: 600;
-      gap: var(--space-xsmall);
+      gap: var(--space-small);
     }
 
     button.history-overlay-button {
