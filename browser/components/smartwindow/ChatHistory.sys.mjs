@@ -77,7 +77,7 @@ ChromeUtils.defineLazyGetter(lazy, "logConsole", function () {
 // In practice, schema changes should be additive, allowing newer versions to
 // operate on older schemas, albeit with potentially reduced functionality.
 
-const CURRENT_SCHEMA_VERSION = 3;
+const CURRENT_SCHEMA_VERSION = 4;
 
 const DB_FOLDER_PATH = PathUtils.profileDir;
 const DB_FILE_NAME = "chat-history.sqlite";
@@ -278,7 +278,7 @@ export class ChatHistory {
       }
 
       // Put migrations here with a brief description of what they do.
-      await this.applyV3(version);
+      await this.applyV4(version);
 
       /* Example:
       if (version < 2) {
@@ -290,48 +290,49 @@ export class ChatHistory {
     });
   }
 
-  async applyV3(version) {
-    if (version < 3) {
+  /**
+   * This migration should have been V3, but had to be updated to V4 to fix
+   * an error with the initial V3 migration code.
+   *
+   * - Adds page_url to message in order to track the page URL that the
+   *   user was on when message was submitted, allows opening up conversation
+   *   on the last url of the conversation, as well as searching for conversations
+   *   that happened over a particular url.
+   *
+   * - Adds turn_index to track logical steps, it groups all messages type
+   *   on a per turn basis.
+   *
+   *  @param {number} version - The version number of the current schema
+   */
+  async applyV4(version) {
+    if (version < 4) {
       // Drop the summary table, it is no longer needed
       await this.#conn.execute(`DROP TABLE IF EXISTS summary;`);
 
-      // Add a page_url column to the message table to keep track
-      // of the pages visitedjduring a conversation and when they
-      // were visited
-      await this.#conn.execute(`
+      try {
+        await this.#conn.execute("SELECT page_url FROM message LIMIT 1");
+      } catch (e) {
+        // Add a page_url column to the message table to keep track
+        // of the pages visitedjduring a conversation and when they
+        // were visited
+        await this.#conn.execute(`
           ALTER TABLE message ADD COLUMN page_url TEXT;
         `);
+      }
 
-      // Add a turn_index column to group all types of messages into a
-      // particular turn, ex: prompt -> response would be a single turn.
-      await this.#conn.execute(`
+      try {
+        await this.#conn.execute("SELECT turn_index FROM message LIMIT 1");
+      } catch (e) {
+        // Add a turn_index column to group all types of messages into a
+        // particular turn, ex: prompt -> response would be a single turn.
+        await this.#conn.execute(`
           ALTER TABLE message ADD COLUMN turn_index INTEGER;
         `);
+      }
     }
   }
 
   async #createDatabaseEntities() {
-    // One entry per conversation and a summary is created when the conversation
-    // reaches lifecycle or grows excessively.
-    // The following generates a summary:
-    // * rolling window size reached (how much?)
-    // * token count exceeds a threshold (which one?)
-    // * large tool output
-    // When a summary is updated, end_orginal, content and updated_date are
-    // updated and large message contents can be removed.
-    await this.#conn.execute(`
-      CREATE TABLE summary (
-        summary_id TEXT PRIMARY KEY,
-        conv_id TEXT UNIQUE NOT NULL REFERENCES conversation(conv_id) ON DELETE CASCADE,
-        start_ordinal INTEGER NOT NULL CHECK(start_ordinal >= 0),
-        end_ordinal INTEGER NOT NULL CHECK(end_ordinal >= start_ordinal),
-        content TEXT NOT NULL,
-        model_id TEXT,
-        prompt_version TEXT,
-        created_date INTEGER NOT NULL,
-        updated_date INTEGER NOT NULL
-      ) WITHOUT ROWID;
-    `);
     await this.#conn.execute(`
       CREATE TABLE conversation (
         conv_id TEXT PRIMARY KEY,
@@ -361,7 +362,9 @@ export class ChatHistory {
         model_id TEXT,
         params_jsonb BLOB,
         content TEXT,
-        usage_jsonb BLOB
+        usage_jsonb BLOB,
+        page_url TEXT,
+        turn_index INTEGER,
       ) WITHOUT ROWID;
     `);
     await this.#conn.execute(`
