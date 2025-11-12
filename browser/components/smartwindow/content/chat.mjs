@@ -1097,7 +1097,7 @@ class ChatBot extends MozLitElement {
         prefixMessages.push({
           role: ChatHistory.MESSAGE_ROLE.SYSTEM,
           content:
-            "For this single response, ignore prior conversation and any memories about the user. Do not reference earlier assistant messages or answers. Rely only on the current user message and these system instructions.",
+            "For this single response, ignore prior conversation and any insights about the user. Do not reference earlier assistant messages or answers. Rely only on the current user message and these system instructions.",
         });
         this._forceAmnesiaNextTurn = false;
       }
