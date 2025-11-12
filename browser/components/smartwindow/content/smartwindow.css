@@ -767,6 +767,13 @@ body {
   display: flex;
   align-items: center;
   gap: 40px;
+
+  #insights-button,
+  #developer-button {
+    @media not -moz-pref("browser.smartwindow.developer") {
+      display: none;
+    }
+  }
 }
 
 /* Hide quick actions in sidebar mode */
