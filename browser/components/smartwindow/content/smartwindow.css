@@ -647,7 +647,7 @@ body {
 .quick-prompts-container {
   width: calc(100% - 40px); /* Account for container padding */
   max-width: 700px;
-  margin: 20px auto;
+  margin: var(--space-medium) auto;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
