@@ -687,7 +687,7 @@ var SmartWindow = {
     historyOverlay.isOpen = true;
 
     // Listen for close event
-    historyOverlay.addEventListener("close", () => {
+    historyOverlay.addEventListener("history-grid-close", () => {
       this.hidePageHistory();
     });
 

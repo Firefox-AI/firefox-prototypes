@@ -38,7 +38,7 @@ export class PageHistoryOverlay extends LitElement {
 
   handleClose() {
     this.dispatchEvent(
-      new CustomEvent("close", {
+      new CustomEvent("history-grid-close", {
         bubbles: true,
         composed: true,
       })
