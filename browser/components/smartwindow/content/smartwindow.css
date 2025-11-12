@@ -414,19 +414,23 @@ body {
 
 /* Suggestions container */
 .suggestions-container {
+  background: rgb(255, 255, 255);
+  background-image: linear-gradient(white, white), linear-gradient(90deg, #9059ff 0%, #ff4aa2 52.08%, #ffbd4f 100%);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  border: 1px solid transparent;
+  border-top: none;
+  border-radius: 0 0 18px 18px;
   position: absolute;
   top: 100%;
-  left: 0;
+  left: -1px;
   right: 0;
-  width: 100%;
+  width: calc(100% + 2px);
   max-width: 700px;
-  background: rgb(255, 255, 255);
-  border-radius: 0 0 18px 18px;
   padding: var(--space-medium) var(--space-small);
   box-shadow:
     0 0.25px 0.75px 0 rgba(0, 0, 0, 0.05),
     0 2px 20px 0 rgba(255, 82, 255, 0.15);
-  outline: 1px solid #eab2f7;
   clip-path: inset(0 -20px -20px -20px);
   z-index: 10000; /* High z-index to appear above everything */
 }
@@ -544,13 +548,10 @@ body {
 
 /* Sidebar mode adjustments */
 .sidebar-mode .suggestions-container {
+  border-bottom: none;
+  border-top: 1px solid transparent;
   position: absolute;
   top: calc(100% + var(--space-xsmall));
-  left: 0;
-  right: 0;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  max-width: 100%;
 }
 
 .sidebar-mode .suggestion-button {
@@ -628,8 +629,6 @@ body {
     clip-path: inset(-20px -20px 0 -20px);
     position: absolute;
     top: auto; /* Override the default top positioning */
-    left: 0;
-    right: 0;
     margin: 0;
     z-index: 10000;
   }
