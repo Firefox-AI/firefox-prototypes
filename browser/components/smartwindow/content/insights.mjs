@@ -1298,6 +1298,52 @@ const LIVE_INSIGHTS_SCHEMA = {
   },
 };
 
+const INSIGHTS_DEDUPE_SCHEMA = {
+  type: "array",
+  minItems: 1,
+  items: {
+    type: "object",
+    additionalProperties: false,
+    required: [ "unique_insights" ],
+    properties: {
+      unique_insights: {
+        type: "array",
+        minItems: 1,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: [ "main_insight", "duplicates" ],
+          properties: {
+            main_insight: { type: "string" },
+            duplicates: {
+              type: "array",
+              minItems: 1,
+              items: { type: "string" }
+            },
+          },
+        }
+      },
+    },
+  },
+};
+
+const INSIGHTS_NON_SENSITIVE_SCHEMA = {
+  type: "array",
+  minItems: 1,
+  items: {
+    type: "object",
+    additionalProperties: false,
+    required: [ "non_sensitive_insights" ],
+    properties: {
+      non_sensitive_insights: {
+        type: "array",
+        minItems: 1,
+        items: { type: "string" }
+      },
+    },
+  },
+};
+
 export const COVE_QUESTIONS_SCHEMA = {
   name: "CoVeQuestions",
   schema: {
@@ -1688,58 +1734,164 @@ export function buildLiveInsightPrompt({
   profile_records = [],
   related_insights = [],
 } = {}) {
-  const profile_snip = JSON.stringify(profile_records, null, 2);
-  const insights_hint = JSON.stringify(related_insights, null, 2);
-  const categoriesList = JSON.stringify(CATEGORIES);
-  const intentsList = JSON.stringify(INTENTS);
+
+  // Render profile_records as CSV tables or JSON objects
+  const profileRecordsRendered = [];
+  for (const rec of profile_records) {
+    // Row is just a domain/title with rank score
+    if (Array.isArray(rec[0]) && rec[0].length === 2 && typeof rec[0][0] === "string" && isFiniteNumber(rec[0][1])) {
+      const rankTable = ["Item,Rank Score"];
+      for (const row of rec) {
+        rankTable.push(`${row[0].replace("www.", "")},${row[1]}`);
+      }
+      profileRecordsRendered.push(rankTable.join("\n"));
+    // Row is a search record with sid, cnt, q, ls, r
+    } else if (rec.hasOwnProperty("sid") && rec.hasOwnProperty("r")) {
+      const searchTable = ["Session ID,Queries,Rank Score"];
+      for (const row of rec) {
+        const sid = row.sid;
+        //const cnt = row.cnt;
+        const q = Array.isArray(row.q) ? row.q.join(" | ") : "";
+        //const ls = row.ls;
+        const r = row.r;
+        searchTable.push(`${sid},${q},${r}`);
+      }
+      profileRecordsRendered.push(searchTable.join("\n"));
+    // Fallback: row is anything else, just render as JSON
+    } else {
+      profileRecordsRendered.push(JSON.stringify(rec, null, 2));
+    }
+  }
+  const profileRecordsRenderedStr = profileRecordsRendered.join("\n\n");
+
+  const categoriesList = "- " + CATEGORIES.join("\n- ");
+  const intentsList = "- " + INTENTS.join("\n- ");
 
   return `
-You are a JSON generator. Use ONLY the provided user profile records and past insights.
+# Overview
+You are an expert at extracting insights from user browser data. An insight is a short, concise statement about user interests or behaviors (products, brands, behaviors) that can help personalize their experience.
 
-# HARD CONSTRAINTS (apply before anything else)
-- Never include or infer: medical/health, pregnancy/fertility, financial, legal, political leaning, religion, race/ethnicity, gender/sexual orientation, PII.
-- If any candidate insight or any evidence contains sensitive content (see lists below), you MUST set "insight_summary": null and still return a valid object.
-- Use ONLY verbatim strings from profile_records for evidence of type "domain"|"title"|"search". Do not paraphrase.
+You will receive CSV tables and/or JSON objects of data representing the user's browsing history, search history, and chat history. Use ONLY this data to generate insights. Each table has a header row that defines the schema.
 
-## Inputs
-- profile_records: ${profile_snip}
-- related_insights: ${insights_hint}
-
-## Category rules
-Choose ONLY one from this list; if none fits, use null:
-${categoriesList}
-
-## Intent rules
-Choose ONLY one from this list; if none fits, use null:
-${intentsList}
-
-## Duplicate insight rules (must follow)
-- Do not add duplicate insights that are already in related_insights.
-- Do not repeat insights about entities that are already in related_insights.
-
-- DO NOT generate or infer insights related to personal medical/health, pregnancy/fertility, financial, or legal information, or other sensitive life events.
-- Insights are non-sensitive user preferences (products, brands, behaviors) useful for future personalization.
+# Instructions
+- Extract up as many insights as you can.
+- Each insight must be supported by 1-4 pieces of evidence from the user records. ONLY USE VERBATIM STRINGS FROM THE USER RECORDS!
+- Insights are user preferences (products, brands, behaviors) useful for future personalization.
 - Do not imagine actions without evidence. Prefer "shops for / plans / looked for" over "bought / booked / watched" unless explicit.
 - Do not include personal names unless widely public (avoid PII).
-- Do not create an insight from a single odd visit; prefer patterns.
-- Do not infer product relationships across unrelated domains unless co-occurring in the same session.
-- Do not generate a new insight if it's not meaningfully different from items in related_insights.
-- If no safe, specific insight is supported by Inputs, set "insight_summary": null.
+- Base insights on patterns, not single instances.
 
-### Examples of good form
+## Exemplars
+Below are examples of high quality insights (for reference only; do NOT copy):
 - "Prefers LLBean & Nordstrom formalwear collections"
 - "Compares white jeans under $80 at Target"
 - "Streams new-release movies via Fandango"
 - "Cooks Mediterranean seafood from TasteAtlas recipes"
 - "Tracks minimalist fashion drops at Uniqlo"
 
-## Exclusion rules (non-exhaustive)
-- Medical/Health (exclude): diagnoses, symptoms, treatments, conditions, mental health, pregnancy, fertility, contraception.
-- Finance (exclude): income/salary/compensation, bank/credit card details, credit score, loans/mortgage, taxes/benefits, debt/collections, investments/brokerage.
-- Legal (exclude): lawsuits, settlements, subpoenas/warrants, arrests/convictions, immigration status/visas/asylum, divorce/custody, NDAs.
-- Politics/Demographics/PII (exclude): political leaning/affiliation, religion, race/ethnicity, gender/sexual orientation, addresses/phones/emails/IDs.
+## Category rules
+Every insight requires a category. Choose ONLY one from this list; if none fits, use null:
+${categoriesList}
 
-### BAD/SENSITIVE (must exclude → set insight_summary = null)
+## Intent rules
+Every insight requires an intent. Choose ONLY one from this list; if none fits, use null:
+${intentsList}
+
+# Output Schema
+
+Return ONLY a JSON array of objects, no prose, no code fences. Each object must have:
+\`\`\`json
+[
+  {
+    "why": "<12-40 words that briefly explains the rationale, referencing the cited evidence (no new claims or invented entities).>",
+    "category": "<one of the categories or null>",
+    "intent": "<one of the intents or null>",
+    "insight_summary": "<4-10 words, crisp and specific or null>",
+    "score": <integer 1-5>,
+    "evidence": [
+      {
+        "type": "<one of ["domain","title","search","chat","user"]>",
+        "value": "<a **verbatim** string copied from profile_records (for domain/title/search) or a short user/chat quote>",
+        "session_ids": ["<optional array of session ids (if available from inputs)>"],
+        "weight": "<optional 0-1 indicating contribution strength>"
+      },
+      ...
+    ]
+  }
+]
+\`\`\`
+
+## Scoring priorities
+- Base "score" on *strength + recency*; boost multi-source corroboration.
+- Source priority: user (highest) > chat > search > history (lowest).
+- Typical caps: recent history ≤1; search up to 2; multi-source 2-3; recent chat 4; explicit user 5.
+- Do not assign 5 unless pattern is strong and recent.
+
+# Inputs
+Analyze the records below to generate as many unique, non-sensitive, specific user insights as possible. Each set of records is a CSV table with header row that defines the schema or JSON object.
+
+${profileRecordsRenderedStr}
+
+** CREATE ALL POSSIBLE UNIQUE INSIGHTS WITHOUT VIOLATING THE RULES ABOVE **
+`.trim();
+}
+
+function buildDedupeInsightsPrompt({ insights, existing_insights = [] }) {
+
+  const insightsJSON = JSON.stringify(insights, null, 2);
+  const existingInsightsJSON = JSON.stringify(existing_insights, null, 2);
+
+  return `
+You are an expert at identifying duplicate statements.
+
+Examine the following list of statements and find the unique ones. If you identify a set of statements that express the same general idea, pick the most general one from the set as the "main insight" and mark the rest as duplicates of it.
+
+There are 2 lists of statements: Existing Statements and New Statements. If you find a duplicate between the 2, **ALWAYS** pick the Existing Statement as the "main insight".
+
+If all statements are unique, simply return them all.
+
+## Existing Statements:
+${existingInsightsJSON}
+
+## New Statements:
+${insightsJSON}
+
+Return ONLY JSON per the schema below.
+\`\`\`json
+{
+  "unique_insights": [
+    {
+      "main_insight": "<the main unique insight statement>",
+      "duplicates": [
+        "<duplicate_statement_1>",
+        "<duplicate_statement_2>",
+        ...
+      ]
+    },
+    ...
+  ]
+}
+\`\`\`
+`.trim();
+
+};
+
+function buildNonSensitiveInsightsPrompt({ insights }) {
+
+  const insightsJSON = JSON.stringify(insights, null, 2);
+
+  return `
+You are an expert at identifying sensitive statements and content.
+
+Examine the following list of statements and filter out any that contain sensitive information or content.
+Sensitive information includes, but is not limited to:
+
+- Medical/Health: diagnoses, symptoms, treatments, conditions, mental health, pregnancy, fertility, contraception.
+- Finance: income/salary/compensation, bank/credit card details, credit score, loans/mortgage, taxes/benefits, debt/collections, investments/brokerage.
+- Legal: lawsuits, settlements, subpoenas/warrants, arrests/convictions, immigration status/visas/asylum, divorce/custody, NDAs.
+- Politics/Demographics/PII: political leaning/affiliation, religion, race/ethnicity, gender/sexual orientation, addresses/phones/emails/IDs.
+
+Below are exemplars of sensitive statements:
 - "Researches treatment about arthritis"
 - "Searches about pregnancy tests online"
 - "Pediatrician in San Francisco"
@@ -1751,47 +1903,24 @@ ${intentsList}
 - "Applies for work visa extension"
 - "Marie, female from Ohio looking for rental apartments"
 
-## Sensitive Information Handling
-- Immediately set "insight_summary": null if the insight or any evidence contains these or close variants (case-insensitive):
-  Medical/Health: "pregnancy", "pregnant", "fertility", "ivf", "abortion", "contraception", "cancer", "arthritis", "depression", "anxiety", "mental health", "therapy", "treatment", "diagnosis", "health condition".
-  Finance: "salary", "income", "paystub", "tax return", "irs", "cra", "credit score", "credit card", "bank account", "routing number", "loan", "mortgage", "refinance", "collections", "bankruptcy", "investment account", "401k", "rrsp".
-  Legal: "lawsuit", "settlement", "warrant", "arrest", "indictment", "conviction", "probation", "parole", "immigration status", "deportation", "asylum", "visa", "green card", "citizenship interview", "divorce", "custody", "restraining order", "nda".
-- Never infer sensitive topics even if they seem likely; absence of explicit, non-sensitive evidence → set summary to null.
+If all statements are not sensitive, simply return them all.
 
-## Reason ("why")
-Add "why": 12-40 words that briefly explains the rationale, referencing the cited evidence (no new claims or invented entities). Give exact evidence why the new insight does not violate the sensitivity restrictions. Also provide the closest existing insight and state why the new insight is or is not a duplicate.
+Here are the statements to analyze:
+${insightsJSON}
 
-## Scoring priorities
-- Base "score" on *strength + recency*; boost multi-source corroboration.
-- Source priority: user (highest) > chat > search > history (lowest).
-- Typical caps: recent history ≤1; search up to 2; multi-source 2-3; recent chat 4; explicit user 5.
-- Do not assign 5 unless pattern is strong and recent.
-
-## Evidence (REQUIRED)
-For each insight, include 1-4 items in "evidence". Each item:
-- "type": one of ["domain","title","search","chat","user"].
-- "value": a **verbatim** string copied from profile_records (for domain/title/search) or a short user/chat quote.
-- "session_ids": optional array of session ids (if available from inputs).
-- "weight": optional 0-1 indicating contribution strength.
-The evidence strings MUST be directly copyable from profile_records for domain/title/search. Do not paraphrase these.
-
-Return ONLY a JSON array of objects, no prose, no code fences. Each object must have:
+Return ONLY JSON per the schema below.
 \`\`\`json
-[
-  {
-    "why": "<12-40 words>",
-    "category": "<one of the categories or null>",
-    "intent": "<one of the intents or null>",
-    "insight_summary": "<4-10 words, crisp and specific or null>",
-    "score": <integer 1-5>,
-    "evidence": [ { "type":"domain|title|search|chat|user", "value":"...", "session_ids":[...], "weight":0.0-1.0 }, ... ]
-  }
-]
-\`\`\`
-
-** CREATE AS MANY UNIQUE INSIGHTS AS POSSIBLE WITHOUT VIOLATING THE RULES ABOVE **
-`.trim();
+{
+  "non_sensitive_insights": [
+    "<insight_statement_1>",
+    "<insight_statement_2>",
+    ...
+  ]
 }
+\`\`\`
+`.trim();
+
+};
 
 // ============================================================================
 // Main Insights Generation Functions
@@ -1845,6 +1974,8 @@ async function generateInsightsWithLLM(profile, source) {
   // console.debug(`promptText = ${JSON.stringify(promptText)}`);
 
   const engine = await createOpenAIEngine();
+
+  // First pass: generate candidate insights
   const response = await engine.run({
     args: [
       {
@@ -1860,6 +1991,58 @@ async function generateInsightsWithLLM(profile, source) {
   const rawContent = response?.finalOutput ?? "";
   const parsed = extractJSON(rawContent);
   const list = normalizeInsightList(parsed);
+  const intentSummaryList = list.map((insight) => { return insight.insight_summary });
+
+  console.debug(`Generated ${list.length} raw insights from LLM.`);
+
+  // Second pass: deduplicate
+  const dedupeInsightsPrompt = buildDedupeInsightsPrompt({ insights: intentSummaryList , existing_insights: related_insights });
+  const dedupeResponse = await engine.run({
+    args: [
+      {
+        role: "system",
+        content:
+          "You are an expert at identifying duplicate statements. Return ONLY valid JSON.",
+      },
+      { role: "user", content: dedupeInsightsPrompt },
+    ],
+    responseFormat: { type: "json_schema", schema: INSIGHTS_DEDUPE_SCHEMA },
+  });
+
+  const dedupeRawContent = dedupeResponse?.finalOutput ?? "";
+  const dedupeParsed = extractJSON(dedupeRawContent);
+  const dedupeList = dedupeParsed?.unique_insights.map((insight) => { return insight.main_insight }) || [];
+
+  console.debug(`Deduped to ${dedupeList.length} unique insights.`);
+
+  // Third pass: filter out sensitive insights
+  // Pass the raw list of deduped insights directly to the sensitivity filter
+  const nonSensitiveInsightsPrompt = buildNonSensitiveInsightsPrompt({ insights: dedupeList });
+  const nonSensitiveResponse = await engine.run({
+    args: [
+      {
+        role: "system",
+        content:
+          "You are an expert at identifying sensitive statements and content. Return ONLY valid JSON.",
+      },
+      { role: "user", content: nonSensitiveInsightsPrompt },
+    ],
+    responseFormat: { type: "json_schema", schema: INSIGHTS_NON_SENSITIVE_SCHEMA },
+  });
+
+  const nonSensitiveRawContent = nonSensitiveResponse?.finalOutput ?? "";
+  const nonSensitiveParsed = extractJSON(nonSensitiveRawContent);
+  const nonSensitiveList = nonSensitiveParsed?.non_sensitive_insights || [];
+
+  console.debug(`Filtered to ${nonSensitiveList.length} non-sensitive insights.`);
+
+  // Put the final list together
+  const finalNewInsights = [];
+  for (const insight of list) {
+    if (!related_insights.includes(insight.insight_summary) && nonSensitiveList.includes(insight.insight_summary)) {
+      finalNewInsights.push(insight);
+    }
+  }
 
   if (!list) {
     // Expected when everything is sensitive or model returns a lone object
@@ -1867,7 +2050,7 @@ async function generateInsightsWithLLM(profile, source) {
     return [placeholderInsight()];
   }
 
-  return list; // array of insights
+  return finalNewInsights; // array of insights
 }
 
 /**
@@ -2134,19 +2317,7 @@ function rankAndDiversify(insights, { maxPerCategory = 2 } = {}) {
     const c = x.category || "null";
     const i = x.intent || "null";
 
-    // soft brand de-dup
     const brands = extractBrandsFromEvidence(x.evidence);
-    let brandClash = false;
-    for (const b of brands) {
-      const seen = byBrand.get(b) || 0;
-      if (seen >= 2) {
-        brandClash = true;
-        break;
-      }
-    }
-    if (brandClash) {
-      continue;
-    }
 
     if ((byCat.get(c) || 0) >= maxPerCategory) {
       continue;
