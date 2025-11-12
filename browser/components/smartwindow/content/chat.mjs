@@ -795,6 +795,7 @@ class ChatBot extends MozLitElement {
     this._lastSentPageInfoSignature = null;
     this._lastSelectionSignature = null;
     this.openChatInsights = false;
+    this._forceAmnesiaNextTurn = false;
 
     // TODO: Figure out what/where to get this info from, if necessary
     this.#conversation = new ChatHistoryConversation({
@@ -1091,6 +1092,16 @@ class ChatBot extends MozLitElement {
       if (selectionMessage) {
         prefixMessages.push(selectionMessage);
       }
+
+      if (this._forceAmnesiaNextTurn === true) {
+        prefixMessages.push({
+          role: ChatHistory.MESSAGE_ROLE.SYSTEM,
+          content:
+            "For this single response, ignore prior conversation and any memories about the user. Do not reference earlier assistant messages or answers. Rely only on the current user message and these system instructions.",
+        });
+        this._forceAmnesiaNextTurn = false;
+      }
+
       messagesForAPI.unshift(...prefixMessages);
     }
 
@@ -1711,6 +1722,7 @@ Today's date: ${currentDate}`;
 
     const prevUseInsights = this.useInsights;
     this.useInsights = false;
+    this._forceAmnesiaNextTurn = true;
     this.prompt = retryPrompt.content;
     await this.sendPrompt();
     this.useInsights = prevUseInsights;
