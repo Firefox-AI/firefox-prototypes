@@ -1692,6 +1692,30 @@ Today's date: ${currentDate}`;
     this.openChatInsights = this.openChatInsights === key ? null : key;
   }
 
+  async handleRetryWithoutInsights(key) {
+    const msgs = this.#conversation.messages;
+
+    const assistantMsg = msgs.find(m => m.id === key || m.messageId === key);
+    if (!assistantMsg) {
+      return;
+    }
+
+    const retryPrompt = msgs.find(m => m.id === assistantMsg.parentMessageId);
+    if (
+      !retryPrompt &&
+      !retryPrompt.content &&
+      retryPrompt.role !== ChatHistory.MESSAGE_ROLE.USER
+    ) {
+      return;
+    }
+
+    const prevUseInsights = this.useInsights;
+    this.useInsights = false;
+    this.prompt = retryPrompt.content;
+    await this.sendPrompt();
+    this.useInsights = prevUseInsights;
+  }
+
   render() {
     // Count total insights for the badge
     const insightsData =
@@ -2087,6 +2111,8 @@ Today's date: ${currentDate}`;
                                 </button>
                                 <button
                                   class="insights-applied-chat-popover-retry-button"
+                                  @click=${() =>
+                                    this.handleRetryWithoutInsights(key)}
                                 >
                                   <svg
                                     width="16"
