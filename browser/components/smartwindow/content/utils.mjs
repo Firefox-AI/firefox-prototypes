@@ -129,12 +129,6 @@ const toolsConfig = [
             description:
               "Extraction mode to use. Choose viewport for what is visible, reader for distilled content, or full for entire page. Defaults to viewport.",
           },
-          page: {
-            type: "integer",
-            minimum: 1,
-            description:
-              "When using viewport mode, the 1-based page index to capture. Defaults to the page currently in view.",
-          },
         },
         required: ["url"],
       },
@@ -274,18 +268,18 @@ ${tabList}`;
 };
 
 const MODE_HANDLERS = {
-  viewport: async (pageExtractor, { page }) => {
-    const options = { justViewport: true, includePageInfo: true };
-    if (Number.isInteger(page) && page > 0) {
-      options.viewportPage = page - 1;
-    }
-    return pageExtractor.getText(options);
+  viewport: async pageExtractor => {
+    const result = await pageExtractor.getText({ justViewport: true });
+    return { text: result.text };
   },
   reader: async pageExtractor => {
     const text = await pageExtractor.getReaderModeContent();
     return { text: typeof text === "string" ? text : "" };
   },
-  full: async pageExtractor => pageExtractor.getText({ includePageInfo: true }),
+  full: async pageExtractor => {
+    const result = await pageExtractor.getText();
+    return { text: result.text };
+  },
 };
 
 const DEFAULT_MODE = "viewport";
@@ -294,10 +288,9 @@ const DEFAULT_MODE = "viewport";
  * @param {object} toolParams
  * @param {string} toolParams.url
  * @param {string} toolParams.mode
- * @param {string} toolParams.page
  * @param {Set<string>} allowedUrls
  */
-const get_page_content = async ({ url, mode, page }, allowedUrls) => {
+const get_page_content = async ({ url, mode }, allowedUrls) => {
   try {
     let win = lazy.BrowserWindowTracker.getTopWindow();
     let gBrowser = win.gBrowser;
@@ -353,7 +346,7 @@ const get_page_content = async ({ url, mode, page }, allowedUrls) => {
       // it's open, and with a "keep alive" timeout. For now it's simpler to just
       // load the page fresh every time.
       return PageExtractorParent.getHeadlessExtractor(url, pageExtractor =>
-        runExtraction(pageExtractor, mode, page, url)
+        runExtraction(pageExtractor, mode, url)
       );
     }
 
@@ -371,12 +364,7 @@ const get_page_content = async ({ url, mode, page }, allowedUrls) => {
         "PageExtractor"
       );
 
-    return runExtraction(
-      pageExtractor,
-      mode,
-      page,
-      `"${targetTab.label}" (${url})`
-    );
+    return runExtraction(pageExtractor, mode, `"${targetTab.label}" (${url})`);
   } catch (error) {
     return `Error retrieving content from ${url}: ${error.message}. Try refreshing the tab or checking if it's accessible.`;
   }
@@ -385,17 +373,16 @@ const get_page_content = async ({ url, mode, page }, allowedUrls) => {
 /**
  * @param {PageExtractor} pageExtractor
  * @param {string} mode
- * @param {string} page
  * @param {string} label
  */
-async function runExtraction(pageExtractor, mode, page, label) {
+async function runExtraction(pageExtractor, mode, label) {
   const selectedMode =
     typeof mode === "string" && MODE_HANDLERS[mode] ? mode : DEFAULT_MODE;
   const handler = MODE_HANDLERS[selectedMode];
   let extraction = null;
 
   try {
-    extraction = await handler(pageExtractor, { page });
+    extraction = await handler(pageExtractor);
   } catch (err) {
     console.warn(
       "[SmartWindow] get_page_content mode failed",
@@ -404,8 +391,13 @@ async function runExtraction(pageExtractor, mode, page, label) {
     );
   }
 
-  const pageContent =
-    typeof extraction?.text === "string" ? extraction.text.trim() : "";
+  const extractedText =
+    typeof extraction === "string"
+      ? extraction
+      : typeof extraction?.text === "string"
+        ? extraction.text
+        : "";
+  const pageContent = extractedText.trim();
 
   if (!pageContent) {
     return `get_page_content(${selectedMode}) returned no content for ${label}. Try another mode if you still need information.`;
@@ -435,18 +427,9 @@ async function runExtraction(pageExtractor, mode, page, label) {
   };
   const modeLabel = modeLabels[selectedMode] || "selected mode";
 
-  let pageInfoText = "";
-  const pageInfo = extraction?.pageInfo;
-  if (pageInfo) {
-    const humanPage = pageInfo.currentPage + 1;
-    const totalPages = pageInfo.count;
-    const viewportHeight = Math.round(pageInfo.viewportHeight);
-    pageInfoText = `\n\nPageInfo: page ${humanPage} of ${totalPages} (viewport height ≈ ${viewportHeight}px)`;
-  }
-
   return `Content (${modeLabel}) from ${label}:
 
-  ${cleanContent}${pageInfoText}`;
+${cleanContent}`;
 }
 
 /**
