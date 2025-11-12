@@ -10,6 +10,7 @@ import {
   generateFollowupPrompts,
 } from "./suggestions.mjs";
 import { showChatHistoryOverlay } from "chrome://browser/content/smartwindow/chat-history.mjs";
+import { deleteInsight, enumerateInsightSummaries } from "./insights.mjs";
 
 const { ChatHistory, ChatHistoryConversation } = ChromeUtils.importESModule(
   "resource:///modules/smartwindow/ChatHistory.sys.mjs"
@@ -2413,6 +2414,13 @@ class SmartWindowPage {
         pop.classList.add("is-open");
       });
 
+      if (this.isSidebarMode) {
+        const listHost = pop.querySelector("[data-insights-list]");
+        if (listHost) {
+          this.renderAllInsightsPanel(listHost);
+        }
+      }
+
       queueMicrotask(() => {
         sw?.focus();
       });
@@ -2494,6 +2502,70 @@ class SmartWindowPage {
       conv.settings.useInsights = val;
     }
     return true;
+  }
+
+   renderAllInsightsPanel(listHost) {
+    if (!listHost) {
+      return;
+    }
+
+    const store =
+      this.getInsightsData?.() ??
+      window.browsingContext?.topChromeWindow?.SmartWindow?.getInsightsData?.() ??
+      {};
+
+    const items = enumerateInsightSummaries(store);
+
+    listHost.textContent = "";
+
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.textContent = "No insights available.";
+      listHost.appendChild(empty);
+      return;
+    }
+
+    for (const { category, summary } of items) {
+      const row = document.createElement("div");
+      row.className = "insight-pill";
+
+      const text = document.createElement("div");
+      text.textContent = summary;
+
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "insight-delete";
+      del.dataset.category = category;
+      del.dataset.summary = summary;
+      del.setAttribute("aria-label", `Delete insight: ${summary}`);
+      del.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 3.06055L9.06055 8L14 12.9385L12.9395 14L8 9.06055L3.06152 14L2.00098 12.9395L6.93848 8L2 3.06152L3.06055 2.00098L7.99902 6.93945L12.9385 2L14 3.06055Z" fill="#5B5B66"/>
+        </svg>
+      `;
+
+      row.append(text, del);
+      listHost.append(row);
+    }
+
+    if (!listHost._boundDelete) {
+      listHost.addEventListener("click", async (e) => {
+        const btn = e.target.closest(".insight-delete");
+        if (!btn) { return; }
+
+        const { category, summary } = btn.dataset;
+
+        try {
+          const changed = deleteInsight(summary, category);
+          if (changed) {
+            this.renderAllInsightsPanel(listHost);
+          }
+        } catch (err) {
+          console.error("Failed to delete insight:", err);
+        }
+      });
+      listHost._boundDelete = true;
+    }
   }
 }
 

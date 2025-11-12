@@ -3797,3 +3797,45 @@ if (document.readyState === "loading") {
 } else {
   autoRenderOverlayForAboutInsights();
 }
+
+/**
+ * Flatten the insights store into [{ category, summary }].
+ *
+ * @param {{insightsDataByCategory?: Record<string, unknown|unknown[]>}} store
+ * @returns {Array<{category: string, summary: string}>}
+ */
+export function enumerateInsightSummaries(store) {
+  const insightsByCategory = store?.insightsDataByCategory ?? {};
+  const results = [];
+
+  const asArray = (value) => {
+    if (Array.isArray(value)) {
+      return value;
+    }
+    if (value != null) {
+      return [value];
+    }
+    return [];
+  };
+
+  const extractSummary = (entry) => {
+    if (typeof entry === "string") {
+      return entry.trim();
+    }
+    if (entry && typeof entry === "object" && entry.insight_summary) {
+      return String(entry.insight_summary).trim();
+    }
+    return "";
+  };
+
+  for (const [category, categoryEntries] of Object.entries(insightsByCategory)) {
+    for (const entry of asArray(categoryEntries)) {
+      const summary = extractSummary(entry);
+      if (summary) {
+        results.push({ category, summary });
+      }
+    }
+  }
+
+  return results;
+}
