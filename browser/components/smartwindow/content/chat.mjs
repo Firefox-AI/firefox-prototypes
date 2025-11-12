@@ -2111,11 +2111,13 @@ Today's date: ${currentDate}`;
                       ? html`
                           <div class="search-suggestions">
                             ${searchQueries.map(query => {
+                              const NUM_PRIMARY = 1;
                               const primaryEngines = this.searchEngines.slice(
                                 0,
-                                2
+                                NUM_PRIMARY
                               );
-                              const moreEngines = this.searchEngines.slice(2);
+                              const moreEngines =
+                                this.searchEngines.slice(NUM_PRIMARY);
                               const isDropdownOpen =
                                 this.openDropdownQuery === query;
 
