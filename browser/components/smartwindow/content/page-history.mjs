@@ -16,7 +16,7 @@ export class PageHistoryOverlay extends LitElement {
     isOpen: { type: Boolean },
     historyItems: { type: Array },
     isLoading: { type: Boolean },
-    error: { type: String }
+    error: { type: String },
   };
 
   constructor() {
@@ -37,18 +37,22 @@ export class PageHistoryOverlay extends LitElement {
   }
 
   handleClose() {
-    this.dispatchEvent(new CustomEvent("close", {
-      bubbles: true,
-      composed: true
-    }));
+    this.dispatchEvent(
+      new CustomEvent("close", {
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
   handleItemClick(item) {
-    this.dispatchEvent(new CustomEvent("item-selected", {
-      detail: item,
-      bubbles: true,
-      composed: true
-    }));
+    this.dispatchEvent(
+      new CustomEvent("item-selected", {
+        detail: item,
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
   handleOverlayClick(event) {
@@ -59,11 +63,14 @@ export class PageHistoryOverlay extends LitElement {
 
   renderHistoryItem(item) {
     // Format visit date
-    const formatVisitDate = (visitDate) => {
+    const formatVisitDate = visitDate => {
       if (!visitDate) {
         return "";
-      };
-      const date = typeof visitDate === "string" ? new Date(visitDate) : new Date(visitDate);
+      }
+      const date =
+        typeof visitDate === "string"
+          ? new Date(visitDate)
+          : new Date(visitDate);
       const now = new Date();
       const diff = now - date;
       const hours = Math.floor(diff / 3600000);
@@ -84,7 +91,8 @@ export class PageHistoryOverlay extends LitElement {
       return date.toLocaleDateString();
     };
 
-    const previewType = item.previewType || (item.thumbnail ? "thumbnail" : null);
+    const previewType =
+      item.previewType || (item.thumbnail ? "thumbnail" : null);
 
     return html`
       <div
@@ -93,32 +101,56 @@ export class PageHistoryOverlay extends LitElement {
         title=${item.url}
       >
         <div class="item-title-container">
-          ${item.favicon ? html`
-            <img class="favicon" src=${item.favicon} alt="" onerror="this.style.display='none'">
-          ` : ''}
+          ${item.favicon
+            ? html`
+                <img
+                  class="favicon"
+                  src=${item.favicon}
+                  alt=""
+                  onerror="this.style.display='none'"
+                />
+              `
+            : ""}
           <div class="history-title">${item.title || item.url}</div>
         </div>
-        <div class="item-thumbnail ${previewType === "wireframe" ? "is-wireframe" : ""}">
-          ${item.thumbnail ? html`
-            <img
-              class="thumbnail-image ${previewType === "wireframe" ? "wireframe" : ""}"
-              src=${item.thumbnail}
-              alt=${previewType === "wireframe" ? "Wireframe preview" : ""}
-            >
-          ` : html`
-            <div class="thumbnail-placeholder">→</div>
-          `}
+        <div
+          class="item-thumbnail ${previewType === "wireframe"
+            ? "is-wireframe"
+            : ""}"
+        >
+          ${item.thumbnail
+            ? html`
+                <img
+                  class="thumbnail-image ${previewType === "wireframe"
+                    ? "wireframe"
+                    : ""}"
+                  src=${item.thumbnail}
+                  alt=${previewType === "wireframe" ? "Wireframe preview" : ""}
+                />
+              `
+            : html` <div class="thumbnail-placeholder">→</div> `}
         </div>
-        ${(item.visitDate || item.visitCount) ? html`
-          <div class="item-info">
-            ${item.visitDate ? html`
-              <span class="visit-date">${formatVisitDate(item.visitDate)}</span>
-            ` : ''}
-            ${item.visitCount ? html`
-              <span class="visit-count">${item.visitCount} ${item.visitCount === 1 ? 'visit' : 'visits'}</span>
-            ` : ''}
-          </div>
-        ` : ''}
+        ${item.visitDate || item.visitCount
+          ? html`
+              <div class="item-info">
+                ${item.visitDate
+                  ? html`
+                      <span class="visit-date"
+                        >${formatVisitDate(item.visitDate)}</span
+                      >
+                    `
+                  : ""}
+                ${item.visitCount
+                  ? html`
+                      <span class="visit-count"
+                        >${item.visitCount}
+                        ${item.visitCount === 1 ? "visit" : "visits"}</span
+                      >
+                    `
+                  : ""}
+              </div>
+            `
+          : ""}
       </div>
     `;
   }
@@ -128,7 +160,9 @@ export class PageHistoryOverlay extends LitElement {
       return html`<div class="error-message">Error: ${this.error}</div>`;
     }
 
-    const historyItems = Array.isArray(this.historyItems) ? this.historyItems : [];
+    const historyItems = Array.isArray(this.historyItems)
+      ? this.historyItems
+      : [];
 
     if (historyItems.length === 0) {
       return html`
@@ -160,9 +194,7 @@ export class PageHistoryOverlay extends LitElement {
             <h3>Pages from History (${this.historyItems.length})</h3>
             <button class="close-btn" @click=${this.handleClose}>×</button>
           </div>
-          <div class="history-content">
-            ${this.renderContent()}
-          </div>
+          <div class="history-content">${this.renderContent()}</div>
         </div>
       </div>
     `;
@@ -204,7 +236,13 @@ export class PageHistoryOverlay extends LitElement {
     .history-header::before {
       content: "";
       opacity: 0.5;
-      background: linear-gradient(90deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0) 60%, rgba(0, 0, 0, 0.5) 100%);
+      background: linear-gradient(
+        90deg,
+        rgba(0, 0, 0, 0.5) 0%,
+        rgba(0, 0, 0, 0) 40%,
+        rgba(0, 0, 0, 0) 60%,
+        rgba(0, 0, 0, 0.5) 100%
+      );
       position: absolute;
       left: 50%;
       top: 50%;
@@ -332,7 +370,17 @@ export class PageHistoryOverlay extends LitElement {
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      box-shadow: var(--box-shadow-level-1-shadow-1-x, 0) var(--box-shadow-level-1-shadow-1-y, 0) var(--box-shadow-level-1-shadow-1-blur, 1px) var(--box-shadow-level-1-shadow-1-spread, 0) var(--box-shadow-level-1-shadow-1-color, rgba(0, 0, 0, 0.15)), var(--box-shadow-level-1-shadow-2-x, 0) var(--box-shadow-level-1-shadow-2-y, 1px) var(--box-shadow-level-1-shadow-2-blur, 2px) var(--box-shadow-level-1-shadow-2-spread, 0) var(--box-shadow-level-1-shadow-2-color, rgba(0, 0, 0, 0.20));
+      box-shadow:
+        var(--box-shadow-level-1-shadow-1-x, 0)
+          var(--box-shadow-level-1-shadow-1-y, 0)
+          var(--box-shadow-level-1-shadow-1-blur, 1px)
+          var(--box-shadow-level-1-shadow-1-spread, 0)
+          var(--box-shadow-level-1-shadow-1-color, rgba(0, 0, 0, 0.15)),
+        var(--box-shadow-level-1-shadow-2-x, 0)
+          var(--box-shadow-level-1-shadow-2-y, 1px)
+          var(--box-shadow-level-1-shadow-2-blur, 2px)
+          var(--box-shadow-level-1-shadow-2-spread, 0)
+          var(--box-shadow-level-1-shadow-2-color, rgba(0, 0, 0, 0.2));
     }
 
     .item-thumbnail.is-wireframe {
@@ -397,9 +445,19 @@ export class PageHistoryOverlay extends LitElement {
       align-items: center;
       flex-shrink: 0;
       border-radius: 18px;
-      border: 0.5px solid rgba(243, 238, 226, 0.50);
-      background: #FFF;
-      box-shadow: var(--box-shadow-level-1-shadow-1-x, 0) var(--box-shadow-level-1-shadow-1-y, 0) var(--box-shadow-level-1-shadow-1-blur, 1px) var(--box-shadow-level-1-shadow-1-spread, 0) var(--box-shadow-level-1-shadow-1-color, rgba(0, 0, 0, 0.15)), var(--box-shadow-level-1-shadow-2-x, 0) var(--box-shadow-level-1-shadow-2-y, 1px) var(--box-shadow-level-1-shadow-2-blur, 2px) var(--box-shadow-level-1-shadow-2-spread, 0) var(--box-shadow-level-1-shadow-2-color, rgba(0, 0, 0, 0.20));
+      border: 0.5px solid rgba(243, 238, 226, 0.5);
+      background: #fff;
+      box-shadow:
+        var(--box-shadow-level-1-shadow-1-x, 0)
+          var(--box-shadow-level-1-shadow-1-y, 0)
+          var(--box-shadow-level-1-shadow-1-blur, 1px)
+          var(--box-shadow-level-1-shadow-1-spread, 0)
+          var(--box-shadow-level-1-shadow-1-color, rgba(0, 0, 0, 0.15)),
+        var(--box-shadow-level-1-shadow-2-x, 0)
+          var(--box-shadow-level-1-shadow-2-y, 1px)
+          var(--box-shadow-level-1-shadow-2-blur, 2px)
+          var(--box-shadow-level-1-shadow-2-spread, 0)
+          var(--box-shadow-level-1-shadow-2-color, rgba(0, 0, 0, 0.2));
       max-width: 100%;
       min-width: 0;
     }

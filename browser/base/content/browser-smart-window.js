@@ -618,7 +618,10 @@ var SmartWindow = {
       };
 
       gBrowser.tabContainer.addEventListener("TabOpen", this._tabOpenListener);
-      gBrowser.tabContainer.addEventListener("TabSelect", this._tabSelectListener);
+      gBrowser.tabContainer.addEventListener(
+        "TabSelect",
+        this._tabSelectListener
+      );
 
       console.log("[Smart Window] Tab event listeners set up");
     }
@@ -694,13 +697,10 @@ var SmartWindow = {
       console.log("[SmartWindow] Selected history item:", selectedItem);
 
       if (selectedItem.url) {
-        gBrowser.selectedBrowser.fixupAndLoadURIString(
-          selectedItem.url,
-          {
-            triggeringPrincipal:
-              Services.scriptSecurityManager.getSystemPrincipal(),
-          }
-        );
+        gBrowser.selectedBrowser.fixupAndLoadURIString(selectedItem.url, {
+          triggeringPrincipal:
+            Services.scriptSecurityManager.getSystemPrincipal(),
+        });
       }
 
       this.hidePageHistory();
@@ -728,7 +728,9 @@ var SmartWindow = {
           : "tabbrowser-tabbox"
       );
     } else {
-      console.error("[SmartWindow] Unable to find container for history overlay");
+      console.error(
+        "[SmartWindow] Unable to find container for history overlay"
+      );
       return;
     }
 
@@ -741,7 +743,9 @@ var SmartWindow = {
   },
 
   hidePageHistory() {
-    const historyOverlay = document.getElementById("page-history-overlay-instance");
+    const historyOverlay = document.getElementById(
+      "page-history-overlay-instance"
+    );
     if (historyOverlay) {
       historyOverlay.isOpen = false;
       // Remove from DOM after animation
