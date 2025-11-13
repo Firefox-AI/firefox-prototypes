@@ -140,25 +140,25 @@ const toolsConfig = [
     function: {
       name: SEARCH_HISTORY,
       description:
-        "Search the user's browser history stored in sqlite-vec using an embedding model. If a search term is provided, performs vector search and ranks by semantic distance with frecency tie-breaks. If no search term is provided, returns the most relevant pages within a time window ranked by recency and frecency. Supports optional time range filtering using microsecond timestamps. This is to find previously visited pages related to specific keywords or topics. This helps find relevant pages the user has visited before, even if they're not currently open.",
+        "Search the user's browser history stored in sqlite-vec using an embedding model. If a search term is provided, performs vector search and ranks by semantic distance with frecency tie-breaks. If no search term is provided, returns the most relevant pages within a time window ranked by recency and frecency. Supports optional time range filtering using ISO 8601 datetime strings. This is to find previously visited pages related to specific keywords or topics. This helps find relevant pages the user has visited before, even if they're not currently open. All datetime must be before the user's current datetime. For parsing time window from dates and holidays, must depend on the user's current datetime, timezone, and locale.",
       parameters: {
         type: "object",
         properties: {
           search_term: {
             type: "string",
             description:
-              "Detailed phrases to search semantically (title/description) using embeddings, detailed related words are preferable. Leave empty or omit to return time-windowed recent pages without semantic filtering. Use specific terms that are likely to appear in page titles and descriptions. Examples: 'python tutorial', 'react documentation', 'news climate change', 'github repository'",
+              "A detailed, noun-heavy phrase (~5-12 meaningful tokens) summarizing the user's intent for semantic retrieval. Include the main entity/topic plus 1–3 contextual qualifiers (e.g., library name, purpose, site, or timeframe). Avoid vague or single-word queries.",
           },
-          start_ts: {
-            type: ["integer", "null"],
-            description: "Inclusive lower bound of the time window as a Unix timestamp in MICROSECONDS. Use when the users ask for results within a time or range start, for examples: 'last week', 'since yesterday', 'last night'. Example value: 1751929200000000",
-            default: null
+          "start_ts": {
+            "type": ["string", "null"],
+            "description": "Inclusive lower bound of the time window as an ISO 8601 datetime string (e.g., '2025-11-07T09:00:00-05:00'). Use when the user asks for results within a time or range start, such as 'last week', 'since yesterday', or 'last night'. This must be before the user's current datetime.",
+            "default": null
           },
-          end_ts: {
-            type: ["integer", "null"],
-            description: "Inclusive upper bound of the time window as a Unix timestamp in MICROSECONDS. Use when the users ask for results within a time or range end, for examples: 'last week', 'between 2025-10-01 and 2025-10-31', 'this summer', 'before Monday'. Example value: 1751929200000000",
-            default: null
-          },
+          "end_ts": {
+            "type": ["string", "null"],
+            "description": "Inclusive upper bound of the time window as an ISO 8601 datetime string (e.g., '2025-11-07T21:00:00-05:00'). Use when the user asks for results within a time or range end, such as 'last week', 'between 2025-10-01 and 2025-10-31', or 'before Monday'. This must be before the user's current datetime.",
+            "default": null
+          }
         },
         required: [],
       },
@@ -169,159 +169,161 @@ const toolsConfig = [
 export async function searchBrowserHistory({ search_term = "", start_ts = null, end_ts = null, limit = 10 }) {
 
   console.warn("[searchBrowserHistory]", "search_term:", search_term, "limit:", limit, "(hard limit for pre coarse search is 100)");
-  console.warn("[searchBrowserHistory]", "start_ts:", start_ts, "end_ts:", end_ts);
-  console.warn("[searchBrowserHistory]", "start_ts ISO:", new Date(Math.round(start_ts / 1000)).toISOString(), "end_ts ISO:", new Date(Math.round(end_ts / 1000)).toISOString());
-  let root;
-  let openedRoot = false;
+  console.warn("[searchBrowserHistory]", "start_ts ISO:", start_ts, "end_ts ISO:", end_ts);
 
   let results;
 
   try {
+
+    const isoToMicroseconds = iso => iso ? new Date(iso).getTime() * 1000 : null;
+    start_ts = isoToMicroseconds(start_ts);
+    end_ts = isoToMicroseconds(end_ts);
+
     const distanceThreshold = Services.prefs.getFloatPref(
-        "places.semanticHistory.distanceThreshold",
-        0.6
-      );
+      "places.semanticHistory.distanceThreshold",
+      0.6
+    );
     const semanticManager = lazy.getPlacesSemanticHistoryManager({
-        rowLimit: 10000,
-        samplingAttrib: "frecency",
-        changeThresholdCount: 3,
-        distanceThreshold,
-      });
+      rowLimit: 10000,
+      samplingAttrib: "frecency",
+      changeThresholdCount: 3,
+      distanceThreshold,
+    });
 
     const rows = [];
     if (semanticManager.canUseSemanticSearch && (await semanticManager.hasSufficientEntriesForSearching())) {
-        await semanticManager.embedder.ensureEngine();
 
-        // handle case without search_term, time range query with no semantic
-        if (!search_term || !search_term.trim()) {
-            let conn = await semanticManager.getConnection();
-            results = await conn.executeCached(
-                `
-                  SELECT id,
-                         title,
-                         url,
-                         NULL AS distance,
-                         frecency,
-                         last_visit_date,
-                         preview_image_url
-                  FROM moz_places
-                  WHERE frecency <> 0
-                  AND (:start_ts IS NULL OR last_visit_date >= :start_ts)
-                  AND (:end_ts IS NULL OR last_visit_date <= :end_ts)
-                  ORDER BY last_visit_date DESC, frecency DESC
-                  LIMIT :limit
-                `,
-                {
-                    start_ts: start_ts,
-                    end_ts: end_ts,
-                    limit: limit,
-                }
-            );
+      await semanticManager.embedder.ensureEngine();
+
+      // handle case without search_term, time range query with no semantic
+      if (!search_term || !search_term.trim()) {
+        let conn = await semanticManager.getConnection();
+        results = await conn.executeCached(
+          `
+            SELECT id,
+                   title,
+                   url,
+                   NULL AS distance,
+                   frecency,
+                   last_visit_date,
+                   preview_image_url
+            FROM moz_places
+            WHERE frecency <> 0
+            AND (:start_ts IS NULL OR last_visit_date >= :start_ts)
+            AND (:end_ts IS NULL OR last_visit_date <= :end_ts)
+            ORDER BY last_visit_date DESC, frecency DESC
+            LIMIT :limit
+          `,
+          {
+            start_ts: start_ts,
+            end_ts: end_ts,
+            limit: limit,
+          }
+        );
+      } else {
+        let tensor = await semanticManager.embedder.embed(search_term);
+        let vec = null;
+
+        // It may be a { metrics, output } object.
+        if (tensor.output) {
+          if (Array.isArray(tensor.output) && (Array.isArray(tensor.output[0]) || ArrayBuffer.isView(tensor.output[0]))) {
+            vec = tensor.output[0];
+          } else {
+            vec = tensor.output
+          }
         } else {
-            let tensor = await semanticManager.embedder.embed(search_term);
-            let vec = null;
+          // It may be a nested array, then we must extract it first.
+          if (
+            Array.isArray(tensor) &&
+            tensor.length === 1 &&
+            Array.isArray(tensor[0])
+          ) {
+            tensor = tensor[0];
+          }
 
-            // It may be a { metrics, output } object.
-            if (tensor.output) {
-              if (Array.isArray(tensor.output) && (Array.isArray(tensor.output[0]) || ArrayBuffer.isView(tensor.output[0]))) {
-                vec = tensor.output[0];
-              } else {
-                vec = tensor.output
-              }
-            } else {
-              // It may be a nested array, then we must extract it first.
-              if (
-                Array.isArray(tensor) &&
-                tensor.length === 1 &&
-                Array.isArray(tensor[0])
-              ) {
-                tensor = tensor[0];
-              }
-
-              // Then we check if it's an array of arrays or just a single value.
-              if (Array.isArray(tensor) && (Array.isArray(tensor[0]) || ArrayBuffer.isView(tensor[0]))) {
-                vec = tensor[0];
-              } else {
-                vec = tensor;
-              }
-            }
-
-            const vector = lazy.PlacesUtils.tensorToSQLBindable(vec);
-            let conn = await semanticManager.getConnection();
-            results = await conn.executeCached(
-              `
-              WITH coarse_matches AS (
-                SELECT rowid,
-                       embedding
-                FROM vec_history
-                WHERE embedding_coarse match vec_quantize_binary(:vector)
-                ORDER BY distance
-                LIMIT 100
-              ),
-              matches AS (
-                SELECT url_hash, vec_distance_cosine(embedding, :vector) AS distance
-                FROM vec_history_mapping
-                JOIN coarse_matches USING (rowid)
-                WHERE distance <= :distanceThreshold
-                ORDER BY distance
-                LIMIT :limit
-              )
-              SELECT id,
-                     title,
-                     url,
-                     distance,
-                     frecency,
-                     last_visit_date,
-                     preview_image_url
-              FROM moz_places
-              JOIN matches USING (url_hash)
-              WHERE frecency <> 0
-              AND (:start_ts IS NULL OR last_visit_date >= :start_ts)
-              AND (:end_ts IS NULL OR last_visit_date <= :end_ts)
-              ORDER BY distance
-              `,
-              {
-                vector: vector,
-                distanceThreshold: distanceThreshold,
-                limit: limit,
-                start_ts: start_ts,
-                end_ts: end_ts,
-              }
-            );
-
+          // Then we check if it's an array of arrays or just a single value.
+          if (Array.isArray(tensor) && (Array.isArray(tensor[0]) || ArrayBuffer.isView(tensor[0]))) {
+            vec = tensor[0];
+          } else {
+            vec = tensor;
+          }
         }
 
-        for (let row of results) {
-          const title = row.getResultByName("title");
-          const url = row.getResultByName("url");
-          const lastVisit = row.getResultByName("last_visit_date");
-          const relevanceScore = 1 - row.getResultByName("distance");
-          const previewImageURL = row.getResultByName("preview_image_url");
+        const vector = lazy.PlacesUtils.tensorToSQLBindable(vec);
+        let conn = await semanticManager.getConnection();
+        results = await conn.executeCached(
+          `
+          WITH coarse_matches AS (
+            SELECT rowid,
+                   embedding
+            FROM vec_history
+            WHERE embedding_coarse match vec_quantize_binary(:vector)
+            ORDER BY distance
+            LIMIT 100
+          ),
+          matches AS (
+            SELECT url_hash, vec_distance_cosine(embedding, :vector) AS distance
+            FROM vec_history_mapping
+            JOIN coarse_matches USING (rowid)
+            WHERE distance <= :distanceThreshold
+            ORDER BY distance
+            LIMIT :limit
+          )
+          SELECT id,
+                 title,
+                 url,
+                 distance,
+                 frecency,
+                 last_visit_date,
+                 preview_image_url
+          FROM moz_places
+          JOIN matches USING (url_hash)
+          WHERE frecency <> 0
+          AND (:start_ts IS NULL OR last_visit_date >= :start_ts)
+          AND (:end_ts IS NULL OR last_visit_date <= :end_ts)
+          ORDER BY distance
+          `,
+          {
+            vector: vector,
+            distanceThreshold: distanceThreshold,
+            limit: limit,
+            start_ts: start_ts,
+            end_ts: end_ts,
+          }
+        );
+      }
 
-          rows.push({
-            title: title || url,
-            url: url,
-            visitDate: new Date(Math.round(lastVisit / 1000)).toISOString(), // ISO timestamp format
-            visitCount: 0,
-            relevanceScore: relevanceScore || 0, // Use frecency as relevance score
-            ...(previewImageURL && { thumbnail: previewImageURL }), // Only include thumbnail if available
-          });
-        }
+      for (let row of results) {
+        const title = row.getResultByName("title");
+        const url = row.getResultByName("url");
+        const lastVisit = row.getResultByName("last_visit_date");
+        const relevanceScore = 1 - row.getResultByName("distance");
+        const previewImageURL = row.getResultByName("preview_image_url");
 
-        if (rows.length === 0) {
-          return JSON.stringify({
-            search_term,
-            results: [],
-            message: `No browser history found for "${search_term}".`,
-          });
-        }
+        rows.push({
+          title: title || url,
+          url: url,
+          visitDate: new Date(Math.round(lastVisit / 1000)).toISOString(), // ISO timestamp format
+          visitCount: 0,
+          relevanceScore: relevanceScore || 0, // Use frecency as relevance score
+          ...(previewImageURL && { thumbnail: previewImageURL }), // Only include thumbnail if available
+        });
+      }
 
-        // Return as JSON string with metadata
+      if (rows.length === 0) {
         return JSON.stringify({
           search_term,
-          count: rows.length,
-          results: rows,
+          results: [],
+          message: `No browser history found for "${search_term}".`,
         });
+      }
+
+      // Return as JSON string with metadata
+      return JSON.stringify({
+        search_term,
+        count: rows.length,
+        results: rows,
+      });
 
     }
 
@@ -333,9 +335,7 @@ export async function searchBrowserHistory({ search_term = "", start_ts = null, 
       results: [],
     });
   } finally {
-    if (root && openedRoot) {
-      root.containerOpen = false;
-    }
+
   }
 }
 
