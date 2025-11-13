@@ -731,17 +731,31 @@ var gSync = {
     toolbarItem.addEventListener("click", () => {
       gBrowser.selectedTab = gBrowser.addTrustedTab(BROWSER_NEW_TAB_URL);
 
-      // NOTE: Needs a delay to give the chat-bot element time
-      // to be available, not sure if there's a better way to do this
-      setTimeout(() => {
-        const chatBot =
-          gBrowser?.selectedBrowser?.contentDocument?.querySelector?.(
-            "#chat-bot"
-          );
-
-        chatBot.showChatHistoryOverlay();
-      }, 100);
+      this.openHistory();
     });
+  },
+
+  openHistory(retries = 0) {
+    if (retries > 5) {
+      return;
+    }
+
+    const delay = 100 * (retries + 1);
+
+    // NOTE: Needs a delay to give the chat-bot element time
+    // to be available, not sure if there's a better way to do this
+    setTimeout(() => {
+      const chatBot =
+        gBrowser?.selectedBrowser?.contentDocument?.querySelector?.(
+          "#chat-bot"
+        );
+
+      if (chatBot) {
+        chatBot.showChatHistoryOverlay();
+      } else {
+        this.openHistory(retries++);
+      }
+    }, delay);
   },
 
   removeChatsOption() {
