@@ -1119,6 +1119,84 @@ function topkAggregates(
   return [dom_items, tit_items, srch_items];
 }
 
+function safeLc(s) {
+  return String(s || "").toLowerCase();
+}
+
+function textOverlapBoost(message, insight) {
+  const m = safeLc(message);
+  const terms = new Set(
+    String(insight?.insight_summary || "")
+      .toLowerCase()
+      .split(/[^a-z0-9]+/i)
+      .filter(w => w.length >= 4)
+  );
+  if (!terms.size || !m) {
+    return 0;
+  }
+  let hits = 0;
+  for (const t of terms) {
+    if (m.includes(t)) {
+      hits++;
+    }
+  }
+  // tiny, bounded boost
+  return Math.min(0.4, hits * 0.08);
+}
+
+// Fallback if the classifier returns nulls
+function fallbackCategoryFromMessage(message) {
+  const m = safeLc(message);
+  const pairs = [
+    [/news|headline|article/, "News"],
+    [/shop|buy|deal|price|cart/, "Shopping"],
+    [/code|api|library|sdk|repo|git/, "Computers & Electronics"],
+    [/recipe|restaurant|cook|food/, "Food & Drink"],
+    [/travel|flight|hotel|trip|itinerary/, "Travel & Transportation"],
+    [/sports?|nba|nfl|soccer|match/, "Sports"],
+    [/movie|music|tv|game|stream/, "Arts & Entertainment"],
+    [/learn|course|tutorial|class|school/, "Jobs & Education"],
+  ];
+  for (const [re, cat] of pairs) {
+    if (re.test(m)) {
+      return cat;
+    }
+  }
+  return null;
+}
+
+function fallbackIntentFromMessage(message) {
+  const m = safeLc(message);
+  if (/compare|vs|which.*better|review/.test(m)) {
+    return "Compare / Evaluate";
+  }
+  if (/plan|organize|schedule|itinerary|outline/.test(m)) {
+    return "Plan / Organize";
+  }
+  if (/buy|purchase|order|deal|price|subscribe/.test(m)) {
+    return "Buy / Acquire";
+  }
+  if (/learn|how to|what is|explain|guide|docs?/.test(m)) {
+    return "Research / Learn";
+  }
+  if (/draft|write|make|build|code|create/.test(m)) {
+    return "Create / Produce";
+  }
+  if (/share|post|tweet|email|message/.test(m)) {
+    return "Communicate / Share";
+  }
+  if (/track|monitor|watch list|alerts?/.test(m)) {
+    return "Monitor / Track";
+  }
+  if (/relax|fun|bored|entertain|watch/.test(m)) {
+    return "Entertain / Relax";
+  }
+  if (/again|revisit|resume|back to|recent/.test(m)) {
+    return "Resume / Revisit";
+  }
+  return null;
+}
+
 // ============================================================================
 // Chat Analysis Functions
 // ============================================================================
@@ -1421,6 +1499,22 @@ export const COVE_ANSWERS_SCHEMA = {
     },
     required: ["answers", "verdict"],
     additionalProperties: false,
+  },
+};
+
+// Predict a single category & intent from a freeform message
+const CLASSIFY_MESSAGE_SCHEMA = {
+  name: "ClassifyMessage",
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["category", "intent"],
+    properties: {
+      category: { type: ["string", "null"], enum: [...CATEGORIES, null] },
+      intent: { type: ["string", "null"], enum: [...INTENTS, null] },
+      confidence: { type: "number", minimum: 0, maximum: 1 },
+      rationale: { type: "string" }, // optional, for debugging
+    },
   },
 };
 
@@ -2863,6 +2957,7 @@ export function getInsightsState() {
 /**
  * Builds the system prompt with insights data
  * Uses generated insights if available, otherwise uses default placeholder data
+ *
  */
 export function buildInsightsSystemPrompt() {
   const insightsData = getInsightsData();
@@ -2956,6 +3051,209 @@ export function detectInsightTokens(content) {
   }
 
   return matches;
+}
+
+/**
+ * Classify a freeform message into {category, intent} using the LLM.
+ * Falls back to regex heuristics if the model yields nulls.
+ *
+ * @param {string} message
+ *   The user's raw input message to classify.
+ */
+async function classifyMessage(message) {
+  const engine = await createOpenAIEngine();
+  const categories = JSON.stringify(CATEGORIES);
+  const intents = JSON.stringify(INTENTS);
+
+  const resp = await engine.run({
+    args: [
+      {
+        role: "system",
+        content:
+          "Classify the user's message into a single high-level Category and Intent. Return ONLY valid JSON per schema.",
+      },
+      {
+        role: "user",
+        content: `
+          Message:
+          ${message}
+
+          Pick exactly ONE Category from:
+          ${categories}
+
+          Pick exactly ONE Intent from:
+          ${intents}
+
+          Guidance:
+          - Choose the most directly implied category/intent.
+          - If ambiguous, pick the closest likely choice.
+          - Keep it non-sensitive and general; do NOT fabricate specifics.
+        `.trim(),
+      },
+    ],
+    responseFormat: { type: "json_schema", schema: CLASSIFY_MESSAGE_SCHEMA },
+  });
+
+  const raw = resp?.finalOutput ?? "{}";
+  const parsed = extractJSON(raw);
+
+  // Helper: read any of these keys without changing value casing
+  const get = (o, keys) => {
+    for (const k of keys) {
+      if (o && Object.prototype.hasOwnProperty.call(o, k)) {
+        return o[k];
+      }
+    }
+    return undefined;
+  };
+
+  let category = get(parsed, ["category", "Category"]);
+  let intent = get(parsed, ["intent", "Intent"]);
+  let confidence = get(parsed, ["confidence", "Confidence"]);
+
+  if (typeof category === "string") {
+    category = category.trim();
+  }
+  if (typeof intent === "string") {
+    intent = intent.trim();
+  }
+  confidence = Number.isFinite(Number(confidence)) ? Number(confidence) : 0;
+
+  // Validate strictly against your enums (case-sensitive)
+  if (!CATEGORIES.includes(category)) {
+    category = null;
+  }
+  if (!INTENTS.includes(intent)) {
+    intent = null;
+  }
+
+  // treat very low confidence as “unsure”
+  const CONFIDENCE_MIN = 0.2;
+  if (confidence < CONFIDENCE_MIN) {
+    if (!category) {
+      category = null;
+    }
+    if (!intent) {
+      intent = null;
+    }
+  }
+
+  // Apply fallbacks only if needed
+  if (!category) {
+    category = fallbackCategoryFromMessage(message) || null;
+  }
+  if (!intent) {
+    intent = fallbackIntentFromMessage(message) || null;
+  }
+
+  // Clamp confidence
+  confidence = Math.max(0, Math.min(1, confidence));
+
+  console.log(`parsed = ${JSON.stringify(parsed)}`);
+  console.log(`predicted category = ${category}`);
+  console.log(`predicted intent = ${intent}`);
+  console.log(`predicted confidence = ${confidence}`);
+
+  return { category, intent, confidence };
+}
+
+/**
+ * Select top insights from the predicted category (and intent if available).
+ *
+ * @param {string} message
+ * @param {object} [opts]
+ * @param {number} [opts.limit=5]
+ * @returns {Promise<{predicted_category:string|null, predicted_intent:string|null, selected:Array, available_count:number}>}
+ */
+export async function getRelevantInsights(message, opts = {}) {
+  const input = String(message || "").trim();
+  const limit = Math.max(1, Math.min(20, Number(opts.limit) || 5));
+
+  if (!input) {
+    return {
+      predicted_category: null,
+      predicted_intent: null,
+      selected: [],
+      available_count: 0,
+      note: "Empty message; nothing to select.",
+    };
+  }
+
+  // 1) predict category/intent
+  const { category, intent } = await classifyMessage(input);
+
+  // 2) pull indexed insights
+  const data = getInsightsData();
+  const index = ensureRichIndex(data);
+
+  // No category? try a soft sweep: gather from all cats and still rank
+  const candidateLists =
+    category && index[category] ? index[category] : Object.values(index).flat();
+
+  console.log(`[Insights] candidateLists = ${JSON.stringify(candidateLists)}`);
+
+  if (!Array.isArray(candidateLists) || candidateLists.length === 0) {
+    return {
+      predicted_category: category || null,
+      predicted_intent: intent || null,
+      selected: [],
+      available_count: 0,
+    };
+  }
+
+  // 3) score: base(score) + categoryPrior + intentExact + textOverlap
+  const CATEGORY_MATCH_BOOST = 0.75; // exact category hit
+  const CATEGORY_MISMATCH_PENALTY = -0.25; // gentle nudge down for others during soft sweep
+
+  const ranked = candidateLists
+    .map(obj => {
+      const base = Math.max(1, Math.min(5, Number(obj?.score) || 1)) / 5; // 0.2..1.0
+
+      const iBoost =
+        intent && obj?.intent && safeLc(obj.intent) === safeLc(intent)
+          ? 0.15
+          : 0;
+
+      const tBoost = textOverlapBoost(input, obj);
+
+      let cBoost = 0;
+      if (category) {
+        cBoost =
+          safeLc(obj?.category) === safeLc(category)
+            ? CATEGORY_MATCH_BOOST
+            : CATEGORY_MISMATCH_PENALTY;
+      }
+
+      // Keep composite non-negative (defensive)
+      const composite = Math.max(0, base + cBoost + iBoost + tBoost);
+
+      return { obj, composite };
+    })
+    .sort((a, b) => b.composite - a.composite)
+    .slice(0, limit)
+    .map(({ obj, composite }) => ({
+      category: obj?.category || category || null,
+      intent: obj?.intent ?? null,
+      insight_summary: obj?.insight_summary ?? "",
+      score: obj?.score ?? null,
+      updated_at: obj?.updated_at ?? null,
+      evidence: Array.isArray(obj?.evidence) ? obj.evidence.slice(0, 3) : [],
+      why: obj?.why || "",
+      composite,
+    }));
+
+  console.log(`[Insights] ranked = ${JSON.stringify(ranked)}`);
+
+  if (ranked) {
+    return {
+      available: true,
+      insights: ranked,
+    };
+  }
+  return {
+    available: false,
+    insights: ranked,
+  };
 }
 
 /**
