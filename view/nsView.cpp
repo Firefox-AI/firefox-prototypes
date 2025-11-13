@@ -5,6 +5,7 @@
 
 #include "nsView.h"
 
+#include "nsDeviceContext.h"
 #include "mozilla/BasicEvents.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/IntegerPrintfMacros.h"
@@ -42,18 +43,10 @@ nsView::nsView(nsViewManager* aViewManager)
   // SetViewContentTransparency.
 }
 
-void nsView::DropMouseGrabbing() {
-  if (mViewManager->GetPresShell()) {
-    PresShell::ClearMouseCapture();
-  }
-}
-
 nsView::~nsView() {
   MOZ_COUNT_DTOR(nsView);
 
   if (mViewManager) {
-    DropMouseGrabbing();
-
     nsView* rootView = mViewManager->GetRootView();
     if (rootView == this) {
       // Inform the view manager that the root view has gone away...
@@ -189,29 +182,6 @@ static LayoutDeviceIntRect WidgetViewBoundsToDevicePixels(
                                               aViewBounds.mRoundTo);
 }
 
-LayoutDeviceIntRect nsView::CalcWidgetBounds(WindowType aType,
-                                             TransparencyMode aTransparency) {
-  int32_t p2a = mViewManager->AppUnitsPerDevPixel();
-  auto viewBounds =
-      CalcWidgetViewBounds(mDimBounds, p2a, nullptr, mWindow.get(), aType);
-  auto newBounds =
-      WidgetViewBoundsToDevicePixels(viewBounds, p2a, aType, aTransparency);
-
-  // Compute where the top-left of our widget ended up relative to the parent
-  // widget, in appunits.
-  nsPoint roundedOffset(NSIntPixelsToAppUnits(newBounds.X(), p2a),
-                        NSIntPixelsToAppUnits(newBounds.Y(), p2a));
-
-  // mViewToWidgetOffset is added to coordinates relative to the view origin
-  // to get coordinates relative to the widget.
-  // The view origin, relative to the parent widget, is at
-  // mDimBounds.TopLeft() + viewBounds.TopLeft().
-  // Our widget, relative to the parent widget, is roundedOffset.
-  mViewToWidgetOffset =
-      mDimBounds.TopLeft() + viewBounds.mBounds.TopLeft() - roundedOffset;
-  return newBounds;
-}
-
 LayoutDeviceIntRect nsView::CalcWidgetBounds(
     const nsRect& aBounds, int32_t aAppUnitsPerDevPixel, nsIFrame* aParentFrame,
     nsIWidget* aThisWidget, WindowType aType, TransparencyMode aTransparency) {
@@ -221,23 +191,7 @@ LayoutDeviceIntRect nsView::CalcWidgetBounds(
                                         aTransparency);
 }
 
-LayoutDeviceIntRect nsView::RecalcWidgetBounds() {
-  MOZ_ASSERT(mWindow);
-  return CalcWidgetBounds(mWindow->GetWindowType(),
-                          mWindow->GetTransparencyMode());
-}
-
-void nsView::SetDimensions(const nsRect& aRect) {
-  // Don't use nsRect's operator== here, since it returns true when
-  // both rects are empty even if they have different widths and we
-  // have cases where that sort of thing matters to us.
-  if (mDimBounds.TopLeft() == aRect.TopLeft() &&
-      mDimBounds.Size() == aRect.Size()) {
-    return;
-  }
-
-  mDimBounds = aRect;
-}
+void nsView::SetDimensions(const nsRect& aRect) { mDimBounds = aRect; }
 
 void nsView::SetNeedsWindowPropertiesSync() {
   mNeedsWindowPropertiesSync = true;
@@ -276,9 +230,6 @@ void nsView::AttachToTopLevelWidget(nsIWidget* aWidget) {
     mWindow->AsyncEnableDragDrop(true);
   }
   mWidgetIsTopLevel = true;
-
-  // Refresh the view bounds
-  RecalcWidgetBounds();
 }
 
 // Detach this view from an attached widget.
@@ -338,17 +289,11 @@ void nsView::List(FILE* out, int32_t aIndent) const {
   int32_t i;
   for (i = aIndent; --i >= 0;) fputs("  ", out);
   fprintf(out, "%p ", (void*)this);
-  if (nullptr != mWindow) {
-    nscoord p2a = mViewManager->AppUnitsPerDevPixel();
-    LayoutDeviceIntRect rect = mWindow->GetClientBounds();
-    nsRect windowBounds = LayoutDeviceIntRect::ToAppUnits(rect, p2a);
-    rect = mWindow->GetBounds();
-    nsRect nonclientBounds = LayoutDeviceIntRect::ToAppUnits(rect, p2a);
+  if (mWindow) {
     nsrefcnt widgetRefCnt = mWindow.get()->AddRef() - 1;
     mWindow.get()->Release();
-    fprintf(out, "(widget=%p[%" PRIuPTR "] pos={%d,%d,%d,%d}) ", (void*)mWindow,
-            widgetRefCnt, nonclientBounds.X(), nonclientBounds.Y(),
-            windowBounds.Width(), windowBounds.Height());
+    fprintf(out, "(widget=%p[%" PRIuPTR "] pos=%s) ", (void*)mWindow,
+            widgetRefCnt, ToString(mWindow->GetBounds()).c_str());
   }
   nsRect brect = GetBounds();
   fprintf(out, "{%d,%d,%d,%d}", brect.X(), brect.Y(), brect.Width(),
@@ -376,11 +321,20 @@ bool nsView::WindowResized(nsIWidget* aWidget, int32_t aWidth,
     return false;
   }
 
-  RefPtr<nsDeviceContext> devContext = mViewManager->GetDeviceContext();
+  PresShell* ps = mViewManager->GetPresShell();
+  if (!ps) {
+    return false;
+  }
+
+  nsPresContext* pc = ps->GetPresContext();
+  if (!pc) {
+    return false;
+  }
+
   // ensure DPI is up-to-date, in case of window being opened and sized
   // on a non-default-dpi display (bug 829963)
-  devContext->CheckDPIChange();
-  int32_t p2a = devContext->AppUnitsPerDevPixel();
+  pc->DeviceContext()->CheckDPIChange();
+  int32_t p2a = pc->AppUnitsPerDevPixel();
   if (auto* frame = GetFrame()) {
     // Usually the resize would deal with this, but there are some cases (like
     // web-extension popups) where frames might already be correctly sized etc
@@ -392,10 +346,7 @@ bool nsView::WindowResized(nsIWidget* aWidget, int32_t aWidth,
                                     NSIntPixelsToAppUnits(aHeight, p2a));
 
   if (nsXULPopupManager* pm = nsXULPopupManager::GetInstance()) {
-    PresShell* presShell = mViewManager->GetPresShell();
-    if (presShell && presShell->GetDocument()) {
-      pm->AdjustPopupsOnWindowChange(presShell);
-    }
+    pm->AdjustPopupsOnWindowChange(ps);
   }
 
   return true;
@@ -506,18 +457,9 @@ void nsView::RequestRepaint() {
   }
 }
 
-bool nsView::ShouldNotBeVisible() {
-  if (mFrame && mFrame->IsMenuPopupFrame()) {
-    nsXULPopupManager* pm = nsXULPopupManager::GetInstance();
-    return !pm || !pm->IsPopupOpen(mFrame->GetContent()->AsElement());
-  }
-
-  return false;
-}
-
 nsEventStatus nsView::HandleEvent(WidgetGUIEvent* aEvent,
                                   bool aUseAttachedEvents) {
-  MOZ_ASSERT(nullptr != aEvent->mWidget, "null widget ptr");
+  MOZ_ASSERT(aEvent->mWidget, "null widget ptr");
 
   nsEventStatus result = nsEventStatus_eIgnore;
   nsView* view;

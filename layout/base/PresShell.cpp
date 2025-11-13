@@ -4799,10 +4799,9 @@ nsresult PresShell::RenderDocument(const nsRect& aRect,
   }
   if (aFlags & RenderDocumentFlags::UseWidgetLayers) {
     // We only support using widget layers on display root's with widgets.
-    nsView* view = rootFrame->GetView();
-    if (view && view->GetWidget() &&
-        nsLayoutUtils::GetDisplayRootFrame(rootFrame) == rootFrame) {
-      WindowRenderer* renderer = view->GetWidget()->GetWindowRenderer();
+    nsIWidget* widget = rootFrame->GetOwnWidget();
+    if (widget && nsLayoutUtils::GetDisplayRootFrame(rootFrame) == rootFrame) {
+      WindowRenderer* renderer = widget->GetWindowRenderer();
       // WebRenderLayerManagers in content processes
       // don't support taking snapshots.
       if (renderer &&
@@ -5961,9 +5960,7 @@ void PresShell::ProcessSynthMouseOrPointerMoveEvent(
   if (rootView->GetFrame()) {
     popupFrame = FindPopupFrame(mPresContext, rootView->GetWidget(),
                                 LayoutDeviceIntPoint::FromAppUnitsToNearest(
-                                    aPointerInfo.mLastRefPointInRootDoc +
-                                        rootView->ViewToWidgetOffset(),
-                                    APD));
+                                    aPointerInfo.mLastRefPointInRootDoc, APD));
     if (popupFrame) {
       pointShell = popupFrame->PresShell();
       widget = popupFrame->GetWidget();
@@ -5987,8 +5984,7 @@ void PresShell::ProcessSynthMouseOrPointerMoveEvent(
     // pointView can be null in situations related to mouse capture
     pointShell = (pointView ? pointView : rootView)->GetPresShell();
     bbc = GetChildBrowser(pointView);
-    refpoint =
-        aPointerInfo.mLastRefPointInRootDoc + rootView->ViewToWidgetOffset();
+    refpoint = aPointerInfo.mLastRefPointInRootDoc;
   }
   NS_ASSERTION(widget, "view should have a widget here");
   Maybe<WidgetMouseEvent> mouseMoveEvent;
@@ -6524,8 +6520,9 @@ void PresShell::PaintAndRequestComposite(nsIFrame* aFrame,
     // The fallback renderer doesn't do any retaining, so we just need to
     // notify the view and widget that we're invalid, and we'll do a
     // paint+composite from the PaintWindow callback.
-    if (auto* view = aFrame ? aFrame->GetView() : nullptr) {
-      GetViewManager()->InvalidateView(view);
+    if (nsIWidget* widget = aFrame ? aFrame->GetOwnWidget() : nullptr) {
+      auto bounds = widget->GetBounds();
+      widget->Invalidate(LayoutDeviceIntRect({}, bounds.Size()));
     }
     return;
   }

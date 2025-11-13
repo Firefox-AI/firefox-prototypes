@@ -252,14 +252,6 @@ class nsView final : public nsIWidgetListener {
   LayoutDeviceIntRect CalcWidgetBounds(mozilla::widget::WindowType,
                                        mozilla::widget::TransparencyMode);
 
-  LayoutDeviceIntRect RecalcWidgetBounds();
-
-  // This is an app unit offset to add when converting view coordinates to
-  // widget coordinates.  It is the offset in view coordinates from widget
-  // origin (unlike views, widgets can't extend above or to the left of their
-  // origin) to view origin expressed in appunits of this.
-  nsPoint ViewToWidgetOffset() const { return mViewToWidgetOffset; }
-
   // nsIWidgetListener
   mozilla::PresShell* GetPresShell() override;
   nsView* GetView() override { return this; }
@@ -281,7 +273,6 @@ class nsView final : public nsIWidgetListener {
                           const mozilla::TimeStamp& aCompositeStart,
                           const mozilla::TimeStamp& aCompositeEnd) override;
   void RequestRepaint() override;
-  bool ShouldNotBeVisible() override;
   MOZ_CAN_RUN_SCRIPT_BOUNDARY
   nsEventStatus HandleEvent(mozilla::WidgetGUIEvent* aEvent,
                             bool aUseAttachedEvents) override;
@@ -306,10 +297,6 @@ class nsView final : public nsIWidgetListener {
    */
   void SetDimensions(const nsRect& aRect);
 
-  // Helper function to get mouse grabbing off this view (by moving it to the
-  // parent, if we can)
-  void DropMouseGrabbing();
-
   bool IsDirty() const { return mIsDirty; }
   void SetIsDirty(bool aDirty) { mIsDirty = aDirty; }
 
@@ -325,8 +312,6 @@ class nsView final : public nsIWidgetListener {
   nsIFrame* mFrame;
   // relative to parent, but in our appunits
   nsRect mDimBounds;
-  // in our appunits
-  nsPoint mViewToWidgetOffset;
   bool mWidgetIsTopLevel;
   bool mForcedRepaint;
   bool mNeedsWindowPropertiesSync;

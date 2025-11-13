@@ -3693,7 +3693,7 @@
 # Whether the navigation API will be exposed.
 - name: dom.navigation.webidl.enabled
   type: RelaxedAtomicBool
-  value: @IS_EARLY_BETA_OR_EARLIER@
+  value: true
   mirror: always
   do_not_use_directly: true
 
@@ -4071,6 +4071,40 @@
   value: false
   mirror: always
   do_not_use_directly: true
+
+# Should we clear non-persisted origins with zero usage during final steps of
+# temporary storage initialization?
+# When enabled, the QuotaManager will automatically clear non-persisted
+# origins that have zero quota-charged usage during final steps of temporary
+# storage initialization. This removes directories and files belonging to
+# origins that do not store any real data but still consume resources through
+# bookkeeping structures on disk. The feature helps reduce storage bloat and
+# improve initialization performance, especially on long-lived profiles with a
+# large number of unused origins.
+- name: dom.quotaManager.temporaryStorage.clearNonPersistedZeroUsageOrigins
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
+
+# Controls the maximum number of origins cleared in a single batch during
+# final steps of temporary storage initialization. The value defaults to 50 on
+# Android and 150 on other platforms. Smaller values can be useful for testing
+# and experimentation to exercise multi-batch clearing behavior without
+# requiring hundreds of origins. Larger values may reduce the number of
+# batches but can increase I/O spikes.
+#
+# Currently this pref is only applied when clearing non-persisted zero-usage
+# origins, but it is intended to serve as a general batch limit for other
+# clearing strategies that may be introduced in the future (for example, to
+# remove very old origins).
+- name: dom.quotaManager.temporaryStorage.maxOriginsToClearDuringCleanup
+  type: RelaxedAtomicUint32
+#if defined(MOZ_WIDGET_ANDROID)
+  value: 50
+#else
+  value: 150
+#endif
+  mirror: always
 
 # A pref that is used to slow down origin operations for testing purposes.
 - name: dom.quotaManager.originOperations.pauseOnIOThreadMs
@@ -8987,14 +9021,21 @@
   mirror: always
   set_spidermonkey_pref: startup
 
- # Experimental support for Iterator Chunking in JavaScript.
+  # Experimental support for Iterator Chunking in JavaScript.
 - name: javascript.options.experimental.iterator_chunking
   type: bool
   value: false
   mirror: always
   set_spidermonkey_pref: startup
 
-#endif  // NIGHTLY_BUILD
+ #endif  // NIGHTLY_BUILD
+
+  # Capture stack traces for OOM
+- name: javascript.options.experimental.capture_oom_stack_trace
+  type: bool
+  value: @IS_NIGHTLY_BUILD@
+  mirror: always
+  set_spidermonkey_pref: startup
 
 # Whether to Baseline-compile self-hosted functions the first time they are
 # used and cache the result.

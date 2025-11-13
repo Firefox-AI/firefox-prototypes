@@ -2333,7 +2333,9 @@ void nsWindow::NativeMoveResizeWaylandPopup(bool aMove, bool aResize) {
   }
 
   // It's safe to expect the popup position is handled onwards.
-  mWaylandApplyPopupPositionBeforeShow = false;
+  if (aMove) {
+    mWaylandApplyPopupPositionBeforeShow = false;
+  }
 
   // We expect all Wayland popus have zero margin. If not, just position
   // it as is and throw an error message.
@@ -7667,8 +7669,7 @@ bool nsWindow::CheckForRollup(gdouble aMouseX, gdouble aMouseY, bool aIsWheel,
     }
   }
   LayoutDeviceIntPoint point;
-  nsIRollupListener::RollupOptions options{0,
-                                           nsIRollupListener::FlushViews::Yes};
+  nsIRollupListener::RollupOptions options;
   // if we're dealing with menus, we probably have submenus and
   // we don't want to rollup if the click is in a parent menu of
   // the current submenu

@@ -11,7 +11,6 @@
 #include "nsCOMPtr.h"
 #include "nsCRT.h"
 #include "nsTArray.h"
-#include "nsDeviceContext.h"
 #include "nsTArray.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/EventForwards.h"
@@ -19,7 +18,6 @@
 class nsIWidget;
 struct nsRect;
 class nsRegion;
-class nsDeviceContext;
 
 namespace mozilla {
 class PresShell;
@@ -36,7 +34,7 @@ class nsViewManager final {
 
   NS_INLINE_DECL_REFCOUNTING(nsViewManager)
 
-  explicit nsViewManager(nsDeviceContext* aContext);
+  nsViewManager();
 
   /**
    * Initialize the ViewManager
@@ -44,7 +42,7 @@ class nsViewManager final {
    * because it holds a reference to this instance.
    * @result The result of the initialization, NS_OK if no errors
    */
-  nsresult Init(nsDeviceContext* aContext);
+  nsresult Init();
 
   /**
    * Create an ordinary view
@@ -93,18 +91,6 @@ class nsViewManager final {
   void FlushDelayedResize();
 
   /**
-   * Called to inform the view manager that the entire area of a view
-   * is dirty and needs to be redrawn.
-   * @param aView view to paint. should be root view
-   */
-  void InvalidateView(nsView* aView);
-
-  /**
-   * Called to inform the view manager that it should invalidate all views.
-   */
-  void InvalidateAllViews();
-
-  /**
    * Called to dispatch an event to the appropriate view. Often called
    * as a result of receiving a mouse or keyboard event from the widget
    * event system.
@@ -138,11 +124,6 @@ class nsViewManager final {
    */
   mozilla::PresShell* GetPresShell() const { return mPresShell; }
 
-  /**
-   * Get the device context associated with this manager
-   */
-  nsDeviceContext* GetDeviceContext() const { return mContext; }
-
  public:
   /**
    * Indicate whether the viewmanager is currently painting
@@ -170,10 +151,6 @@ class nsViewManager final {
    */
   MOZ_CAN_RUN_SCRIPT void UpdateWidgetGeometry();
 
-  int32_t AppUnitsPerDevPixel() const {
-    return mContext->AppUnitsPerDevPixel();
-  }
-
  private:
   static uint32_t gLastUserEventTime;
 
@@ -187,7 +164,6 @@ class nsViewManager final {
   MOZ_CAN_RUN_SCRIPT
   void ProcessPendingUpdatesPaint(nsIWidget* aWidget);
 
-  void FlushDirtyRegionToWidget(nsView* aView);
   /**
    * Call WillPaint() on all view observers under this vm root.
    */
@@ -195,21 +171,9 @@ class nsViewManager final {
   static void CollectVMsForWillPaint(nsView* aView, nsViewManager* aParentVM,
                                      nsTArray<RefPtr<nsViewManager>>& aVMs);
 
-  void InvalidateWidgetArea(nsView* aWidgetView,
-                            const nsRegion& aDamagedRegion);
-
-  void InvalidateViews(nsView* aView);
-
   // aView is the view for aWidget and aRegion is relative to aWidget.
   MOZ_CAN_RUN_SCRIPT
   void Refresh(nsView* aView, const LayoutDeviceIntRegion& aRegion);
-
-  /**
-   * Intersects aRect with aView's bounds and then transforms it from aView's
-   * coordinate system to the coordinate system of the widget attached to
-   * aView.
-   */
-  LayoutDeviceIntRect ViewToWidget(nsView* aView, const nsRect& aRect) const;
 
   MOZ_CAN_RUN_SCRIPT_BOUNDARY
   void DoSetWindowDimensions(nscoord aWidth, nscoord aHeight);
@@ -232,7 +196,6 @@ class nsViewManager final {
   // pending updates.
   void PostPendingUpdate();
 
-  RefPtr<nsDeviceContext> mContext;
   mozilla::PresShell* mPresShell;
 
   // The size for a resize that we delayed until the root view becomes
@@ -246,7 +209,6 @@ class nsViewManager final {
   // this, as noted.
   // Use IsPainting() and SetPainting() to access mPainting.
   bool mPainting;
-  bool mRecursiveRefreshPending;
   bool mHasPendingWidgetGeometryChanges;
 
   // from here to public should be static and locked... MMP
