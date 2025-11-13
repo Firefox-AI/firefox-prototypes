@@ -2414,7 +2414,7 @@ Today's date: ${currentDate}`;
                                     <ul
                                       class="insights-applied-chat-popover-list"
                                     >
-                                      ${usedInsights
+                                      ${[...new Set(usedInsights)]
                                         .slice(0, 5)
                                         .map(
                                           insight =>
@@ -2423,7 +2423,8 @@ Today's date: ${currentDate}`;
                                             >
                                               ${insight}
                                             </li>`
-                                        )}
+                                        )
+                                      }
                                     </ul>
                                     <div
                                       class="insights-applied-chat-popover-footer"
