@@ -250,7 +250,9 @@ export class MentionDropdown {
   selectItem(index = this.selectedIndex) {
     if (index >= 0 && index < this.items.length) {
       this.onSelectCallback?.(this.items[index]);
+      return true;
     }
+    return false;
   }
 
   scrollToSelected() {
@@ -278,8 +280,7 @@ export class MentionDropdown {
 
     if (event.key === "Enter") {
       event.preventDefault();
-      this.selectItem();
-      return true;
+      return this.selectItem();
     }
 
     return false;

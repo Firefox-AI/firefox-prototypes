@@ -93,7 +93,7 @@ body {
   padding: var(--space-small) var(--space-medium);
 }
 
-#tiptap-editor {
+#editor {
   width: 100%;
   font-size: 15px;
   border: none;
@@ -112,24 +112,25 @@ body {
 }
 
 /* Tiptap Editor Styles */
-#tiptap-editor {
+#editor {
   flex: 1;
   min-height: 40px;
   overflow-y: auto;
 }
 
-#tiptap-editor .ProseMirror {
+#editor .ProseMirror {
   outline: none;
   padding: 0;
   min-height: var(--icon-size-medium);
+  white-space: pre-wrap;
 }
 
-#tiptap-editor .ProseMirror p {
+#editor .ProseMirror p {
   margin: 0;
   padding: 0;
 }
 
-#tiptap-editor .ProseMirror p.is-editor-empty:first-child::before {
+#editor .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
   color: rgba(21, 20, 26, 0.69);
@@ -137,12 +138,12 @@ body {
   height: 0;
 }
 
-#tiptap-editor .ProseMirror:focus {
+#editor .ProseMirror:focus {
   outline: none;
 }
 
 /* Ensure single line appearance by default */
-#tiptap-editor .ProseMirror p:not(:first-child) {
+#editor .ProseMirror p:not(:first-child) {
   margin-top: 0.5em;
 }
 

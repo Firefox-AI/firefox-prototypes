@@ -981,11 +981,12 @@ class ChatBot extends MozLitElement {
     console.log("Mention dataset:", mentionElement.dataset);
 
     const url =
-      mentionElement.dataset.id || mentionElement.getAttribute("data-id");
+      mentionElement.dataset.mentionId ||
+      mentionElement.getAttribute("data-mention-id");
     console.log("Extracted URL:", url);
 
     if (!url) {
-      console.warn("No URL found in mention data-id attribute");
+      console.warn("No URL found in mention data-mention-id attribute");
       return;
     }
 
@@ -1509,7 +1510,7 @@ Today's date: ${currentDate}`;
       // Create the same HTML structure as renderHTML in smartbar.mjs
       const iconSrc = `page-icon:${url}`;
       const mentionHTML =
-        `<span class="mention" data-id="${this.escapeHTML(url)}" data-icon="">` +
+        `<span class="mention" data-mention-id="${this.escapeHTML(url)}" data-icon="">` +
         `<img src="${iconSrc}" alt="" class="mention-icon" width="16" height="16">` +
         `<span class="mention-label" title="${this.escapeHTML(title)} (${this.escapeHTML(url)})">${this.escapeHTML(title)}</span>` +
         `</span>`;

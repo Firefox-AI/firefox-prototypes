@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { detectQueryType, searchBrowserHistory } from "./utils.mjs";
-import { attachToElement } from "chrome://browser/content/smartwindow/smartbar.mjs";
+import { attachToElement } from "chrome://browser/content/smartwindow/smartbar/index.mjs";
 import {
   generateLiveSuggestions,
   generateConversationStarters,
@@ -702,7 +702,7 @@ class SmartWindowPage {
   async onDOMReady() {
     this.isSidebarMode = embedderElement.id == "smartwindow-browser";
 
-    const editorDiv = document.getElementById("tiptap-editor");
+    const editorDiv = document.getElementById("editor");
 
     this.smartbar = attachToElement(editorDiv, {
       onKeyDown: event => this.handleKeyDown(event),
@@ -1785,6 +1785,15 @@ class SmartWindowPage {
     // Mark that user has manually edited the query
     this.userHasEditedQuery = true;
 
+    // Don’t fetch live suggestions or autofill data while the user is
+    // interacting with mentions. The ProseMirror document length doesn’t map
+    // cleanly to the plain-text query once mentions are present, which causes
+    // autofill to move the caret unexpectedly after the next key press.
+    if (this.smartbar?.hasExistingMentions()) {
+      this.smartbar.hideSuggestions();
+      return;
+    }
+
     // Don’t show suggestions mid-conversation
     if (this.chatBot?.messages?.length > 0) {
       return;
@@ -1806,6 +1815,12 @@ class SmartWindowPage {
       query,
       topChromeWindow
     );
+
+    if (this.smartbar?.hasExistingMentions()) {
+      this.smartbar.hideSuggestions();
+      return;
+    }
+
     if (this.smartbar) {
       this.smartbar.showSuggestions(suggestions, "Suggestions:", false, query);
 

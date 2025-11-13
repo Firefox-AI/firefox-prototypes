@@ -168,7 +168,7 @@ export function attachToElement(element, options = {}) {
       const attrs = {
         ...HTMLAttributes,
         class: `${HTMLAttributes.class ?? ""} mention`.trim(),
-        "data-id": id,
+        "data-mention-id": id,
         "data-icon": icon || "",
         ...(source ? { "data-source": source } : {}),
       };
@@ -355,12 +355,12 @@ export function attachToElement(element, options = {}) {
   });
 
   // Add click event listener for mention expansion toggle
-  element.addEventListener('click', (event) => {
-    const mentionElement = event.target.closest('.mention');
+  element.addEventListener("click", event => {
+    const mentionElement = event.target.closest(".mention");
     if (mentionElement) {
       event.preventDefault();
       event.stopPropagation();
-      mentionElement.classList.toggle('expanded');
+      mentionElement.classList.toggle("expanded");
     }
   });
 
