@@ -607,6 +607,12 @@ class ChatBot extends MozLitElement {
       vertical-align: middle;
       border: 1px solid var(--tab-border-color, rgba(0, 0, 0, 0));
       background: rgba(191, 143, 204, 0.1);
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .mention:hover {
+      background: rgba(191, 143, 204, 0.2);
     }
 
     .mention .mention-icon {
@@ -884,6 +890,8 @@ class ChatBot extends MozLitElement {
     };
     document.addEventListener("click", this._closeChatInsights);
 
+    // Mention click handling is now done in updated() method
+
     // Load search engines with their icons
     await this.loadSearchEngines();
 
@@ -929,6 +937,51 @@ class ChatBot extends MozLitElement {
     if (this._closeChatInsights) {
       document.removeEventListener("click", this._closeChatInsights);
       this._closeChatInsights = null;
+    }
+    // Mention click handlers are removed automatically when DOM is updated
+  }
+
+  /**
+   * Open a tab from a mention click
+   * @param {HTMLElement} mentionElement - The mention element that was clicked
+   */
+  openTabFromMention(mentionElement) {
+    console.log('openTabFromMention called with:', mentionElement);
+    console.log('Mention attributes:', mentionElement.attributes);
+    console.log('Mention dataset:', mentionElement.dataset);
+    
+    const url = mentionElement.dataset.id || mentionElement.getAttribute('data-id');
+    console.log('Extracted URL:', url);
+    
+    if (!url) {
+      console.warn('No URL found in mention data-id attribute');
+      return;
+    }
+
+    // Get access to the browser window
+    const { topChromeWindow } = window.browsingContext;
+    if (!topChromeWindow?.gBrowser) {
+      console.error('Cannot access browser window');
+      return;
+    }
+
+    const gBrowser = topChromeWindow.gBrowser;
+    
+    // Look for an existing tab with this URL
+    const existingTab = Array.from(gBrowser.tabs).find(tab => {
+      const browser = gBrowser.getBrowserForTab(tab);
+      return browser.currentURI.spec === url;
+    });
+
+    if (existingTab) {
+      // Switch to existing tab
+      gBrowser.selectedTab = existingTab;
+    } else {
+      // Create new tab
+      gBrowser.addTab(url, {
+        triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
+        relatedToCurrent: true,
+      });
     }
   }
 
@@ -2359,6 +2412,32 @@ Today's date: ${currentDate}`;
           `
         : ""}
     `;
+  }
+
+  updated(changedProperties) {
+    super.updated(changedProperties);
+    
+    // Create a single click handler function if it doesn't exist
+    if (!this._mentionClickHandler) {
+      this._mentionClickHandler = (e) => {
+        console.log('Mention clicked directly:', e.currentTarget);
+        e.preventDefault();
+        e.stopPropagation();
+        this.openTabFromMention(e.currentTarget);
+      };
+    }
+    
+    // Attach click handlers to mentions after content is rendered
+    const mentions = this.renderRoot.querySelectorAll('.mention');
+    console.log('Found mentions in updated():', mentions.length);
+    
+    mentions.forEach(mention => {
+      // Check if handler is already attached
+      if (!mention.hasAttribute('data-click-attached')) {
+        mention.addEventListener('click', this._mentionClickHandler);
+        mention.setAttribute('data-click-attached', 'true');
+      }
+    });
   }
 
   set conversation(conversation) {

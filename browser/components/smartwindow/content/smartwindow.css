@@ -304,6 +304,12 @@ body {
   vertical-align: middle;
   gap: var(--space-xsmall);
   max-width: 185px;
+  cursor: pointer;
+  transition: max-width 0.2s ease;
+}
+
+.mention.expanded {
+  max-width: none;
 }
 
 .mention-list {
