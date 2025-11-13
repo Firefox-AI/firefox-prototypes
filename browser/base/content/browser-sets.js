@@ -3,6 +3,27 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+function openHistory(retries = 0) {
+  if (retries > 5) {
+    return;
+  }
+
+  const delay = 100 * (retries + 1);
+
+  // NOTE: Needs a delay to give the chat-bot element time
+  // to be available, not sure if there's a better way to do this
+  setTimeout(() => {
+    const chatBot =
+      gBrowser?.selectedBrowser?.contentDocument?.querySelector?.("#chat-bot");
+
+    if (chatBot) {
+      chatBot.showChatHistoryOverlay();
+    } else {
+      openHistory(retries++);
+    }
+  }, delay);
+}
+
 document.addEventListener(
   "MozBeforeInitialXULLayout",
   () => {
@@ -15,16 +36,7 @@ document.addEventListener(
           case "View:Chats":
             gBrowser.selectedTab = gBrowser.addTrustedTab(BROWSER_NEW_TAB_URL);
 
-            // NOTE: Needs a delay to give the chat-bot element time
-            // to be available, not sure if there's a better way to do this
-            setTimeout(() => {
-              const chatBot =
-                gBrowser?.selectedBrowser?.contentDocument?.querySelector?.(
-                  "#chat-bot"
-                );
-
-              chatBot.showChatHistoryOverlay();
-            }, 100);
+            openHistory();
             break;
           case "cmd_newNavigator":
             OpenBrowserWindow();

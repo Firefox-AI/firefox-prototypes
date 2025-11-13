@@ -310,7 +310,7 @@ export class ChatHistory {
       await this.#conn.execute(`DROP TABLE IF EXISTS summary;`);
 
       try {
-        await this.#conn.execute("SELECT page_url FROM message LIMIT 1");
+        await this.#conn.execute("SELECT page_url FROM message LIMIT 1;");
       } catch (e) {
         // Add a page_url column to the message table to keep track
         // of the pages visitedjduring a conversation and when they
@@ -321,7 +321,7 @@ export class ChatHistory {
       }
 
       try {
-        await this.#conn.execute("SELECT turn_index FROM message LIMIT 1");
+        await this.#conn.execute("SELECT turn_index FROM message LIMIT 1;");
       } catch (e) {
         // Add a turn_index column to group all types of messages into a
         // particular turn, ex: prompt -> response would be a single turn.
@@ -364,7 +364,7 @@ export class ChatHistory {
         content TEXT,
         usage_jsonb BLOB,
         page_url TEXT,
-        turn_index INTEGER,
+        turn_index INTEGER
       ) WITHOUT ROWID;
     `);
     await this.#conn.execute(`
