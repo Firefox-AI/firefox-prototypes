@@ -944,30 +944,32 @@ class ChatBot extends MozLitElement {
 
   /**
    * Open a tab from a mention click
+   *
    * @param {HTMLElement} mentionElement - The mention element that was clicked
    */
   openTabFromMention(mentionElement) {
-    console.log('openTabFromMention called with:', mentionElement);
-    console.log('Mention attributes:', mentionElement.attributes);
-    console.log('Mention dataset:', mentionElement.dataset);
-    
-    const url = mentionElement.dataset.id || mentionElement.getAttribute('data-id');
-    console.log('Extracted URL:', url);
-    
+    console.log("openTabFromMention called with:", mentionElement);
+    console.log("Mention attributes:", mentionElement.attributes);
+    console.log("Mention dataset:", mentionElement.dataset);
+
+    const url =
+      mentionElement.dataset.id || mentionElement.getAttribute("data-id");
+    console.log("Extracted URL:", url);
+
     if (!url) {
-      console.warn('No URL found in mention data-id attribute');
+      console.warn("No URL found in mention data-id attribute");
       return;
     }
 
     // Get access to the browser window
     const { topChromeWindow } = window.browsingContext;
     if (!topChromeWindow?.gBrowser) {
-      console.error('Cannot access browser window');
+      console.error("Cannot access browser window");
       return;
     }
 
     const gBrowser = topChromeWindow.gBrowser;
-    
+
     // Look for an existing tab with this URL
     const existingTab = Array.from(gBrowser.tabs).find(tab => {
       const browser = gBrowser.getBrowserForTab(tab);
@@ -980,7 +982,8 @@ class ChatBot extends MozLitElement {
     } else {
       // Create new tab
       gBrowser.addTab(url, {
-        triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
+        triggeringPrincipal:
+          Services.scriptSecurityManager.getSystemPrincipal(),
         relatedToCurrent: true,
       });
     }
@@ -2138,14 +2141,16 @@ Today's date: ${currentDate}`;
                           >
                             <div class="insights-applied-chat-popover-body">
                               <ul class="insights-applied-chat-popover-list">
-                                ${usedInsights.slice(0, 5).map(
-                                  insight =>
-                                    html`<li
-                                      class="insights-applied-chat-popover-list-item"
-                                    >
-                                      ${insight}
-                                    </li>`
-                                )}
+                                ${usedInsights
+                                  .slice(0, 5)
+                                  .map(
+                                    insight =>
+                                      html`<li
+                                        class="insights-applied-chat-popover-list-item"
+                                      >
+                                        ${insight}
+                                      </li>`
+                                  )}
                               </ul>
                               <div class="insights-applied-chat-popover-footer">
                                 <button
@@ -2454,26 +2459,26 @@ Today's date: ${currentDate}`;
 
   updated(changedProperties) {
     super.updated(changedProperties);
-    
+
     // Create a single click handler function if it doesn't exist
     if (!this._mentionClickHandler) {
-      this._mentionClickHandler = (e) => {
-        console.log('Mention clicked directly:', e.currentTarget);
+      this._mentionClickHandler = e => {
+        console.log("Mention clicked directly:", e.currentTarget);
         e.preventDefault();
         e.stopPropagation();
         this.openTabFromMention(e.currentTarget);
       };
     }
-    
+
     // Attach click handlers to mentions after content is rendered
-    const mentions = this.renderRoot.querySelectorAll('.mention');
-    console.log('Found mentions in updated():', mentions.length);
-    
+    const mentions = this.renderRoot.querySelectorAll(".mention");
+    console.log("Found mentions in updated():", mentions.length);
+
     mentions.forEach(mention => {
       // Check if handler is already attached
-      if (!mention.hasAttribute('data-click-attached')) {
-        mention.addEventListener('click', this._mentionClickHandler);
-        mention.setAttribute('data-click-attached', 'true');
+      if (!mention.hasAttribute("data-click-attached")) {
+        mention.addEventListener("click", this._mentionClickHandler);
+        mention.setAttribute("data-click-attached", "true");
       }
     });
   }

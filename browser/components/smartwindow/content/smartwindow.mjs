@@ -2521,6 +2521,7 @@ class SmartWindowPage {
 
   // Track if favicon has been changed to avoid changing it multiple times
   faviconChangedToChat = false;
+
   renderAllInsightsPanel(listHost) {
     if (!listHost) {
       return;

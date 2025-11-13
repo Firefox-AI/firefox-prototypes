@@ -1304,7 +1304,7 @@ const INSIGHTS_DEDUPE_SCHEMA = {
   items: {
     type: "object",
     additionalProperties: false,
-    required: [ "unique_insights" ],
+    required: ["unique_insights"],
     properties: {
       unique_insights: {
         type: "array",
@@ -1312,16 +1312,16 @@ const INSIGHTS_DEDUPE_SCHEMA = {
         items: {
           type: "object",
           additionalProperties: false,
-          required: [ "main_insight", "duplicates" ],
+          required: ["main_insight", "duplicates"],
           properties: {
             main_insight: { type: "string" },
             duplicates: {
               type: "array",
               minItems: 1,
-              items: { type: "string" }
+              items: { type: "string" },
             },
           },
-        }
+        },
       },
     },
   },
@@ -1333,12 +1333,12 @@ const INSIGHTS_NON_SENSITIVE_SCHEMA = {
   items: {
     type: "object",
     additionalProperties: false,
-    required: [ "non_sensitive_insights" ],
+    required: ["non_sensitive_insights"],
     properties: {
       non_sensitive_insights: {
         type: "array",
         minItems: 1,
-        items: { type: "string" }
+        items: { type: "string" },
       },
     },
   },
@@ -1734,18 +1734,22 @@ export function buildLiveInsightPrompt({
   profile_records = [],
   related_insights = [],
 } = {}) {
-
   // Render profile_records as CSV tables or JSON objects
   const profileRecordsRendered = [];
   for (const rec of profile_records) {
     // Row is just a domain/title with rank score
-    if (Array.isArray(rec[0]) && rec[0].length === 2 && typeof rec[0][0] === "string" && isFiniteNumber(rec[0][1])) {
+    if (
+      Array.isArray(rec[0]) &&
+      rec[0].length === 2 &&
+      typeof rec[0][0] === "string" &&
+      isFiniteNumber(rec[0][1])
+    ) {
       const rankTable = ["Item,Rank Score"];
       for (const row of rec) {
         rankTable.push(`${row[0].replace("www.", "")},${row[1]}`);
       }
       profileRecordsRendered.push(rankTable.join("\n"));
-    // Row is a search record with sid, cnt, q, ls, r
+      // Row is a search record with sid, cnt, q, ls, r
     } else if (rec.hasOwnProperty("sid") && rec.hasOwnProperty("r")) {
       const searchTable = ["Session ID,Queries,Rank Score"];
       for (const row of rec) {
@@ -1757,7 +1761,7 @@ export function buildLiveInsightPrompt({
         searchTable.push(`${sid},${q},${r}`);
       }
       profileRecordsRendered.push(searchTable.join("\n"));
-    // Fallback: row is anything else, just render as JSON
+      // Fallback: row is anything else, just render as JSON
     } else {
       profileRecordsRendered.push(JSON.stringify(rec, null, 2));
     }
@@ -1837,7 +1841,6 @@ ${profileRecordsRenderedStr}
 }
 
 function buildDedupeInsightsPrompt({ insights, existing_insights = [] }) {
-
   const insightsJSON = JSON.stringify(insights, null, 2);
   const existingInsightsJSON = JSON.stringify(existing_insights, null, 2);
 
@@ -1873,11 +1876,9 @@ Return ONLY JSON per the schema below.
 }
 \`\`\`
 `.trim();
-
-};
+}
 
 function buildNonSensitiveInsightsPrompt({ insights }) {
-
   const insightsJSON = JSON.stringify(insights, null, 2);
 
   return `
@@ -1919,8 +1920,7 @@ Return ONLY JSON per the schema below.
 }
 \`\`\`
 `.trim();
-
-};
+}
 
 // ============================================================================
 // Main Insights Generation Functions
@@ -1991,12 +1991,17 @@ async function generateInsightsWithLLM(profile, source) {
   const rawContent = response?.finalOutput ?? "";
   const parsed = extractJSON(rawContent);
   const list = normalizeInsightList(parsed);
-  const intentSummaryList = list.map((insight) => { return insight.insight_summary });
+  const intentSummaryList = list.map(insight => {
+    return insight.insight_summary;
+  });
 
   console.debug(`Generated ${list.length} raw insights from LLM.`);
 
   // Second pass: deduplicate
-  const dedupeInsightsPrompt = buildDedupeInsightsPrompt({ insights: intentSummaryList , existing_insights: related_insights });
+  const dedupeInsightsPrompt = buildDedupeInsightsPrompt({
+    insights: intentSummaryList,
+    existing_insights: related_insights,
+  });
   const dedupeResponse = await engine.run({
     args: [
       {
@@ -2011,13 +2016,18 @@ async function generateInsightsWithLLM(profile, source) {
 
   const dedupeRawContent = dedupeResponse?.finalOutput ?? "";
   const dedupeParsed = extractJSON(dedupeRawContent);
-  const dedupeList = dedupeParsed?.unique_insights.map((insight) => { return insight.main_insight }) || [];
+  const dedupeList =
+    dedupeParsed?.unique_insights.map(insight => {
+      return insight.main_insight;
+    }) || [];
 
   console.debug(`Deduped to ${dedupeList.length} unique insights.`);
 
   // Third pass: filter out sensitive insights
   // Pass the raw list of deduped insights directly to the sensitivity filter
-  const nonSensitiveInsightsPrompt = buildNonSensitiveInsightsPrompt({ insights: dedupeList });
+  const nonSensitiveInsightsPrompt = buildNonSensitiveInsightsPrompt({
+    insights: dedupeList,
+  });
   const nonSensitiveResponse = await engine.run({
     args: [
       {
@@ -2027,19 +2037,27 @@ async function generateInsightsWithLLM(profile, source) {
       },
       { role: "user", content: nonSensitiveInsightsPrompt },
     ],
-    responseFormat: { type: "json_schema", schema: INSIGHTS_NON_SENSITIVE_SCHEMA },
+    responseFormat: {
+      type: "json_schema",
+      schema: INSIGHTS_NON_SENSITIVE_SCHEMA,
+    },
   });
 
   const nonSensitiveRawContent = nonSensitiveResponse?.finalOutput ?? "";
   const nonSensitiveParsed = extractJSON(nonSensitiveRawContent);
   const nonSensitiveList = nonSensitiveParsed?.non_sensitive_insights || [];
 
-  console.debug(`Filtered to ${nonSensitiveList.length} non-sensitive insights.`);
+  console.debug(
+    `Filtered to ${nonSensitiveList.length} non-sensitive insights.`
+  );
 
   // Put the final list together
   const finalNewInsights = [];
   for (const insight of list) {
-    if (!related_insights.includes(insight.insight_summary) && nonSensitiveList.includes(insight.insight_summary)) {
+    if (
+      !related_insights.includes(insight.insight_summary) &&
+      nonSensitiveList.includes(insight.insight_summary)
+    ) {
       finalNewInsights.push(insight);
     }
   }
@@ -3808,7 +3826,7 @@ export function enumerateInsightSummaries(store) {
   const insightsByCategory = store?.insightsDataByCategory ?? {};
   const results = [];
 
-  const asArray = (value) => {
+  const asArray = value => {
     if (Array.isArray(value)) {
       return value;
     }
@@ -3818,7 +3836,7 @@ export function enumerateInsightSummaries(store) {
     return [];
   };
 
-  const extractSummary = (entry) => {
+  const extractSummary = entry => {
     if (typeof entry === "string") {
       return entry.trim();
     }
@@ -3828,7 +3846,9 @@ export function enumerateInsightSummaries(store) {
     return "";
   };
 
-  for (const [category, categoryEntries] of Object.entries(insightsByCategory)) {
+  for (const [category, categoryEntries] of Object.entries(
+    insightsByCategory
+  )) {
     for (const entry of asArray(categoryEntries)) {
       const summary = extractSummary(entry);
       if (summary) {
