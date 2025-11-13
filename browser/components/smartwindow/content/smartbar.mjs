@@ -354,6 +354,16 @@ export function attachToElement(element, options = {}) {
     },
   });
 
+  // Add click event listener for mention expansion toggle
+  element.addEventListener('click', (event) => {
+    const mentionElement = event.target.closest('.mention');
+    if (mentionElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      mentionElement.classList.toggle('expanded');
+    }
+  });
+
   function highlightQueryMatches(element, query) {
     if (!query || !element.textContent) {
       return;
