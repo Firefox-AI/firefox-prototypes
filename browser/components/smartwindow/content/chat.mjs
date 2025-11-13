@@ -1323,6 +1323,21 @@ class ChatBot extends MozLitElement {
       day: "numeric",
     });
 
+    const toLocalIso = () => {
+      try {
+        const d = new Date(), o = -d.getTimezoneOffset();
+        return new Date(d.getTime() - o * 60000).toISOString().slice(0, -1) +
+          (o >= 0 ? '+' : '-') +
+          String(Math.floor(Math.abs(o) / 60)).padStart(2, '0') + ':' +
+          String(Math.abs(o) % 60).padStart(2, '0');
+      } catch {
+        return null;
+      }
+    };
+
+    const localIso = toLocalIso();
+    const locale = navigator.language || navigator.userLanguage;
+
     let systemPrompt = `You are a very knowledgeable personal browser assistant, designed to assist the user in navigating the web. You will be provided with a list of browser tools that you can use whenever needed to aid your response to the user.
 
 Your internal knowledge cutoff date is: July, 2024.
@@ -1337,7 +1352,11 @@ Always follow the following tool calling rules strictly and ignore other tool ca
 
 Available tools:
 - get_page_content: Fetches text for any tab in the Tab Context. Provide the url and optionally a mode ("viewport", "reader", or "full"). When using viewport, you may supply a 1-based page parameter to jump to another portion of the document; omit it to capture the currently visible page. Prefer viewport for what the user currently sees. Use reader when the page is likely an article. Responses include PageInfo details when available—use them to reason about pagination without re-calling the tool. Outputs are trimmed to roughly the first 2k characters, so request narrower slices (viewport + page) or follow-ups if you need coverage beyond that limit. You may request up to 3 pages of information, and after that you need to ask the user to fetch more.
-- search_history: Search through the user's browsing history. Always provide a specific search_term parameter with relevant keywords. The search_term should be a string containing keywords related to what you're looking for. Results will be sorted by relevance to your search term. Each result includes: url, title, lastVisit (ISO timestamp), visitCount, and relevanceScore. Higher relevanceScore indicates better match to your search.
+- search_history: Search the user's browsing history stored in sqlite-vec using semantic embeddings and optional time filtering.
+  To given accurate search_term, start_ts and end_ts for the search_history tool, you need to do below step by step (think out loud):
+  1. Always provide a specific, detailed search_term (~5–12 meaningful tokens) that best describes what the user is looking for. Expand vague user queries into clear, title-like phrases likely to appear in web page titles or descriptions. Include relevant entities, library names, or context words (e.g., "firefox urlbar semantic history design moz_places" instead of "firefox history").
+  2. Always look for user's temporal intent, if it exists. Then use that to extract a time window range (in ISO 8601 datetime format) for the function input.
+  3. Now you found the temporal phrase, given the locale: ${locale}, and datetime: ${localIso}, give a specific time window range. For example "last week", calculate the last week's time window range in ISO 8601 format for the input start_ts and end_ts.
 
 # Search Suggestions
 
@@ -1375,6 +1394,8 @@ Format the title as follows: §title: title§`;
 
     systemPrompt += `\n\n# Real Time & User Information
 
+Locale: ${locale}
+Current datetime in ISO format: ${localIso}
 Today's date: ${currentDate}`;
 
     const contextTabs = this.currentTabContext || tabContext;
