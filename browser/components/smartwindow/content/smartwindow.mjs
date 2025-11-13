@@ -70,6 +70,7 @@ class SmartWindowPage {
     this.onboardingRendered = false;
     this.openInsightsPopover = null;
     this.closeInsightsPopover = null;
+    this._setInsightsToggle = null;
 
     this.#chatHistory = new ChatHistory();
 
@@ -704,6 +705,20 @@ class SmartWindowPage {
         this.showChatMode();
       } else {
         this.hideChatMode();
+      }
+
+      const useInsightsSetting =
+        typeof conversation?.settings?.useInsights === "boolean"
+          ? conversation.settings.useInsights
+          : true;
+      this._setInsightsToggle?.(useInsightsSetting);
+
+      const pop = document.getElementById("toggle-insights-popover");
+      if (pop?.classList.contains("is-open")) {
+        const listHost = pop.querySelector("[data-insights-list]");
+        if (listHost) {
+          this.renderAllInsightsPanel(listHost);
+        }
       }
     });
 
@@ -2405,8 +2420,10 @@ class SmartWindowPage {
       txt.innerText = val ? "On" : "Off";
       sw.classList.toggle("on", val);
     };
+    this._setInsightsToggle = setOn;
 
-    setOn(this.chatBot ? !!this.chatBot.useInsights : true);
+    const initialUseInsights = this.chatBot?.useInsights;
+    setOn(typeof initialUseInsights === "boolean" ? initialUseInsights : true);
 
     const outsideClick = e => {
       if (!pop.contains(e.target) && e.target !== btn) {

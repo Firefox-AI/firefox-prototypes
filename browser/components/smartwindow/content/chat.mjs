@@ -864,6 +864,25 @@ class ChatBot extends MozLitElement {
     }
   }
 
+  #rebuildConversationInsights(conversation) {
+    this.conversationInsights = new Set();
+    const messages = conversation?.messages ?? [];
+    for (const msg of messages) {
+      if (
+        msg?.role === ChatHistory.MESSAGE_ROLE.ASSISTANT &&
+        typeof msg.content === "string" &&
+        msg.content
+      ) {
+        const tokens = detectInsightTokens(msg.content);
+        for (const token of tokens) {
+          if (token.insight) {
+            this.conversationInsights.add(token.insight);
+          }
+        }
+      }
+    }
+  }
+
   async connectedCallback() {
     super.connectedCallback();
     // Listen for insights-updated events to re-render the overlay
@@ -1269,6 +1288,8 @@ class ChatBot extends MozLitElement {
   ) {
     if (!this.#conversation || this.#conversation.id !== conversation.id) {
       this.#conversation = conversation;
+      this.#rebuildConversationInsights(conversation);
+      this.#hydrateUseInsightsFromConversation();
       this._lastSentPageInfoSignature = null;
       this._lastSelectionSignature = null;
     }
@@ -2553,6 +2574,8 @@ Today's date: ${currentDate}`;
   set conversation(conversation) {
     this.#conversation = conversation;
     this.conversationTitle = conversation.title;
+    this.#rebuildConversationInsights(conversation);
+    this.#hydrateUseInsightsFromConversation();
 
     this.dispatchEvent(
       new CustomEvent("chatbot-conversation-updated", {
