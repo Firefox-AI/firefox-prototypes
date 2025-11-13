@@ -1433,7 +1433,20 @@ Today's date: ${currentDate}`;
       } else if (token.insight) {
         usedInsights.unshift(token.insight); // Add to beginning to maintain order
         // Track this insight as used in the conversation
+        const beforeSize = this.conversationInsights.size;
         this.conversationInsights.add(token.insight);
+        if (this.conversationInsights.size !== beforeSize) {
+          this.dispatchEvent(
+            new CustomEvent("conversation-insight-used", {
+              detail: {
+                insight: token.insight,
+                total: this.conversationInsights.size,
+              },
+              bubbles: true,
+              composed: true,
+            })
+          );
+        }
       } else if (token.title) {
         title = token.title; // Only one title expected
       }
@@ -1607,6 +1620,17 @@ Today's date: ${currentDate}`;
   handleInsightClick() {
     this.showInsightsOverlay = true;
     this.requestUpdate();
+  }
+
+  handleManageInsightsClick(e) {
+    e?.preventDefault();
+    e?.stopPropagation();
+    this.dispatchEvent(
+      new CustomEvent("conversation-insights-panel-requested", {
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
   closeInsightsOverlay() {
@@ -2364,6 +2388,8 @@ Today's date: ${currentDate}`;
                                     >
                                       <button
                                         class="insights-applied-chat-popover-manage-button"
+                                        @click=${e =>
+                                          this.handleManageInsightsClick(e)}
                                       >
                                         <svg
                                           width="16"

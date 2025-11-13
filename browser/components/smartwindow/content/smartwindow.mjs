@@ -10,7 +10,7 @@ import {
   generateFollowupPrompts,
 } from "./suggestions.mjs";
 import { showChatHistoryOverlay } from "chrome://browser/content/smartwindow/chat-history.mjs";
-import { deleteInsight, enumerateInsightSummaries } from "./insights.mjs";
+import { deleteInsight } from "./insights.mjs";
 
 const { ChatHistory, ChatHistoryConversation } = ChromeUtils.importESModule(
   "resource:///modules/smartwindow/ChatHistory.sys.mjs"
@@ -68,6 +68,8 @@ class SmartWindowPage {
     this._lastSearchHistoryItems = null;
 
     this.onboardingRendered = false;
+    this.openInsightsPopover = null;
+    this.closeInsightsPopover = null;
 
     this.#chatHistory = new ChatHistory();
 
@@ -1419,6 +1421,22 @@ class SmartWindowPage {
       this.chatBot.addEventListener("reopen-search-history-overlay", () => {
         this.toggleCachedHistoryOverlay();
       });
+
+      this.chatBot.addEventListener("conversation-insight-used", () => {
+        const listHost = document
+          .getElementById("toggle-insights-popover")
+          ?.querySelector("[data-insights-list]");
+        if (listHost) {
+          this.renderAllInsightsPanel(listHost);
+        }
+      });
+
+      this.chatBot.addEventListener(
+        "conversation-insights-panel-requested",
+        () => {
+          this.showInsightsPanel("manage-button");
+        }
+      );
     }
 
     if (topChromeWindow) {
@@ -2372,13 +2390,9 @@ class SmartWindowPage {
       return;
     }
 
-    if (this.isSidebarMode) {
-      pop.classList.add("insights--sidebar");
-      btn.classList.add("insights-button--sidebar");
-    } else {
-      pop.classList.remove("insights--sidebar");
-      btn.classList.remove("insights-button--sidebar");
-    }
+    pop.classList.toggle("insights--sidebar", this.isSidebarMode);
+    pop.classList.toggle("insights--fullpage", !this.isSidebarMode);
+    btn.classList.toggle("insights-button--sidebar", this.isSidebarMode);
 
     btn.hidden = false;
 
@@ -2420,11 +2434,9 @@ class SmartWindowPage {
         pop.classList.add("is-open");
       });
 
-      if (this.isSidebarMode) {
-        const listHost = pop.querySelector("[data-insights-list]");
-        if (listHost) {
-          this.renderAllInsightsPanel(listHost);
-        }
+      const listHost = pop.querySelector("[data-insights-list]");
+      if (listHost) {
+        this.renderAllInsightsPanel(listHost);
       }
 
       queueMicrotask(() => {
@@ -2441,13 +2453,15 @@ class SmartWindowPage {
       document.removeEventListener("keydown", esc);
       btn.setAttribute("aria-expanded", "false");
 
-      const isSidebarVariant = pop.classList.contains("insights--sidebar");
+      const isSlidingPanel =
+        pop.classList.contains("insights--sidebar") ||
+        pop.classList.contains("insights--fullpage");
       const cs = getComputedStyle(pop);
       const hasTransformTransition =
         cs.transitionProperty.includes("transform") &&
         parseFloat(cs.transitionDuration) > 0;
 
-      if (isSidebarVariant && hasTransformTransition) {
+      if (isSlidingPanel && hasTransformTransition) {
         const onEnd = e => {
           if (e.propertyName !== "transform") {
             return;
@@ -2488,6 +2502,27 @@ class SmartWindowPage {
     btn.addEventListener("click", toggleOpen);
     closeBtn?.addEventListener("click", closePopover);
     sw.addEventListener("click", onSwitch);
+
+    this.openInsightsPopover = openPopover;
+    this.closeInsightsPopover = closePopover;
+  }
+
+  showInsightsPanel(reason = "manual") {
+    const btn = document.getElementById("toggle-insights-button");
+    if (!btn) {
+      return;
+    }
+    const isOpen = btn.getAttribute("aria-expanded") === "true";
+    if (!isOpen) {
+      this.openInsightsPopover?.();
+      return;
+    }
+    const listHost = document
+      .getElementById("toggle-insights-popover")
+      ?.querySelector("[data-insights-list]");
+    if (listHost) {
+      this.renderAllInsightsPanel(listHost);
+    }
   }
 
   applyInsightsToChat() {
@@ -2527,18 +2562,73 @@ class SmartWindowPage {
       return;
     }
 
+    const usedInsights = this.chatBot?.conversationInsights ?? new Set();
+    listHost.textContent = "";
+
+    if (!usedInsights.size) {
+      const empty = document.createElement("div");
+      empty.className = "insights-panel-empty";
+      empty.textContent =
+        "No insights have been applied to this conversation yet.";
+      listHost.appendChild(empty);
+      return;
+    }
+
     const store =
       this.getInsightsData?.() ??
       window.browsingContext?.topChromeWindow?.SmartWindow?.getInsightsData?.() ??
       {};
 
-    const items = enumerateInsightSummaries(store);
+    const byCategory =
+      store && typeof store === "object" ? store.insightsDataByCategory : null;
+    const sourceEntries = (() => {
+      if (byCategory && Object.keys(byCategory).length) {
+        return Object.entries(byCategory);
+      }
+      if (store && typeof store === "object") {
+        return Object.entries(store).filter(([, value]) =>
+          Array.isArray(value)
+        );
+      }
+      return [];
+    })();
 
-    listHost.textContent = "";
+    const asArray = value =>
+      Array.isArray(value) ? value : value ? [value] : [];
+
+    const extractSummary = entry => {
+      if (typeof entry === "string") {
+        return entry.trim();
+      }
+      if (entry && typeof entry === "object") {
+        if (entry.insight_summary) {
+          return String(entry.insight_summary).trim();
+        }
+        if (entry.insight_short) {
+          return String(entry.insight_short).trim();
+        }
+        if (entry.summary) {
+          return String(entry.summary).trim();
+        }
+      }
+      return "";
+    };
+
+    const items = [];
+    for (const [category, rawEntries] of sourceEntries) {
+      for (const entry of asArray(rawEntries)) {
+        const summary = extractSummary(entry);
+        if (summary && usedInsights.has(summary)) {
+          items.push({ category, summary });
+        }
+      }
+    }
 
     if (!items.length) {
       const empty = document.createElement("div");
-      empty.textContent = "No insights available.";
+      empty.className = "insights-panel-empty";
+      empty.textContent =
+        "No insights have been applied to this conversation yet.";
       listHost.appendChild(empty);
       return;
     }
