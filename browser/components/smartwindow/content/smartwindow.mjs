@@ -1416,12 +1416,9 @@ class SmartWindowPage {
         }
       });
 
-      this.chatBot.addEventListener(
-        "reopen-search-history-overlay",
-        () => {
-          this.toggleCachedHistoryOverlay();
-        }
-      );
+      this.chatBot.addEventListener("reopen-search-history-overlay", () => {
+        this.toggleCachedHistoryOverlay();
+      });
     }
 
     if (topChromeWindow) {
@@ -2052,6 +2049,15 @@ class SmartWindowPage {
         const pageInfo = await this.fetchCurrentPageInfo();
         const selectionText = await this.fetchCurrentSelectionText();
 
+        // Change favicon to chat icon on first message submission
+        if (
+          !this.faviconChangedToChat &&
+          gBrowser.selectedTab.conversation.messages.length === 0
+        ) {
+          this.changeFaviconToChatIcon();
+          this.faviconChangedToChat = true;
+        }
+
         await this.chatBot.submitPrompt(
           gBrowser.selectedTab.conversation,
           { text, html },
@@ -2359,7 +2365,7 @@ class SmartWindowPage {
     const closeBtn = document.getElementById(
       this.isSidebarMode ? "toggle-insights-back" : "toggle-insights-close"
     );
-    const txt = document.getElementById('toggle-insights-text')
+    const txt = document.getElementById("toggle-insights-text");
     const sw = document.getElementById("toggle-insights-switch");
 
     if (!btn || !pop || !sw) {
@@ -2504,7 +2510,18 @@ class SmartWindowPage {
     return true;
   }
 
-   renderAllInsightsPanel(listHost) {
+  changeFaviconToChatIcon() {
+    // Change favicon from the new icon to the old desktop-notification.svg
+    const favicon = document.querySelector('link[rel="icon"]');
+    if (favicon) {
+      favicon.href =
+        "chrome://browser/skin/notification-icons/desktop-notification.svg";
+    }
+  }
+
+  // Track if favicon has been changed to avoid changing it multiple times
+  faviconChangedToChat = false;
+  renderAllInsightsPanel(listHost) {
     if (!listHost) {
       return;
     }
@@ -2549,9 +2566,11 @@ class SmartWindowPage {
     }
 
     if (!listHost._boundDelete) {
-      listHost.addEventListener("click", async (e) => {
+      listHost.addEventListener("click", async e => {
         const btn = e.target.closest(".insight-delete");
-        if (!btn) { return; }
+        if (!btn) {
+          return;
+        }
 
         const { category, summary } = btn.dataset;
 
