@@ -801,6 +801,7 @@ class ChatBot extends MozLitElement {
     this._lastSentPageInfoSignature = null;
     this._lastSelectionSignature = null;
     this.openChatInsights = false;
+    this._forceAmnesiaNextTurn = false;
 
     // TODO: Figure out what/where to get this info from, if necessary
     this.#conversation = new ChatHistoryConversation({
@@ -1144,6 +1145,16 @@ class ChatBot extends MozLitElement {
       if (selectionMessage) {
         prefixMessages.push(selectionMessage);
       }
+
+      if (this._forceAmnesiaNextTurn === true) {
+        prefixMessages.push({
+          role: ChatHistory.MESSAGE_ROLE.SYSTEM,
+          content:
+            "For this single response, ignore prior conversation and any insights about the user. Do not reference earlier assistant messages or answers. Rely only on the current user message and these system instructions.",
+        });
+        this._forceAmnesiaNextTurn = false;
+      }
+
       messagesForAPI.unshift(...prefixMessages);
     }
 
@@ -1745,6 +1756,31 @@ Today's date: ${currentDate}`;
     this.openChatInsights = this.openChatInsights === key ? null : key;
   }
 
+  async handleRetryWithoutInsights(key) {
+    const msgs = this.#conversation.messages;
+
+    const assistantMsg = msgs.find(m => m.id === key || m.messageId === key);
+    if (!assistantMsg) {
+      return;
+    }
+
+    const retryPrompt = msgs.find(m => m.id === assistantMsg.parentMessageId);
+    if (
+      !retryPrompt &&
+      !retryPrompt.content &&
+      retryPrompt.role !== ChatHistory.MESSAGE_ROLE.USER
+    ) {
+      return;
+    }
+
+    const prevUseInsights = this.useInsights;
+    this.useInsights = false;
+    this._forceAmnesiaNextTurn = true;
+    this.prompt = retryPrompt.content;
+    await this.sendPrompt();
+    this.useInsights = prevUseInsights;
+  }
+
   render() {
     // Count total insights for the badge
     const insightsData =
@@ -2140,6 +2176,8 @@ Today's date: ${currentDate}`;
                                 </button>
                                 <button
                                   class="insights-applied-chat-popover-retry-button"
+                                  @click=${() =>
+                                    this.handleRetryWithoutInsights(key)}
                                 >
                                   <svg
                                     width="16"
