@@ -2051,6 +2051,12 @@ class SmartWindowPage {
         const pageInfo = await this.fetchCurrentPageInfo();
         const selectionText = await this.fetchCurrentSelectionText();
 
+        // Change favicon to chat icon on first message submission
+        if (!this.faviconChangedToChat && gBrowser.selectedTab.conversation.messages.length === 0) {
+          this.changeFaviconToChatIcon();
+          this.faviconChangedToChat = true;
+        }
+
         await this.chatBot.submitPrompt(
           gBrowser.selectedTab.conversation,
           { text, html },
@@ -2495,6 +2501,17 @@ class SmartWindowPage {
     }
     return true;
   }
+
+  changeFaviconToChatIcon() {
+    // Change favicon from the new icon to the old desktop-notification.svg
+    const favicon = document.querySelector('link[rel="icon"]');
+    if (favicon) {
+      favicon.href = 'chrome://browser/skin/notification-icons/desktop-notification.svg';
+    }
+  }
+
+  // Track if favicon has been changed to avoid changing it multiple times
+  faviconChangedToChat = false;
 }
 
 new SmartWindowPage();
