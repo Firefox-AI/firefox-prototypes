@@ -8,6 +8,9 @@ const { ChatHistory } = ChromeUtils.importESModule(
   "resource:///modules/smartwindow/ChatHistory.sys.mjs"
 );
 
+export const CHAT_HISTORY_CONVERSATION_SELECTED_EVENT =
+  "chat-history:conversation-selected";
+
 /**
  * Fetches recent chat conversations from the last week
  *
@@ -389,7 +392,23 @@ export function showChatHistoryOverlay(onSelectConversation) {
     render(null, container);
   };
 
-  createHistoryOverlay(onClose, onSelectConversation);
+  const handleConversationSelect =
+    typeof onSelectConversation === "function"
+      ? onSelectConversation
+      : conversation => {
+          if (!conversation) {
+            return;
+          }
+          document.dispatchEvent(
+            new CustomEvent(CHAT_HISTORY_CONVERSATION_SELECTED_EVENT, {
+              detail: { conversation },
+              bubbles: true,
+              composed: true,
+            })
+          );
+        };
+
+  createHistoryOverlay(onClose, handleConversationSelect);
 }
 
 // Styles for the history overlay

@@ -9,7 +9,10 @@ import {
   generateConversationStarters,
   generateFollowupPrompts,
 } from "./suggestions.mjs";
-import { showChatHistoryOverlay } from "chrome://browser/content/smartwindow/chat-history.mjs";
+import {
+  showChatHistoryOverlay,
+  CHAT_HISTORY_CONVERSATION_SELECTED_EVENT,
+} from "chrome://browser/content/smartwindow/chat-history.mjs";
 import { deleteInsight } from "./insights.mjs";
 
 const { ChatHistory, ChatHistoryConversation } = ChromeUtils.importESModule(
@@ -66,6 +69,17 @@ class SmartWindowPage {
     this.currentTabPageInfo = null;
     this.quickActionButtons = {};
     this._lastSearchHistoryItems = null;
+    this.handleChatHistorySelection = event => {
+      const conversation = event.detail?.conversation;
+      if (conversation) {
+        this.loadConversationFromHistory(conversation);
+      }
+    };
+
+    document.addEventListener(
+      CHAT_HISTORY_CONVERSATION_SELECTED_EVENT,
+      this.handleChatHistorySelection
+    );
 
     this.onboardingRendered = false;
     this.openInsightsPopover = null;
@@ -106,6 +120,13 @@ class SmartWindowPage {
   }
 
   destructor() {
+    if (this.handleChatHistorySelection) {
+      document.removeEventListener(
+        CHAT_HISTORY_CONVERSATION_SELECTED_EVENT,
+        this.handleChatHistorySelection
+      );
+    }
+
     // Clean up preference observer
     if (this.onboardingPrefObserver) {
       Services.prefs.removeObserver(
