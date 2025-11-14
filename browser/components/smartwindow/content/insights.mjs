@@ -2955,46 +2955,6 @@ export function getInsightsState() {
 }
 
 /**
- * Builds the system prompt with insights data
- * Uses generated insights if available, otherwise uses default placeholder data
- *
- */
-export function buildInsightsSystemPrompt() {
-  const insightsData = getInsightsData();
-
-  if (!insightsData || Object.keys(insightsData).length === 0) {
-    return DEFAULT_INSIGHTS_SYSTEM_PROMPT;
-  }
-
-  // Use generated insights if available, otherwise fall back to defaults
-  const dataToUse = Object.keys(insightsData).length
-    ? insightsData
-    : DEFAULT_INSIGHTS_DATA;
-
-  let systemPrompt = `
-A list of insights about the user appear below. These insights were derived using signals from the user's browsing behavior, previous chats with the browsing assistant, and explicit input from the user. When responding, if you use any user insights from the list below to personalize your response (even implicitly), you must reference them by including §insight: specific term§ inline, directly after the phrase or sentence where the insight is applied. Use specific terms from the list rather than broad categories, and include multiple tags if multiple insights are relevant. Include the insights EXACTLY as they appear in the list. This enables better personalization features—do not skip tagging if an insight influences your answer. Only tag insights you actually use; avoid tagging irrelevant ones.
-
-User Insights List:`;
-
-  // Build insights list from data
-  Object.entries(dataToUse).forEach(([_category, insights]) => {
-    if (insights.length) {
-      const insightString = insights.join(", ");
-      systemPrompt += `\n- ${insightString}.`;
-    }
-  });
-
-  systemPrompt += `
-
-Examples of Insight Tagging:
-- User asks about flights: Weave in personalization like "Since you often fly from SJC §insight: SJC§, consider direct options..."
-- User asks about meals: "This recipe fits your interest in seasonal cooking §insight: seasonal cooking§ and healthy recipes §insight: healthy recipes§."
-- User asks about shoes: "For hiking boots, check REI §insight: REI§ based on your outdoor gear research §insight: outdoor gear research§."`;
-
-  return systemPrompt;
-}
-
-/**
  * Deletes an insight from storage
  *
  * @param {string} insight

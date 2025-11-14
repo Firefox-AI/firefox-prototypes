@@ -1351,11 +1351,15 @@ class ChatBot extends MozLitElement {
 
     const toLocalIso = () => {
       try {
-        const d = new Date(), o = -d.getTimezoneOffset();
-        return new Date(d.getTime() - o * 60000).toISOString().slice(0, -1) +
-          (o >= 0 ? '+' : '-') +
-          String(Math.floor(Math.abs(o) / 60)).padStart(2, '0') + ':' +
-          String(Math.abs(o) % 60).padStart(2, '0');
+        const d = new Date(),
+          o = -d.getTimezoneOffset();
+        return (
+          new Date(d.getTime() - o * 60000).toISOString().slice(0, -1) +
+          (o >= 0 ? "+" : "-") +
+          String(Math.floor(Math.abs(o) / 60)).padStart(2, "0") +
+          ":" +
+          String(Math.abs(o) % 60).padStart(2, "0")
+        );
       } catch {
         return null;
       }
@@ -1386,7 +1390,8 @@ Available tools:
 - get_relevant_insights: Fetches preferences to personalize responses to user queries. Use this tool if the user's message contains hints that personalization would improve your response (i.e. "for me", "that I like", etc.). Provide the user message and limit where limit is a maximum number of relevant insights. Keep "limit" small (e.g., 3–8). Results will be sorted by selected relevant insights
 
 # Use User Insights List from "get_relevant_insights tool call", If insights data is present, only use it when "available" is true or personalization is relevant. Otherwise, ignore it.
-
+  When responding, if you use any user insights from the list to personalize your response (even implicitly), you must reference them by including §insight: specific term§ inline, directly after the phrase or sentence where the insight is applied. Use specific terms from the list rather than broad categories, and include multiple tags if multiple insights are relevant. Include the insights EXACTLY as they appear in the list. This enables better personalization features—do not skip tagging if an insight influences your answer. Only tag insights you actually use; avoid tagging irrelevant ones.
+  
 # Search Suggestions
 
 When responding to user queries, if you determine that a web search would be more helpful than a direct answer, you may include a search suggestion using this exact format: §search: your suggested search query§
@@ -2447,8 +2452,7 @@ Today's date: ${currentDate}`;
                                             >
                                               ${insight}
                                             </li>`
-                                        )
-                                      }
+                                        )}
                                     </ul>
                                     <div
                                       class="insights-applied-chat-popover-footer"
