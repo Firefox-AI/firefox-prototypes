@@ -460,17 +460,19 @@ export class ChatHistory {
         params: m.params ? JSON.stringify(m.params) : null,
         content: m.content,
         usage: m.usage ? JSON.stringify(m.usage) : null,
+        page_url: m.page_url?.href || "",
+        turn_index: m.turn_index,
       }));
       await this.#conn.executeCached(
         `
         INSERT INTO message (
           message_id, conv_id, created_date, parent_message_id,
           revision_root_message_id, ordinal, is_active_branch, role,
-          model_id, params_jsonb, content, usage_jsonb
+          model_id, params_jsonb, content, usage_jsonb, page_url, turn_index
         ) VALUES (
           :message_id, :conv_id, :created_date, :parent_message_id,
           :revision_root_message_id, :ordinal, :is_active_branch, :role,
-          :model_id, jsonb(:params), :content, jsonb(:usage)
+          :model_id, jsonb(:params), :content, jsonb(:usage), :page_url, :turn_index
         )
         ON CONFLICT(message_id) DO UPDATE SET
           is_active_branch = :is_active_branch
@@ -713,20 +715,25 @@ export class ChatHistoryConversation {
   /**
    * @param {ConversationRole} role - The type of conversation message
    * @param {string} content - The conversation message contents
+   * @param {string} page_url - The current page url when message was submitted
+   * @param {string} turn_index - The current conversation turn/cycle
    */
-  addMessage(role, content) {
+  addMessage(role, content, page_url, turn_index) {
     let parentMessageId = null;
     if (this?.messages?.length) {
       const lastMessageIndex = this.messages.length - 1;
       parentMessageId = this.messages[lastMessageIndex].id;
     }
 
-    const ordinal = this?.messages?.length ? this.messages.length + 1 : 1;
+    const currentMessages = this?.messages || [];
+    const ordinal = currentMessages.length ? currentMessages.length + 1 : 1;
 
     const newMessage = new ChatHistoryMessage({
       parentMessageId,
       content,
       ordinal,
+      page_url,
+      turn_index,
       role,
     });
 
@@ -735,16 +742,58 @@ export class ChatHistoryConversation {
 
   /**
    * @param {string} content - The user message content
+   * @param {string?} pageUrl - The current page url when message was submitted
+   * @param {number} [turn_index=0] - The conversation turn/cycle
    */
-  addUserMessage(content) {
-    this.addMessage(ChatHistory.MESSAGE_ROLE.USER, content);
+  addUserMessage(content, pageUrl = "", turn_index = 0) {
+    this.addMessage(
+      ChatHistory.MESSAGE_ROLE.USER,
+      content,
+      pageUrl,
+      turn_index
+    );
   }
 
   /**
    * @param {string} content - The assistant message content
+   * @param {*} turn_index - The current conversation turn/cycle
    */
-  addAssistantMessage(content) {
-    this.addMessage(ChatHistory.MESSAGE_ROLE.ASSISTANT, content);
+  addAssistantMessage(content, turn_index) {
+    this.addMessage(
+      ChatHistory.MESSAGE_ROLE.ASSISTANT,
+      content,
+      "",
+      turn_index
+    );
+  }
+
+  /**
+   * Retrieves the list of visited sites during a conversation in visited order.
+   *
+   * @returns {Array<string>} - Ordered list of visited page URLs for this conversation
+   */
+  getSitesList() {
+    const sites = new Set();
+
+    this.messages.forEach(message => {
+      if (message.page_url && isNotInternalUrl(message.page_url)) {
+        sites.add(message.page_url);
+      }
+    });
+
+    return Array.from(sites);
+  }
+
+  /**
+   * Returns the most recently visited site during this conversation, or null
+   * if no sites have been visited.
+   *
+   * @returns {string|null}
+   */
+  getMostRecentPageVisited() {
+    const sites = this.getSitesList();
+
+    return sites.length ? sites.pop() : null;
   }
 
   set messages(value) {
@@ -755,6 +804,25 @@ export class ChatHistoryConversation {
   get messages() {
     return this.#messages;
   }
+}
+
+// NOTE: This type of logic is used in several places, we should put
+// this somewhere to be reused instead of redeclared in multiple places
+function isNotInternalUrl(tabInfo) {
+  if (!tabInfo) {
+    return false;
+  }
+
+  const url = tabInfo.toLowerCase();
+
+  // Filter out browser internal URLs
+  return (
+    (!url.startsWith("about:") || url.startsWith("about:reader?")) &&
+    !url.startsWith("chrome:") &&
+    !url.startsWith("moz-extension:") &&
+    !url.startsWith("resource:") &&
+    url !== "about:blank"
+  );
 }
 
 /**

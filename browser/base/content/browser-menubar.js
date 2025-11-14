@@ -336,16 +336,11 @@ function addRecentChatItems(menu, items, endMarker) {
         return;
       }
 
-      // TODO: Switch this from using conversation.pageUrl to getting the
-      // URL from the latest message with a pageUrl once per message page url
-      // tracking is added to the ChatHistory so that the chat opens to the
-      // page that the user was looking at last at the end of the conversation
-      if (
-        conversation?.pageUrl?.href &&
-        isValidUrl(conversation.pageUrl.href)
-      ) {
+      const lastVisitedSite = conversation.getMostRecentPageVisited();
+
+      if (lastVisitedSite && isValidUrl(lastVisitedSite)) {
         gBrowser.selectedTab = gBrowser.addTrustedTab(BROWSER_NEW_TAB_URL);
-        openUILink(conversation.pageUrl.href, event, {
+        openUILink(lastVisitedSite, event, {
           triggeringPrincipal:
             Services.scriptSecurityManager.createNullPrincipal({}),
         });

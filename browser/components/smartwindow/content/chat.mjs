@@ -1073,6 +1073,21 @@ class ChatBot extends MozLitElement {
     };
   }
 
+  getCurrentTabUrl(aUrl) {
+    // Get access to the browser window
+    const gBrowser = window?.browsingContext?.topChromeWindow?.gBrowser;
+    if (!gBrowser) {
+      return "";
+    }
+
+    const url = aUrl || gBrowser?.selectedBrowser?.currentURI?.spec;
+    try {
+      return new URL(url);
+    } catch (e) {
+      return "";
+    }
+  }
+
   async sendPrompt() {
     if (!this.prompt.trim()) {
       return;
@@ -1084,9 +1099,21 @@ class ChatBot extends MozLitElement {
       this.conversationTitle = "";
     }
 
+    const currentMessages = this.#conversation?.messages || [];
+    const turn_index =
+      currentMessages.reduce((turn, msg) => {
+        if (!isNaN(msg.turn_index) && msg.turn_index > turn) {
+          return msg.turn_index;
+        }
+
+        return turn;
+      }, -1) + 1;
+
+    const currentUrl = this.getCurrentTabUrl();
+
     // Conversation holds string-only {role, content}; keep render-only data in _uiMeta so it never reaches the backend.
     const before = this.#conversation.messages.length;
-    this.#conversation.addUserMessage(this.prompt);
+    this.#conversation.addUserMessage(this.prompt, currentUrl, turn_index);
     const msgsAfter = this.#conversation.messages;
     const userMsg = msgsAfter[before];
     const userKey = (userMsg && (userMsg.id ?? userMsg.messageId)) ?? before;
@@ -1147,7 +1174,7 @@ class ChatBot extends MozLitElement {
     }));
 
     // Prepare an empty assistant message for streaming
-    this.#conversation.addAssistantMessage("");
+    this.#conversation.addAssistantMessage("", turn_index);
     this.requestUpdate();
 
     const pageInfoMessage = this.#createPageInfoMessageIfNeeded();
