@@ -10,6 +10,8 @@ import {
   TextSelection,
   baseKeymap,
   history as PMHistory,
+  undo as PMHistoryUndo,
+  redo as PMHistoryRedo,
   keymap,
   suggestionsPlugin,
   triggerCharacter,
@@ -19,6 +21,7 @@ import {
   PLACEHOLDER_TEXT,
   buildExtractedTexts,
   createDocFromText,
+  createPasteToPillPlugin,
   createPlaceholderPlugin,
   schema,
 } from "chrome://browser/content/smartwindow/smartbar/smartbar-document.mjs";
@@ -109,6 +112,9 @@ export function attachToElement(element, options = {}) {
   });
 
   const placeholderPlugin = createPlaceholderPlugin(PLACEHOLDER_TEXT);
+  const pasteToPillPlugin = createPasteToPillPlugin((item, range) =>
+    mentionController.insertMentionCommand(item, range)
+  );
 
   const mentionPlugin = suggestionsPlugin({
     matcher: triggerCharacter("@"),
@@ -124,7 +130,13 @@ export function attachToElement(element, options = {}) {
     plugins: [
       PMHistory(),
       keymap(baseKeymap),
+      keymap({
+        "Mod-z": PMHistoryUndo,
+        "Mod-y": PMHistoryRedo,
+        "Shift-Mod-z": PMHistoryRedo,
+      }),
       placeholderPlugin,
+      pasteToPillPlugin,
       mentionPlugin,
       mentionDropdownStatePlugin,
     ],
@@ -172,6 +184,7 @@ export function attachToElement(element, options = {}) {
           return true;
         }
 
+        // return false to let other plugins handle the event
         return false;
       },
     }

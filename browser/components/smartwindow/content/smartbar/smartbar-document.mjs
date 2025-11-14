@@ -13,6 +13,9 @@ import {
 
 const PLACEHOLDER_TEXT = "Ask, search, or type a URL";
 
+// matches http(s) URLs
+const URL_REGEX = /^https?:\/\/[^\s]+$/i;
+
 function resolveMentionIcon({ id, icon }) {
   if (!icon) {
     return id ? `page-icon:${id}` : "";
@@ -126,6 +129,55 @@ function createPlaceholderPlugin(
 }
 
 /**
+ * Returns a ProseMirror plugin that converts pasted URLs to mention pills.
+ *
+ * @param {Function} insertMentionCommand - Command function from MentionDropdownController that inserts a mention.
+ * @param {typeof PMPlugin} [pluginClass]
+ * @returns {PMPlugin}
+ */
+function createPasteToPillPlugin(insertMentionCommand, pluginClass = PMPlugin) {
+  return new pluginClass({
+    props: {
+      handlePaste(view, _event, slice) {
+        // Don’t intercept paste during composition
+        if (view.composing) {
+          return false;
+        }
+
+        // Extract text from the pasted content
+        const pastedText = slice.content.textBetween(
+          0,
+          slice.content.size,
+          "\n"
+        );
+        const trimmed = pastedText.trim();
+
+        // Check URL
+        if (!URL_REGEX.test(trimmed)) {
+          return false; // Let default paste behavior handle it
+        }
+
+        // Create a mention pill covering the current selection
+        const { from, to } = view.state.selection;
+        const cmd = insertMentionCommand({
+          id: trimmed,
+          label: trimmed,
+          icon: "",
+          type: "paste",
+        }, { from, to });
+
+        // Execute the command with closeHistory to isolate as single undo step
+        cmd(view.state, tr => {
+          view.dispatch(tr.setMeta("closeHistory", true));
+        });
+
+        return true; // prevents default paste
+      },
+    },
+  });
+}
+
+/**
  * Serializes the document node to an HTML string.
  *
  * @param {ProseMirrorNode} doc
@@ -205,6 +257,12 @@ function buildExtractedTexts(json) {
       labeledQueryParts.push(t);
       return;
     }
+    if (node.type === "hard_break") {
+      plainParts.push("\n");
+      queryParts.push("\n");
+      labeledQueryParts.push("\n");
+      return;
+    }
     if (node.type === "mention") {
       const label = node.attrs?.label || node.attrs?.id || "";
       const id = node.attrs?.id || "";
@@ -268,6 +326,7 @@ export {
   PLACEHOLDER_TEXT,
   buildExtractedTexts,
   createDocFromText,
+  createPasteToPillPlugin,
   createPlaceholderPlugin,
   docToHTML,
   getExistingMentionIds,
