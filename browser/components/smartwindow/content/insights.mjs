@@ -4117,3 +4117,38 @@ export function enumerateInsightSummaries(store) {
 
   return results;
 }
+
+/**
+ * Return up to `limit` concise insight summaries for prompt seeding.
+ * Wraps enumerateInsightSummaries and adds dedupe + limit.
+ *
+ * @param {object} store
+ * @param {number} [limit=8]
+ * @returns {string[]}
+ */
+export function getInsightSummariesForPrompt(store, limit = 8) {
+  const insightEntries = enumerateInsightSummaries(store);
+  const summaries = [];
+  const seenNormalizedSummaries = new Set();
+
+  for (const { summary } of insightEntries) {
+    const summaryText = String(summary ?? "").trim();
+    if (!summaryText) {
+      continue;
+    }
+
+    const normalized = summaryText.toLowerCase();
+    if (seenNormalizedSummaries.has(normalized)) {
+      continue;
+    }
+
+    seenNormalizedSummaries.add(normalized);
+    summaries.push(summaryText);
+
+    if (summaries.length >= limit) {
+      break;
+    }
+  }
+
+  return summaries;
+}
