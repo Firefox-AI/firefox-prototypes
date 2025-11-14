@@ -89,12 +89,14 @@ const SEARCH_OPEN_TABS = "search_open_tabs";
 const GET_PAGE_CONTENT = "get_page_content";
 const SEARCH_HISTORY = "search_history";
 const GET_RELEVANT_INSIGHTS = "get_relevant_insights";
+const FLAG_ADD_INSIGHT = "flag_add_insight";
 
 const TOOLS = [
   SEARCH_OPEN_TABS,
   GET_PAGE_CONTENT,
   SEARCH_HISTORY,
   GET_RELEVANT_INSIGHTS,
+  FLAG_ADD_INSIGHT
 ];
 
 const toolsConfig = [
@@ -196,6 +198,25 @@ const toolsConfig = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: FLAG_ADD_INSIGHT,
+      description:
+        "Flags that the current user message indicates an insight should be added, but does not add the insight directly.",
+      parameters: {
+        type: "object",
+        properties: {
+          message: {
+            type: "string",
+            description:
+              "The user message that indicates an insight should be added.",
+          },
+        },
+        required: ["message"],
+      },
+    }
+  }
 ];
 
 export async function searchBrowserHistory({ search_term = "", start_ts = null, end_ts = null, limit = 10 }) {
@@ -369,6 +390,11 @@ export async function searchBrowserHistory({ search_term = "", start_ts = null, 
   } finally {
 
   }
+}
+
+async function flagAddInsight({ message }) {
+  console.log("Flagging message as likely insight source:", message);
+  return true;
 }
 
 const search_open_tabs = ({ type }) => {
@@ -709,6 +735,10 @@ export async function* fetchWithHistory(messages, allowedUrls) {
             } catch (e) {
               result = JSON.stringify({ error: String(e), message, limit });
             }
+            break;
+          }
+          case FLAG_ADD_INSIGHT: {
+            result = await flagAddInsight(toolParams);
             break;
           }
         }

@@ -1093,8 +1093,6 @@ class ChatBot extends MozLitElement {
       return;
     }
 
-    const directChatTextForInsights = this.prompt.trim();
-
     if (this.#conversation.messages.length === 0) {
       this.conversationTitle = "";
     }
@@ -1124,47 +1122,6 @@ class ChatBot extends MozLitElement {
       this._uiMeta.set(userKey, meta);
       this._uiMeta.set(before, meta);
       this._lastUserHTML = null;
-    }
-
-    // create insights from the user's direct message.
-    try {
-      const useInsights = Services.prefs.getBoolPref(
-        "browser.smartwindow.useInsights",
-        true
-      );
-      const looksLikePreference =
-        directChatTextForInsights.length <= 280 &&
-        /\b(remember|save|store|note|add to memory|i (prefer|like|love|hate|avoid)|my preference|i'm|i am)\b/i.test(
-          directChatTextForInsights
-        );
-
-      if (useInsights && looksLikePreference) {
-        // Log start
-        this.updateLogState({
-          content: "Generate insights from direct chat",
-          result: { status: "started" },
-        });
-        // Fire-and-forget: don't block streaming
-        generateInsightsFromDirectChat(directChatTextForInsights)
-          .then(({ addedCount }) => {
-            this.updateLogState({
-              content: "Direct-chat insights",
-              result: { addedCount },
-            });
-          })
-          .catch(err => {
-            this.updateLogState({
-              content: "Direct-chat insights error",
-              result: { error: true, message: err?.message || String(err) },
-            });
-          });
-      }
-    } catch (e) {
-      // Never let insights errors impact chat UX
-      this.updateLogState({
-        content: "Direct-chat insights error (outer)",
-        result: { error: true, message: e?.message || String(e) },
-      });
     }
 
     // Prepare messages with system prompt for the API call
@@ -1238,6 +1195,8 @@ class ChatBot extends MozLitElement {
           });
           if (chunk.tool === "search_history") {
             this.#flagHistoryOverlayForCurrentResponse(historyMeta);
+          } else if (chunk.tool == "flag_add_insight") {
+            this.#addFlaggedInsight(this.prompt.trim())
           }
           continue;
         }
@@ -1388,6 +1347,7 @@ Available tools:
   2. Always look for user's temporal intent, if it exists. Then use that to extract a time window range (in ISO 8601 datetime format) for the function input.
   3. Now you found the temporal phrase, given the locale: ${locale}, and datetime: ${localIso}, give a specific time window range. For example "last week", calculate the last week's time window range in ISO 8601 format for the input start_ts and end_ts.
 - get_relevant_insights: Fetches preferences to personalize responses to user queries. Use this tool if the user's message contains hints that personalization would improve your response (i.e. "for me", "that I like", etc.). Provide the user message and limit where limit is a maximum number of relevant insights. Keep "limit" small (e.g., 3–8). Results will be sorted by selected relevant insights
+- flag_add_insights: Flags that the user's latest message and dialog context express interests ("I'm interested in...", "Research..."), preferences ("I like..."), desires ("I want..."), memories ("Remember..."), etc. that could help tailor future responses by generating an insight. Only provide the user's latest message.
 
 # Use User Insights List from "get_relevant_insights tool call", If insights data is present, only use it when "available" is true or personalization is relevant. Otherwise, ignore it.
   When responding, if you use any user insights from the list to personalize your response (even implicitly), you must reference them by including §insight: specific term§ inline, directly after the phrase or sentence where the insight is applied. Use specific terms from the list rather than broad categories, and include multiple tags if multiple insights are relevant. Include the insights EXACTLY as they appear in the list. This enables better personalization features—do not skip tagging if an insight influences your answer. Only tag insights you actually use; avoid tagging irrelevant ones.
@@ -1669,6 +1629,36 @@ Today's date: ${currentDate}`;
     this._uiMeta.set(messageKey, metaWithHistory);
     this._uiMeta.set(lastIdx, metaWithHistory);
     this.requestUpdate();
+  }
+
+  #addFlaggedInsight(promptForInsight) {
+    try {
+      // Log start
+      this.updateLogState({
+        content: "Generate insights from direct chat",
+        result: { status: "started" },
+      });
+      // Fire-and-forget: don't block streaming
+      generateInsightsFromDirectChat(promptForInsight)
+        .then(({ addedCount }) => {
+          this.updateLogState({
+            content: "Direct-chat insights",
+            result: { addedCount },
+          });
+        })
+        .catch(err => {
+          this.updateLogState({
+            content: "Direct-chat insights error",
+            result: { error: true, message: err?.message || String(err) },
+          });
+        });
+    } catch (e) {
+      // Never let insights errors impact chat UX
+      this.updateLogState({
+        content: "Direct-chat insights error (outer)",
+        result: { error: true, message: e?.message || String(e) },
+      });
+    }
   }
 
   handleSearchQuery(query, engineName, clickEvent) {
