@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+import { getInsightSummariesForPrompt } from "./insights.mjs";
+
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   ChatHistory: "resource:///modules/smartwindow/ChatHistory.sys.mjs",
@@ -240,26 +242,29 @@ export async function generateLiveSuggestions(query, topChromeWindow) {
       // Get the intent for the original query
       const queryIntentType = await detectQueryType(query);
       const oppositeType = queryIntentType === "search" ? "chat" : "search";
-      
+
       // Process search results - preserve some as original type to ensure opposites
       const resultsToProcess = searchResults.slice(0, 6);
       const processedSuggestions = [];
-      
+
       // Keep at least one result as original "search" type to ensure we have opposites
       let preservedSearchCount = 0;
       const maxPreservedSearch = queryIntentType === "chat" ? 2 : 0; // Preserve search suggestions when intent is chat
-      
+
       for (const result of resultsToProcess) {
         let finalType;
-        
+
         // If we need search suggestions for opposites, preserve some original search results
-        if (queryIntentType === "chat" && preservedSearchCount < maxPreservedSearch) {
+        if (
+          queryIntentType === "chat" &&
+          preservedSearchCount < maxPreservedSearch
+        ) {
           finalType = "search";
           preservedSearchCount++;
         } else {
           finalType = await detectQueryType(result.text);
         }
-        
+
         processedSuggestions.push({
           title: result.title,
           text: result.text,
@@ -267,12 +272,18 @@ export async function generateLiveSuggestions(query, topChromeWindow) {
           type: finalType,
         });
       }
-      
+
       // Reorder suggestions: intent type first, opposite type second, then others
-      const intentSuggestions = processedSuggestions.filter(s => s.type === queryIntentType);
-      const oppositeSuggestions = processedSuggestions.filter(s => s.type === oppositeType);
-      const otherSuggestions = processedSuggestions.filter(s => s.type !== queryIntentType && s.type !== oppositeType);
-      
+      const intentSuggestions = processedSuggestions.filter(
+        s => s.type === queryIntentType
+      );
+      const oppositeSuggestions = processedSuggestions.filter(
+        s => s.type === oppositeType
+      );
+      const otherSuggestions = processedSuggestions.filter(
+        s => s.type !== queryIntentType && s.type !== oppositeType
+      );
+
       // Add in desired order: intent first (always the original query for chat/search), then opposite, then others
       // For chat or search intent, always put the original query as the first suggestion
       if (queryIntentType === "chat" || queryIntentType === "search") {
@@ -280,13 +291,16 @@ export async function generateLiveSuggestions(query, topChromeWindow) {
           title: "",
           text: query,
           icon: "",
-          type: queryIntentType
+          type: queryIntentType,
         });
-      } else if (intentSuggestions.length > 0) {
+      } else if (intentSuggestions.length) {
         suggestions.push(intentSuggestions[0]); // First suggestion matches intent
-      } else if (processedSuggestions.length > 0) {
+      } else if (processedSuggestions.length) {
         // If no intent matches, add the first available suggestion and ensure it has the right type
-        const firstSuggestion = { ...processedSuggestions[0], type: queryIntentType };
+        const firstSuggestion = {
+          ...processedSuggestions[0],
+          type: queryIntentType,
+        };
         suggestions.push(firstSuggestion);
       } else {
         // Fallback: always add the original query with detected intent type
@@ -294,24 +308,30 @@ export async function generateLiveSuggestions(query, topChromeWindow) {
           title: "",
           text: query,
           icon: "",
-          type: queryIntentType
+          type: queryIntentType,
         });
       }
-      
+
       // Ensure we always have an opposite type as second suggestion using the original query
       // Always use the original query text for the opposite suggestion to maintain consistency
-      suggestions.push({ 
-        title: "", 
-        text: query, 
-        icon: "", 
-        type: oppositeType 
+      suggestions.push({
+        title: "",
+        text: query,
+        icon: "",
+        type: oppositeType,
       });
-      
+
       // Add remaining suggestions (avoid duplicates)
       const addedTexts = new Set(suggestions.map(s => s.text));
-      suggestions.push(...intentSuggestions.slice(1).filter(s => !addedTexts.has(s.text)));
-      suggestions.push(...oppositeSuggestions.slice(1).filter(s => !addedTexts.has(s.text)));
-      suggestions.push(...otherSuggestions.filter(s => !addedTexts.has(s.text)));
+      suggestions.push(
+        ...intentSuggestions.slice(1).filter(s => !addedTexts.has(s.text))
+      );
+      suggestions.push(
+        ...oppositeSuggestions.slice(1).filter(s => !addedTexts.has(s.text))
+      );
+      suggestions.push(
+        ...otherSuggestions.filter(s => !addedTexts.has(s.text))
+      );
     }
 
     // Add navigate results as-is
@@ -346,7 +366,10 @@ export async function generateLiveSuggestions(query, topChromeWindow) {
         // If this is the first suggestion, ensure it follows intent-first pattern
         if (suggestions.length === 0) {
           suggestions.push({ text: query, type: queryType });
-        } else if (suggestions.length === 1 && suggestions[0].type === queryType) {
+        } else if (
+          suggestions.length === 1 &&
+          suggestions[0].type === queryType
+        ) {
           // If first suggestion matches intent, add opposite type as second
           suggestions.push({ text: query, type: oppositeType });
         } else {
@@ -501,7 +524,7 @@ Rules:
 Return ONLY the suggestions, one per line, no numbering, no extra formatting:`;
 
 /**
- * Generates conversation starter prompts based on tab context
+ * Generates conversation starter prompts based on tab context + (optional) user insights
  *
  * @param {Array} contextTabs - Array of tab objects with title, url, favicon
  * @param {number} n - Number of suggestions to generate (default 6)
@@ -526,13 +549,45 @@ export async function generateConversationStarters(contextTabs = [], n = 6) {
           ? "Only current tab is open"
           : "No tabs available";
 
-    const filled = CONVERSATION_STARTERS_TEMPLATE.replace(
+    // Base template
+    const base = CONVERSATION_STARTERS_TEMPLATE.replace(
       "{current_tab}",
       currentTab
     )
       .replace("{opened_tabs}", openedTabs)
       .replace("{n}", String(n))
       .replace("{date}", today);
+
+    const topWin = window.browsingContext?.topChromeWindow;
+    const conv = topWin?.gBrowser?.selectedTab?.conversation;
+
+    let insightsEnabled = true;
+    if (conv?.settings && typeof conv.settings.useInsights === "boolean") {
+      insightsEnabled = conv.settings.useInsights;
+    }
+
+    let filled = base;
+
+    if (insightsEnabled) {
+      const sw = topWin?.SmartWindow || window.SmartWindow;
+      const store = sw?.getInsightsData?.() || {};
+      const summaries = getInsightSummariesForPrompt(store, 8);
+
+      if (summaries.length) {
+        const insightsBlock = summaries.map(s => `- ${s}`).join("\n");
+        filled = `${base}
+
+========
+User Insights:
+${insightsBlock}
+
+Guideline:
+- Use insights only when relevant to the current tab or open tabs; otherwise default to general starters.
+- Paraphrase insights into actionable starters; do not repeat them verbatim or reveal sensitive details.
+- Do not invent new personal attributes or insights; prefer neutral phrasing when unsure.
+- Aim for variety; avoid duplicates across suggestions.`;
+      }
+    }
 
     const engineInstance = await createOpenAIEngine("smart-start");
 
@@ -546,7 +601,7 @@ export async function generateConversationStarters(contextTabs = [], n = 6) {
       ],
     });
 
-    const text = result.finalOutput.trim() || "";
+    const text = (result.finalOutput || "").trim();
 
     // Parse newline-separated responses
     const lines = text
@@ -556,13 +611,10 @@ export async function generateConversationStarters(contextTabs = [], n = 6) {
 
     // Clean up any numbering or bullet points that might have been added
     const prompts = lines
-      .map(line => {
-        const cleaned = line.replace(/^[-*\d.)\]]+\s*/, "");
-        return cleaned;
-      })
-      .filter(p => !!p.length);
+      .map(line => line.replace(/^[-*\d.)\]]+\s*/, ""))
+      .filter(p => p.length);
 
-    return prompts.slice(0, n).map(text => ({ text, type: "chat" }));
+    return prompts.slice(0, n).map(t => ({ text: t, type: "chat" }));
   } catch (e) {
     console.warn("[suggestions][conversation-starters] failed:", e);
     return [];

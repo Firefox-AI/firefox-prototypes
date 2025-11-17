@@ -13,7 +13,7 @@ import {
   showChatHistoryOverlay,
   CHAT_HISTORY_CONVERSATION_SELECTED_EVENT,
 } from "chrome://browser/content/smartwindow/chat-history.mjs";
-import { deleteInsight } from "./insights.mjs";
+import { deleteInsight, getInsightSummariesForPrompt } from "./insights.mjs";
 
 const { ChatHistory, ChatHistoryConversation } = ChromeUtils.importESModule(
   "resource:///modules/smartwindow/ChatHistory.sys.mjs"
@@ -168,8 +168,12 @@ class SmartWindowPage {
     return await detectQueryType(query, isFollowup);
   }
 
+  hashSummaries(arr) {
+    return arr.join("|").toLowerCase().slice(0, 128);
+  }
+
   // Generate conversation starters with caching
-  async generateQuickPrompts(tabTitle = "") {
+  async generateQuickPrompts(tabTitle = "", { force = false } = {}) {
     let contextTabs = this.getAllContextTabs();
 
     // If no context tabs, use recent tabs (up to 5)
@@ -185,14 +189,34 @@ class SmartWindowPage {
       return [];
     }
 
-    // Use caching for conversation starters
-    const cacheKey =
-      topChromeWindow.SmartWindow.getContextCacheKey(contextTabs);
-    const cachedPromise =
-      topChromeWindow.SmartWindow.getPromptsFromCache(cacheKey);
+    // use toggle value if set, otherwise default ON
+    const conv = topChromeWindow?.gBrowser?.selectedTab?.conversation;
+    let insightsEnabled = true;
+    if (conv?.settings && typeof conv.settings.useInsights === "boolean") {
+      insightsEnabled = conv.settings.useInsights;
+    }
 
-    if (cachedPromise) {
-      return await cachedPromise;
+    // insight summaries (only if enabled)
+    let insightsKey = "insights:off";
+    if (insightsEnabled) {
+      const store = topChromeWindow?.SmartWindow?.getInsightsData?.() || {};
+      const summaries = getInsightSummariesForPrompt(store, 8);
+      insightsKey = summaries.length
+        ? `insights:${this.hashSummaries(summaries)}`
+        : "insights:none";
+    }
+
+    const baseKey = topChromeWindow.SmartWindow.getContextCacheKey(contextTabs);
+
+    // Use caching for conversation starters
+    const cacheKey = `${baseKey}|${insightsKey}`;
+
+    if (!force) {
+      const cachedPromise =
+        topChromeWindow.SmartWindow.getPromptsFromCache(cacheKey);
+      if (cachedPromise) {
+        return await cachedPromise;
+      }
     }
 
     const promptsPromise = this._generatePromptsInternal(contextTabs);
@@ -215,6 +239,25 @@ class SmartWindowPage {
       console.error("Failed to generate conversation starters:", error);
     }
     return [];
+  }
+
+  setupInsightsEventHooks() {
+    if (this._insightsHooksBound) {
+      return;
+    }
+    this._insightsHooksBound = true;
+
+    const refresh = async () => {
+      try {
+        const prompts = await this.generateQuickPrompts("", { force: true });
+        this.displayQuickPrompts(prompts, "starters");
+      } catch (e) {
+        console.warn("[starters] refresh failed:", e);
+      }
+    };
+
+    window.addEventListener("smartwindow:useinsights", refresh);
+    window.addEventListener("smartwindow:insights-updated", refresh);
   }
 
   // Tab Context Management Methods
@@ -787,6 +830,8 @@ class SmartWindowPage {
       // Don't await to avoid blocking initialization
       this.showQuickPrompts().catch(console.error);
     }
+
+    this.setupInsightsEventHooks();
   }
 
   setupKeyUI() {
