@@ -877,11 +877,6 @@
   value: false
   mirror: always
 
-- name: apz.windows.use_direct_manipulation
-  type: RelaxedAtomicBool
-  value: true
-  mirror: always
-
 - name: apz.windows.check_for_pan_gesture_conversion
   type: RelaxedAtomicBool
   value: true
@@ -8978,6 +8973,13 @@
   mirror: always
   set_spidermonkey_pref: startup
 
+  # Experimental support for Iterator Sequencing in JavaScript.
+-   name: javascript.options.experimental.iterator_sequencing
+    type: bool
+    value: true
+    mirror: always
+    set_spidermonkey_pref: startup
+
 #ifdef NIGHTLY_BUILD
   # Experimental support for Async Iterator Helpers in JavaScript.
 -   name: javascript.options.experimental.async_iterator_helpers
@@ -8995,13 +8997,6 @@
 
   # Experimental support for Joint Iteration in JavaScript.
 -   name: javascript.options.experimental.joint_iteration
-    type: bool
-    value: false
-    mirror: always
-    set_spidermonkey_pref: startup
-
-  # Experimental support for Iterator Sequencing in JavaScript.
--   name: javascript.options.experimental.iterator_sequencing
     type: bool
     value: false
     mirror: always
@@ -9407,11 +9402,9 @@
   do_not_use_directly: true
 
 # Use the JS microtask queue for Promise jobs and other microtasks.
-# DO NOT TURN THIS ON BY DEFAULT WITHOUT THE BUGS BLOCKING
-# BUG 1990841 being fixed (especially Bug 1990842).
 - name: javascript.options.use_js_microtask_queue
   type: RelaxedAtomicBool
-  value: false
+  value: true
   # Changing this mid process will break invariants and crash, however
   # making this mirror: once, and set_spidermonkey_pref: startup is
   # broken: See Bug 1989094
@@ -13287,6 +13280,13 @@
   value: true
   mirror: always
 
+# Default buffer size for buffered stream operations. The actual value used will
+# be floored to the nearest power of two.
+- name: network.buffer.default_size
+  type: RelaxedAtomicUint32
+  value: 65536
+  mirror: always
+
 # See the full list of values in nsICookieService.idl.
 - name: network.cookie.cookieBehavior
   type: RelaxedAtomicInt32
@@ -13459,14 +13459,17 @@
   value: false
   mirror: always
 
-# If we should attempt to race the cache and network.
+# If we should attempt to race the cache with network.
+# See also race_with_non_ssd for auto-enable behavior on Windows non-SSD drives.
 - name: network.http.rcwn.enabled
   type: bool
-#if defined(ANDROID)
   value: false
-#else
+  mirror: always
+
+# If we should attempt to race the cache with network for non-SSD drives (Windows only).
+- name: network.http.rcwn.race_with_non_ssd
+  type: bool
   value: true
-#endif
   mirror: always
 
 - name: network.http.rcwn.cache_queue_normal_threshold

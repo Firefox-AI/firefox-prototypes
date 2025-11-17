@@ -943,7 +943,6 @@ void nsIFrame::Destroy(DestroyContext& aContext) {
   }
 
   if (nsView* view = GetView()) {
-    view->SetFrame(nullptr);
     view->Destroy();
   }
 
@@ -1260,7 +1259,7 @@ void nsIFrame::DidSetComputedStyle(ComputedStyle* aOldComputedStyle) {
 
   const bool isRootElementStyle = Style()->IsRootElementStyle();
   if (isRootElementStyle) {
-    PresShell()->SyncWindowProperties(/* aSync = */ false);
+    PresShell()->SetNeedsWindowPropertiesSync();
   }
 
   const nsStyleImageLayers* oldLayers =
@@ -3326,6 +3325,7 @@ void nsIFrame::BuildDisplayListForStackingContext(
 
   const bool useStickyPosition =
       disp->mPosition == StylePositionProperty::Sticky;
+  bool shouldFlattenStickyItem = true;
 
   const bool useFixedPosition =
       disp->mPosition == StylePositionProperty::Fixed &&
@@ -3364,7 +3364,7 @@ void nsIFrame::BuildDisplayListForStackingContext(
   // NOTE(emilio): The order of these RAII objects is quite subtle.
   nsDisplayListBuilder::AutoEnterViewTransitionCapture
       inViewTransitionCaptureSetter(aBuilder, capturedByViewTransition);
-  nsDisplayListBuilder::AutoContainerASRTracker contASRTracker(aBuilder);
+  RefPtr<const ActiveScrolledRoot> stickyASR = nullptr;
   nsDisplayListBuilder::AutoCurrentActiveScrolledRootSetter asrSetter(aBuilder);
   if (aBuilder->IsInViewTransitionCapture()) {
     // View transition contents shouldn't scroll along our ASR. They get
@@ -3372,6 +3372,29 @@ void nsIFrame::BuildDisplayListForStackingContext(
     // anyways).
     asrSetter.SetCurrentActiveScrolledRoot(nullptr);
   }
+  if (useStickyPosition) {
+    StickyScrollContainer* stickyScrollContainer =
+        StickyScrollContainer::GetOrCreateForFrame(this);
+    if (stickyScrollContainer) {
+      if (aBuilder->IsPaintingToWindow() &&
+          !aBuilder->IsInViewTransitionCapture() &&
+          stickyScrollContainer->ScrollContainer()
+              ->IsMaybeAsynchronouslyScrolled()) {
+        shouldFlattenStickyItem = false;
+      }
+      stickyScrollContainer->SetShouldFlatten(shouldFlattenStickyItem);
+    }
+
+    if (shouldFlattenStickyItem) {
+      stickyASR = aBuilder->CurrentActiveScrolledRoot();
+    } else {
+      stickyASR = aBuilder->AllocateActiveScrolledRootForSticky(
+          aBuilder->CurrentActiveScrolledRoot(), this);
+      asrSetter.SetCurrentActiveScrolledRoot(stickyASR);
+    }
+  }
+
+  nsDisplayListBuilder::AutoContainerASRTracker contASRTracker(aBuilder);
 
   auto cssClip = GetClipPropClipRect(disp, effects, GetSize());
   auto ApplyClipProp = [&](DisplayListClipState::AutoSaveRestore& aClipState) {
@@ -3450,6 +3473,7 @@ void nsIFrame::BuildDisplayListForStackingContext(
 
   nsDisplayListCollection set(aBuilder);
   Maybe<nsRect> clipForMask;
+
   {
     DisplayListClipState::AutoSaveRestore nestedClipState(aBuilder);
     nsDisplayListBuilder::AutoInTransformSetter inTransformSetter(aBuilder,
@@ -3458,6 +3482,11 @@ void nsIFrame::BuildDisplayListForStackingContext(
                                                           usingFilter);
     nsDisplayListBuilder::AutoInEventsOnly inEventsSetter(
         aBuilder, opacityItemForEventsOnly);
+
+    DisplayListClipState::AutoSaveRestore stickyItemNestedClipState(aBuilder);
+    if (useStickyPosition && !shouldFlattenStickyItem) {
+      stickyItemNestedClipState.MaybeRemoveDisplayportClip();
+    }
 
     // If we have a mask, compute a clip to bound the masked content.
     // This is necessary in case the content moves with an ancestor
@@ -3876,9 +3905,11 @@ void nsIFrame::BuildDisplayListForStackingContext(
     // item as well.
     const ActiveScrolledRoot* fixedASR = ActiveScrolledRoot::PickAncestor(
         containerItemASR, aBuilder->CurrentActiveScrolledRoot());
+    const ActiveScrolledRoot* scrollTargetASR =
+        containerItemASR ? containerItemASR->GetNearestScrollASR() : nullptr;
     resultList.AppendNewToTop<nsDisplayFixedPosition>(
         aBuilder, this, &resultList, fixedASR,
-        nsDisplayItem::ContainerASRType::AncestorOfContained, containerItemASR,
+        nsDisplayItem::ContainerASRType::AncestorOfContained, scrollTargetASR,
         ShouldForceIsolation());
     createdContainer = true;
   } else if (useStickyPosition && !capturedByViewTransition) {
@@ -3895,19 +3926,17 @@ void nsIFrame::BuildDisplayListForStackingContext(
     // that on the display item as the "container ASR" (i.e. the normal ASR of
     // the container item, excluding the special behaviour induced by fixed
     // descendants).
-    const ActiveScrolledRoot* stickyASR = ActiveScrolledRoot::PickAncestor(
+    DisplayListClipState::AutoSaveRestore stickyItemClipState(aBuilder);
+    stickyItemClipState.MaybeRemoveDisplayportClip();
+    const ActiveScrolledRoot* stickyItemASR = ActiveScrolledRoot::PickAncestor(
         containerItemASR, aBuilder->CurrentActiveScrolledRoot());
 
     auto* stickyItem = MakeDisplayItem<nsDisplayStickyPosition>(
-        aBuilder, this, &resultList, stickyASR,
+        aBuilder, this, &resultList, stickyItemASR,
         nsDisplayItem::ContainerASRType::AncestorOfContained,
-        aBuilder->CurrentActiveScrolledRoot(),
-        clipState.IsClippedToDisplayPort());
+        aBuilder->CurrentActiveScrolledRoot());
 
-    auto* ssc = StickyScrollContainer::GetOrCreateForFrame(this);
-    const bool shouldFlatten =
-        !ssc || !ssc->ScrollContainer()->IsMaybeAsynchronouslyScrolled();
-    stickyItem->SetShouldFlatten(shouldFlatten);
+    stickyItem->SetShouldFlatten(shouldFlattenStickyItem);
 
     resultList.AppendToTop(stickyItem);
     createdContainer = true;
@@ -3915,9 +3944,11 @@ void nsIFrame::BuildDisplayListForStackingContext(
     // If the sticky element is inside a filter, annotate the scroll frame that
     // scrolls the filter as having out-of-flow content inside a filter (this
     // inhibits paint skipping).
-    if (aBuilder->GetFilterASR() && aBuilder->GetFilterASR() == stickyASR) {
+    if (aBuilder->GetFilterASR() && aBuilder->GetFilterASR() == stickyItemASR) {
       aBuilder->GetFilterASR()
-          ->mScrollContainerFrame->SetHasOutOfFlowContentInsideFilter();
+          ->GetNearestScrollASR()
+          ->ScrollFrame()
+          ->SetHasOutOfFlowContentInsideFilter();
     }
   }
 
@@ -6573,7 +6604,7 @@ nsIFrame::SizeComputationResult nsIFrame::ComputeSize(
   // isAutoBSize is true, or styleBSize is of type LengthPercentage()).
   const auto styleBSize = [&] {
     auto styleBSizeConsideringOverrides =
-        (aSizeOverrides.mStyleBSize)
+        aSizeOverrides.mStyleBSize
             ? AnchorResolvedSizeHelper::Overridden(*aSizeOverrides.mStyleBSize)
             : stylePos->BSize(aWM, anchorResolutionParams);
     if (styleBSizeConsideringOverrides->BehavesLikeStretchOnBlockAxis() &&
@@ -7320,8 +7351,41 @@ nsIFrame::ISizeComputationResult nsIFrame::ComputeISizeValue(
     if (nsLayoutUtils::IsAutoBSize(aStyleBSize, aCBSize.BSize(aWM))) {
       return Nothing();
     }
+
+    // Helper used below to resolve aStyleBSize if it's 'stretch' or an alias.
+    // XXXdholbert Really we should be resolving 'stretch' and its aliases
+    // sooner; see bug 2000035.
+    auto ResolveStretchBSize = [&]() {
+      MOZ_ASSERT(aStyleBSize.BehavesLikeStretchOnBlockAxis(),
+                 "Only call me for 'stretch'-like BSizes");
+      MOZ_ASSERT(aCBSize.BSize(aWM) != NS_UNCONSTRAINEDSIZE,
+                 "If aStyleBSize is stretch-like, then unconstrained "
+                 "aCBSize.BSize should make us return via the IsAutoBSize "
+                 "check above");
+
+      // NOTE: the borderPadding and margin variables might be zero-filled
+      // instead of having the true values, if those values haven't been
+      // stashed in our property-table yet (e.g. if we're in the midst of
+      // setting up a ReflowInput for our first reflow). So ideally, we should
+      // be resolving 'stretch' **in our callers** rather than here, if those
+      // callers have more up-to-date resolved margin/border/padding values.
+      // We'll still make a best-effort attempt to resolve 'stretch' here,
+      // though, for the benefit of callers that might not have handled it, to
+      // be sure we don't abort in aStyleBSize.AsLengthPercentage(). Ultimately
+      // this all can be removed when we fix bug 2000035.
+      const auto borderPadding = GetLogicalUsedBorderAndPadding(aWM);
+      const auto margin = GetLogicalUsedMargin(aWM);
+      nscoord stretchBSize = nsLayoutUtils::ComputeStretchBSize(
+          aCBSize.BSize(aWM), margin.BStartEnd(aWM),
+          borderPadding.BStartEnd(aWM), StylePosition()->mBoxSizing);
+      return LengthPercentage::FromAppUnits(stretchBSize);
+    };
+
     return Some(ComputeISizeValueFromAspectRatio(
-        aWM, aCBSize, aContentEdgeToBoxSizing, aStyleBSize.AsLengthPercentage(),
+        aWM, aCBSize, aContentEdgeToBoxSizing,
+        aStyleBSize.BehavesLikeStretchOnBlockAxis()
+            ? ResolveStretchBSize()
+            : aStyleBSize.AsLengthPercentage(),
         aAspectRatio));
   }();
 
@@ -8652,9 +8716,8 @@ bool nsIFrame::IsBlockContainer() const {
   //
   // If we ever start skipping table row groups from being containing blocks,
   // you need to remove the StickyScrollContainer hack referencing bug 1421660.
-  return !IsLineParticipant() && !IsBlockWrapper() && !IsSubgrid() &&
-         // Table rows are not containing blocks either
-         !IsTableRowFrame();
+  // Table rows are not containing blocks either
+  return !IsLineParticipant() && !IsBlockWrapper() && !IsTableRowFrame();
 }
 
 nsIFrame* nsIFrame::GetContainingBlock(

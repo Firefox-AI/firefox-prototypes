@@ -13,7 +13,6 @@
 #include "gfxQuaternion.h"
 #include "mozilla/ComputedStyle.h"
 #include "mozilla/ComputedStyleInlines.h"
-#include "mozilla/Likely.h"
 #include "mozilla/PresShell.h"
 #include "mozilla/PresShellInlines.h"
 #include "mozilla/ServoBindings.h"  // StyleLockedDeclarationBlock
@@ -118,7 +117,7 @@ bool AnimationValue::IsOffsetPathUrl() const {
 MatrixScales AnimationValue::GetScaleValue(const nsIFrame* aFrame) const {
   using namespace nsStyleTransformMatrix;
 
-  AnimatedPropertyID property(eCSSProperty_UNKNOWN);
+  CSSPropertyId property(eCSSProperty_UNKNOWN);
   Servo_AnimationValue_GetPropertyId(mServo, &property);
   switch (property.mId) {
     case eCSSProperty_scale: {
@@ -152,13 +151,13 @@ MatrixScales AnimationValue::GetScaleValue(const nsIFrame* aFrame) const {
 }
 
 void AnimationValue::SerializeSpecifiedValue(
-    const AnimatedPropertyID& aProperty,
-    const StylePerDocumentStyleData* aRawData, nsACString& aString) const {
+    const CSSPropertyId& aProperty, const StylePerDocumentStyleData* aRawData,
+    nsACString& aString) const {
   MOZ_ASSERT(mServo);
   Servo_AnimationValue_Serialize(mServo, &aProperty, aRawData, &aString);
 }
 
-bool AnimationValue::IsInterpolableWith(const AnimatedPropertyID& aProperty,
+bool AnimationValue::IsInterpolableWith(const CSSPropertyId& aProperty,
                                         const AnimationValue& aToValue) const {
   if (IsNull() || aToValue.IsNull()) {
     return false;
@@ -183,7 +182,7 @@ double AnimationValue::ComputeDistance(const AnimationValue& aOther) const {
 }
 
 /* static */
-AnimationValue AnimationValue::FromString(AnimatedPropertyID& aProperty,
+AnimationValue AnimationValue::FromString(CSSPropertyId& aProperty,
                                           const nsACString& aValue,
                                           Element* aElement) {
   MOZ_ASSERT(aElement);

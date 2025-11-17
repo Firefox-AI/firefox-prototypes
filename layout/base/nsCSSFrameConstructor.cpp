@@ -23,7 +23,6 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/ErrorResult.h"
 #include "mozilla/Likely.h"
-#include "mozilla/LinkedList.h"
 #include "mozilla/ManualNAC.h"
 #include "mozilla/PresShell.h"
 #include "mozilla/PresShellInlines.h"
@@ -2670,7 +2669,7 @@ ViewportFrame* nsCSSFrameConstructor::ConstructRootFrame() {
   // Bind the viewport frame to the root view
   if (nsView* rootView = mPresShell->GetViewManager()->GetRootView()) {
     viewportFrame->SetView(rootView);
-    rootView->SetNeedsWindowPropertiesSync();
+    mPresShell->SetNeedsWindowPropertiesSync();
   }
 
   // Make it an absolute container for fixed-pos elements

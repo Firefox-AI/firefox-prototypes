@@ -67,23 +67,14 @@ class nsViewManager final {
    */
   void SetRootView(nsView* aView);
 
-  /**
-   * Get the dimensions of the root window. The dimensions are in
-   * twips
-   * @param aWidth out parameter for width of window in twips
-   * @param aHeight out parameter for height of window in twips
-   */
-  void GetWindowDimensions(nscoord* aWidth, nscoord* aHeight);
+  /** Get the dimensions of the root view. */
+  nsSize GetWindowDimensions() const;
 
   /**
    * Set the dimensions of the root window.
-   * Called if the root window is resized. The dimensions are in
-   * twips
-   * @param aWidth of window in twips
-   * @param aHeight of window in twips
+   * Called if the root window is resized.
    */
-  void SetWindowDimensions(nscoord aWidth, nscoord aHeight,
-                           bool aDelayResize = false);
+  void SetWindowDimensions(const nsSize& aSize, bool aDelayResize = false);
 
   /**
    * Do any resizes that are pending.
@@ -91,27 +82,11 @@ class nsViewManager final {
   void FlushDelayedResize();
 
   /**
-   * Called to dispatch an event to the appropriate view. Often called
-   * as a result of receiving a mouse or keyboard event from the widget
-   * event system.
-   * @param aEvent event to dispatch
-   * @param aViewTarget dispatch the event to this view
-   * @param aStatus event handling status
-   */
-  MOZ_CAN_RUN_SCRIPT
-  void DispatchEvent(mozilla::WidgetGUIEvent* aEvent, nsView* aViewTarget,
-                     nsEventStatus* aStatus);
-
-  /**
-   * Resize a view. In addition to setting the width and height, you can
-   * set the x and y of its bounds relative to its position. Negative x and y
-   * will let the view extend above and to the left of the (0,0) point in its
-   * coordinate system.
-   * The view manager generates the appropriate dirty regions.
+   * Resize a view.
    * @param aView view to move
-   * @param the new bounds relative to the current position
+   * @param aSize the new size
    */
-  void ResizeView(nsView* aView, const nsRect& aRect);
+  void ResizeView(nsView* aView, const nsSize& aSize);
 
   /**
    * Set the presshell associated with this manager
@@ -139,6 +114,7 @@ class nsViewManager final {
    * saves the time of the last user event.
    */
   static uint32_t GetLastUserEventTime() { return gLastUserEventTime; }
+  static void MaybeUpdateLastUserEventTime(mozilla::WidgetGUIEvent*);
 
   /**
    * Flush the accumulated dirty region to the widget and update widget
@@ -150,6 +126,10 @@ class nsViewManager final {
    * Just update widget geometry without flushing the dirty region
    */
   MOZ_CAN_RUN_SCRIPT void UpdateWidgetGeometry();
+
+  // Call this when you need to let the viewmanager know that it now has
+  // pending updates.
+  void PostPendingUpdate();
 
  private:
   static uint32_t gLastUserEventTime;
@@ -175,8 +155,7 @@ class nsViewManager final {
   MOZ_CAN_RUN_SCRIPT
   void Refresh(nsView* aView, const LayoutDeviceIntRegion& aRegion);
 
-  MOZ_CAN_RUN_SCRIPT_BOUNDARY
-  void DoSetWindowDimensions(nscoord aWidth, nscoord aHeight);
+  MOZ_CAN_RUN_SCRIPT_BOUNDARY void DoSetWindowDimensions(const nsSize&);
   bool ShouldDelayResize() const;
 
   bool IsPainting() const { return RootViewManager()->mPainting; }
@@ -191,10 +170,6 @@ class nsViewManager final {
   MOZ_CAN_RUN_SCRIPT
   bool PaintWindow(nsIWidget* aWidget, const LayoutDeviceIntRegion& aRegion);
   MOZ_CAN_RUN_SCRIPT void DidPaintWindow();
-
-  // Call this when you need to let the viewmanager know that it now has
-  // pending updates.
-  void PostPendingUpdate();
 
   mozilla::PresShell* mPresShell;
 

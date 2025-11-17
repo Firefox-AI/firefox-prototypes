@@ -569,7 +569,9 @@ void nsWindow::DispatchActivateEvent(void) {
   DispatchActivateEventAccessible();
 #endif  // ACCESSIBILITY
 
-  if (mWidgetListener) mWidgetListener->WindowActivated();
+  if (mWidgetListener) {
+    mWidgetListener->WindowActivated();
+  }
 }
 
 void nsWindow::DispatchDeactivateEvent() {
@@ -5721,10 +5723,8 @@ void nsWindow::OnWindowStateEvent(GtkWidget* aWidget,
 void nsWindow::OnDPIChanged() {
   // Update menu's font size etc.
   // This affects style / layout because it affects system font sizes.
-  if (mWidgetListener) {
-    if (PresShell* presShell = mWidgetListener->GetPresShell()) {
-      presShell->BackingScaleFactorChanged();
-    }
+  if (PresShell* presShell = GetPresShell()) {
+    presShell->BackingScaleFactorChanged();
   }
   NotifyAPZOfDPIChange();
 }
@@ -5800,10 +5800,8 @@ void nsWindow::RefreshScale(bool aRefreshScreen, bool aForceRefresh) {
 
   RecomputeBounds(/* MayChangeCsdMargin */ true, /* ScaleChanged*/ true);
 
-  if (mWidgetListener) {
-    if (PresShell* presShell = mWidgetListener->GetPresShell()) {
-      presShell->BackingScaleFactorChanged();
-    }
+  if (PresShell* presShell = GetPresShell()) {
+    presShell->BackingScaleFactorChanged();
   }
 
   if (mCursor.IsCustom()) {
@@ -9255,8 +9253,16 @@ double nsWindow::FractionalScaleFactor() {
   if (mSurface) {
     auto scale = mSurface->GetScale();
     if (scale != sNoScale) {
-      LOGVERBOSE("nsWindow::FractionalScaleFactor(): fractional scale %.2f",
-                 scale);
+#  ifdef MOZ_LOGGING
+      if (LOG_ENABLED_VERBOSE()) {
+        static float lastScaleLog = 0.0;
+        if (lastScaleLog != scale) {
+          lastScaleLog = scale;
+          LOGVERBOSE("nsWindow::FractionalScaleFactor(): fractional scale %.2f",
+                     scale);
+        }
+      }
+#  endif
       return scale;
     }
   }
@@ -9920,11 +9926,7 @@ void nsWindow::UpdateMozWindowActive() {
 
 void nsWindow::ForceTitlebarRedraw() {
   MOZ_ASSERT(mDrawInTitlebar, "We should not redraw invisible titlebar.");
-
-  if (!mWidgetListener) {
-    return;
-  }
-  PresShell* ps = mWidgetListener->GetPresShell();
+  PresShell* ps = GetPresShell();
   if (!ps) {
     return;
   }
@@ -9932,7 +9934,6 @@ void nsWindow::ForceTitlebarRedraw() {
   if (!frame) {
     return;
   }
-
   frame = FindTitlebarFrame(frame);
   if (frame) {
     nsIContent* content = frame->GetContent();

@@ -357,21 +357,35 @@ nscoord SizeComputationInput::ComputeISizeValue(
     const SizeOrMaxSize& aSize) const {
   WritingMode wm = GetWritingMode();
   const auto borderPadding = ComputedLogicalBorderPadding(wm);
+  const auto margin = ComputedLogicalMargin(wm);
   const LogicalSize contentEdgeToBoxSizing =
       aBoxSizing == StyleBoxSizing::Border ? borderPadding.Size(wm)
                                            : LogicalSize(wm);
-  const nscoord boxSizingToMarginEdgeISize =
-      borderPadding.IStartEnd(wm) + ComputedLogicalMargin(wm).IStartEnd(wm) -
-      contentEdgeToBoxSizing.ISize(wm);
+  const nscoord boxSizingToMarginEdgeISize = borderPadding.IStartEnd(wm) +
+                                             margin.IStartEnd(wm) -
+                                             contentEdgeToBoxSizing.ISize(wm);
+
+  // Get the bSize with anchor functions resolved, and manually resolve
+  // 'stretch'-like sizes as well (we should do this a bit cleaner,
+  // see bug 2000035):
+  auto bSize = mFrame->StylePosition()->BSize(
+      wm, AnchorPosResolutionParams::From(mFrame, mAnchorPosResolutionCache));
+  if (bSize->BehavesLikeStretchOnBlockAxis()) {
+    if (NS_UNCONSTRAINEDSIZE == aContainingBlockSize.BSize(wm)) {
+      bSize = AnchorResolvedSizeHelper::Auto();
+    } else {
+      nscoord stretchBSize = nsLayoutUtils::ComputeStretchBSize(
+          aContainingBlockSize.BSize(wm), margin.BStartEnd(wm),
+          borderPadding.BStartEnd(wm), aBoxSizing);
+      bSize = AnchorResolvedSizeHelper::LengthPercentage(
+          StyleLengthPercentage::FromAppUnits(stretchBSize));
+    }
+  }
 
   return mFrame
       ->ComputeISizeValue(mRenderingContext, wm, aContainingBlockSize,
                           contentEdgeToBoxSizing, boxSizingToMarginEdgeISize,
-                          aSize,
-                          *mFrame->StylePosition()->BSize(
-                              wm, AnchorPosResolutionParams::From(
-                                      mFrame, mAnchorPosResolutionCache)),
-                          mFrame->GetAspectRatio())
+                          aSize, *bSize, mFrame->GetAspectRatio())
       .mISize;
 }
 
@@ -603,29 +617,23 @@ static bool MightBeContainingBlockFor(nsIFrame* aMaybeContainingBlock,
 }
 
 void ReflowInput::InitCBReflowInput() {
-  if (!mParentReflowInput) {
-    mCBReflowInput = nullptr;
+  mCBReflowInput = mParentReflowInput;
+  if (!mCBReflowInput || mParentReflowInput->mFlags.mDummyParentReflowInput) {
     return;
   }
-  if (mParentReflowInput->mFlags.mDummyParentReflowInput) {
-    mCBReflowInput = mParentReflowInput;
-    return;
-  }
-
   // To avoid a long walk up the frame tree check if the parent frame can be a
   // containing block for mFrame.
-  if (MightBeContainingBlockFor(mParentReflowInput->mFrame, mFrame,
+  if (MightBeContainingBlockFor(mCBReflowInput->mFrame, mFrame,
                                 mStyleDisplay) &&
-      mParentReflowInput->mFrame ==
-          mFrame->GetContainingBlock(0, mStyleDisplay)) {
+      mCBReflowInput->mFrame == mFrame->GetContainingBlock(0, mStyleDisplay)) {
     // Inner table frames need to use the containing block of the outer
     // table frame.
     if (mFrame->IsTableFrame()) {
+      MOZ_ASSERT(mParentReflowInput->mCBReflowInput,
+                 "Inner table frames shouldn't be reflow roots");
       mCBReflowInput = mParentReflowInput->mCBReflowInput;
-    } else {
-      mCBReflowInput = mParentReflowInput;
     }
-  } else {
+  } else if (mParentReflowInput->mCBReflowInput) {
     mCBReflowInput = mParentReflowInput->mCBReflowInput;
   }
 }

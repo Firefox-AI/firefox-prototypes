@@ -17,10 +17,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <initializer_list>
-#include <iterator>
 #include <limits>
-#include <type_traits>
 
 #include "Attr.h"
 #include "ErrorList.h"
@@ -17206,13 +17203,6 @@ void Document::PropagateImageUseCounters(Document* aReferencingDocument) {
   aReferencingDocument->mChildDocumentUseCounters |= mChildDocumentUseCounters;
 }
 
-void Document::CollectShadowedHTMLFormElementProperty(const nsAString& aName) {
-  if (mShadowedHTMLFormElementProperties.Length() <= 10 &&
-      !mShadowedHTMLFormElementProperties.Contains(aName)) {
-    mShadowedHTMLFormElementProperties.AppendElement(aName);
-  }
-}
-
 bool Document::HasScriptsBlockedBySandbox() const {
   return mSandboxFlags & SANDBOXED_SCRIPTS;
 }
@@ -17357,13 +17347,6 @@ void Document::ReportShadowedProperties() {
     glean::security::ShadowedHtmlDocumentPropertyAccessExtra extra = {};
     extra.name = Some(NS_ConvertUTF16toUTF8(property));
     glean::security::shadowed_html_document_property_access.Record(Some(extra));
-  }
-
-  for (const nsString& property : mShadowedHTMLFormElementProperties) {
-    glean::security::ShadowedHtmlFormElementPropertyAccessExtra extra = {};
-    extra.name = Some(NS_ConvertUTF16toUTF8(property));
-    glean::security::shadowed_html_form_element_property_access.Record(
-        Some(extra));
   }
 }
 

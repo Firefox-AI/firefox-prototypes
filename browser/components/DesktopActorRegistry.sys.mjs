@@ -238,6 +238,11 @@ let JSWINDOWACTORS = {
         "BackupUI:RerunEncryption": { wantUntrusted: true },
         "BackupUI:ShowBackupLocation": { wantUntrusted: true },
         "BackupUI:EditBackupLocation": { wantUntrusted: true },
+        "BackupUI:ErrorBarDismissed": { wantUntrusted: true },
+        "BackupUI:SetEmbeddedComponentPersistentData": { wantUntrusted: true },
+        "BackupUI:FlushEmbeddedComponentPersistentData": {
+          wantUntrusted: true,
+        },
       },
     },
     includeChrome: true,
@@ -270,6 +275,21 @@ let JSWINDOWACTORS = {
       esModuleURI: "resource:///actors/BrowserTabChild.sys.mjs",
     },
 
+    messageManagerGroups: ["browsers"],
+  },
+
+  CanonicalURL: {
+    parent: {
+      esModuleURI: "resource:///actors/CanonicalURLParent.sys.mjs",
+    },
+    child: {
+      esModuleURI: "resource:///actors/CanonicalURLChild.sys.mjs",
+      events: {
+        DOMContentLoaded: {},
+      },
+    },
+    enablePreference: "browser.tabs.notes.enabled",
+    matches: ["http://*/*", "https://*/*"],
     messageManagerGroups: ["browsers"],
   },
 

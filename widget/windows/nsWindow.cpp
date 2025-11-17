@@ -75,7 +75,6 @@
 
 #include "mozilla/ipc/MessageChannel.h"
 #include <algorithm>
-#include <limits>
 
 #include "mozilla/widget/WinEventObserver.h"
 #include "mozilla/widget/WinMessages.h"
@@ -957,8 +956,7 @@ void nsWindow::RecreateDirectManipulationIfNeeded() {
     return;
   }
 
-  if (!(StaticPrefs::apz_allow_zooming() ||
-        StaticPrefs::apz_windows_use_direct_manipulation()) ||
+  if (!StaticPrefs::apz_allow_zooming() ||
       StaticPrefs::apz_windows_force_disable_direct_manipulation()) {
     return;
   }

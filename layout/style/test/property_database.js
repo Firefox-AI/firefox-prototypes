@@ -5438,6 +5438,7 @@ var gCSSProperties = {
     domProp: "counterIncrement",
     inherited: false,
     type: CSS_TYPE_LONGHAND,
+    applies_to_marker: true,
     initial_values: ["none"],
     other_values: [
       "foo 1",
@@ -5462,6 +5463,7 @@ var gCSSProperties = {
     domProp: "counterReset",
     inherited: false,
     type: CSS_TYPE_LONGHAND,
+    applies_to_marker: true,
     initial_values: ["none"],
     other_values: [
       "foo 1",
@@ -5485,6 +5487,7 @@ var gCSSProperties = {
     domProp: "counterSet",
     inherited: false,
     type: CSS_TYPE_LONGHAND,
+    applies_to_marker: true,
     initial_values: ["none"],
     other_values: [
       "foo 1",
@@ -7529,6 +7532,7 @@ var gCSSProperties = {
     domProp: "quotes",
     inherited: true,
     type: CSS_TYPE_LONGHAND,
+    applies_to_marker: true,
     initial_values: ["auto"],
     other_values: [
       "none",
@@ -13339,9 +13343,16 @@ if (IsCSSPropertyPrefEnabled("layout.css.anchor-positioning.enabled")) {
     domProp: "positionAnchor",
     inherited: false,
     type: CSS_TYPE_LONGHAND,
-    initial_values: ["auto"],
-    other_values: ["--foo"],
-    invalid_values: ["none", "--foo, auto", "auto, --bar", "foo"],
+    initial_values: ["none"],
+    other_values: ["auto", "--foo"],
+    invalid_values: [
+      "normal",
+      "none, auto",
+      "--foo none",
+      "--foo, auto",
+      "auto, --bar",
+      "foo",
+    ],
   };
 
   gCSSProperties["position-area"] = {

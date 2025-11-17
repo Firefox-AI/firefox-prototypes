@@ -16,6 +16,7 @@ import {
 import {
   ERRORS,
   STEPS,
+  errorString,
 } from "chrome://browser/content/backup/backup-constants.mjs";
 import { BackupError } from "resource:///modules/backup/BackupError.mjs";
 
@@ -39,6 +40,8 @@ const BACKUP_DEBUG_INFO_PREF_NAME = "browser.backup.backup-debug-info";
 const MAXIMUM_NUMBER_OF_UNREMOVABLE_STAGING_ITEMS_PREF_NAME =
   "browser.backup.max-num-unremovable-staging-items";
 const CREATED_MANAGED_PROFILES_PREF_NAME = "browser.profiles.created";
+const RESTORED_BACKUP_METADATA_PREF_NAME =
+  "browser.backup.restored-backup-metadata";
 
 const SCHEMAS = Object.freeze({
   BACKUP_MANIFEST: 1,
@@ -184,6 +187,19 @@ XPCOMUtils.defineLazyPreferenceGetter(
   "maximumNumberOfUnremovableStagingItems",
   MAXIMUM_NUMBER_OF_UNREMOVABLE_STAGING_ITEMS_PREF_NAME,
   5
+);
+
+XPCOMUtils.defineLazyPreferenceGetter(
+  lazy,
+  "backupErrorCode",
+  BACKUP_ERROR_CODE_PREF_NAME,
+  0,
+  function onUpdateBackupErrorCode(_pref, _prevVal, newVal) {
+    let bs = BackupService.get();
+    if (bs) {
+      bs.onUpdateBackupErrorCode(newVal);
+    }
+  }
 );
 
 XPCOMUtils.defineLazyServiceGetter(
@@ -759,6 +775,19 @@ export class BackupService extends EventTarget {
   }
 
   /**
+   * Sets the persisted options between screens for embedded components.
+   * This is specifically used in the Spotlight onboarding experience.
+   *
+   * This data is flushed upon creating a backup or exiting the backup flow.
+   *
+   * @param {object} data - data to persist between screens.
+   */
+  setEmbeddedComponentPersistentData(data) {
+    this.#_state.embeddedComponentPersistentData = { ...data };
+    this.stateUpdate();
+  }
+
+  /**
    * An object holding the current state of the BackupService instance, for
    * the purposes of representing it in the user interface. Ideally, this would
    * be named #state instead of #_state, but sphinx-js seems to be fairly
@@ -779,7 +808,20 @@ export class BackupService extends EventTarget {
     lastBackupFileName: "",
     supportBaseLink: Services.urlFormatter.formatURLPref("app.support.baseURL"),
     recoveryInProgress: false,
-    recoveryErrorCode: 0,
+    /**
+     * Every file we load successfully is going to get a restore ID which is
+     * basically the identifier for that profile restore event. If we actually
+     * do restore it, this ID will end up being propagated into the restored
+     * file and used to correlate this restore event with the profile that was
+     * restored.
+     */
+    restoreID: null,
+    recoveryErrorCode: ERRORS.NONE,
+    backupErrorCode: lazy.backupErrorCode,
+    archiveEnabledStatus: this.archiveEnabledStatus.enabled,
+    restoreEnabledStatus: this.restoreEnabledStatus.enabled,
+    /** Utilized by the spotlight to persist information between screens */
+    embeddedComponentPersistentData: {},
   };
 
   /**
@@ -1159,6 +1201,10 @@ export class BackupService extends EventTarget {
     if (this.#instance) {
       return this.#instance;
     }
+
+    // If there is unsent restore telemetry, send it now.
+    GleanPings.profileRestore.submit();
+
     this.#instance = new BackupService(DefaultBackupResources);
 
     this.#instance.checkForPostRecovery();
@@ -1213,6 +1259,37 @@ export class BackupService extends EventTarget {
         });
       }
     }, BackupService.REGENERATION_DEBOUNCE_RATE_MS);
+    this.#postRecoveryPromise.then(() => {
+      const payload = {
+        is_restored:
+          !!Services.prefs.getIntPref(
+            "browser.backup.profile-restoration-date",
+            0
+          ) &&
+          !Services.prefs.getBoolPref("browser.profiles.profile-copied", false),
+      };
+      if (payload.is_restored) {
+        let backupMetadata = {};
+        try {
+          backupMetadata = JSON.parse(
+            Services.prefs.getStringPref(
+              RESTORED_BACKUP_METADATA_PREF_NAME,
+              "{}"
+            )
+          );
+        } catch {}
+        payload.backup_timestamp = backupMetadata.date
+          ? new Date(backupMetadata.date).getTime()
+          : null;
+        payload.backup_app_name = backupMetadata.appName || null;
+        payload.backup_app_version = backupMetadata.appVersion || null;
+        payload.backup_build_id = backupMetadata.buildID || null;
+        payload.backup_os_name = backupMetadata.osName || null;
+        payload.backup_os_version = backupMetadata.osVersion || null;
+        payload.backup_legacy_client_id = backupMetadata.legacyClientID || null;
+      }
+      Glean.browserBackup.restoredProfileData.set(payload);
+    });
   }
 
   /**
@@ -1650,6 +1727,7 @@ export class BackupService extends EventTarget {
             })
           );
 
+          this.stateUpdate();
           throw e;
         } finally {
           this.#backupInProgress = false;
@@ -2864,6 +2942,10 @@ export class BackupService extends EventTarget {
       return null;
     }
 
+    Glean.browserBackup.restoreStarted.record({
+      restore_id: this.#_state.restoreID,
+    });
+
     try {
       this.#_state.recoveryInProgress = true;
       this.#_state.recoveryErrorCode = 0;
@@ -2920,6 +3002,17 @@ export class BackupService extends EventTarget {
           profileRootPath,
           encState
         );
+
+        Glean.browserBackup.restoreComplete.record({
+          restore_id: this.#_state.restoreID,
+        });
+        // We are probably about to shutdown, so we want to submit this ASAP.
+        // But this will also clear out the data in this ping, which is a bit
+        // of a problem for testing. So fire off an event first that tests can
+        // listen for.
+        Services.obs.notifyObservers(null, "browser-backup-restore-complete");
+        GleanPings.profileRestore.submit();
+
         return newProfile;
       } finally {
         // If we had decrypted a backup, we would have created the temporary
@@ -2937,6 +3030,12 @@ export class BackupService extends EventTarget {
           );
         }
       }
+    } catch (ex) {
+      Glean.browserBackup.restoreFailed.record({
+        restore_id: this.#_state.restoreID,
+        error_type: errorString(ex.cause),
+      });
+      throw ex;
     } finally {
       this.#_state.recoveryInProgress = false;
       this.stateUpdate();
@@ -3184,6 +3283,24 @@ export class BackupService extends EventTarget {
         profile.rootDir.path
       );
 
+      try {
+        postRecovery.backupServiceInternal = {
+          // Indicates that this is not a result of a profile copy (which uses the
+          // same mechanism, but doesn't go through this function).
+          isProfileRestore: true,
+          restoreID: this.#_state.restoreID,
+          backupMetadata: {
+            date: this.#_state.backupFileInfo.date,
+            appName: this.#_state.backupFileInfo.appName,
+            appVersion: this.#_state.backupFileInfo.appVersion,
+            buildID: this.#_state.backupFileInfo.buildID,
+            osName: this.#_state.backupFileInfo.osName,
+            osVersion: this.#_state.backupFileInfo.osVersion,
+            legacyClientID: this.#_state.backupFileInfo.legacyClientID,
+          },
+        };
+      } catch {}
+
       await this.#maybeWriteEncryptedStateObject(
         encState,
         profile.rootDir.path
@@ -3350,17 +3467,39 @@ export class BackupService extends EventTarget {
       let postRecovery = await IOUtils.readJSON(postRecoveryFile);
       for (let resourceKey in postRecovery) {
         let postRecoveryEntry = postRecovery[resourceKey];
-        let resourceClass = this.#resources.get(resourceKey);
-        if (!resourceClass) {
-          lazy.logConsole.error(
-            `Invalid resource for post-recovery step: ${resourceKey}`
+        if (
+          resourceKey == "backupServiceInternal" &&
+          postRecoveryEntry.isProfileRestore
+        ) {
+          Services.prefs.setStringPref(
+            RESTORED_BACKUP_METADATA_PREF_NAME,
+            JSON.stringify(postRecoveryEntry.backupMetadata)
           );
-          continue;
-        }
+          Glean.browserBackup.restoredProfileLaunched.record({
+            restore_id: postRecoveryEntry.restoreID,
+          });
+          // This will clear out the data in this ping, which is a bit of a problem
+          // for testing. So fire off an event first that tests can listen for.
+          Services.obs.notifyObservers(
+            null,
+            "browser-backup-restored-profile-telemetry-set"
+          );
+          GleanPings.postProfileRestore.submit();
+        } else {
+          let resourceClass = this.#resources.get(resourceKey);
+          if (!resourceClass) {
+            lazy.logConsole.error(
+              `Invalid resource for post-recovery step: ${resourceKey}`
+            );
+            continue;
+          }
 
-        lazy.logConsole.debug(`Running post-recovery step for ${resourceKey}`);
-        await new resourceClass().postRecovery(postRecoveryEntry);
-        lazy.logConsole.debug(`Done post-recovery step for ${resourceKey}`);
+          lazy.logConsole.debug(
+            `Running post-recovery step for ${resourceKey}`
+          );
+          await new resourceClass().postRecovery(postRecoveryEntry);
+          lazy.logConsole.debug(`Done post-recovery step for ${resourceKey}`);
+        }
       }
     } finally {
       await IOUtils.remove(postRecoveryFile, {
@@ -3418,6 +3557,20 @@ export class BackupService extends EventTarget {
   }
 
   /**
+   * Updates backupErrorCode in the backup service state. Should be called every time
+   * the value for browser.backup.errorCode changes.
+   *
+   * @param {number} newErrorCode
+   *    Any of the ERROR code's from backup-constants.mjs
+   */
+  onUpdateBackupErrorCode(newErrorCode) {
+    lazy.logConsole.debug(`Updating backup error code to ${newErrorCode}`);
+
+    this.#_state.backupErrorCode = newErrorCode;
+    this.stateUpdate();
+  }
+
+  /**
    * Returns the moz-icon URL of a file. To get the moz-icon URL, the
    * file path is convered to a fileURI. If there is a problem retreiving
    * the moz-icon due to an invalid file path, return null instead.
@@ -3453,6 +3606,9 @@ export class BackupService extends EventTarget {
     if (shouldEnableScheduledBackups) {
       // reset the error states when reenabling backup
       Services.prefs.setIntPref(BACKUP_ERROR_CODE_PREF_NAME, ERRORS.NONE);
+
+      // flush the embedded component's persistent data
+      this.setEmbeddedComponentPersistentData({});
     } else {
       // set user-disabled pref if backup is being disabled
       Services.prefs.setBoolPref(
@@ -3983,6 +4139,11 @@ export class BackupService extends EventTarget {
    * 2. If archive is disabled, clean up any backup files
    */
   #handleStatusChange() {
+    // Update the BackupService state before notifying observers about the
+    // state change
+    this.#_state.archiveEnabledStatus = this.archiveEnabledStatus.enabled;
+    this.#_state.restoreEnabledStatus = this.restoreEnabledStatus.enabled;
+
     this.#notifyStatusObservers();
 
     if (!this.archiveEnabledStatus.enabled) {
@@ -4262,6 +4423,13 @@ export class BackupService extends EventTarget {
    */
   async getBackupFileInfo(backupFilePath) {
     lazy.logConsole.debug(`Getting info from backup file at ${backupFilePath}`);
+
+    this.#_state.restoreID = Services.uuid.generateUUID().toString();
+    this.#_state.backupFileInfo = null;
+    this.#_state.backupFileToRestore = backupFilePath;
+    this.#_state.backupFileCoarseLocation =
+      this.classifyLocationForTelemetry(backupFilePath);
+
     try {
       let { archiveJSON, isEncrypted } =
         await this.sampleArchive(backupFilePath);
@@ -4269,25 +4437,27 @@ export class BackupService extends EventTarget {
         isEncrypted,
         date: archiveJSON?.meta?.date,
         deviceName: archiveJSON?.meta?.deviceName,
+        appName: archiveJSON?.meta?.appName,
+        appVersion: archiveJSON?.meta?.appVersion,
+        buildID: archiveJSON?.meta?.buildID,
+        osName: archiveJSON?.meta?.osName,
+        osVersion: archiveJSON?.meta?.osVersion,
+        healthTelemetryEnabled: archiveJSON?.meta?.healthTelemetryEnabled,
+        legacyClientID: archiveJSON?.meta?.legacyClientID,
       };
-      this.#_state.backupFileToRestore = backupFilePath;
-      // Clear any existing recovery error from state since we've successfully got our file info
+
+      // Clear any existing recovery error from state since we've successfully
+      // got our file info. Make sure to do this last, since it will cause
+      // state change observers to fire.
       this.setRecoveryError(ERRORS.NONE);
     } catch (error) {
-      this.setRecoveryError(error.cause);
       // Nullify the file info when we catch errors that indicate the file is invalid
-      switch (error.cause) {
-        case ERRORS.FILE_SYSTEM_ERROR:
-        case ERRORS.CORRUPTED_ARCHIVE:
-        case ERRORS.UNSUPPORTED_BACKUP_VERSION:
-          this.#_state.backupFileInfo = null;
-          this.#_state.backupFileToRestore = null;
-          break;
-        default:
-          break;
-      }
+      this.#_state.backupFileInfo = null;
+      this.#_state.backupFileToRestore = null;
+
+      // Notify observers of the error last, after we have set the state.
+      this.setRecoveryError(error.cause);
     }
-    this.stateUpdate();
   }
 
   /**

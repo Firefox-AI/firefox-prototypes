@@ -67,6 +67,7 @@ DIRS += [
     "smartwindow",
     "syncedtabs",
     "tabbrowser",
+    "tabnotes",
     "tabunloader",
     "taskbartabs",
     "textrecognition",
