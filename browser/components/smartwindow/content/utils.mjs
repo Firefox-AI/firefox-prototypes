@@ -219,9 +219,9 @@ const toolsConfig = [
   }
 ];
 
-export async function searchBrowserHistory({ search_term = "", start_ts = null, end_ts = null, limit = 10 }) {
+export async function searchBrowserHistory({ search_term = "", start_ts = null, end_ts = null, history_limit = 15 }) {
 
-  console.warn("[searchBrowserHistory]", "search_term:", search_term, "limit:", limit, "(hard limit for pre coarse search is 100)");
+  console.warn("[searchBrowserHistory]", "search_term:", search_term, "limit:", history_limit, "(hard limit for pre coarse search is 100)");
   console.warn("[searchBrowserHistory]", "start_ts ISO:", start_ts, "end_ts ISO:", end_ts);
 
   let results;
@@ -257,6 +257,7 @@ export async function searchBrowserHistory({ search_term = "", start_ts = null, 
                    title,
                    url,
                    NULL AS distance,
+                   visit_count,
                    frecency,
                    last_visit_date,
                    preview_image_url
@@ -270,7 +271,7 @@ export async function searchBrowserHistory({ search_term = "", start_ts = null, 
           {
             start_ts: start_ts,
             end_ts: end_ts,
-            limit: limit,
+            limit: history_limit,
           }
         );
       } else {
@@ -326,6 +327,7 @@ export async function searchBrowserHistory({ search_term = "", start_ts = null, 
                  title,
                  url,
                  distance,
+                 visit_count,
                  frecency,
                  last_visit_date,
                  preview_image_url
@@ -339,7 +341,7 @@ export async function searchBrowserHistory({ search_term = "", start_ts = null, 
           {
             vector: vector,
             distanceThreshold: distanceThreshold,
-            limit: limit,
+            limit: history_limit,
             start_ts: start_ts,
             end_ts: end_ts,
           }
@@ -350,15 +352,39 @@ export async function searchBrowserHistory({ search_term = "", start_ts = null, 
         const title = row.getResultByName("title");
         const url = row.getResultByName("url");
         const lastVisit = row.getResultByName("last_visit_date");
+        const visit_count = row.getResultByName("visit_count");
         const relevanceScore = 1 - row.getResultByName("distance");
         const previewImageURL = row.getResultByName("preview_image_url");
+
+        // Get thumbnail URL for the page if preview_image_url not exists
+        try {
+          if (!preview_image_url) {
+            if (await lazy.PageThumbsStorage.fileExistsForURL(url)) {
+              previewImageURL = lazy.PageThumbs.getThumbnailURL(url);
+            }
+          }
+        } catch (e) {
+          // If thumbnail lookup fails, continue without it
+          // console.warn("Could not get thumbnail for:", url);
+        }
+
+        // Get favicon URL for the page
+        let faviconUrl = null;
+        try {
+          const faviconURI = Services.io.newURI(url);
+          faviconUrl = `page-icon:${faviconURI.spec}`;
+        } catch (e) {
+          // If favicon lookup fails, continue without it
+          // console.warn("Could not get favicon for:", url);
+        }
 
         rows.push({
           title: title || url,
           url: url,
           visitDate: new Date(Math.round(lastVisit / 1000)).toISOString(), // ISO timestamp format
-          visitCount: 0,
-          relevanceScore: relevanceScore || 0, // Use frecency as relevance score
+          visitCount: visit_count || 0,
+          relevanceScore: relevanceScore || 0, // Use embedding's distance as relevance score
+          ...(faviconUrl && { favicon: faviconUrl }), // Only include favicon if available
           ...(previewImageURL && { thumbnail: previewImageURL }), // Only include thumbnail if available
         });
       }
