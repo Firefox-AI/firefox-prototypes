@@ -184,8 +184,11 @@ export class PageHistoryOverlay extends LitElement {
 
   render() {
     if (!this.isOpen) {
+      document.documentElement.removeAttribute("smart-window-history");
       return html``;
     }
+
+    document.documentElement.setAttribute("smart-window-history", "true");
 
     return html`
       <div class="history-overlay" @click=${this.handleOverlayClick}>

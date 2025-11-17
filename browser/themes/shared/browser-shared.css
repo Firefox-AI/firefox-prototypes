@@ -1439,9 +1439,11 @@ browser {
   }
 }
 
-:root[smart-window][smart-window-url] #smartwindow-box,
-:root[smart-window][smart-window-url] #smartwindow-splitter {
-  visibility: collapse;
+:root[smart-window][smart-window-url]:not([inFullscreen]) {
+  #smartwindow-box,
+  #smartwindow-splitter {
+    visibility: collapse;
+  }
 }
 
 :root[smart-window] .tabbrowser-tab > .tab-stack > .tab-background[selected] {
