@@ -15,7 +15,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
 
 import { createEngine } from "chrome://global/content/ml/EngineProcess.sys.mjs";
 import { SmartAssistEngine } from "moz-src:///browser/components/genai/SmartAssistEngine.sys.mjs";
-import { getRelevantInsights } from "chrome://browser/content/smartwindow/insights.mjs";
 
 const { ChatHistoryMessage } = ChromeUtils.importESModule(
   "resource:///modules/smartwindow/ChatHistory.sys.mjs"
@@ -88,14 +87,12 @@ export async function createOpenAIEngine(engineId = "smart-openai") {
 const SEARCH_OPEN_TABS = "search_open_tabs";
 const GET_PAGE_CONTENT = "get_page_content";
 const SEARCH_HISTORY = "search_history";
-const GET_RELEVANT_INSIGHTS = "get_relevant_insights";
 const FLAG_ADD_INSIGHT = "flag_add_insight";
 
 const TOOLS = [
   SEARCH_OPEN_TABS,
   GET_PAGE_CONTENT,
   SEARCH_HISTORY,
-  GET_RELEVANT_INSIGHTS,
   FLAG_ADD_INSIGHT
 ];
 
@@ -170,31 +167,6 @@ const toolsConfig = [
           }
         },
         required: [],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: GET_RELEVANT_INSIGHTS,
-      description:
-        "Given a freeform user message, predict category & intent with an LLM and return top insights selected for that predicted category.",
-      parameters: {
-        type: "object",
-        properties: {
-          message: {
-            type: "string",
-            description:
-              "A freeform user message or query. The LLM will infer category and intent from this message and return relevant insights.",
-          },
-          limit: {
-            type: "integer",
-            minimum: 1,
-            maximum: 20,
-            description: "Maximum number of insights to return (default 5).",
-          },
-        },
-        required: ["message"],
       },
     },
   },
@@ -724,19 +696,6 @@ export async function* fetchWithHistory(messages, allowedUrls) {
           case SEARCH_HISTORY:
             result = await searchBrowserHistory(toolParams);
             break;
-          case GET_RELEVANT_INSIGHTS: {
-            const { message, limit } = toolParams;
-            console.log(`Inside tool calling GET_RELEVANT_INSIGHTS`);
-            console.log(`message = ${message}`);
-            console.log(`limit = ${limit}`);
-            try {
-              const out = await getRelevantInsights(message, { limit });
-              result = JSON.stringify(out);
-            } catch (e) {
-              result = JSON.stringify({ error: String(e), message, limit });
-            }
-            break;
-          }
           case FLAG_ADD_INSIGHT: {
             result = await flagAddInsight(toolParams);
             break;

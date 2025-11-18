@@ -16,6 +16,7 @@ import {
   insightsStyles,
   deleteInsight,
   generateInsightsFromDirectChat,
+  getRelevantInsights,
 } from "chrome://browser/content/smartwindow/insights.mjs";
 
 import { showChatHistoryOverlay } from "chrome://browser/content/smartwindow/chat-history.mjs";
@@ -1172,6 +1173,31 @@ class ChatBot extends MozLitElement {
       messagesForAPI.unshift(...prefixMessages);
     }
 
+    // Inject insights relevant to the current user prompt ONLY immediately before the user prompt
+    const out = await getRelevantInsights(this.prompt.trim());
+    let relevant_insights_list = [];
+    for (const entry of out.insights || []) {
+      if (entry.insight_summary) {
+        relevant_insights_list.push(`- ${entry.insight_summary}`);
+      }
+    }
+    const relevant_insights_for_prompt = relevant_insights_list.join("\n");
+    if (out && out.insights && out.insights.length > 0) {
+      messagesForAPI.splice(
+        messagesForAPI.length - 1, 0,
+        {
+          role: ChatHistory.MESSAGE_ROLE.SYSTEM,
+          content: `
+Below is a list of insights relevant to this conversation. TAG ALL INSIGHTS FROM THIS LIST YOU USE IN YOUR RESPONSE WITH §insight: insight text§ !
+
+${relevant_insights_for_prompt}
+
+DO NOT TAG INSIGHTS THAT ARE NOT IN THE LIST ABOVE! ONLY TAG INSIGHTS YOU ACTUALLY USE TO RESPOND TO THE USER! DO NOT MAKE UP INSIGHTS! DO NOT USE THE TAG NEW INSIGHTS!
+`
+        }
+      );
+    }
+
     const allowedRemoteUrls = new Set(
       this.mentions
         .filter(mention => mention.source == "history")
@@ -1346,11 +1372,8 @@ Available tools:
   1. Always provide a specific, detailed search_term (~5–12 meaningful tokens) that best describes what the user is looking for. Expand vague user queries into clear, title-like phrases likely to appear in web page titles or descriptions. Include relevant entities, library names, or context words (e.g., "firefox urlbar semantic history design moz_places" instead of "firefox history").
   2. Always look for user's temporal intent, if it exists. Then use that to extract a time window range (in ISO 8601 datetime format) for the function input.
   3. Now you found the temporal phrase, given the locale: ${locale}, and datetime: ${localIso}, give a specific time window range. For example "last week", calculate the last week's time window range in ISO 8601 format for the input start_ts and end_ts.
-- get_relevant_insights: Fetches preferences to personalize responses to user queries. Use this tool if the user's message contains hints that personalization would improve your response (i.e. "for me", "that I like", etc.). Provide the user message and limit where limit is a maximum number of relevant insights. Keep "limit" small (e.g., 3–8). Results will be sorted by selected relevant insights
-- flag_add_insights: Flags that the user's latest message and dialog context express interests ("I'm interested in...", "Research..."), preferences ("I like..."), desires ("I want..."), memories ("Remember..."), etc. that could help tailor future responses by generating an insight. Only provide the user's latest message.
+- flag_add_insights: Flags that the user's latest message and dialog context express interests ("I'm interested in...", "Research..."), preferences ("I like..."), desires ("I want..."), memories ("Remember..."), etc. that could help tailor future responses by generating an insight. Only provide the user's latest message. DO NOT TAG NEW INSIGHTS.
 
-# Use User Insights List from "get_relevant_insights tool call", If insights data is present, only use it when "available" is true or personalization is relevant. Otherwise, ignore it.
-  When responding, if you use any user insights from the list to personalize your response (even implicitly), you must reference them by including §insight: specific term§ inline, directly after the phrase or sentence where the insight is applied. Use specific terms from the list rather than broad categories, and include multiple tags if multiple insights are relevant. Include the insights EXACTLY as they appear in the list. This enables better personalization features—do not skip tagging if an insight influences your answer. Only tag insights you actually use; avoid tagging irrelevant ones.
   
 # Search Suggestions
 
