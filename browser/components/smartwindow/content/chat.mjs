@@ -189,7 +189,8 @@ class ChatBot extends MozLitElement {
 
     .actions-wrapper {
       display: flex;
-      align-items: center;
+      flex-direction: column;
+      align-items: flex-start;
       gap: 0.5rem;
     }
 
