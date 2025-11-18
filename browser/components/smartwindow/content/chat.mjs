@@ -17,6 +17,7 @@ import {
   deleteInsight,
   generateInsightsFromDirectChat,
   getRelevantInsights,
+  saveInsightPreview,
 } from "chrome://browser/content/smartwindow/insights.mjs";
 
 import { showChatHistoryOverlay } from "chrome://browser/content/smartwindow/chat-history.mjs";
@@ -749,6 +750,79 @@ class ChatBot extends MozLitElement {
         transition: none;
       }
     }
+
+    .insight-preview-popover {
+      background-color: #f4f0ff;
+      border: 1px solid #fff;
+      border-radius: 8px;
+      box-shadow:
+        0px 2px 6px 0px rgba(120, 68, 240, 0.15),
+        0px 1px 1px 0px rgba(40, 25, 83, 0.08),
+        0px 0px 25px 0px rgba(139, 92, 255, 0.05);
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      width: fit-content;
+    }
+
+    .insight-preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .insight-preview-title {
+      color: #8341ca;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .insight-preview-close-btn {
+      appearance: none;
+      background: transparent;
+      color: rgba(21, 20, 26, 1);
+      margin: 0;
+      padding: 0;
+      font-size: 18px;
+    }
+
+    .insight-preview-close-btn:hover {
+      color: rgba(21, 20, 26, 0.60);
+    }
+
+    .insight-preview-text {
+      color; #3B2279;
+      font-weight: 600;
+    }
+
+    .insight-preview-actions {
+      border-top: 1px solid #BF8FCC33;
+      display: flex;
+      margin-top: 12px;
+      padding: 12px 0 0;
+    }
+
+    .insight-preview-actions button {
+      appearance: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin: 0;
+    }
+
+    .insight-preview-retry-btn {
+      background: transparent;
+      color: #15141AB0;
+      fill: #15141AB0;
+    }
+
+    .insight-preview-save-btn {
+      background: #7543E31A;
+      border-radius: 8px;
+      color: #15141A;
+      fill: #15141A;
+    }
   `;
 
   showChatHistoryOverlay = showChatHistoryOverlay;
@@ -769,7 +843,10 @@ class ChatBot extends MozLitElement {
       searchEngines: { type: Array },
       openDropdownQuery: { type: String },
       useInsights: { type: Boolean, reflect: true },
-      openChatInsights: { type: Boolean },
+      openChatInsights: { type: String | null },
+      pendingInsightPreview: { type: Array | null },
+      showInsightPreviewKey: { type: String | null },
+      savedInsightCount: { type: Number },
     };
   }
 
@@ -809,16 +886,10 @@ class ChatBot extends MozLitElement {
     this.openDropdownQuery = null;
     this._lastSentPageInfoSignature = null;
     this._lastSelectionSignature = null;
-    this.openChatInsights = false;
-    this._forceAmnesiaNextTurn = false;
-
-    // TODO: Figure out what/where to get this info from, if necessary
-    this.#conversation = new ChatHistoryConversation({
-      title: "",
-      description: "",
-      pageUrl: "",
-      pageMeta: "",
-    });
+    this.openChatInsights = null;
+    this.pendingInsightPreview = null;
+    this.showInsightPreviewKey = null;
+    this.savedInsightCount = 0;
 
     let saved = "";
     try {
@@ -842,6 +913,9 @@ class ChatBot extends MozLitElement {
         this.requestUpdate();
       },
     };
+
+    this._closeChatInsightsApplied =
+      this.handleCloseChatInsightsApplied.bind(this);
   }
 
   clearUIMeta() {
@@ -892,32 +966,7 @@ class ChatBot extends MozLitElement {
     window.addEventListener("insights-updated", this._insightsUpdatedHandler);
     Services.prefs.addObserver(PROMPT_PREF, this._prefObserver);
 
-    this._closeChatInsights = e => {
-      const path = e.composedPath();
-      const popover = this.renderRoot?.querySelector(
-        ".insights-applied-chat-popover.is-open"
-      );
-      const trigger = this.renderRoot?.querySelector(
-        '.insights-applied-trigger-chat-popover[aria-expanded="true"]'
-      );
-
-      if (
-        (popover && path.includes(popover)) ||
-        (trigger && path.includes(trigger))
-      ) {
-        return;
-      }
-
-      if (path.includes(this)) {
-        this.openChatInsights = null;
-        this.requestUpdate();
-        return;
-      }
-
-      this.openChatInsights = null;
-      this.requestUpdate();
-    };
-    document.addEventListener("click", this._closeChatInsights);
+    document.addEventListener("click", this._closeChatInsightsApplied);
 
     // Mention click handling is now done in updated() method
 
@@ -963,12 +1012,38 @@ class ChatBot extends MozLitElement {
     try {
       Services.prefs.removeObserver(PROMPT_PREF, this._prefObserver);
     } catch {}
-    if (this._closeChatInsights) {
-      document.removeEventListener("click", this._closeChatInsights);
-      this._closeChatInsights = null;
+    if (this._closeChatInsightsApplied) {
+      document.removeEventListener("click", this._closeChatInsightsApplied);
+      this._closeChatInsightsApplied = null;
     }
     // Mention click handlers are removed automatically when DOM is updated
   }
+
+  handleCloseChatInsightsApplied = e => {
+    const path = e.composedPath();
+    const popover = this.renderRoot?.querySelector(
+      ".insights-applied-chat-popover.is-open"
+    );
+    const trigger = this.renderRoot?.querySelector(
+      '.insights-applied-trigger-chat-popover[aria-expanded="true"]'
+    );
+
+    if (
+      (popover && path.includes(popover)) ||
+      (trigger && path.includes(trigger))
+    ) {
+      return;
+    }
+
+    if (path.includes(this)) {
+      this.openChatInsights = null;
+      this.requestUpdate();
+      return;
+    }
+
+    this.openChatInsights = null;
+    this.requestUpdate();
+  };
 
   /**
    * Open a tab from a mention click
@@ -1133,6 +1208,13 @@ class ChatBot extends MozLitElement {
 
     // Prepare an empty assistant message for streaming
     this.#conversation.addAssistantMessage("", turn_index);
+
+    this.pendingInsightPreview = null;
+    this.showInsightPreviewKey = null;
+    const lastIdx = this.#conversation.messages.length - 1;
+    const assistantMsg = this.#conversation.messages[lastIdx];
+    const assistantKey = assistantMsg?.id ?? assistantMsg?.messageId ?? lastIdx;
+
     this.requestUpdate();
 
     const pageInfoMessage = this.#createPageInfoMessageIfNeeded();
@@ -1161,15 +1243,6 @@ class ChatBot extends MozLitElement {
         prefixMessages.push(selectionMessage);
       }
 
-      if (this._forceAmnesiaNextTurn === true) {
-        prefixMessages.push({
-          role: ChatHistory.MESSAGE_ROLE.SYSTEM,
-          content:
-            "For this single response, ignore prior conversation and any insights about the user. Do not reference earlier assistant messages or answers. Rely only on the current user message and these system instructions.",
-        });
-        this._forceAmnesiaNextTurn = false;
-      }
-
       messagesForAPI.unshift(...prefixMessages);
     }
 
@@ -1183,21 +1256,17 @@ class ChatBot extends MozLitElement {
     }
     const relevant_insights_for_prompt = relevant_insights_list.join("\n");
     if (out && out.insights && out.insights.length) {
-      messagesForAPI.splice(
-        messagesForAPI.length - 1, 0,
-        {
-          tool_call_id: "inject_insights",
-          role: ChatHistory.MESSAGE_ROLE.TOOL,
-          content: `
+      messagesForAPI.splice(messagesForAPI.length - 1, 0, {
+        tool_call_id: "inject_insights",
+        role: ChatHistory.MESSAGE_ROLE.TOOL,
+        content: `
 Below is a list of insights relevant to this conversation. TAG ALL INSIGHTS FROM THIS LIST YOU USE IN YOUR RESPONSE WITH §insight: insight text§ !
 
 ${relevant_insights_for_prompt}
 
 DO NOT TAG INSIGHTS THAT ARE NOT IN THE LIST ABOVE! ONLY TAG INSIGHTS YOU ACTUALLY USE TO RESPOND TO THE USER! DO NOT MAKE UP INSIGHTS! DO NOT USE THE TAG NEW INSIGHTS!
 `,
-          type: "insights"
-        }
-      );
+      });
     }
 
     const allowedRemoteUrls = new Set(
@@ -1224,7 +1293,7 @@ DO NOT TAG INSIGHTS THAT ARE NOT IN THE LIST ABOVE! ONLY TAG INSIGHTS YOU ACTUAL
           if (chunk.tool === "search_history") {
             this.#flagHistoryOverlayForCurrentResponse(historyMeta);
           } else if (chunk.tool == "flag_add_insight") {
-            this.#addFlaggedInsight(this.prompt.trim())
+            this.#addFlaggedInsight(this.prompt.trim(), assistantKey);
           }
           continue;
         }
@@ -1242,7 +1311,6 @@ DO NOT TAG INSIGHTS THAT ARE NOT IN THE LIST ABOVE! ONLY TAG INSIGHTS YOU ACTUAL
           document.title = title;
         }
 
-        const lastIdx = this.#conversation.messages.length - 1;
         // Store raw content WITH tokens for later rendering
         this.#conversation.messages[lastIdx].content = fullResponse;
         // Auto-scrolling disabled during streaming
@@ -1252,7 +1320,7 @@ DO NOT TAG INSIGHTS THAT ARE NOT IN THE LIST ABOVE! ONLY TAG INSIGHTS YOU ACTUAL
     } catch (err) {
       console.error("Streaming error:", err);
       // Optionally show an error in the assistant bubble
-      const lastIdx = this.#conversation.messages.length - 1;
+
       this.#conversation.messages[lastIdx].content +=
         "\n[Error streaming response]";
 
@@ -1656,27 +1724,28 @@ Today's date: ${currentDate}`;
     this.requestUpdate();
   }
 
-  #addFlaggedInsight(promptForInsight) {
+  #addFlaggedInsight(promptForInsight, assistantKey) {
     try {
       // Log start
       this.updateLogState({
         content: "Generate insights from direct chat",
         result: { status: "started" },
       });
+
       // Fire-and-forget: don't block streaming
-      generateInsightsFromDirectChat(promptForInsight)
-        .then(({ addedCount }) => {
+      generateInsightsFromDirectChat(promptForInsight).then(
+        ({ previewCount, list }) => {
           this.updateLogState({
             content: "Direct-chat insights",
-            result: { addedCount },
+            result: { previewCount },
           });
-        })
-        .catch(err => {
-          this.updateLogState({
-            content: "Direct-chat insights error",
-            result: { error: true, message: err?.message || String(err) },
-          });
-        });
+          if (list.length) {
+            this.pendingInsightPreview = list;
+            this.showInsightPreviewKey = assistantKey;
+            this.requestUpdate();
+          }
+        }
+      );
     } catch (e) {
       // Never let insights errors impact chat UX
       this.updateLogState({
@@ -1915,13 +1984,29 @@ Today's date: ${currentDate}`;
 
     const prevUseInsights = this.useInsights;
     this.useInsights = false;
-    this._forceAmnesiaNextTurn = true;
     this.prompt = retryContent;
     try {
       await this.sendPrompt();
     } finally {
       this.useInsights = prevUseInsights;
     }
+  }
+
+  handleSaveInsightPreview() {
+    const { saved } = saveInsightPreview(this.pendingInsightPreview);
+    this.updateLogState({
+      content: "Insight preview saved",
+      result: { saved },
+    });
+    this.savedInsightCount = saved;
+    this.handleCloseInsightPreview();
+  }
+
+  handleCloseInsightPreview() {
+    this.pendingInsightPreview = null;
+    this.showInsightPreviewKey = null;
+    this.showInsightProposalDialog = false;
+    this.requestUpdate();
   }
 
   render() {
@@ -2400,6 +2485,72 @@ Today's date: ${currentDate}`;
                               stroke-linejoin="round"
                             />
                           </svg>
+                          ${this.showInsightPreviewKey === key &&
+                          this.pendingInsightPreview.length
+                            ? html`
+                                <div class="insight-preview-popover">
+                                  <div class="insight-preview-header">
+                                    <span class="insight-preview-title">
+                                      Add insight?
+                                    </span>
+                                    <button
+                                      class="insight-preview-close-btn"
+                                      aria-label="Close insight preview"
+                                      @click=${() =>
+                                        this.handleCloseInsightPreview()}
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                  ${this.pendingInsightPreview.map(
+                                    insight => html`
+                                      <div class="insight-preview-item">
+                                        <span class="insight-preview-text"
+                                          >${insight.insight_summary}</span
+                                        >
+                                      </div>
+                                    `
+                                  )}
+
+                                  <div class="insight-preview-actions">
+                                    <button class="insight-preview-retry-btn">
+                                      <svg
+                                        width="16"
+                                        height="15"
+                                        viewBox="0 0 16 15"
+                                        fill="none"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                      >
+                                        <path
+                                          d="M7.5 0C10.0599 0 12.3193 1.29042 13.6709 3.25391L14.8037 2.12109C15.1007 1.82409 15.6094 2.0341 15.6094 2.4541V6.0293C15.6092 6.28916 15.3976 6.5 15.1377 6.5H11.5635C11.1435 6.5 10.9335 5.99229 11.2305 5.69629L12.5889 4.33594C11.5304 2.63507 9.6472 1.5 7.5 1.5C4.191 1.5 1.5 4.191 1.5 7.5C1.5 10.809 4.191 13.5 7.5 13.5C10.468 13.5 12.9322 11.333 13.4102 8.5H14.9248C14.4338 12.163 11.296 15 7.5 15C3.364 15 0 11.636 0 7.5C0 3.364 3.364 0 7.5 0Z"
+                                          fill="black"
+                                        />
+                                      </svg>
+                                      Try again
+                                    </button>
+                                    <button
+                                      class="insight-preview-save-btn"
+                                      @click=${this.handleSaveInsightPreview}
+                                    >
+                                      <svg
+                                        width="14"
+                                        height="10"
+                                        viewBox="0 0 14 10"
+                                        fill="none"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                      >
+                                        <path
+                                          d="M5.01202 9.15938L0.172022 4.32038C0.0596431 4.20202 -0.00206363 4.04444 5.26916e-05 3.88124C0.00216901 3.71804 0.0679411 3.56212 0.183351 3.44671C0.298761 3.3313 0.454682 3.26553 0.617883 3.26341C0.781084 3.26129 0.938658 3.323 1.05702 3.43538L5.36402 7.74338L12.923 0.182379C13.0407 0.0655596 13.1997 0 13.3655 0C13.5313 0 13.6904 0.0655596 13.808 0.182379C13.9248 0.300023 13.9904 0.459088 13.9904 0.624879C13.9904 0.790671 13.9248 0.949736 13.808 1.06738L5.71802 9.15738L5.01202 9.15938Z"
+                                          fill="#3A0F6E"
+                                        />
+                                      </svg>
+
+                                      Save Insight
+                                    </button>
+                                  </div>
+                                </div>
+                              `
+                            : ""}
                           ${usedInsights.length
                             ? html`<div class="message-footer">
                                 <button
