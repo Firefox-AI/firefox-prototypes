@@ -2545,7 +2545,7 @@ Today's date: ${currentDate}`;
                                         />
                                       </svg>
 
-                                      Save Insight
+                                      Looks good
                                     </button>
                                   </div>
                                 </div>
