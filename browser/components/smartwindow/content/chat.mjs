@@ -1956,7 +1956,7 @@ Today's date: ${currentDate}`;
     this.openChatInsights = this.openChatInsights === key ? null : key;
   }
 
-  async handleRetryWithoutInsights(key) {
+  async handleRetryInsights(key, withInsight) {
     const msgs = this.#conversation.messages;
 
     const assistantIdx = msgs.findIndex(
@@ -1992,7 +1992,7 @@ Today's date: ${currentDate}`;
     this.requestUpdate();
 
     const prevUseInsights = this.useInsights;
-    this.useInsights = false;
+    this.useInsights = withInsight;
     this.prompt = retryContent;
     try {
       await this.sendPrompt();
@@ -2494,6 +2494,7 @@ Today's date: ${currentDate}`;
                               stroke-linejoin="round"
                             />
                           </svg>
+                          ${console.log(this.showInsightPreviewKey, key)}
                           ${this.showInsightPreviewKey === key &&
                           this.pendingInsightPreview.length
                             ? html`
@@ -2522,7 +2523,11 @@ Today's date: ${currentDate}`;
                                   )}
 
                                   <div class="insight-preview-actions">
-                                    <button class="insight-preview-retry-btn">
+                                    <button
+                                      class="insight-preview-retry-btn"
+                                      @click=${() =>
+                                        this.handleRetryInsights(key, true)}
+                                    >
                                       <svg
                                         width="16"
                                         height="15"
@@ -2663,7 +2668,7 @@ Today's date: ${currentDate}`;
                                       <button
                                         class="insights-applied-chat-popover-retry-button"
                                         @click=${() =>
-                                          this.handleRetryWithoutInsights(key)}
+                                          this.handleRetryInsights(key, false)}
                                       >
                                         <svg
                                           width="16"
