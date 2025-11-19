@@ -1268,11 +1268,20 @@ class ChatBot extends MozLitElement {
         tool_call_id: "inject_insights",
         role: ChatHistory.MESSAGE_ROLE.TOOL,
         content: `
-Below is a list of insights relevant to this conversation. TAG ALL INSIGHTS FROM THIS LIST YOU USE IN YOUR RESPONSE WITH §insight: insight text§ !
+# Existing Insights
+
+Below is a list of existing insights:
 
 ${relevant_insights_for_prompt}
 
-DO NOT TAG INSIGHTS THAT ARE NOT IN THE LIST ABOVE! ONLY TAG INSIGHTS YOU ACTUALLY USE TO RESPOND TO THE USER! DO NOT MAKE UP INSIGHTS! DO NOT USE THE TAG NEW INSIGHTS!
+Use them to personalized your response using the following guidelines:
+
+1. Consider the user message below
+2. Choose SPECIFIC and RELEVANT insights from the list above to personalize your response to the user
+3. Write those SPECIFIC insights into your response to make it more helpful and tailored, then tag them AFTER your response using the format: \`§existing_insight: insight text§\`
+
+- NEVER tag insights you DID NOT USE in your response.
+- NEVER tag new insights; instead, to save, note, or add new insights, only use the \`add_new_insight\` tool.
 `,
       });
     }
@@ -1300,7 +1309,7 @@ DO NOT TAG INSIGHTS THAT ARE NOT IN THE LIST ABOVE! ONLY TAG INSIGHTS YOU ACTUAL
           });
           if (chunk.tool === "search_history") {
             this.#flagHistoryOverlayForCurrentResponse(historyMeta);
-          } else if (chunk.tool == "flag_add_insight") {
+          } else if (chunk.tool == "add_new_insight") {
             this.#addFlaggedInsight(this.prompt.trim(), assistantKey);
           }
           continue;
@@ -1450,9 +1459,16 @@ Available tools:
   1. Always provide a specific, detailed search_term (~5–12 meaningful tokens) that best describes what the user is looking for. Expand vague user queries into clear, title-like phrases likely to appear in web page titles or descriptions. Include relevant entities, library names, or context words (e.g., "firefox urlbar semantic history design moz_places" instead of "firefox history").
   2. Always look for user's temporal intent, if it exists. Then use that to extract a time window range (in ISO 8601 datetime format) for the function input.
   3. Now you found the temporal phrase, given the locale: ${locale}, and datetime: ${localIso}, give a specific time window range. For example "last week", calculate the last week's time window range in ISO 8601 format for the input start_ts and end_ts.
-- flag_add_insights: Flags that the user's latest message and dialog context express interests ("I'm interested in...", "Research..."), preferences ("I like..."), desires ("I want..."), memories ("Remember..."), etc. that could help tailor future responses by generating an insight. Only provide the user's latest message. DO NOT TAG NEW INSIGHTS.
+- add_new_insight: Adds a new insight (like, interest, preference, desire, or memory) using the latest user message to help personalize future responses. Call this tool for phrases like:
+    - "I'm interested in..." -> Expresses an interest in something
+    - "I want..." -> Expresses a desire or wish
+    - "Remember..." -> Requests to save a memory, preference, detail, etc.
+    - "Note that..." -> Requests to note a detail or fact
+    - "Keep in mind..." -> Requests to remember a consideration or detail
+    - "I like..." -> Expresses a liking or preference
+    - "I hate..." -> Expresses a dislike or aversion
+Provide a summary of the new insight you want to save or note. ALWAYS call \`add_new_insight\` BEFORE telling the user you saved or noted the insight. An insight WILL NOT be saved unless you call this tool.
 
-  
 # Search Suggestions
 
 When responding to user queries, if you determine that a web search would be more helpful than a direct answer, you may include a search suggestion using this exact format: §search: your suggested search query§
