@@ -1186,14 +1186,16 @@ class ChatBot extends MozLitElement {
       messagesForAPI.splice(
         messagesForAPI.length - 1, 0,
         {
-          role: ChatHistory.MESSAGE_ROLE.SYSTEM,
+          tool_call_id: "inject_insights",
+          role: ChatHistory.MESSAGE_ROLE.TOOL,
           content: `
 Below is a list of insights relevant to this conversation. TAG ALL INSIGHTS FROM THIS LIST YOU USE IN YOUR RESPONSE WITH §insight: insight text§ !
 
 ${relevant_insights_for_prompt}
 
 DO NOT TAG INSIGHTS THAT ARE NOT IN THE LIST ABOVE! ONLY TAG INSIGHTS YOU ACTUALLY USE TO RESPOND TO THE USER! DO NOT MAKE UP INSIGHTS! DO NOT USE THE TAG NEW INSIGHTS!
-`
+`,
+          type: "insights"
         }
       );
     }
