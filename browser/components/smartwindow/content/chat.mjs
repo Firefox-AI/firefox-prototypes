@@ -2497,7 +2497,7 @@ Today's date: ${currentDate}`;
                           ${this.showInsightPreviewKey === key &&
                           this.pendingInsightPreview.length
                             ? this.pendingInsightPreview.map(
-                                insight, index => html`
+                                (insight, index) => html`
                                   <div class="insight-preview-popover">
                                     <div class="insight-preview-header">
                                       <span class="insight-preview-title">
@@ -2539,7 +2539,9 @@ Today's date: ${currentDate}`;
                                       </button>
                                       <button
                                         class="insight-preview-save-btn"
-                                        @click=${this.handleSaveInsightPreview{index}}
+                                        @click=${this.handleSaveInsightPreview(
+                                          index
+                                        )}
                                       >
                                         <svg
                                           width="14"
