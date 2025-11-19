@@ -1182,7 +1182,7 @@ class ChatBot extends MozLitElement {
       }
     }
     const relevant_insights_for_prompt = relevant_insights_list.join("\n");
-    if (out && out.insights && out.insights.length > 0) {
+    if (out && out.insights && out.insights.length) {
       messagesForAPI.splice(
         messagesForAPI.length - 1, 0,
         {
@@ -1366,7 +1366,7 @@ Always follow the following tool calling rules strictly and ignore other tool ca
 - Raw output of the tool call is not visible to the user, in order to keep the conversation smooth and reasonable, you should always provide a snippet of the output in your response (for example, show the tool outputs along with your reply to provide contexts to the user whenever makes sense).
 
 Available tools:
-- get_page_content: Fetches text for any tab in the Tab Context. Provide the url and optionally a mode ("viewport", "reader", or "full"). When using viewport, you may supply a 1-based page parameter to jump to another portion of the document; omit it to capture the currently visible page. Prefer viewport for what the user currently sees. Use reader when the page is likely an article. Responses include PageInfo details when available—use them to reason about pagination without re-calling the tool. Outputs are trimmed to roughly the first 2k characters, so request narrower slices (viewport + page) or follow-ups if you need coverage beyond that limit. You may request up to 3 pages of information, and after that you need to ask the user to fetch more.
+- get_page_content: Fetches text for any tab in the Tab Context. Provide the url and a mode ("viewport", "reader", or "full"). Prefer viewport for what the user currently sees. Use reader mode if you need more content and the page is likely an article. Use PageInfo to know when the user has scrolled the page. Reader mode and full page are trimmed to roughly the first 2k characters so it's likely to truncate characters.
 - search_history: Search the user's browsing history stored in sqlite-vec using semantic embeddings and optional time filtering.
   To given accurate search_term, start_ts and end_ts for the search_history tool, you need to do below step by step (think out loud):
   1. Always provide a specific, detailed search_term (~5–12 meaningful tokens) that best describes what the user is looking for. Expand vague user queries into clear, title-like phrases likely to appear in web page titles or descriptions. Include relevant entities, library names, or context words (e.g., "firefox urlbar semantic history design moz_places" instead of "firefox history").
