@@ -892,6 +892,14 @@ class ChatBot extends MozLitElement {
     this.showInsightPreviewKey = null;
     this.savedInsightCount = 0;
 
+    // TODO: Figure out what/where to get this info from, if necessary
+    this.#conversation = new ChatHistoryConversation({
+      title: "",
+      description: "",
+      pageUrl: "",
+      pageMeta: "",
+    });
+
     let saved = "";
     try {
       saved = Services.prefs.getStringPref(PROMPT_PREF, "");
