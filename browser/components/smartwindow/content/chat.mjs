@@ -752,6 +752,13 @@ class ChatBot extends MozLitElement {
       }
     }
 
+    .insight-previews {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+      max-width: 100%;
+    }
+
     .insight-preview-popover {
       background-color: #f4f0ff;
       border: 1px solid #fff;
@@ -1037,21 +1044,13 @@ class ChatBot extends MozLitElement {
       '.insights-applied-trigger-chat-popover[aria-expanded="true"]'
     );
 
-    if (
-      (popover && path.includes(popover)) ||
-      (trigger && path.includes(trigger))
-    ) {
-      return;
-    }
+    const clickedInsidePopover = !!popover && path.includes(popover);
+    const clickedTrigger = !!trigger && path.includes(trigger);
 
-    if (path.includes(this)) {
+    if (!clickedInsidePopover && !clickedTrigger) {
       this.openChatInsights = null;
       this.requestUpdate();
-      return;
     }
-
-    this.openChatInsights = null;
-    this.requestUpdate();
   };
 
   /**
@@ -2002,19 +2001,25 @@ Today's date: ${currentDate}`;
   }
 
   handleSaveInsightPreview(index) {
-    const { saved } = saveInsightPreview(this.pendingInsightPreview[index]);
+    const item = this.pendingInsightPreview?.[index];
+    const { saved } = saveInsightPreview(item);
     this.updateLogState({
       content: "Insight preview saved",
       result: { saved },
     });
     this.savedInsightCount = saved;
-    this.handleCloseInsightPreview();
+    this.handleCloseInsightPreview(index);
   }
 
-  handleCloseInsightPreview() {
-    this.pendingInsightPreview = null;
-    this.showInsightPreviewKey = null;
-    this.showInsightProposalDialog = false;
+  handleCloseInsightPreview(index) {
+    const next = [...this.pendingInsightPreview];
+    next.splice(index, 1);
+    if (next.length) {
+      this.pendingInsightPreview = next;
+    } else {
+      this.pendingInsightPreview = null;
+      this.showInsightPreviewKey = null;
+    }
     this.requestUpdate();
   }
 
@@ -2495,73 +2500,79 @@ Today's date: ${currentDate}`;
                             />
                           </svg>
                           ${this.showInsightPreviewKey === key &&
-                          this.pendingInsightPreview.length
-                            ? this.pendingInsightPreview.map(
-                                (insight, index) => html`
-                                  <div class="insight-preview-popover">
-                                    <div class="insight-preview-header">
-                                      <span class="insight-preview-title">
-                                        Add insight?
-                                      </span>
-                                      <button
-                                        class="insight-preview-close-btn"
-                                        aria-label="Close insight preview"
-                                        @click=${() =>
-                                          this.handleCloseInsightPreview()}
-                                      >
-                                        ×
-                                      </button>
-                                    </div>
-                                    <div class="insight-preview-item">
-                                      <span class="insight-preview-text"
-                                        >${insight.insight_summary}</span
-                                      >
-                                    </div>
-                                    <div class="insight-preview-actions">
-                                      <button
-                                        class="insight-preview-retry-btn"
-                                        @click=${() =>
-                                          this.handleRetryInsights(key, true)}
-                                      >
-                                        <svg
-                                          width="16"
-                                          height="15"
-                                          viewBox="0 0 16 15"
-                                          fill="none"
-                                          xmlns="http://www.w3.org/2000/svg"
+                          this.pendingInsightPreview?.length
+                            ? html` <div
+                                class="insight-previews"
+                                @click=${e => e.stopPropagation()}
+                              >
+                                ${this.pendingInsightPreview.map(
+                                  (insight, index) => html`
+                                    <div class="insight-preview-popover">
+                                      <div class="insight-preview-header">
+                                        <span class="insight-preview-title">
+                                          Add insight?
+                                        </span>
+                                        <button
+                                          class="insight-preview-close-btn"
+                                          aria-label="Close insight preview"
+                                          @click=${() =>
+                                            this.handleCloseInsightPreview()}
                                         >
-                                          <path
-                                            d="M7.5 0C10.0599 0 12.3193 1.29042 13.6709 3.25391L14.8037 2.12109C15.1007 1.82409 15.6094 2.0341 15.6094 2.4541V6.0293C15.6092 6.28916 15.3976 6.5 15.1377 6.5H11.5635C11.1435 6.5 10.9335 5.99229 11.2305 5.69629L12.5889 4.33594C11.5304 2.63507 9.6472 1.5 7.5 1.5C4.191 1.5 1.5 4.191 1.5 7.5C1.5 10.809 4.191 13.5 7.5 13.5C10.468 13.5 12.9322 11.333 13.4102 8.5H14.9248C14.4338 12.163 11.296 15 7.5 15C3.364 15 0 11.636 0 7.5C0 3.364 3.364 0 7.5 0Z"
-                                            fill="black"
-                                          />
-                                        </svg>
-                                        Try again
-                                      </button>
-                                      <button
-                                        class="insight-preview-save-btn"
-                                        @click=${this.handleSaveInsightPreview(
-                                          index
-                                        )}
-                                      >
-                                        <svg
-                                          width="14"
-                                          height="10"
-                                          viewBox="0 0 14 10"
-                                          fill="none"
-                                          xmlns="http://www.w3.org/2000/svg"
+                                          ×
+                                        </button>
+                                      </div>
+                                      <div class="insight-preview-item">
+                                        <span class="insight-preview-text"
+                                          >${insight.insight_summary}</span
                                         >
-                                          <path
-                                            d="M5.01202 9.15938L0.172022 4.32038C0.0596431 4.20202 -0.00206363 4.04444 5.26916e-05 3.88124C0.00216901 3.71804 0.0679411 3.56212 0.183351 3.44671C0.298761 3.3313 0.454682 3.26553 0.617883 3.26341C0.781084 3.26129 0.938658 3.323 1.05702 3.43538L5.36402 7.74338L12.923 0.182379C13.0407 0.0655596 13.1997 0 13.3655 0C13.5313 0 13.6904 0.0655596 13.808 0.182379C13.9248 0.300023 13.9904 0.459088 13.9904 0.624879C13.9904 0.790671 13.9248 0.949736 13.808 1.06738L5.71802 9.15738L5.01202 9.15938Z"
-                                            fill="#3A0F6E"
-                                          />
-                                        </svg>
+                                      </div>
+                                      <div class="insight-preview-actions">
+                                        <button
+                                          class="insight-preview-retry-btn"
+                                          @click=${() =>
+                                            this.handleRetryInsights(key, true)}
+                                        >
+                                          <svg
+                                            width="16"
+                                            height="15"
+                                            viewBox="0 0 16 15"
+                                            fill="none"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                          >
+                                            <path
+                                              d="M7.5 0C10.0599 0 12.3193 1.29042 13.6709 3.25391L14.8037 2.12109C15.1007 1.82409 15.6094 2.0341 15.6094 2.4541V6.0293C15.6092 6.28916 15.3976 6.5 15.1377 6.5H11.5635C11.1435 6.5 10.9335 5.99229 11.2305 5.69629L12.5889 4.33594C11.5304 2.63507 9.6472 1.5 7.5 1.5C4.191 1.5 1.5 4.191 1.5 7.5C1.5 10.809 4.191 13.5 7.5 13.5C10.468 13.5 12.9322 11.333 13.4102 8.5H14.9248C14.4338 12.163 11.296 15 7.5 15C3.364 15 0 11.636 0 7.5C0 3.364 3.364 0 7.5 0Z"
+                                              fill="black"
+                                            />
+                                          </svg>
+                                          Try again
+                                        </button>
+                                        <button
+                                          class="insight-preview-save-btn"
+                                          @click=${() =>
+                                            this.handleSaveInsightPreview(
+                                              index
+                                            )}
+                                        >
+                                          <svg
+                                            width="14"
+                                            height="10"
+                                            viewBox="0 0 14 10"
+                                            fill="none"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                          >
+                                            <path
+                                              d="M5.01202 9.15938L0.172022 4.32038C0.0596431 4.20202 -0.00206363 4.04444 5.26916e-05 3.88124C0.00216901 3.71804 0.0679411 3.56212 0.183351 3.44671C0.298761 3.3313 0.454682 3.26553 0.617883 3.26341C0.781084 3.26129 0.938658 3.323 1.05702 3.43538L5.36402 7.74338L12.923 0.182379C13.0407 0.0655596 13.1997 0 13.3655 0C13.5313 0 13.6904 0.0655596 13.808 0.182379C13.9248 0.300023 13.9904 0.459088 13.9904 0.624879C13.9904 0.790671 13.9248 0.949736 13.808 1.06738L5.71802 9.15738L5.01202 9.15938Z"
+                                              fill="#3A0F6E"
+                                            />
+                                          </svg>
 
-                                        Looks good
-                                      </button>
+                                          Looks good
+                                        </button>
+                                      </div>
                                     </div>
-                                  </div>
-                                `
-                              )
+                                  `
+                                )}
+                              </div>`
                             : ""}
                           ${usedInsights.length
                             ? html`<div class="message-footer">
