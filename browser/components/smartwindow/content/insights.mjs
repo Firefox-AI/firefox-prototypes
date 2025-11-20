@@ -197,11 +197,10 @@ async function withGenerationLock(fn) {
   }
 }
 
-async function runInsights(
-  profile_records,
-  source,
-  caps = { maxPerCategory: 2, maxPerIntent: 2 }
-) {
+async function runInsights(profile_records, source, opts = {}) {
+  const { preview = false, caps = { maxPerCategory: 2, maxPerIntent: 2 } } =
+    opts;
+
   const llm_pipeline = Services.prefs.getStringPref(
     "browser.smartwindow.insightsPipeline",
     "regular"
@@ -224,11 +223,26 @@ async function runInsights(
   if (!list.length) {
     return { addedCount: 0 };
   }
+
+  if (preview) {
+    return { addedCount: 0, list };
+  }
+
   const { addedCount } = addInsightsToData(list);
   console.log(
     `[Insights] Added ${addedCount}/${list.length} insights from ${source}`
   );
   return { addedCount };
+}
+
+export function saveInsightPreview(list) {
+  const { addedCount } = addInsightsToData(list);
+
+  try {
+    window.dispatchEvent(new CustomEvent("insights-updated"));
+  } catch {}
+
+  return { saved: addedCount };
 }
 
 // ===================== CoVe: Engine Runners =====================
@@ -2632,7 +2646,10 @@ export async function generateInsightsFromHistory(
     });
 
     console.log(`[Insights] Generating insights with LLM...`);
-    await runInsights(topk, "history", { maxPerCategory: 5, maxPerIntent: 2 });
+    await runInsights(topk, "history", {
+      preview: false,
+      caps: { maxPerCategory: 5, maxPerIntent: 2 },
+    });
 
     // Seed meta for incrementals
     const meta = getInsightsMeta();
@@ -2716,8 +2733,8 @@ export async function updateInsightsFromHistoryIncremental() {
 
     if (deltaMagnitude > 0) {
       await runInsights(deltaTopK, "history", {
-        maxPerCategory: 3,
-        maxPerIntent: 2,
+        preview: false,
+        caps: { maxPerCategory: 3, maxPerIntent: 2 },
       });
     } else {
       console.log("[Insights] Delta too small; skipping LLM.");
@@ -2816,8 +2833,11 @@ export async function generateInsightsFromConversations() {
 
     console.log(`[Insights] Found ${chatHistory.length} conversations`);
     await runInsights(chatHistory, "conversation", {
-      maxPerCategory: 2,
-      maxPerIntent: 2,
+      preview: false,
+      caps: {
+        maxPerCategory: 2,
+        maxPerIntent: 2,
+      },
     });
 
     // Watermark
@@ -2846,8 +2866,11 @@ export async function updateInsightsFromConversationsIncremental() {
     }
 
     await runInsights(delta, "conversation", {
-      maxPerCategory: 2,
-      maxPerIntent: 2,
+      preview: false,
+      caps: {
+        maxPerCategory: 2,
+        maxPerIntent: 2,
+      },
     });
 
     const newest = Math.max(lastTs, ...delta.map(d => d.lastTs || 0));
@@ -2869,7 +2892,10 @@ export async function generateInsightsFromCustomText(inputText) {
       throw new Error("No input text provided");
     }
 
-    await runInsights(text, "custom", { maxPerCategory: 2, maxPerIntent: 2 });
+    await runInsights(text, "custom", {
+      preview: false,
+      caps: { maxPerCategory: 2, maxPerIntent: 2 },
+    });
   });
 }
 
@@ -2909,17 +2935,18 @@ export async function generateInsightsFromDirectChat(inputText) {
     ];
 
     // Reuse the same pipeline selector (regular vs CoVe) and storage path.
-    const { addedCount } = await runInsights(profile_records, "user", {
-      maxPerCategory: 5,
-      maxPerIntent: 2,
+    const { list } = await runInsights(profile_records, "user", {
+      preview: true,
+      caps: {
+        maxPerCategory: 5,
+        maxPerIntent: 2,
+      },
     });
 
-    // Notify UI (overlay) to refresh.
-    try {
-      window.dispatchEvent(new CustomEvent("insights-updated"));
-    } catch {}
-
-    return { addedCount };
+    return {
+      previewCount: list ? list.length : 0,
+      list: list || [],
+    };
   });
 }
 
