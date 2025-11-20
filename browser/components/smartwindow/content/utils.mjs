@@ -326,7 +326,7 @@ export async function searchBrowserHistory({ search_term = "", start_ts = null, 
         const lastVisit = row.getResultByName("last_visit_date");
         const visit_count = row.getResultByName("visit_count");
         const relevanceScore = 1 - row.getResultByName("distance");
-        const previewImageURL = row.getResultByName("preview_image_url");
+        let previewImageURL = row.getResultByName("preview_image_url");
 
         // Get thumbnail URL for the page if preview_image_url not exists
         try {
@@ -387,6 +387,24 @@ export async function searchBrowserHistory({ search_term = "", start_ts = null, 
     });
   } finally {
 
+  }
+}
+
+function stripSearchBrowserHistoryFields(result) {
+  try {
+    const data = JSON.parse(result);
+    if (data.error || !Array.isArray(data.results) || data.results.length === 0) return result;
+
+    // Remove large or unnecessary fields to save tokens
+    const OMIT_KEYS = ["favicon", "thumbnail"];
+    for (const item of data.results) {
+      if (item && typeof item === "object") {
+        for (const k of OMIT_KEYS) delete item[k];
+      }
+    }
+    return JSON.stringify(data);
+  } catch {
+    return result;
   }
 }
 
@@ -742,6 +760,9 @@ export async function* fetchWithHistory(messages, allowedUrls) {
       } catch (e) {
         result = { error: `Tool execution failed: ${String(e)}` };
       }
+
+      // For SEARCH_HISTORY results, remove heavy fields (e.g., favicon, thumbnail) to reduce token cost
+      result = toolName === SEARCH_HISTORY ? stripSearchBrowserHistoryFields(result) : result;
 
       toolResultMessages.push({
         role: "tool",
