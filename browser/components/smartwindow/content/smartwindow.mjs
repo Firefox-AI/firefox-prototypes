@@ -752,7 +752,7 @@ class SmartWindowPage {
       onUpdate: ({ text, isAutofilled }) =>
         this.handleOnUpdate({ text, isAutofilled }),
       onSuggestionSelect: suggestion =>
-        this.handleEnter(suggestion.text, suggestion.type),
+        this.handleEnter(suggestion.text, suggestion.type, suggestion),
       getQueryTypeIcon: type => this.getQueryTypeIcon(type),
     });
 
@@ -1646,7 +1646,11 @@ class SmartWindowPage {
             if (this.smartbar) {
               this.smartbar.setContent(selectedSuggestion.text);
             }
-            this.handleEnter(selectedSuggestion.text);
+            this.handleEnter(
+              selectedSuggestion.text,
+              selectedSuggestion.type,
+              selectedSuggestion
+            );
           } else {
             const text = this.smartbar ? this.smartbar.getText() : "";
             this.handleEnter(text);
@@ -2093,12 +2097,12 @@ class SmartWindowPage {
     }
   }
 
-  async handleEnter(query, suggestionType = null) {
+  async handleEnter(query, suggestionType = null, suggestion = null) {
     if (!query.trim()) {
       return;
     }
     this.hideOnboardingMessage();
-
+    console.log(suggestion);
     const textFromBar = this.smartbar?.getText?.() || "";
     const htmlFromBar = this.smartbar?.getHTML?.() || null;
     const mentionsFromBar = this.smartbar?.getMentions?.() || [];
@@ -2211,7 +2215,14 @@ class SmartWindowPage {
       // The sidebar logic is handled by performNavigation for search/navigate types
     } else if (type === "action") {
       this.hideChatMode();
-      this.performNavigation(query, type);
+      this.smartbar.switchToMatchingTab(
+        {
+          url: suggestion.url,
+          title: suggestion.title,
+          query,
+        },
+        window
+      );
     } else {
       // For navigate and search, hide chat mode and show regular messages
       this.hideChatMode();
