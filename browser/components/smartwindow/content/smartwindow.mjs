@@ -2102,7 +2102,7 @@ class SmartWindowPage {
       return;
     }
     this.hideOnboardingMessage();
-    console.log(suggestion);
+
     const textFromBar = this.smartbar?.getText?.() || "";
     const htmlFromBar = this.smartbar?.getHTML?.() || null;
     const mentionsFromBar = this.smartbar?.getMentions?.() || [];
