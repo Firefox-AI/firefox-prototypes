@@ -87,13 +87,13 @@ export async function createOpenAIEngine(engineId = "smart-openai") {
 const SEARCH_OPEN_TABS = "search_open_tabs";
 const GET_PAGE_CONTENT = "get_page_content";
 const SEARCH_HISTORY = "search_history";
-const FLAG_ADD_INSIGHT = "flag_add_insight";
+const ADD_NEW_INSIGHT = "add_new_insight";
 
 const TOOLS = [
   SEARCH_OPEN_TABS,
   GET_PAGE_CONTENT,
   SEARCH_HISTORY,
-  FLAG_ADD_INSIGHT
+  ADD_NEW_INSIGHT
 ];
 
 const toolsConfig = [
@@ -173,16 +173,16 @@ const toolsConfig = [
   {
     type: "function",
     function: {
-      name: FLAG_ADD_INSIGHT,
+      name: ADD_NEW_INSIGHT,
       description:
-        "Flags that the current user message indicates an insight should be added, but does not add the insight directly.",
+        "Adds a new insight (like, interest, preference, desire, or memory) using the latest user message to help personalize future responses. Call or trigger this tool for phrases like \"I'm interested in...\", \"I want...\", \"Remember...\", \"I like...\", etc. to save or note new insights.",
       parameters: {
         type: "object",
         properties: {
-          message: {
+          new_insight_summary: {
             type: "string",
             description:
-              "The user message that indicates an insight should be added.",
+              "A summary of the new insight to be added.",
           },
         },
         required: ["message"],
@@ -390,7 +390,7 @@ export async function searchBrowserHistory({ search_term = "", start_ts = null, 
   }
 }
 
-async function flagAddInsight({ message }) {
+async function addNewInsight({ message }) {
   console.log("Flagging message as likely insight source:", message);
   return true;
 }
@@ -722,8 +722,8 @@ export async function* fetchWithHistory(messages, allowedUrls) {
           case SEARCH_HISTORY:
             result = await searchBrowserHistory(toolParams);
             break;
-          case FLAG_ADD_INSIGHT: {
-            result = await flagAddInsight(toolParams);
+          case ADD_NEW_INSIGHT: {
+            result = await addNewInsight(toolParams);
             break;
           }
         }

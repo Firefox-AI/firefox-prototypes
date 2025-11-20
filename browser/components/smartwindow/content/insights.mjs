@@ -3024,7 +3024,7 @@ export function deleteInsight(insight, category) {
  * @returns {Array<{fullMatch:string, insight:string, startIndex:number, endIndex:number}>}
  */
 export function detectInsightTokens(content) {
-  const insightRegex = /§insight:\s*([^§]+)§/gi;
+  const insightRegex = /§existing_insight:\s*([^§]+)§/gi;
   const matches = [];
   let match;
 
