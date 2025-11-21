@@ -2711,9 +2711,11 @@ class SmartWindowPage {
     const items = [];
     for (const [category, rawEntries] of sourceEntries) {
       for (const entry of asArray(rawEntries)) {
-        const summary = extractSummary(entry);
-        if (summary && usedInsights.has(summary)) {
-          items.push({ category, summary });
+        if (!entry.is_deleted) {
+          const summary = extractSummary(entry);
+          if (summary && usedInsights.has(summary)) {
+            items.push({ category, summary });
+          }
         }
       }
     }

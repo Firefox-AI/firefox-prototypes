@@ -1532,6 +1532,18 @@ const CLASSIFY_MESSAGE_SCHEMA = {
   },
 };
 
+const MOST_RELATED_STRING_SCHEMA = {
+  name: "MostRelatedString",
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["most_related_string"],
+    properties: {
+      most_related_string: { type: ["string", "null"] },
+    },
+  },
+};
+
 // Sensitive keywords (mirror prompt rules) for cove
 const SENSITIVE_KEYWORDS = [
   // medical & health keywords
@@ -2238,6 +2250,7 @@ function addInsightsToData(payload) {
             evidence: evidence.length ? evidence : (cur?.evidence ?? []),
             why: why || cur?.why || "",
             updated_at: ts,
+            is_deleted: false
           };
           found = true;
           break;
@@ -2254,6 +2267,7 @@ function addInsightsToData(payload) {
           evidence,
           why,
           updated_at: ts,
+          is_deleted: false
         });
       }
       upsertedByCategory += 1;
@@ -2995,20 +3009,10 @@ export function deleteInsight(insight, category) {
   let changed = false;
 
   if (insightsData[category]) {
-    const i = insightsData[category].indexOf(insight);
-    if (i > -1) {
-      insightsData[category].splice(i, 1);
-      changed = true;
-    }
-  }
-
-  const richIndex = ensureRichIndex(insightsData);
-  if (Array.isArray(richIndex[category])) {
-    const before = richIndex[category].length;
-    richIndex[category] = richIndex[category].filter(
-      r => (r?.insight_summary || "") !== insight
-    );
-    changed = changed || richIndex[category].length !== before;
+    const insightsInOrder = insightsData.insightsDataByCategory[category].map(insight => insight.insight_summary);
+    const i = insightsInOrder.indexOf(insight);
+    insightsData.insightsDataByCategory[category][i].is_deleted = true;
+    changed = true;
   }
 
   if (changed) {
@@ -3155,6 +3159,7 @@ async function classifyMessage(message) {
 export async function getRelevantInsights(message, opts = {}) {
   const input = String(message || "").trim();
   const limit = Math.max(1, Math.min(20, Number(opts.limit) || 5));
+  const insightIsDeleted = opts.filterDeleted ?? true;
 
   if (!input) {
     return {
@@ -3173,13 +3178,18 @@ export async function getRelevantInsights(message, opts = {}) {
   const data = getInsightsData();
   const index = ensureRichIndex(data);
 
-  // No category? try a soft sweep: gather from all cats and still rank
+  // Empty list if no category
   const candidateLists =
-    category && index[category] ? index[category] : Object.values(index).flat();
+    category && index[category] ? index[category] : [];
 
-  console.log(`[Insights] candidateLists = ${JSON.stringify(candidateLists)}`);
+  const candidateListFiltered = candidateLists.filter(insightObj => {
+    return insightObj.is_deleted !== insightIsDeleted;
+  });
+  console.log(`[Insights] candidateListFiltered = ${JSON.stringify(
+    candidateListFiltered
+  )}`);
 
-  if (!Array.isArray(candidateLists) || candidateLists.length === 0) {
+  if (!Array.isArray(candidateListFiltered) || candidateListFiltered.length === 0) {
     return {
       predicted_category: category || null,
       predicted_intent: intent || null,
@@ -3192,7 +3202,7 @@ export async function getRelevantInsights(message, opts = {}) {
   const CATEGORY_MATCH_BOOST = 0.75; // exact category hit
   const CATEGORY_MISMATCH_PENALTY = -0.25; // gentle nudge down for others during soft sweep
 
-  const ranked = candidateLists
+  const ranked = candidateListFiltered
     .map(obj => {
       const base = Math.max(1, Math.min(5, Number(obj?.score) || 1)) / 5; // 0.2..1.0
 
@@ -3242,6 +3252,64 @@ export async function getRelevantInsights(message, opts = {}) {
     insights: ranked,
   };
 }
+
+export async function findRelatedInsight(message, findNotDeletedInsights = false) {
+
+  const options = await getRelevantInsights(message, {filterDeleted: findNotDeletedInsights});
+  if (options && options.insights && options.insights.length) {
+    const insightSummaries = options.insights.map(i => i.insight_summary);
+    const insightSummariesStr = " - " + insightSummaries.join("\n - ");
+
+    const engine = await createOpenAIEngine();
+
+    const resp = await engine.run({
+      args: [
+        {
+          role: "system",
+          content: "Find and return the string most related to the target."
+        },
+        {
+          role: "user",
+          content: `
+Find the string most related to the target message.
+
+TARGET MESSAGE: ${message}
+
+OPTIONS:
+${insightSummariesStr}
+
+Return ONLY the most related string. If none are related, return null.
+
+Give you answer in the following JSON format:
+\`\`\`json
+{
+  "most_related_string": <string|null>
+}
+\`\`\`
+`.trim()
+        }
+      ],
+      responseFormat: { type: "json_schema", schema: MOST_RELATED_STRING_SCHEMA }
+    });
+    const raw = resp?.finalOutput;
+    const parsed = extractJSON(raw);
+    const mostRelatedString = parsed?.most_related_string || null;
+    if (mostRelatedString) {
+      let insightCategory = null;
+      for (const insight of options.insights) {
+        if (insight.insight_summary === mostRelatedString) {
+          insightCategory = insight.category;
+          break;
+        }
+      }
+      if (insightCategory) {
+        return {insight: mostRelatedString, category: insightCategory};
+      }
+    }
+  }
+  return {insight: null, category: null};
+}
+
 
 /**
  * Creates a clickable insight token element
@@ -3558,12 +3626,13 @@ export function createInsightsOverlay(
                   <div class="insight-items">
                     ${insight_summary.map(insight => {
                       const isUsed = usedInsights.has(insight);
+                      const isDeleted = dataToDisplay.insightsDataByCategory[category]?.find(item => item.insight_summary === insight)?.is_deleted;
                       return html`
                         <span
                           class="insight-item ${isUsed ? "used" : ""}"
                           title=${isUsed ? "Used in this conversation" : ""}
                         >
-                          <span class="insight-text">${insight}</span>
+                          <span class="insight-text">${isDeleted ? html`<s>${insight}</s>` : insight}</span>
                           ${onDeleteInsight
                             ? html`
                                 <button
