@@ -284,6 +284,7 @@ export const SpecialMessageActions = {
       "termsofuse.minimumVersion",
       "privacy.trackingprotection.allow_list.baseline.enabled",
       "privacy.trackingprotection.allow_list.convenience.enabled",
+      "browser.smartwindow.tos",
     ];
 
     // Array of prefs that are allowed to be edited when SET_PREF is called on
@@ -756,6 +757,10 @@ export const SpecialMessageActions = {
         }
 
         if (await this.fxaSignInFlow(action.data, browser)) {
+          if (!Services.prefs.getBoolPref("browser.smartwindow.tos", false)){
+            Services.prefs.setBoolPref("browser.smartwindow.isfirstrun", true);
+          }
+          Services.prefs.setBoolPref("browser.smartwindow.tos", true);
           window.SmartWindow.toggleSmartWindow();
         }
         break;

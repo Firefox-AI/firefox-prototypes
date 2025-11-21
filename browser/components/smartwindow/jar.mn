@@ -23,3 +23,6 @@ browser.jar:
     content/browser/smartwindow/utils.mjs                    (content/utils.mjs)
     content/browser/smartwindow/welcome.html                 (content/welcome.html)
     content/browser/smartwindow/welcome.js                   (content/welcome.js)
+    content/browser/smartwindow/firstrun.html                (content/firstrun.html)
+    content/browser/smartwindow/firstrun.js                  (content/firstrun.js)
+    content/browser/smartwindow/insights.png                 (content/insights.png)

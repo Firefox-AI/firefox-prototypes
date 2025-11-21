@@ -1255,12 +1255,22 @@ body {
 }
 
 #multi-stage-message-root {
+  --background-color-canvas: transparent;
+  /*--single-select-hover-color: #FCFAFE;*/
+  height: 100vh;
   .welcome-text {
     max-width: 600px;
   }
-
   .main-content {
-    background-color: rgba(247, 230, 251, 1);
+    /*background-color: #FCFAFE;*/
+  }
+
+  .screen {
+    /*background-color: rgba(247, 230, 251, 1);*/
+  }
+
+  .onboardingContainer .tiles-single-select-section.single-select .select-item:hover{
+    background-color: #FCFAFE;
   }
 }
 

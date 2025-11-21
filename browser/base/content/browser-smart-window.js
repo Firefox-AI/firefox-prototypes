@@ -8,6 +8,9 @@ var SmartWindow = {
   PAGE_URL: Services.io.newURI(
     "chrome://browser/content/smartwindow/smartwindow.html"
   ),
+  FIRST_RUN_URL: Services.io.newURI(
+    "chrome://browser/content/smartwindow/firstrun.html"
+  ),
 
   _initialized: false,
   _viewInitialized: false,
@@ -67,7 +70,7 @@ var SmartWindow = {
   },
 
   _isSmartPage(browser) {
-    return !!browser?.currentURI?.equalsExceptRef(this.PAGE_URL);
+    return !!browser?.currentURI?.equalsExceptRef(this.PAGE_URL) || !!browser?.currentURI?.equalsExceptRef(this.FIRST_RUN_URL);
   },
 
   _ensureViewInitialized() {
@@ -92,61 +95,51 @@ var SmartWindow = {
           this.toggleSmartWindow();
           break;
         case "smart-window-switch-smart": {
-          const skipOnboarding = Services.prefs.getBoolPref(
-            "browser.smartwindow.skipOnboarding",
-            true
-          );
-          const completedOnboarding = Services.prefs.getBoolPref(
-            "messaging-system-action.smart-window-tos",
+          const requireSignIn = Services.prefs.getBoolPref(
+            "browser.smartwindow.requireSignIn",
             false
           );
 
-          if (skipOnboarding || completedOnboarding) {
-            const requireSignIn = Services.prefs.getBoolPref(
-              "browser.smartwindow.requireSignIn",
-              false
+          if (!requireSignIn) {
+            this.toggleSmartWindow();
+            break;
+          }
+          const { UIState } = ChromeUtils.importESModule(
+            "resource://services-sync/UIState.sys.mjs"
+          );
+          const currentState = UIState.get();
+
+          if (currentState.status !== UIState.STATUS_SIGNED_IN) {
+            console.warn(
+              "[Smart Window] User not authenticated, sign in with FxA"
             );
 
-            if (requireSignIn) {
-              const { UIState } = ChromeUtils.importESModule(
-                "resource://services-sync/UIState.sys.mjs"
+            try {
+              const { SpecialMessageActions } = ChromeUtils.importESModule(
+                "resource://messaging-system/lib/SpecialMessageActions.sys.mjs"
               );
-              const currentState = UIState.get();
-
-              if (currentState.status !== UIState.STATUS_SIGNED_IN) {
-                console.warn(
-                  "[Smart Window] User not authenticated, sign in with FxA"
-                );
-
-                try {
-                  const { SpecialMessageActions } = ChromeUtils.importESModule(
-                    "resource://messaging-system/lib/SpecialMessageActions.sys.mjs"
-                  );
-                  // FXA_SMART_WINDOW_SIGNIN_FLOW handles toggling smart window on success
-                  SpecialMessageActions.handleAction(
-                    {
-                      type: "FXA_SMART_WINDOW_SIGNIN_FLOW",
-                      data: {
-                        entrypoint: "aimode",
-                      },
-                    },
-                    gBrowser.selectedBrowser
-                  );
-                  break;
-                } catch (error) {
-                  console.error(
-                    "[Smart Window] Error during FxA sign-in:",
-                    error
-                  );
-                }
-              }
+              // FXA_SMART_WINDOW_SIGNIN_FLOW handles toggling smart window on success
+              // TODO: we should await handleAction and set tos and isfirstrun pref here
+              // instead of SpecialMessageActions
+              SpecialMessageActions.handleAction(
+                {
+                  type: "FXA_SMART_WINDOW_SIGNIN_FLOW",
+                  data: {
+                    entrypoint: "aimode",
+                  },
+                },
+                gBrowser.selectedBrowser
+              );
+              break;
+            } catch (error) {
+              console.error(
+                "[Smart Window] Error during FxA sign-in:",
+                error
+              );
             }
-
-            this.toggleSmartWindow();
           } else {
-            this.showOnboarding();
+            this.toggleSmartWindow();
           }
-
           break;
         }
         case "smart-window-dev-onboarding":
@@ -187,13 +180,18 @@ var SmartWindow = {
     }
   },
 
-  showOnboarding() {
-    window.openTrustedLinkIn(
-      Services.urlFormatter.formatURL(
-        "chrome://browser/content/smartwindow/welcome.html"
-      ),
-      "tab"
-    );
+  // Shows Post login first run onboarding
+  async showOnboarding() {
+    return new Promise(resolve => {
+      window.openTrustedLinkIn(
+        Services.urlFormatter.formatURL(
+          "chrome://browser/content/smartwindow/firstrun.html"
+        ),
+        "tab"
+      );
+      // Resolve after a brief delay to ensure the window is opened
+      setTimeout(() => resolve(), 2000);
+    });
   },
 
   toggleSmartWindow() {
@@ -223,8 +221,14 @@ var SmartWindow = {
    *                 Can be omitted if not switching from classic to smart
    *                 window mode.
    */
-  reconcileUIToSmartWindowState(oldNewTabURL = "") {
+  async reconcileUIToSmartWindowState(oldNewTabURL = "") {
     if (this.isSmartWindowActive()) {
+      // Show the first run onboarding first time user switches to smart window mode
+      if (Services.prefs.getBoolPref("browser.smartwindow.isfirstrun", false)) {
+        Services.prefs.setBoolPref("browser.smartwindow.isfirstrun", false);
+        await this.showOnboarding();
+      }
+
       // Check if we're on a smart window page
       const isSmartWindowPage = this._isSmartPage(gBrowser.selectedBrowser);
 

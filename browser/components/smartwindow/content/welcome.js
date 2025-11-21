@@ -58,15 +58,6 @@ XPCOMUtils.defineLazyPreferenceGetter(
               data: {
                 actions: [
                   {
-                    type: "SET_PREF",
-                    data: {
-                      pref: {
-                        name: "messaging-system-action.smart-window-tos",
-                        value: true,
-                      },
-                    },
-                  },
-                  {
                     data: {
                       entrypoint: "aimode",
                     },
@@ -99,12 +90,6 @@ function addStylesheet(href) {
   link.rel = "stylesheet";
   link.href = href;
 }
-
-// TODO
-// Check if a) is signedIn b)  Has FxAccount and not signed in  c) doesn't have FxAccount
-// a) Check consent stored in pref `messaging-system-action.smart-window-tos` , if yes toggle to smart window without redirect to account.firefox.com
-// b) and c) Redirect to account.firefox.com for account creation and signin and on success call toggle smart window
-// See GENAI-2201
 
 function renderMultistage(ready) {
   const AWParent = new lazy.AboutWelcomeParent();
