@@ -15,6 +15,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
 
 import { createEngine } from "chrome://global/content/ml/EngineProcess.sys.mjs";
 import { SmartAssistEngine } from "moz-src:///browser/components/genai/SmartAssistEngine.sys.mjs";
+import { getRelevantInsights, deleteInsight, findRelatedInsight } from "chrome://browser/content/smartwindow/insights.mjs";
 
 const { ChatHistoryMessage } = ChromeUtils.importESModule(
   "resource:///modules/smartwindow/ChatHistory.sys.mjs"
@@ -88,12 +89,14 @@ const SEARCH_OPEN_TABS = "search_open_tabs";
 const GET_PAGE_CONTENT = "get_page_content";
 const SEARCH_HISTORY = "search_history";
 const ADD_NEW_INSIGHT = "add_new_insight";
+const DELETE_INSIGHT = "delete_insight";
 
 const TOOLS = [
   SEARCH_OPEN_TABS,
   GET_PAGE_CONTENT,
   SEARCH_HISTORY,
-  ADD_NEW_INSIGHT
+  ADD_NEW_INSIGHT,
+  DELETE_INSIGHT
 ];
 
 const toolsConfig = [
@@ -183,6 +186,25 @@ const toolsConfig = [
             type: "string",
             description:
               "A summary of the new insight to be added.",
+          },
+        },
+        required: ["message"],
+      },
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: DELETE_INSIGHT,
+      description:
+        "Deletes an insight based on the current user message.",
+      parameters: {
+        type: "object",
+        properties: {
+          message: {
+            type: "string",
+            description:
+              "The user message that indicates which insight to delete.",
           },
         },
         required: ["message"],
@@ -408,9 +430,35 @@ function stripSearchBrowserHistoryFields(result) {
   }
 }
 
-async function addNewInsight({ message }) {
-  console.log("Flagging message as likely insight source:", message);
-  return true;
+async function addNewInsight({ new_insight_summary }) {
+  console.log("[Insights][addNewInsight] Trying to add new insight based on message:", new_insight_summary);
+  const findNotDeletedInsights = false;
+  const foundRelatedInsight = await findRelatedInsight(new_insight_summary, findNotDeletedInsights);
+  if (foundRelatedInsight.insight) {
+    console.log("[Insights][addNewInsight] Found existing deleted insight: ", foundRelatedInsight);
+    return JSON.stringify({
+      error: true,
+      message: "Insight was deleted previously; cannot re-add the same insight."
+    });
+  }
+  return JSON.stringify({
+    error: false,
+    message: "Attempting to add insight",
+    insight_source: new_insight_summary,
+  });
+}
+
+async function deleteRelevantInsight({ message }) {
+  console.log("[Insights][deleteRelevantInsight] Trying to delete existing insight based on message:", message);
+  const findNotDeletedInsights = true;
+  const foundRelatedInsight = await findRelatedInsight(message, findNotDeletedInsights);
+  console.log("[Insights][deleteRelevantInsight] Found existing insight to delete: ", foundRelatedInsight);
+
+  if (foundRelatedInsight.insight) {
+    deleteInsight(foundRelatedInsight.insight, foundRelatedInsight.category);
+    return "Deleted insight: " + foundRelatedInsight.insight;
+  }
+  return "No insights found to delete.";
 }
 
 const search_open_tabs = ({ type }) => {
@@ -742,6 +790,10 @@ export async function* fetchWithHistory(messages, allowedUrls) {
             break;
           case ADD_NEW_INSIGHT: {
             result = await addNewInsight(toolParams);
+            break;
+          }
+          case DELETE_INSIGHT: {
+            result = await deleteRelevantInsight(toolParams);
             break;
           }
         }

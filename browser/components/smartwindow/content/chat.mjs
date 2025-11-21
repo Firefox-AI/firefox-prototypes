@@ -1310,7 +1310,10 @@ Use them to personalized your response using the following guidelines:
           if (chunk.tool === "search_history") {
             this.#flagHistoryOverlayForCurrentResponse(historyMeta);
           } else if (chunk.tool == "add_new_insight") {
-            this.#addFlaggedInsight(this.prompt.trim(), assistantKey);
+            if (!JSON.parse(chunk.result).error) {
+              console.log("[Assistant] New Insight Added:", chunk.result);
+              this.#addFlaggedInsight(JSON.parse(chunk.result).insight_source, assistantKey);
+            }
           }
           continue;
         }
@@ -1459,7 +1462,7 @@ Available tools:
   1. Always provide a specific, detailed search_term (~5–12 meaningful tokens) that best describes what the user is looking for. Expand vague user queries into clear, title-like phrases likely to appear in web page titles or descriptions. Include relevant entities, library names, or context words (e.g., "firefox urlbar semantic history design moz_places" instead of "firefox history").
   2. Always look for user's temporal intent, if it exists. Then use that to extract a time window range (in ISO 8601 datetime format) for the function input.
   3. Now you found the temporal phrase, given the locale: ${locale}, and datetime: ${localIso}, give a specific time window range. For example "last week", calculate the last week's time window range in ISO 8601 format for the input start_ts and end_ts.
-- add_new_insight: Adds a new insight (like, interest, preference, desire, or memory) using the latest user message to help personalize future responses. Call this tool for phrases like:
+- add_new_insight: Attempts to add a new insight (like, interest, preference, desire, or memory) using the latest user message to help personalize future responses. Call this tool for phrases like:
     - "I'm interested in..." -> Expresses an interest in something
     - "I want..." -> Expresses a desire or wish
     - "Remember..." -> Requests to save a memory, preference, detail, etc.
@@ -1468,6 +1471,8 @@ Available tools:
     - "I like..." -> Expresses a liking or preference
     - "I hate..." -> Expresses a dislike or aversion
 Provide a summary of the new insight you want to save or note. ALWAYS call \`add_new_insight\` BEFORE telling the user you saved or noted the insight. An insight WILL NOT be saved unless you call this tool.
+- delete_insight: Deletes, forgets, removes, etc. an insight based on the user's latest message. User requests may be direct (i.e. "Forget...", "Don't remmeber...") or indirect ("I don't [...] anymore", etc.). Only provide the user's latest message.
+
 
 # Search Suggestions
 
