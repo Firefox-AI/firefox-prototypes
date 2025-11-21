@@ -355,12 +355,12 @@ export function attachToElement(element, options = {}) {
   });
 
   // Add click event listener for mention expansion toggle
-  element.addEventListener('click', (event) => {
-    const mentionElement = event.target.closest('.mention');
+  element.addEventListener("click", event => {
+    const mentionElement = event.target.closest(".mention");
     if (mentionElement) {
       event.preventDefault();
       event.stopPropagation();
-      mentionElement.classList.toggle('expanded');
+      mentionElement.classList.toggle("expanded");
     }
   });
 
@@ -747,6 +747,7 @@ export function attachToElement(element, options = {}) {
       return hasExistingMentions(editor.getJSON());
     },
 
+    switchToMatchingTab,
     showSuggestions,
     hideSuggestions,
     navigateSuggestions,
