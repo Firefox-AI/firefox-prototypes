@@ -31,10 +31,35 @@ const { SessionStore } = ChromeUtils.importESModule(
 const { TabStateFlusher } = ChromeUtils.importESModule(
   "resource:///modules/sessionstore/TabStateFlusher.sys.mjs"
 );
+const { SecurityOrchestrator } = ChromeUtils.importESModule(
+  "chrome://global/content/ml/security/SecurityOrchestrator.sys.mjs"
+);
 const { embedderElement, topChromeWindow } = window.browsingContext;
 const gBrowser = topChromeWindow.gBrowser;
 
 const FIRST_RUN_PREF = "browser.smartwindow.firstrun.didSeeWelcome";
+
+// Register SmartWindowMeta actor for secure page metadata extraction
+try {
+  ChromeUtils.registerWindowActor("SmartWindowMeta", {
+    parent: {
+      esModuleURI: "chrome://browser/content/smartwindow/actors/SmartWindowMetaParent.sys.mjs",
+    },
+    child: {
+      esModuleURI: "chrome://browser/content/smartwindow/actors/SmartWindowMetaChild.sys.mjs",
+      events: {
+        DOMContentLoaded: {},
+      },
+    },
+    allFrames: true,
+  });
+} catch (e) {
+  // Actor already registered - this is expected if Smart Window
+  // has been opened before in this browser session
+  if (!e.message?.includes("already registered")) {
+    console.error("Failed to register SmartWindowMeta actor:", e);
+  }
+}
 
 /**
  *
@@ -88,6 +113,25 @@ class SmartWindowPage {
 
     this.#chatHistory = new ChatHistory();
 
+    // Initialize security orchestrator (if enabled)
+    // Creates the SessionLedger that tracks trusted URLs across tabs
+    // Only initialize if Smart Window security is enabled
+    const sessionId = `smart-window-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    const securityEnabled = Services.prefs.getBoolPref("browser.smartwindow.security.enabled", true);
+    
+    if (securityEnabled) {
+      SecurityOrchestrator.init(sessionId).then(sessionLedger => {
+        this.sessionLedger = sessionLedger;
+        console.log("[Security] Smart Window security enabled - orchestrator initialized");
+      }).catch(error => {
+        console.error("[Security] Failed to initialize orchestrator:", error);
+        this.sessionLedger = null;
+      });
+    } else {
+      this.sessionLedger = null;
+      console.log("[Security] Smart Window security DISABLED via kill switch - running in pass-through mode");
+    }
+
     gBrowser.selectedTab.conversation = new ChatHistoryConversation({
       title: "",
       description: "",
@@ -134,6 +178,8 @@ class SmartWindowPage {
         this.onboardingPrefObserver
       );
     }
+
+    SecurityOrchestrator.reset();
   }
 
   getQueryTypeIcon(type) {

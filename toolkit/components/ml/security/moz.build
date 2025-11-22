@@ -1,0 +1,20 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+with Files("**"):
+    BUG_COMPONENT = ("Firefox", "Machine Learning")
+
+EXTRA_JS_MODULES += [
+    'ConditionEvaluator.sys.mjs',
+    'DecisionTypes.sys.mjs',
+    'PolicyEvaluator.sys.mjs',
+    'SecurityLogger.sys.mjs',
+    'SecurityOrchestrator.sys.mjs',
+    'SecurityUtils.sys.mjs',
+    'SmartWindowIntegration.sys.mjs',
+]
+
+FINAL_TARGET_FILES.content.ml.security.policies += [
+    'policies/tool-execution-policies.json',
+]

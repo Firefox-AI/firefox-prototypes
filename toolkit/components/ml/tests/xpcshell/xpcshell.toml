@@ -2,4 +2,11 @@
 head = ""
 skip-if = ["os == 'android'"]
 
+["test_condition_evaluator.js"]
+["test_decision_types.js"]
+["test_json_policy_system.js"]
 ["test_ml_engine_security.js"]
+["test_policy_evaluator.js"]
+["test_security_orchestrator.js"]
+["test_security_utils.js"]
+["test_smart_window_integration.js"]

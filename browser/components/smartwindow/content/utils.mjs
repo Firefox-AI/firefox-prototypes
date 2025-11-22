@@ -11,6 +11,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   PageThumbs: "resource://gre/modules/PageThumbs.sys.mjs",
   PageThumbsStorage: "resource://gre/modules/PageThumbs.sys.mjs",
   getPlacesSemanticHistoryManager: "resource://gre/modules/PlacesSemanticHistoryManager.sys.mjs",
+  SecurityOrchestrator:
+    "chrome://global/content/ml/security/SecurityOrchestrator.sys.mjs",
 });
 
 import { createEngine } from "chrome://global/content/ml/EngineProcess.sys.mjs";
@@ -557,6 +559,112 @@ const MODE_HANDLERS = {
 const DEFAULT_MODE = "viewport";
 
 /**
+ * Checks if a tool execution is allowed by security policy.
+ *
+ * @param {string} toolName - Name of the tool being called
+ * @param {object} toolParams - Tool parameters
+ * @param {string} requestId - Unique request identifier
+ * @returns {Promise<{allowed: boolean, reason?: string}>} Security decision
+ */
+async function checkToolSecurity(toolName, toolParams, requestId) {
+  try {
+    // Extract URLs based on tool type
+    let urls = [];
+    let tabId = null;
+
+    if (toolName === GET_PAGE_CONTENT && toolParams.url) {
+      urls = [toolParams.url];
+
+      // Find the target tab
+      let win = lazy.BrowserWindowTracker.getTopWindow();
+      let gBrowser = win.gBrowser;
+      let targetTab = gBrowser.tabs.find(tab => {
+        const tabUrl = tab.linkedBrowser.currentURI.spec;
+        return (
+          tabUrl === toolParams.url ||
+          tabUrl.replace(/\/$/, "") === toolParams.url.replace(/\/$/, "")
+        );
+      });
+
+      if (targetTab) {
+        tabId = targetTab.linkedPanel;
+
+        // Seed this tab's URLs since user is requesting it
+        try {
+          const browser = targetTab.linkedBrowser;
+          if (browser.browsingContext?.currentWindowContext) {
+            const actor =
+              await browser.browsingContext.currentWindowContext.getActor(
+                "SmartWindowMeta"
+              );
+            const sessionLedger = lazy.SecurityOrchestrator.getSessionLedger();
+
+            if (!sessionLedger) {
+              console.log(
+                "[Security] Kill switch disabled - skipping ledger seeding"
+              );
+            } else {
+              const result = await actor.seedLedgerForTab(sessionLedger, tabId);
+
+              if (result.success) {
+                console.warn(
+                  `[Security] Explicitly seeded tab ${tabId} with ${result.seededUrls.length} URLs for tool execution`
+                );
+              }
+            }
+          }
+        } catch (seedError) {
+          console.warn(
+            "[Security] Failed to seed tab before tool execution:",
+            seedError
+          );
+        }
+      }
+    }
+
+    if (urls.length === 0) {
+      return { allowed: true };
+    }
+
+    if (!tabId) {
+      let win = lazy.BrowserWindowTracker.getTopWindow();
+      let gBrowser = win.gBrowser;
+      tabId = gBrowser.selectedTab.linkedPanel;
+    }
+
+    const decision = await lazy.SecurityOrchestrator.evaluate({
+      phase: "tool.execution",
+      action: {
+        type: "tool.call",
+        tool: toolName,
+        urls,
+        tabId,
+      },
+      context: {
+        currentTabId: tabId,
+        mentionedTabIds: [], // TODO: Extract from @mentions
+        requestId,
+      },
+    });
+
+    if (decision.effect === "deny") {
+      return {
+        allowed: false,
+        reason: `Security policy blocked this action: ${decision.reason} (${decision.code})`,
+      };
+    }
+
+    return { allowed: true };
+  } catch (error) {
+    console.error("[Security Check] Error:", error);
+    return {
+      allowed: false,
+      reason: `Security check failed: ${error.message}`,
+    };
+  }
+}
+
+/**
  * @param {object} toolParams
  * @param {string} toolParams.url
  * @param {string} toolParams.mode
@@ -834,23 +942,79 @@ export async function* fetchWithHistory(messages, allowedUrls) {
           result = { error: `There is no tool called : ${String(toolName)}` };
         }
 
-        switch (toolName) {
-          case SEARCH_OPEN_TABS:
-            result = search_open_tabs(toolParams);
-            break;
-          case GET_PAGE_CONTENT:
-            result = await get_page_content(toolParams, allowedUrls);
-            break;
-          case SEARCH_HISTORY:
-            result = await searchBrowserHistory(toolParams);
-            break;
-          case ADD_NEW_INSIGHT: {
-            result = await addNewInsight(toolParams);
-            break;
+        // Check security policy before executing tool
+        const securityCheck = await checkToolSecurity(
+          toolName,
+          toolParams,
+          id // Use tool call ID as request ID
+        );
+
+        if (!securityCheck.allowed) {
+          result = {
+            error: securityCheck.reason || "Security policy denied this action",
+          };
+        } else {
+          // Populate allowedUrls from current tab's ledger for headless extraction
+          // This allows fetching URLs that are part of the current page's metadata
+          // Such as (canonical URLs, related links, etc.) even if they're not in open tabs
+          let allowedUrls = new Set();
+          try {
+            const sessionLedger = lazy.SecurityOrchestrator.getSessionLedger();
+
+            if (sessionLedger) {
+              // Get current tab ID from tool params or browser
+              let currentTabId = toolParams.tabId;
+              if (!currentTabId && toolParams.url) {
+                // Try to find tab by URL
+                let win = lazy.BrowserWindowTracker.getTopWindow();
+                let gBrowser = win.gBrowser;
+                let targetTab = gBrowser.tabs.find(tab => {
+                  const tabUrl = tab.linkedBrowser.currentURI.spec;
+                  return (
+                    tabUrl === toolParams.url ||
+                    tabUrl.replace(/\/$/, "") ===
+                      toolParams.url.replace(/\/$/, "")
+                  );
+                });
+                if (targetTab) {
+                  currentTabId = targetTab.linkedPanel;
+                }
+              }
+
+              if (currentTabId) {
+                const tabLedger = sessionLedger.forTab(currentTabId);
+                if (tabLedger) {
+                  allowedUrls = new Set(tabLedger.getAll());
+                  console.log(
+                    `[Security] Allowing headless extraction for ${allowedUrls.size} URLs from current tab ${currentTabId}`
+                  );
+                }
+              }
+            }
+          } catch (error) {
+            console.warn(
+              "[Security] Could not populate allowedUrls for headless extraction:",
+              error
+            );
+            allowedUrls = new Set();
           }
-          case DELETE_INSIGHT: {
-            result = await deleteRelevantInsight(toolParams);
-            break;
+
+          switch (toolName) {
+            case SEARCH_OPEN_TABS:
+              result = search_open_tabs(toolParams);
+              break;
+            case GET_PAGE_CONTENT:
+              result = await get_page_content(toolParams, allowedUrls);
+              break;
+            case SEARCH_HISTORY:
+              result = await searchBrowserHistory(toolParams);
+              break;
+            case ADD_NEW_INSIGHT:
+              result = await addNewInsight(toolParams);
+              break;
+            case DELETE_INSIGHT:
+              result = await deleteRelevantInsight(toolParams);
+              break;
           }
         }
 
