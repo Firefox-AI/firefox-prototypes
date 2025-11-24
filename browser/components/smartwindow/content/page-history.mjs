@@ -637,7 +637,7 @@ export class PageHistoryOverlay extends LitElement {
       .skeleton-bg,
       .skeleton-rect {
         animation: none;
-        opacity: 0.25; /* Static opacity for reduced motion */
+        opacity: 0.25;
       }
     }
 
