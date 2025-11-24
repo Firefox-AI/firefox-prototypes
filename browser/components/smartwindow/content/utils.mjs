@@ -15,7 +15,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
 
 import { createEngine } from "chrome://global/content/ml/EngineProcess.sys.mjs";
 import { SmartAssistEngine } from "moz-src:///browser/components/genai/SmartAssistEngine.sys.mjs";
-import { getRelevantInsights, deleteInsight, findRelatedInsight } from "chrome://browser/content/smartwindow/insights.mjs";
+import { deleteInsight, findRelatedInsight, generateInsightsFromDirectChat } from "chrome://browser/content/smartwindow/insights.mjs";
 
 const { ChatHistoryMessage } = ChromeUtils.importESModule(
   "resource:///modules/smartwindow/ChatHistory.sys.mjs"
@@ -438,13 +438,24 @@ async function addNewInsight({ new_insight_summary }) {
     console.log("[Insights][addNewInsight] Found existing deleted insight: ", foundRelatedInsight);
     return JSON.stringify({
       error: true,
-      message: "Insight was deleted previously; cannot re-add the same insight."
+      message: "Insight cannot be added. Tell the user this insight was previously deleted and cannot be re-added."
+    });
+  }
+
+  const newInsight = await generateInsightsFromDirectChat(new_insight_summary);
+  console.log("[Insights][addNewInsight] Generated new insight: ", newInsight);
+
+  if (newInsight.previewCount === 0) {
+    return JSON.stringify({
+      error: true,
+      message: "Could not generate an insight. Tell the user this insight is either sensitive content or a duplicate of an existing insight."
     });
   }
   return JSON.stringify({
     error: false,
-    message: "Attempting to add insight",
-    insight_source: new_insight_summary,
+    message: "Generated new insight(s) successfully.",
+    new_insights: newInsight.list,
+    preview_count: newInsight.previewCount
   });
 }
 

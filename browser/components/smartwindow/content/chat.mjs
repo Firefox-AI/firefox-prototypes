@@ -15,7 +15,6 @@ import {
   createInsightsOverlay,
   insightsStyles,
   deleteInsight,
-  generateInsightsFromDirectChat,
   getRelevantInsights,
   saveInsightPreview,
 } from "chrome://browser/content/smartwindow/insights.mjs";
@@ -1312,7 +1311,12 @@ Use them to personalized your response using the following guidelines:
           } else if (chunk.tool == "add_new_insight") {
             if (!JSON.parse(chunk.result).error) {
               console.log("[Assistant] New Insight Added:", chunk.result);
-              this.#addFlaggedInsight(JSON.parse(chunk.result).insight_source, assistantKey);
+              const insightResult = JSON.parse(chunk.result);
+              if (!insightResult.error) {
+                this.pendingInsightPreview = insightResult.new_insights;
+                this.showInsightPreviewKey = assistantKey;
+                this.requestUpdate();
+              }
             }
           }
           continue;
@@ -1751,37 +1755,6 @@ Today's date: ${currentDate}`;
     this._uiMeta.set(messageKey, metaWithHistory);
     this._uiMeta.set(lastIdx, metaWithHistory);
     this.requestUpdate();
-  }
-
-  #addFlaggedInsight(promptForInsight, assistantKey) {
-    try {
-      // Log start
-      this.updateLogState({
-        content: "Generate insights from direct chat",
-        result: { status: "started" },
-      });
-
-      // Fire-and-forget: don't block streaming
-      generateInsightsFromDirectChat(promptForInsight).then(
-        ({ previewCount, list }) => {
-          this.updateLogState({
-            content: "Direct-chat insights",
-            result: { previewCount },
-          });
-          if (list.length) {
-            this.pendingInsightPreview = list;
-            this.showInsightPreviewKey = assistantKey;
-            this.requestUpdate();
-          }
-        }
-      );
-    } catch (e) {
-      // Never let insights errors impact chat UX
-      this.updateLogState({
-        content: "Direct-chat insights error (outer)",
-        result: { error: true, message: e?.message || String(e) },
-      });
-    }
   }
 
   handleSearchQuery(query, engineName, clickEvent) {
