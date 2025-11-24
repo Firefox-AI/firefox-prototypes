@@ -630,7 +630,7 @@ export class PageHistoryOverlay extends LitElement {
 
     @media (prefers-reduced-motion: reduce) {
       .skeleton-loading-container,
-      .thumbnail-image {
+      .skeleton-target {
         transition: none;
       }
 
