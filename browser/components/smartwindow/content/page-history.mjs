@@ -235,7 +235,6 @@ export class PageHistoryOverlay extends LitElement {
                   decoding="async"
                   @load=${e => e.target.classList.add("loaded")}
                   @error=${e => this.handleThumbnailError(e)}
-                  }}
                 />
               `
             : html`<div class="thumbnail-placeholder skeleton-target">→</div>`}
