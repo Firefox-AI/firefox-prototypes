@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+import { EFFECT_DENY } from "chrome://global/content/ml/security/DecisionTypes.sys.mjs";
+
 const logConsole = console.createInstance({
   maxLogLevelPref: "browser.ml.logLevel",
   prefix: "SecurityLogger",
@@ -33,7 +35,7 @@ export class SecurityLogger {
         `[${phase}] Security evaluation error:`,
         error.message || error
       );
-    } else if (decision.effect === "deny") {
+    } else if (decision.effect === EFFECT_DENY) {
       logConsole.warn(
         `[${phase}] DENY: ${decision.code} - ${decision.reason} (${durationMs}ms)`
       );

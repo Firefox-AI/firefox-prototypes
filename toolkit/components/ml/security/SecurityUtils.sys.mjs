@@ -10,6 +10,7 @@
  * - eTLD+1 (effective top-level domain) validation
  * - TabLedger: Per-tab trusted URL storage
  * - SessionLedger: Container for all tab ledgers in a Smart Window session
+ * - Unique ID generation (given a prefix)
  *
  * Security Model:
  * ---------------
@@ -435,4 +436,14 @@ export class SessionLedger {
   tabCount() {
     return this.tabs.size;
   }
+}
+
+/**
+ * Generates a unique ID with the given prefix.
+ *
+ * @param {string} prefix - Prefix for the ID (e.g., "req", "session")
+ * @returns {string} Unique ID like "req-1234567890-abc123def"
+ */
+export function generateId(prefix) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }

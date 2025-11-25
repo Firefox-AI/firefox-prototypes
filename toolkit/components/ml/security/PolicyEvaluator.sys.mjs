@@ -3,6 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import {
+  EFFECT_ALLOW,
+  EFFECT_DENY,
   allow,
   deny,
 } from "chrome://global/content/ml/security/DecisionTypes.sys.mjs";
@@ -78,7 +80,7 @@ export class PolicyEvaluator {
    * @param {boolean} policy.enabled - Whether policy is active
    * @param {object} policy.match - Match criteria
    * @param {Array} policy.conditions - Conditions to evaluate
-   * @param {string} policy.effect - "deny" or "allow"
+   * @param {PolicyEffect} policy.effect - EFFECT_DENY or EFFECT_ALLOW
    * @param {object} policy.onDeny - Denial information
    * @param {object} action - Action being evaluated
    * @param {object} context - Request context
@@ -97,7 +99,7 @@ export class PolicyEvaluator {
       const result = ConditionEvaluator.evaluate(condition, action, context);
 
       if (!result) {
-        if (policy.effect === "deny") {
+        if (policy.effect === EFFECT_DENY) {
           return deny(policy.onDeny.code, policy.onDeny.reason, {
             policyId: policy.id,
             failedCondition: condition.type,
@@ -112,7 +114,7 @@ export class PolicyEvaluator {
       }
     }
 
-    if (policy.effect === "deny") {
+    if (policy.effect === EFFECT_DENY) {
       return null;
     }
 
@@ -152,7 +154,7 @@ export class PolicyEvaluator {
 
       appliedPolicies++;
 
-      if (decision.effect === "deny") {
+      if (decision.effect === EFFECT_DENY) {
         console.warn(
           `[PolicyEvaluator] Policy ${policy.id} denied action:`,
           decision.reason
@@ -210,12 +212,12 @@ export class PolicyEvaluator {
     if (!Array.isArray(policy.conditions)) {
       errors.push("Field 'conditions' must be an array");
     }
-    if (policy.effect !== "deny" && policy.effect !== "allow") {
+    if (policy.effect !== EFFECT_DENY && policy.effect !== EFFECT_ALLOW) {
       errors.push("Field 'effect' must be 'deny' or 'allow'");
     }
 
     // Conditional requirements
-    if (policy.effect === "deny" && !policy.onDeny) {
+    if (policy.effect === EFFECT_DENY && !policy.onDeny) {
       errors.push("Field 'onDeny' required when effect is 'deny'");
     }
     if (policy.onDeny && (!policy.onDeny.code || !policy.onDeny.reason)) {

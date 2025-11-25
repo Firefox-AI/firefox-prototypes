@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { SessionLedger } from "chrome://global/content/ml/security/SecurityUtils.sys.mjs";
+import { SessionLedger, generateId } from "chrome://global/content/ml/security/SecurityUtils.sys.mjs";
 
 const logConsole = console.createInstance({
   maxLogLevelPref: "browser.ml.logLevel",
@@ -27,7 +27,7 @@ let gSessionId = null;
  */
 export function initSecurityLayer(sessionId = null) {
   if (!sessionId) {
-    sessionId = `smart-window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    sessionId = generateId("smart-window");
   }
 
   gSessionId = sessionId;
@@ -176,7 +176,7 @@ export function getRequestContext(
   });
 
   const actualRequestId =
-    requestId || `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    requestId || generateId("req");
 
   return {
     linkLedger,

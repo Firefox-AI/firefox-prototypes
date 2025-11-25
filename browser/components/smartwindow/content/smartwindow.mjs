@@ -14,6 +14,7 @@ import {
   CHAT_HISTORY_CONVERSATION_SELECTED_EVENT,
 } from "chrome://browser/content/smartwindow/chat-history.mjs";
 import { deleteInsight, getInsightSummariesForPrompt } from "./insights.mjs";
+import { generateId } from "chrome://global/content/ml/security/SecurityUtils.sys.mjs";
 
 const { ChatHistory, ChatHistoryConversation } = ChromeUtils.importESModule(
   "resource:///modules/smartwindow/ChatHistory.sys.mjs"
@@ -56,7 +57,7 @@ try {
 } catch (e) {
   // Actor already registered - this is expected if Smart Window
   // has been opened before in this browser session
-  if (!e.message?.includes("already registered")) {
+  if (!e.message?.toLowerCase().includes("already registered")) {
     console.error("Failed to register SmartWindowMeta actor:", e);
   }
 }
@@ -116,7 +117,7 @@ class SmartWindowPage {
     // Initialize security orchestrator (if enabled)
     // Creates the SessionLedger that tracks trusted URLs across tabs
     // Only initialize if Smart Window security is enabled
-    const sessionId = `smart-window-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    const sessionId = generateId("smart-window");
     const securityEnabled = Services.prefs.getBoolPref("browser.smartwindow.security.enabled", true);
     
     if (securityEnabled) {

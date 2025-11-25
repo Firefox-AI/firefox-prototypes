@@ -5,6 +5,7 @@
 import { SessionLedger } from "chrome://global/content/ml/security/SecurityUtils.sys.mjs";
 import { SecurityLogger } from "chrome://global/content/ml/security/SecurityLogger.sys.mjs";
 import {
+  EFFECT_ALLOW,
   allow,
   deny,
 } from "chrome://global/content/ml/security/DecisionTypes.sys.mjs";
@@ -221,13 +222,13 @@ export class SecurityOrchestrator {
           action,
           context,
           decision: {
-            effect: "allow",
+            effect: EFFECT_ALLOW,
             reason: "Security disabled via kill switch",
           },
           durationMs: Date.now() - startTime,
           killSwitchBypass: true,
         });
-        return { effect: "allow" };
+        return { effect: EFFECT_ALLOW };
       }
 
       const policies = this.#policies.get(phase);

@@ -98,6 +98,16 @@ export class SecurityPolicyError extends Error {
   }
 }
 
+/**
+ * @typedef {'allow' | 'deny'} PolicyEffect
+ */
+
+/** @type {PolicyEffect} */
+export const EFFECT_ALLOW = "allow";
+
+/** @type {PolicyEffect} */
+export const EFFECT_DENY = "deny";
+
 // Standard denial codes for consistent error handling across the security layer.
 export const DenialCodes = Object.freeze({
   // URL not present in the request-scoped link ledger.
@@ -131,7 +141,7 @@ export const ReasonPhrases = Object.freeze({
  */
 export const allow = () =>
   /** @type {SecurityDecisionAllow} */ ({
-    effect: "allow",
+    effect: EFFECT_ALLOW,
   });
 
 /**
@@ -150,7 +160,7 @@ export const deny = (
   policyId = "block-unseen-links"
 ) =>
   /** @type {SecurityDecisionDeny} */ ({
-    effect: "deny",
+    effect: EFFECT_DENY,
     policyId,
     code,
     reason,
@@ -163,7 +173,7 @@ export const deny = (
  * @param {SecurityDecision | undefined | null} decision - Decision to check
  * @returns {boolean} True if decision is allow
  */
-export const isAllow = decision => decision?.effect === "allow";
+export const isAllow = decision => decision?.effect === EFFECT_ALLOW;
 
 /**
  * Type guard: checks if a decision is a deny.
@@ -171,4 +181,4 @@ export const isAllow = decision => decision?.effect === "allow";
  * @param {SecurityDecision | undefined | null} decision - Decision to check
  * @returns {boolean} True if decision is deny
  */
-export const isDeny = decision => decision?.effect === "deny";
+export const isDeny = decision => decision?.effect === EFFECT_DENY;

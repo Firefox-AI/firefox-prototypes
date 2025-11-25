@@ -18,6 +18,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
 import { createEngine } from "chrome://global/content/ml/EngineProcess.sys.mjs";
 import { SmartAssistEngine } from "moz-src:///browser/components/genai/SmartAssistEngine.sys.mjs";
 import { deleteInsight, findRelatedInsight, generateInsightsFromDirectChat } from "chrome://browser/content/smartwindow/insights.mjs";
+import { EFFECT_DENY } from "chrome://global/content/ml/security/DecisionTypes.sys.mjs";
 
 const { ChatHistoryMessage } = ChromeUtils.importESModule(
   "resource:///modules/smartwindow/ChatHistory.sys.mjs"
@@ -647,7 +648,7 @@ async function checkToolSecurity(toolName, toolParams, requestId) {
       },
     });
 
-    if (decision.effect === "deny") {
+    if (decision.effect === EFFECT_DENY) {
       return {
         allowed: false,
         reason: `Security policy blocked this action: ${decision.reason} (${decision.code})`,
