@@ -12,7 +12,7 @@ import {
  * Page History Overlay Component
  */
 export class PageHistoryOverlay extends LitElement {
-  static LAZY_LOAD_DELAY = 750;
+  static LAZY_LOAD_DELAY = 300;
 
   static properties = {
     isOpen: { type: Boolean },
@@ -26,6 +26,7 @@ export class PageHistoryOverlay extends LitElement {
     this.isOpen = false;
     this._historyItems = [];
     this.error = null;
+    this._pendingTimeouts = new Set();
   }
 
   disconnectedCallback() {
@@ -33,6 +34,8 @@ export class PageHistoryOverlay extends LitElement {
     if (this._observer) {
       this._observer.disconnect();
     }
+    this._pendingTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+    this._pendingTimeouts.clear();
   }
 
   updated(changedProperties) {
@@ -45,6 +48,9 @@ export class PageHistoryOverlay extends LitElement {
       if (this._observer) {
         this._observer.disconnect();
       }
+
+      this._pendingTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+      this._pendingTimeouts.clear();
 
       if (this.isOpen) {
         this.handleLazyLoad();
@@ -122,18 +128,22 @@ export class PageHistoryOverlay extends LitElement {
           if (img) {
             const dataSrc = img.getAttribute("data-lazy");
             if (dataSrc) {
-              setTimeout(() => {
+              const timeoutId = setTimeout(() => {
                 img.src = dataSrc;
                 img.removeAttribute("data-lazy");
               }, PageHistoryOverlay.LAZY_LOAD_DELAY);
+
+              this._pendingTimeouts.add(timeoutId);
             }
           }
 
           const placeholder = thumbnail.querySelector(".thumbnail-placeholder");
           if (placeholder) {
-            setTimeout(() => {
+            const timeoutId = setTimeout(() => {
               placeholder.classList.add("loaded");
             }, PageHistoryOverlay.LAZY_LOAD_DELAY);
+
+            this._pendingTimeouts.add(timeoutId);
           }
 
           observer.unobserve(thumbnail);
@@ -141,7 +151,6 @@ export class PageHistoryOverlay extends LitElement {
       });
     }, options);
 
-    // Observe all thumbnails
     const thumbnails = this.shadowRoot.querySelectorAll(".item-thumbnail");
     thumbnails.forEach(thumb => observer.observe(thumb));
 
