@@ -12,6 +12,8 @@ import {
  * Page History Overlay Component
  */
 export class PageHistoryOverlay extends LitElement {
+  static LAZY_LOAD_DELAY = 300;
+
   static properties = {
     isOpen: { type: Boolean },
     historyItems: { type: Array },
@@ -24,6 +26,36 @@ export class PageHistoryOverlay extends LitElement {
     this.isOpen = false;
     this._historyItems = [];
     this.error = null;
+    this._pendingTimeouts = new Set();
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    if (this._observer) {
+      this._observer.disconnect();
+    }
+    this._pendingTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+    this._pendingTimeouts.clear();
+  }
+
+  updated(changedProperties) {
+    super.updated(changedProperties);
+
+    if (
+      changedProperties.has("historyItems") ||
+      changedProperties.has("isOpen")
+    ) {
+      if (this._observer) {
+        this._observer.disconnect();
+      }
+
+      this._pendingTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+      this._pendingTimeouts.clear();
+
+      if (this.isOpen) {
+        this.handleLazyLoad();
+      }
+    }
   }
 
   set historyItems(value) {
@@ -59,6 +91,85 @@ export class PageHistoryOverlay extends LitElement {
     if (event.target === event.currentTarget) {
       this.handleClose();
     }
+  }
+
+  handleThumbnailError(event) {
+    event.target.style.display = "none";
+
+    const container = event.target.parentElement;
+    const skeleton = container.querySelector(".skeleton-loading-container");
+    if (skeleton) {
+      skeleton.style.display = "none";
+    }
+
+    const placeholder = document.createElement("div");
+    placeholder.className = "thumbnail-placeholder loaded";
+    placeholder.textContent = "→";
+    container.appendChild(placeholder);
+  }
+
+  handleLazyLoad() {
+    if (!this.isOpen) {
+      return;
+    }
+
+    const options = {
+      root: this.shadowRoot.querySelector(".history-content"),
+      rootMargin: "100px",
+      threshold: 0.01,
+    };
+
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const thumbnail = entry.target;
+
+          const img = thumbnail.querySelector("img[data-lazy]");
+          if (img) {
+            const dataSrc = img.getAttribute("data-lazy");
+            if (dataSrc) {
+              const timeoutId = setTimeout(() => {
+                img.src = dataSrc;
+                img.removeAttribute("data-lazy");
+              }, PageHistoryOverlay.LAZY_LOAD_DELAY);
+
+              this._pendingTimeouts.add(timeoutId);
+            }
+          }
+
+          const placeholder = thumbnail.querySelector(".thumbnail-placeholder");
+          if (placeholder) {
+            const timeoutId = setTimeout(() => {
+              placeholder.classList.add("loaded");
+            }, PageHistoryOverlay.LAZY_LOAD_DELAY);
+
+            this._pendingTimeouts.add(timeoutId);
+          }
+
+          observer.unobserve(thumbnail);
+        }
+      });
+    }, options);
+
+    const thumbnails = this.shadowRoot.querySelectorAll(".item-thumbnail");
+    thumbnails.forEach(thumb => observer.observe(thumb));
+
+    this._observer = observer;
+  }
+
+  renderSkeletonLoader() {
+    return html`
+      <div class="skeleton-wrapper">
+        <div class="skeleton-bg"></div>
+        <div class="skeleton-content">
+          <div class="skeleton-rect skeleton-rect--1"></div>
+          <div class="skeleton-rect skeleton-rect--2"></div>
+          <div class="skeleton-rect skeleton-rect--3"></div>
+          <div class="skeleton-rect skeleton-rect--4"></div>
+          <div class="skeleton-rect skeleton-rect--5"></div>
+        </div>
+      </div>
+    `;
   }
 
   renderHistoryItem(item) {
@@ -118,17 +229,24 @@ export class PageHistoryOverlay extends LitElement {
             ? "is-wireframe"
             : ""}"
         >
+          <div class="skeleton-loading-container">
+            ${this.renderSkeletonLoader()}
+          </div>
           ${item.thumbnail
             ? html`
                 <img
-                  class="thumbnail-image ${previewType === "wireframe"
+                  class="thumbnail-image skeleton-target ${previewType ===
+                  "wireframe"
                     ? "wireframe"
                     : ""}"
-                  src=${item.thumbnail}
+                  data-lazy=${item.thumbnail}
                   alt=${previewType === "wireframe" ? "Wireframe preview" : ""}
+                  decoding="async"
+                  @load=${e => e.target.classList.add("loaded")}
+                  @error=${e => this.handleThumbnailError(e)}
                 />
               `
-            : html` <div class="thumbnail-placeholder">→</div> `}
+            : html`<div class="thumbnail-placeholder skeleton-target">→</div>`}
         </div>
         ${item.visitDate || item.visitCount
           ? html`
@@ -408,6 +526,127 @@ export class PageHistoryOverlay extends LitElement {
       color: #666;
       justify-content: center;
       font-size: 2.5rem;
+    }
+
+    /* Skeleton structure */
+    .skeleton-loading-container {
+      inset: 0;
+      opacity: 1;
+      position: absolute;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      z-index: 2;
+    }
+
+    .skeleton-target {
+      opacity: 0;
+      position: absolute;
+      inset: 0;
+      transition: opacity 0.3s ease;
+      z-index: 2;
+    }
+
+    .skeleton-target.loaded {
+      opacity: 1;
+    }
+
+    .item-thumbnail:has(.skeleton-target.loaded) .skeleton-loading-container {
+      opacity: 0;
+    }
+
+    .skeleton-wrapper {
+      border-radius: 8px;
+      padding: 10px 10px 15px;
+      position: relative;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+    }
+
+    .skeleton-wrapper .skeleton-bg {
+      animation: bgPulse 2.5s ease-in-out infinite;
+      background: #f1e7f8;
+      inset: 0;
+      position: absolute;
+    }
+
+    .skeleton-wrapper .skeleton-content {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .skeleton-rect {
+      background: #c7b2ff;
+      border-radius: 4px;
+      min-height: 10px;
+      height: 7%;
+      opacity: 0.15;
+      animation: rectPulse 2.5s ease-in-out infinite;
+    }
+
+    .skeleton-rect--1 {
+      animation-delay: 0s;
+      margin-bottom: 10px;
+      width: 95%;
+      min-height: 100px;
+      height: 40%;
+    }
+
+    .skeleton-rect--2 {
+      animation-delay: 0.3s;
+      width: 59%;
+    }
+
+    .skeleton-rect--3 {
+      animation-delay: 0.5s;
+      width: 68%;
+    }
+
+    .skeleton-rect--4 {
+      animation-delay: 0.7s;
+      width: 53%;
+    }
+
+    .skeleton-rect--5 {
+      animation-delay: 0.9s;
+      width: 59%;
+    }
+
+    @keyframes bgPulse {
+      0%,
+      100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.7;
+      }
+    }
+
+    @keyframes rectPulse {
+      0%,
+      100% {
+        opacity: 0.15;
+      }
+      50% {
+        opacity: 0.45;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .skeleton-loading-container,
+      .skeleton-target {
+        transition: none;
+      }
+
+      .skeleton-bg,
+      .skeleton-rect {
+        animation: none;
+        opacity: 0.25;
+      }
     }
 
     .item-info {
