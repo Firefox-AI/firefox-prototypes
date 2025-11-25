@@ -12,7 +12,7 @@ import {
  * Page History Overlay Component
  */
 export class PageHistoryOverlay extends LitElement {
-  static LAZY_LOAD_DELAY = 11750;
+  static LAZY_LOAD_DELAY = 750;
 
   static properties = {
     isOpen: { type: Boolean },
