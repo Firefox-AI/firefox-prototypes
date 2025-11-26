@@ -61,29 +61,74 @@ export async function detectQueryType(query, isFollowup = false) {
   }
 }
 
-/**
- * Creates an OpenAI engine instance configured with Smart Window preferences.
- *
- * @param engineId
- * @returns {Promise<object>} The configured engine instance
- */
-export async function createOpenAIEngine(engineId = "smart-openai") {
-  try {
-    const engineInstance = await createEngine({
-      apiKey: Services.prefs.getStringPref("browser.smartwindow.key"),
-      backend: "openai",
-      baseURL: Services.prefs.getStringPref("browser.smartwindow.endpoint"),
-      engineId,
-      modelId: Services.prefs.getStringPref("browser.smartwindow.model"),
-      modelRevision: "main",
-      taskName: "text-generation",
-    });
-    return engineInstance;
-  } catch (error) {
-    console.error("Failed to create OpenAI engine:", error);
-    throw error;
+
+class OpenAIEngine {
+
+  /**
+   * Creates an OpenAI engine instance configured with Smart Window preferences.
+   *
+   * @param engineId
+   * @returns {Promise<object>} The configured engine instance
+   */
+  async createOpenAIEngine(engineId = "smart-openai") {
+    try {
+      const engineInstance = await createEngine({
+        apiKey: Services.prefs.getStringPref("browser.smartwindow.key"),
+        backend: "openai",
+        baseURL: Services.prefs.getStringPref("browser.smartwindow.endpoint"),
+        engineId,
+        modelId: Services.prefs.getStringPref("browser.smartwindow.model"),
+        modelRevision: "main",
+        taskName: "text-generation",
+      });
+      this.engine = engineInstance;
+    } catch (error) {
+      console.error("Failed to create OpenAI engine:", error);
+      throw error;
+    }
   }
+
+  /**
+   * Estimates the number of tokens sent to the LLM in a given string.
+   *
+   * @param {*} str     Input string to LLM
+   * @returns {number}  Estimated token count
+   */
+  estimateTokens(str) {
+    // Very rough: 1 token ≈ 4 chars
+    return Math.ceil((str || "").length / 4);
+  }
+
+  /**
+   * Wrapper around engine.run to send message to the LLM
+   * Calculates and logs estimated input tokens.
+   *
+   * @param {*} content   OpenAI formatted messages to be sent to the LLM
+   * @returns {object}    LLM response
+   */
+  async run(content) {
+    let fullInputText = "";
+    for (const arg of content.args || []) {
+      if (arg && typeof arg.content === "string") {
+        fullInputText += arg.content + "\n";
+      }
+    }
+    console.log(`[OpenAIEngine] Estimated input tokens: ${this.estimateTokens(fullInputText)}`);
+
+    return await this.engine.run(content);
+  }
+
+  runWithGenerator(options) {
+    return this.engine.runWithGenerator(options);
+  }
+};
+
+export async function createOpenAIEngine(engineId = "smart-openai") {
+  const engine = new OpenAIEngine(engineId);
+  await engine.createOpenAIEngine();
+  return engine
 }
+
 
 const SEARCH_OPEN_TABS = "search_open_tabs";
 const GET_PAGE_CONTENT = "get_page_content";
