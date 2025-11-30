@@ -11,9 +11,58 @@ ChromeUtils.defineESModuleGetters(lazy, {
   PageThumbs: "resource://gre/modules/PageThumbs.sys.mjs",
   PageThumbsStorage: "resource://gre/modules/PageThumbs.sys.mjs",
   getPlacesSemanticHistoryManager: "resource://gre/modules/PlacesSemanticHistoryManager.sys.mjs",
-  SecurityOrchestrator:
-    "chrome://global/content/ml/security/SecurityOrchestrator.sys.mjs",
 });
+
+/**
+ * Module-level security orchestrator instance.
+ * Set by SmartWindowPage after initialization.
+ *
+ * @type {import("chrome://global/content/ml/security/SecurityOrchestrator.sys.mjs").SecurityOrchestrator|null}
+ */
+let securityOrchestrator = null;
+
+/**
+ * Sets the security orchestrator instance for this window's utils module.
+ * Called by SmartWindowPage after creating the orchestrator.
+ *
+ * @param {import("chrome://global/content/ml/security/SecurityOrchestrator.sys.mjs").SecurityOrchestrator|null} orchestrator
+ */
+export function setSecurityOrchestrator(orchestrator) {
+  securityOrchestrator = orchestrator;
+}
+
+/**
+ * Seeds a URL into the session ledger for the current tab.
+ * Call this when a user explicitly @mentions a tab/URL.
+ * This grants the AI permission to access the URL's content.
+ *
+ * @param {string} url - The URL to seed
+ */
+export function seedMentionedUrl(url) {
+  if (!securityOrchestrator) {
+    console.log("[Security] No orchestrator - skipping mention seeding");
+    return;
+  }
+
+  const sessionLedger = securityOrchestrator.getSessionLedger();
+  if (!sessionLedger) {
+    console.log("[Security] No session ledger - skipping mention seeding");
+    return;
+  }
+
+  const win = lazy.BrowserWindowTracker.getTopWindow();
+  const gBrowser = win.gBrowser;
+  const tabId = gBrowser.selectedTab.linkedPanel;
+
+  const tabLedger = sessionLedger.forTab(tabId);
+  const added = tabLedger.add(url);
+
+  if (added) {
+    console.log(`[Security] Seeded @mentioned URL: ${url} for tab ${tabId}`);
+  } else {
+    console.warn(`[Security] Failed to seed @mentioned URL: ${url} for tab ${tabId}`);
+  }
+}
 
 import { createEngine } from "chrome://global/content/ml/EngineProcess.sys.mjs";
 import { SmartAssistEngine } from "moz-src:///browser/components/genai/SmartAssistEngine.sys.mjs";
@@ -598,7 +647,7 @@ async function checkToolSecurity(toolName, toolParams, requestId) {
               await browser.browsingContext.currentWindowContext.getActor(
                 "SmartWindowMeta"
               );
-            const sessionLedger = lazy.SecurityOrchestrator.getSessionLedger();
+            const sessionLedger = securityOrchestrator?.getSessionLedger();
 
             if (!sessionLedger) {
               console.log(
@@ -633,7 +682,7 @@ async function checkToolSecurity(toolName, toolParams, requestId) {
       tabId = gBrowser.selectedTab.linkedPanel;
     }
 
-    const decision = await lazy.SecurityOrchestrator.evaluate({
+    const decision = await securityOrchestrator.evaluate({
       phase: "tool.execution",
       action: {
         type: "tool.call",
@@ -955,12 +1004,12 @@ export async function* fetchWithHistory(messages, allowedUrls) {
             error: securityCheck.reason || "Security policy denied this action",
           };
         } else {
-          // Populate allowedUrls from current tab's ledger for headless extraction
+          // Merge session ledger URLs with any pre-existing allowedUrls for headless extraction.
           // This allows fetching URLs that are part of the current page's metadata
-          // Such as (canonical URLs, related links, etc.) even if they're not in open tabs
-          let allowedUrls = new Set();
+          // (canonical URLs, related links, etc.) even if they're not in open tabs.
+          let mergedAllowedUrls = new Set(allowedUrls || []);
           try {
-            const sessionLedger = lazy.SecurityOrchestrator.getSessionLedger();
+            const sessionLedger = securityOrchestrator?.getSessionLedger();
 
             if (sessionLedger) {
               // Get current tab ID from tool params or browser
@@ -985,19 +1034,20 @@ export async function* fetchWithHistory(messages, allowedUrls) {
               if (currentTabId) {
                 const tabLedger = sessionLedger.forTab(currentTabId);
                 if (tabLedger) {
-                  allowedUrls = new Set(tabLedger.getAll());
-                  console.log(
-                    `[Security] Allowing headless extraction for ${allowedUrls.size} URLs from current tab ${currentTabId}`
+                  for (const url of tabLedger.getAll()) {
+                    mergedAllowedUrls.add(url);
+                  }
+                  console.warn(
+                    `[Security] Allowing headless extraction for ${mergedAllowedUrls.size} URLs from current tab ${currentTabId}`
                   );
                 }
               }
             }
           } catch (error) {
             console.warn(
-              "[Security] Could not populate allowedUrls for headless extraction:",
+              "[Security] Could not populate mergedAllowedUrls for headless extraction:",
               error
             );
-            allowedUrls = new Set();
           }
 
           switch (toolName) {
@@ -1005,7 +1055,7 @@ export async function* fetchWithHistory(messages, allowedUrls) {
               result = search_open_tabs(toolParams);
               break;
             case GET_PAGE_CONTENT:
-              result = await get_page_content(toolParams, allowedUrls);
+              result = await get_page_content(toolParams, mergedAllowedUrls);
               break;
             case SEARCH_HISTORY:
               result = await searchBrowserHistory(toolParams);

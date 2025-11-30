@@ -31,7 +31,12 @@ export class PolicyEvaluator {
    * @returns {boolean} True if policy applies to this action
    */
   static checkMatch(matchCriteria, action) {
-    console.warn("[PolicyEvaluator] checkMatch criteria:", JSON.stringify(matchCriteria), "action:", JSON.stringify(action));
+    console.warn(
+      "[PolicyEvaluator] checkMatch criteria:",
+      JSON.stringify(matchCriteria),
+      "action:",
+      JSON.stringify(action)
+    );
     if (!matchCriteria || typeof matchCriteria !== "object") {
       return false;
     }

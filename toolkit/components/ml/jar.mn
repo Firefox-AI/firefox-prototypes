@@ -34,7 +34,6 @@ toolkit.jar:
     content/global/ml/security/SecurityLogger.sys.mjs                (security/SecurityLogger.sys.mjs)
     content/global/ml/security/SecurityOrchestrator.sys.mjs          (security/SecurityOrchestrator.sys.mjs)
     content/global/ml/security/SecurityUtils.sys.mjs                 (security/SecurityUtils.sys.mjs)
-    content/global/ml/security/SmartWindowIntegration.sys.mjs        (security/SmartWindowIntegration.sys.mjs)
     content/global/ml/security/policies/tool-execution-policies.json (security/policies/tool-execution-policies.json)
 #ifdef NIGHTLY_BUILD
     content/global/ml/ort.webgpu-dev.mjs        	        (vendor/ort.webgpu-dev.mjs)

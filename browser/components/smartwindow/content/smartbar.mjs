@@ -15,6 +15,8 @@ import {
   getMentionSuggestions,
 } from "chrome://browser/content/smartwindow/mentions.mjs";
 
+import { seedMentionedUrl } from "./utils.mjs";
+
 // Track autofill state
 let autofillState = null;
 let deletedQuery = "";
@@ -252,6 +254,12 @@ export function attachToElement(element, options = {}) {
                 dropdown = new MentionDropdown();
                 currentCommand = props.command;
                 dropdown.create(props.items, item => {
+                  // Seed the @mentioned URL into the security ledger
+                  // This grants the AI permission to access this URL
+                  if (item.id) {
+                    seedMentionedUrl(item.id);
+                  }
+
                   currentCommand({
                     id: item.id,
                     label: item.label,

@@ -4,17 +4,3 @@
 
 with Files("**"):
     BUG_COMPONENT = ("Firefox", "Machine Learning")
-
-EXTRA_JS_MODULES += [
-    'ConditionEvaluator.sys.mjs',
-    'DecisionTypes.sys.mjs',
-    'PolicyEvaluator.sys.mjs',
-    'SecurityLogger.sys.mjs',
-    'SecurityOrchestrator.sys.mjs',
-    'SecurityUtils.sys.mjs',
-    'SmartWindowIntegration.sys.mjs',
-]
-
-FINAL_TARGET_FILES.content.ml.security.policies += [
-    'policies/tool-execution-policies.json',
-]

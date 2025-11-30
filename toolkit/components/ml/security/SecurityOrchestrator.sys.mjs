@@ -25,8 +25,7 @@ function isSecurityEnabled() {
 
 /**
  * Central security orchestrator for Firefox AI features.
- * Single entry point: evaluate() routes to policy modules with centralized logging.
- *
+ * Each AI Window instance should create its own SecurityOrchestrator.
  */
 export class SecurityOrchestrator {
   /**
@@ -34,45 +33,49 @@ export class SecurityOrchestrator {
    *
    * @type {Map<string, Array<object>>}
    */
-  static #policies = new Map();
+  #policies = new Map();
 
   /**
-   * Shared session ledger for URL tracking across tabs.
+   * Session ledger for URL tracking across tabs in this window.
    *
    * @type {SessionLedger | null}
    */
-  static #sessionLedger = null;
+  #sessionLedger = null;
 
   /**
-   * Session identifier.
+   * Session identifier for this window.
    *
    * @type {string | null}
    */
-  static #sessionId = null;
+  #sessionId = null;
 
   /**
-   * Initializes the security orchestrator for a new session.
-   *
-   * This should be called once when Smart Window (or other AI feature) starts.
-   * Creates the SessionLedger that will track trusted URLs across all tabs.
-   * Loads security policies from JSON files.
+   * Used by create() to instantiate SecurityOrchestrator instance.
    *
    * @param {string} sessionId - Unique identifier for this session
-   * @returns {Promise<SessionLedger>} The initialized session ledger
    */
-  static async init(sessionId) {
+  constructor(sessionId) {
     this.#sessionId = sessionId;
     this.#sessionLedger = new SessionLedger(sessionId);
+  }
 
-    await this.#loadPolicies();
+  /**
+   * Creates and initializes a new SecurityOrchestrator instance.
+   *
+   * @param {string} sessionId - Unique identifier for this session
+   * @returns {Promise<SecurityOrchestrator>} Initialized orchestrator instance
+   */
+  static async create(sessionId) {
+    const instance = new SecurityOrchestrator(sessionId);
+    await instance.#loadPolicies();
 
     console.warn(
       `[Security] Orchestrator initialized for session ${sessionId} with ${Array.from(
-        this.#policies.values()
+        instance.#policies.values()
       ).reduce((sum, policies) => sum + policies.length, 0)} policies`
     );
 
-    return this.#sessionLedger;
+    return instance;
   }
 
   /**
@@ -80,8 +83,7 @@ export class SecurityOrchestrator {
    *
    * @private
    */
-  static async #loadPolicies() {
-    // Add more policy files here as they're created:
+  async #loadPolicies() {
     const policyFiles = ["tool-execution-policies.json"];
 
     const allPolicies = [];
@@ -156,29 +158,27 @@ export class SecurityOrchestrator {
 
   /**
    * Resets the security orchestrator state.
-   * Used for cleanup or testing.
+   * Call this when the AI Window closes.
    */
-  static reset() {
+  reset() {
     this.#sessionLedger = null;
     this.#sessionId = null;
     this.#policies.clear();
   }
 
   /**
-   * Gets the current session ledger.
+   * Gets the session ledger for this orchestrator.
    *
-   * @returns {SessionLedger} The session ledger
+   * @returns {SessionLedger | null} The session ledger
    * @throws {Error} If orchestrator not initialized AND security is enabled
    */
-  static getSessionLedger() {
+  getSessionLedger() {
     if (!this.#sessionLedger) {
       if (!isSecurityEnabled()) {
         return null;
       }
 
-      throw new Error(
-        "Security orchestrator not initialized. Call SecurityOrchestrator.init() first."
-      );
+      throw new Error("Security orchestrator not initialized.");
     }
     return this.#sessionLedger;
   }
@@ -186,21 +186,13 @@ export class SecurityOrchestrator {
   /**
    * Main entry point for all security checks.
    *
-   * This method:
-   * 1. Validates the request envelope
-   * 2. Builds shared context (ledger, metadata)
-   * 3. Routes to appropriate policy module
-   * 4. Evaluates the action against policy
-   * 5. Logs the decision
-   * 6. Returns allow/deny decision
-   *
    * @param {object} envelope - Security check request
-   * @param {string} envelope.phase - Security phase ("tool.execution", "inference-pipeline", etc.)
+   * @param {string} envelope.phase - Security phase ("tool.execution", etc.)
    * @param {object} envelope.action - Action being checked (type, tool, urls, etc.)
    * @param {object} envelope.context - Request context (tabId, requestId, etc.)
    * @returns {Promise<object>} Decision object with effect (allow/deny), code, reason
    */
-  static async evaluate(envelope) {
+  async evaluate(envelope) {
     const startTime = Date.now();
 
     try {
@@ -287,13 +279,10 @@ export class SecurityOrchestrator {
   /**
    * Removes all policies for a phase.
    *
-   * Note: With JSON-based policies, this only affects runtime state.
-   * Policies will be reloaded from JSON on next init().
-   *
    * @param {string} phase - Phase identifier to remove
    * @returns {boolean} True if policies were removed, false if not found
    */
-  static removePolicy(phase) {
+  removePolicy(phase) {
     return this.#policies.delete(phase);
   }
 
@@ -302,13 +291,12 @@ export class SecurityOrchestrator {
    *
    * @returns {object} Stats object with registered policies, session info, etc.
    */
-  static getStats() {
+  getStats() {
     const totalPolicies = Array.from(this.#policies.values()).reduce(
       (sum, policies) => sum + policies.length,
       0
     );
 
-    // Get policy breakdown by phase
     const policyBreakdown = {};
     for (const [phase, policies] of this.#policies.entries()) {
       policyBreakdown[phase] = {

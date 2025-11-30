@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { detectQueryType, searchBrowserHistory } from "./utils.mjs";
+import { detectQueryType, searchBrowserHistory, setSecurityOrchestrator } from "./utils.mjs";
 import { attachToElement } from "chrome://browser/content/smartwindow/smartbar.mjs";
 import {
   generateLiveSuggestions,
@@ -14,7 +14,6 @@ import {
   CHAT_HISTORY_CONVERSATION_SELECTED_EVENT,
 } from "chrome://browser/content/smartwindow/chat-history.mjs";
 import { deleteInsight, getInsightSummariesForPrompt } from "./insights.mjs";
-import { generateId } from "chrome://global/content/ml/security/SecurityUtils.sys.mjs";
 
 const { ChatHistory, ChatHistoryConversation } = ChromeUtils.importESModule(
   "resource:///modules/smartwindow/ChatHistory.sys.mjs"
@@ -34,6 +33,9 @@ const { TabStateFlusher } = ChromeUtils.importESModule(
 );
 const { SecurityOrchestrator } = ChromeUtils.importESModule(
   "chrome://global/content/ml/security/SecurityOrchestrator.sys.mjs"
+);
+const { generateId } = ChromeUtils.importESModule(
+  "chrome://global/content/ml/security/SecurityUtils.sys.mjs"
 );
 const { embedderElement, topChromeWindow } = window.browsingContext;
 const gBrowser = topChromeWindow.gBrowser;
@@ -119,18 +121,25 @@ class SmartWindowPage {
     // Only initialize if Smart Window security is enabled
     const sessionId = generateId("smart-window");
     const securityEnabled = Services.prefs.getBoolPref("browser.smartwindow.security.enabled", true);
+
+    this.securityOrchestrator = null;
     
     if (securityEnabled) {
-      SecurityOrchestrator.init(sessionId).then(sessionLedger => {
-        this.sessionLedger = sessionLedger;
-        console.log("[Security] Smart Window security enabled - orchestrator initialized");
+      SecurityOrchestrator.create(sessionId).then(orchestrator => {
+        this.securityOrchestrator = orchestrator;
+        this.sessionLedger = orchestrator.getSessionLedger();
+        setSecurityOrchestrator(orchestrator);
+        console.warn("[Security] AI Window security enabled - orchestrator initialized");
       }).catch(error => {
         console.error("[Security] Failed to initialize orchestrator:", error);
+        this.securityOrchestrator = null;
         this.sessionLedger = null;
+        setSecurityOrchestrator(null);
       });
     } else {
       this.sessionLedger = null;
-      console.log("[Security] Smart Window security DISABLED via kill switch - running in pass-through mode");
+      setSecurityOrchestrator(null);
+      console.warn("[Security] AI Window security DISABLED via kill switch - running in pass-through mode");
     }
 
     gBrowser.selectedTab.conversation = new ChatHistoryConversation({
@@ -180,7 +189,10 @@ class SmartWindowPage {
       );
     }
 
-    SecurityOrchestrator.reset();
+    if (this.securityOrchestrator) {
+      this.securityOrchestrator.reset();
+      setSecurityOrchestrator(null);
+    }
   }
 
   getQueryTypeIcon(type) {

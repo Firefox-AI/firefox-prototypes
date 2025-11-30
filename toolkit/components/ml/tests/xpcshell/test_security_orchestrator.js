@@ -19,14 +19,17 @@ const { SecurityOrchestrator } = ChromeUtils.importESModule(
 
 const PREF_SECURITY_ENABLED = "browser.smartwindow.security.enabled";
 
+/** @type {SecurityOrchestrator|null} */
+let orchestrator = null;
+
 function setup() {
   Services.prefs.clearUserPref(PREF_SECURITY_ENABLED);
-  SecurityOrchestrator.reset();
 }
 
 function teardown() {
   Services.prefs.clearUserPref(PREF_SECURITY_ENABLED);
-  SecurityOrchestrator.reset();
+  orchestrator?.reset();
+  orchestrator = null;
 }
 
 // =============================================================================
@@ -36,12 +39,13 @@ function teardown() {
 add_task(async function test_initialization_creates_session() {
   setup();
 
-  const ledger = await SecurityOrchestrator.init("test-session");
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
 
   Assert.ok(ledger, "Should return session ledger");
   Assert.equal(ledger.tabCount(), 0, "Should start with no tabs");
   Assert.ok(
-    SecurityOrchestrator.getSessionLedger(),
+    orchestrator.getSessionLedger(),
     "Should be able to get session ledger"
   );
 
@@ -56,11 +60,11 @@ add_task(async function test_kill_switch_disabled_allows_everything() {
   setup();
   Services.prefs.setBoolPref(PREF_SECURITY_ENABLED, false);
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1"); // Empty ledger
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -88,11 +92,11 @@ add_task(async function test_kill_switch_enabled_enforces_policies() {
   setup();
   Services.prefs.setBoolPref(PREF_SECURITY_ENABLED, true);
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1");
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -117,8 +121,8 @@ add_task(async function test_kill_switch_runtime_change() {
   setup();
 
   Services.prefs.setBoolPref(PREF_SECURITY_ENABLED, true);
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1");
 
   const envelope = {
@@ -137,14 +141,14 @@ add_task(async function test_kill_switch_runtime_change() {
   };
 
   // Should deny when enabled
-  let decision = await SecurityOrchestrator.evaluate(envelope);
+  let decision = await orchestrator.evaluate(envelope);
   Assert.equal(decision.effect, "deny", "Should deny when enabled");
 
   // Disable at runtime
   Services.prefs.setBoolPref(PREF_SECURITY_ENABLED, false);
 
   // Should allow immediately
-  decision = await SecurityOrchestrator.evaluate(envelope);
+  decision = await orchestrator.evaluate(envelope);
   Assert.equal(
     decision.effect,
     "allow",
@@ -161,7 +165,7 @@ add_task(async function test_kill_switch_runtime_change() {
 add_task(async function test_invalid_envelope_fails_closed() {
   setup();
   Services.prefs.setBoolPref(PREF_SECURITY_ENABLED, true);
-  await SecurityOrchestrator.init("test-session");
+  orchestrator = await SecurityOrchestrator.create("test-session");
 
   const invalidEnvelopes = [
     null,
@@ -171,7 +175,7 @@ add_task(async function test_invalid_envelope_fails_closed() {
   ];
 
   for (const envelope of invalidEnvelopes) {
-    const decision = await SecurityOrchestrator.evaluate(envelope);
+    const decision = await orchestrator.evaluate(envelope);
     Assert.equal(
       decision.effect,
       "deny",
@@ -190,12 +194,12 @@ add_task(async function test_invalid_envelope_fails_closed() {
 add_task(async function test_policy_allows_seeded_url() {
   setup();
   Services.prefs.setBoolPref(PREF_SECURITY_ENABLED, true);
-  await SecurityOrchestrator.init("test-session");
+  orchestrator = await SecurityOrchestrator.create("test-session");
 
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1").add("https://example.com");
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -218,12 +222,12 @@ add_task(async function test_policy_allows_seeded_url() {
 add_task(async function test_policy_denies_unseen_url() {
   setup();
   Services.prefs.setBoolPref(PREF_SECURITY_ENABLED, true);
-  await SecurityOrchestrator.init("test-session");
+  orchestrator = await SecurityOrchestrator.create("test-session");
 
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1"); // Empty ledger
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -253,12 +257,12 @@ add_task(async function test_policy_denies_unseen_url() {
 add_task(async function test_policy_denies_if_any_url_unseen() {
   setup();
   Services.prefs.setBoolPref(PREF_SECURITY_ENABLED, true);
-  await SecurityOrchestrator.init("test-session");
+  orchestrator = await SecurityOrchestrator.create("test-session");
 
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1").add("https://example.com");
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -292,12 +296,12 @@ add_task(async function test_policy_denies_if_any_url_unseen() {
 add_task(async function test_malformed_url_fails_closed() {
   setup();
   Services.prefs.setBoolPref(PREF_SECURITY_ENABLED, true);
-  await SecurityOrchestrator.init("test-session");
+  orchestrator = await SecurityOrchestrator.create("test-session");
 
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1");
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",

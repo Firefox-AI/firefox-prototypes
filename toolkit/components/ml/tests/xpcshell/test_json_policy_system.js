@@ -20,15 +20,18 @@ const PREF_SECURITY_ENABLED = "browser.smartwindow.security.enabled";
 const POLICY_JSON_URL =
   "chrome://global/content/ml/security/policies/tool-execution-policies.json";
 
+/** @type {SecurityOrchestrator|null} */
+let orchestrator = null;
+
 function setup() {
   Services.prefs.clearUserPref(PREF_SECURITY_ENABLED);
   Services.prefs.setBoolPref(PREF_SECURITY_ENABLED, true);
-  SecurityOrchestrator.reset();
 }
 
 function teardown() {
   Services.prefs.clearUserPref(PREF_SECURITY_ENABLED);
-  SecurityOrchestrator.reset();
+  orchestrator?.reset();
+  orchestrator = null;
 }
 
 // ============================================================================
@@ -60,18 +63,16 @@ add_task(async function test_json_policy_file_loads_and_validates() {
 add_task(async function test_orchestrator_initializes_with_policies() {
   setup();
 
-  // If init succeeds, policies loaded correctly
-  const ledger = await SecurityOrchestrator.init("test-session");
+  // If create succeeds, policies loaded correctly
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
 
   Assert.ok(ledger, "Should initialize successfully");
-  Assert.ok(
-    SecurityOrchestrator.getSessionLedger(),
-    "Should have session ledger"
-  );
+  Assert.ok(orchestrator.getSessionLedger(), "Should have session ledger");
 
   // Verify policies work by testing actual evaluation
   ledger.forTab("tab-1");
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -107,11 +108,11 @@ add_task(async function test_orchestrator_initializes_with_policies() {
 add_task(async function test_e2e_deny_unseen_link() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1"); // Empty ledger
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -148,12 +149,12 @@ add_task(async function test_e2e_deny_unseen_link() {
 add_task(async function test_e2e_deny_if_any_url_unseen() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   const tabLedger = ledger.forTab("tab-1");
   tabLedger.add("https://example.com");
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -184,11 +185,11 @@ add_task(async function test_e2e_deny_if_any_url_unseen() {
 add_task(async function test_e2e_deny_malformed_url() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1");
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -222,12 +223,12 @@ add_task(async function test_e2e_deny_malformed_url() {
 add_task(async function test_e2e_allow_seeded_url() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   const tabLedger = ledger.forTab("tab-1");
   tabLedger.add("https://example.com");
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -254,13 +255,13 @@ add_task(async function test_e2e_allow_seeded_url() {
 add_task(async function test_e2e_allow_multiple_seeded_urls() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   const tabLedger = ledger.forTab("tab-1");
   tabLedger.add("https://example.com");
   tabLedger.add("https://mozilla.org");
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -283,11 +284,11 @@ add_task(async function test_e2e_allow_multiple_seeded_urls() {
 add_task(async function test_e2e_allow_empty_urls() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1");
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -314,8 +315,8 @@ add_task(async function test_e2e_allow_empty_urls() {
 add_task(async function test_e2e_allow_url_from_mentioned_tab() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
 
   // Current tab
   ledger.forTab("tab-1").add("https://example.com");
@@ -323,7 +324,7 @@ add_task(async function test_e2e_allow_url_from_mentioned_tab() {
   // Mentioned tab (different URL)
   ledger.forTab("tab-2").add("https://mozilla.org");
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -350,13 +351,13 @@ add_task(async function test_e2e_allow_url_from_mentioned_tab() {
 add_task(async function test_e2e_deny_url_not_in_mentioned_tabs() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
 
   ledger.forTab("tab-1").add("https://example.com");
   ledger.forTab("tab-2").add("https://mozilla.org");
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -387,11 +388,11 @@ add_task(async function test_e2e_deny_url_not_in_mentioned_tabs() {
 add_task(async function test_e2e_url_normalization_strips_fragments() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1").add("https://example.com/page"); // No fragment
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -425,11 +426,11 @@ add_task(async function test_e2e_kill_switch_bypasses_policies() {
   // Disable security
   Services.prefs.setBoolPref(PREF_SECURITY_ENABLED, false);
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1"); // Empty ledger
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",

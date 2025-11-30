@@ -18,15 +18,18 @@ const { SecurityOrchestrator } = ChromeUtils.importESModule(
 
 const PREF_SECURITY_ENABLED = "browser.smartwindow.security.enabled";
 
+/** @type {SecurityOrchestrator|null} */
+let orchestrator = null;
+
 function setup() {
   Services.prefs.clearUserPref(PREF_SECURITY_ENABLED);
   Services.prefs.setBoolPref(PREF_SECURITY_ENABLED, true);
-  SecurityOrchestrator.reset();
 }
 
 function teardown() {
   Services.prefs.clearUserPref(PREF_SECURITY_ENABLED);
-  SecurityOrchestrator.reset();
+  orchestrator?.reset();
+  orchestrator = null;
 }
 
 // ============================================================================
@@ -36,12 +39,12 @@ function teardown() {
 add_task(async function test_policy_matches_correct_phase() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1");
 
   // tool.execution phase should match our policies
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -69,12 +72,12 @@ add_task(async function test_policy_matches_correct_phase() {
 add_task(async function test_policy_ignores_unknown_phase() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1");
 
   // Unknown phase should not match any policies
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "unknown.phase",
     action: {
       type: "tool.call",
@@ -105,12 +108,12 @@ add_task(async function test_policy_ignores_unknown_phase() {
 add_task(async function test_deny_policy_denies_when_condition_fails() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1").add("https://example.com");
 
   // URL not in ledger = condition fails = deny
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -138,12 +141,12 @@ add_task(
   async function test_deny_policy_passes_through_when_condition_passes() {
     setup();
 
-    await SecurityOrchestrator.init("test-session");
-    const ledger = SecurityOrchestrator.getSessionLedger();
+    orchestrator = await SecurityOrchestrator.create("test-session");
+    const ledger = orchestrator.getSessionLedger();
     ledger.forTab("tab-1").add("https://example.com");
 
     // URL in ledger = condition passes = policy doesn't apply (allow)
-    const decision = await SecurityOrchestrator.evaluate({
+    const decision = await orchestrator.evaluate({
       phase: "tool.execution",
       action: {
         type: "tool.call",
@@ -175,12 +178,12 @@ add_task(
 add_task(async function test_policy_checks_all_urls() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1").add("https://example.com");
   // Not adding evil.com
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -210,13 +213,13 @@ add_task(async function test_policy_checks_all_urls() {
 add_task(async function test_policy_allows_when_all_urls_valid() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   const tabLedger = ledger.forTab("tab-1");
   tabLedger.add("https://example.com");
   tabLedger.add("https://mozilla.org");
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -247,12 +250,12 @@ add_task(async function test_policy_allows_when_all_urls_valid() {
 add_task(async function test_policy_applies_to_get_page_content() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1");
 
   // Verify policy applies to get_page_content (the main URL-fetching tool)
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -283,11 +286,11 @@ add_task(async function test_policy_applies_to_get_page_content() {
 add_task(async function test_deny_decision_includes_policy_info() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1");
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",

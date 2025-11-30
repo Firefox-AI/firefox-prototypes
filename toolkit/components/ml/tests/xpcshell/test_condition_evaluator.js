@@ -18,15 +18,18 @@ const { SecurityOrchestrator } = ChromeUtils.importESModule(
 
 const PREF_SECURITY_ENABLED = "browser.smartwindow.security.enabled";
 
+/** @type {SecurityOrchestrator|null} */
+let orchestrator = null;
+
 function setup() {
   Services.prefs.clearUserPref(PREF_SECURITY_ENABLED);
   Services.prefs.setBoolPref(PREF_SECURITY_ENABLED, true);
-  SecurityOrchestrator.reset();
 }
 
 function teardown() {
   Services.prefs.clearUserPref(PREF_SECURITY_ENABLED);
-  SecurityOrchestrator.reset();
+  orchestrator?.reset();
+  orchestrator = null;
 }
 
 // ============================================================================
@@ -36,13 +39,13 @@ function teardown() {
 add_task(async function test_condition_passes_when_all_urls_in_ledger() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   const tabLedger = ledger.forTab("tab-1");
   tabLedger.add("https://example.com");
   tabLedger.add("https://mozilla.org");
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -69,11 +72,11 @@ add_task(async function test_condition_passes_when_all_urls_in_ledger() {
 add_task(async function test_condition_fails_when_url_missing_from_ledger() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1").add("https://example.com");
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -101,11 +104,11 @@ add_task(async function test_condition_fails_when_url_missing_from_ledger() {
 add_task(async function test_condition_passes_with_empty_urls_array() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1");
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -132,11 +135,11 @@ add_task(async function test_condition_passes_with_empty_urls_array() {
 add_task(async function test_condition_fails_with_malformed_url() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1");
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -170,11 +173,11 @@ add_task(async function test_condition_fails_with_malformed_url() {
 add_task(async function test_condition_checks_current_tab_only() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1").add("https://example.com");
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -201,13 +204,13 @@ add_task(async function test_condition_checks_current_tab_only() {
 add_task(async function test_condition_merges_mentioned_tabs() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
 
   ledger.forTab("tab-1").add("https://example.com");
   ledger.forTab("tab-2").add("https://mozilla.org");
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
@@ -238,11 +241,11 @@ add_task(async function test_condition_merges_mentioned_tabs() {
 add_task(async function test_condition_normalizes_urls() {
   setup();
 
-  await SecurityOrchestrator.init("test-session");
-  const ledger = SecurityOrchestrator.getSessionLedger();
+  orchestrator = await SecurityOrchestrator.create("test-session");
+  const ledger = orchestrator.getSessionLedger();
   ledger.forTab("tab-1").add("https://example.com/page"); // No fragment
 
-  const decision = await SecurityOrchestrator.evaluate({
+  const decision = await orchestrator.evaluate({
     phase: "tool.execution",
     action: {
       type: "tool.call",
