@@ -13,6 +13,19 @@ ChromeUtils.defineESModuleGetters(lazy, {
   getPlacesSemanticHistoryManager: "resource://gre/modules/PlacesSemanticHistoryManager.sys.mjs",
 });
 
+import { createEngine } from "chrome://global/content/ml/EngineProcess.sys.mjs";
+import { SmartAssistEngine } from "moz-src:///browser/components/genai/SmartAssistEngine.sys.mjs";
+import { deleteInsight, findRelatedInsight, generateInsightsFromDirectChat } from "chrome://browser/content/smartwindow/insights.mjs";
+import { EFFECT_DENY } from "chrome://global/content/ml/security/DecisionTypes.sys.mjs";
+
+const { ChatHistoryMessage } = ChromeUtils.importESModule(
+  "resource:///modules/smartwindow/ChatHistory.sys.mjs"
+);
+
+const { PageExtractorParent } = ChromeUtils.importESModule(
+  "resource://gre/actors/PageExtractorParent.sys.mjs"
+);
+
 /**
  * Module-level security orchestrator instance.
  * Set by SmartWindowPage after initialization.
@@ -55,27 +68,18 @@ export function seedMentionedUrl(url) {
   const tabId = gBrowser.selectedTab.linkedPanel;
 
   const tabLedger = sessionLedger.forTab(tabId);
-  const added = tabLedger.add(url);
+  if (!tabLedger) {
+    console.error(`[Security] Unable to seed @mentioned URL: ${url} – no ledger for tab ${tabId}`);
+    return;
+  }
 
+  const added = tabLedger.add(url);
   if (added) {
     console.log(`[Security] Seeded @mentioned URL: ${url} for tab ${tabId}`);
   } else {
-    console.warn(`[Security] Failed to seed @mentioned URL: ${url} for tab ${tabId}`);
+    console.debug(`[Security] @mentioned URL already present in ledger: ${url} for tab ${tabId}`);
   }
 }
-
-import { createEngine } from "chrome://global/content/ml/EngineProcess.sys.mjs";
-import { SmartAssistEngine } from "moz-src:///browser/components/genai/SmartAssistEngine.sys.mjs";
-import { deleteInsight, findRelatedInsight, generateInsightsFromDirectChat } from "chrome://browser/content/smartwindow/insights.mjs";
-import { EFFECT_DENY } from "chrome://global/content/ml/security/DecisionTypes.sys.mjs";
-
-const { ChatHistoryMessage } = ChromeUtils.importESModule(
-  "resource:///modules/smartwindow/ChatHistory.sys.mjs"
-);
-
-const { PageExtractorParent } = ChromeUtils.importESModule(
-  "resource://gre/actors/PageExtractorParent.sys.mjs"
-);
 
 /**
  * Detects the type of query based on patterns in the text.
