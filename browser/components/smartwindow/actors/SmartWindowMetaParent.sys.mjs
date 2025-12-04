@@ -35,74 +35,18 @@ export class SmartWindowMetaParent extends JSWindowActorParent {
         return result;
       }
 
-      const { pageUrl, canonical, ogUrl } = metadata;
+      // Process all URLs in one place
+      const processed = this.#processMetadataUrls(metadata);
 
-      const normalizedPageUrl = normalizeUrl(pageUrl);
-      if (!normalizedPageUrl.success) {
-        result.errors.push({
-          url: pageUrl,
-          reason: "Page URL normalization failed",
-          error: normalizedPageUrl.error,
-        });
+      if (processed.error) {
+        result.errors.push(processed.error);
         return result;
       }
 
-      const urlsToSeed = [normalizedPageUrl.url];
-      result.seededUrls.push({
-        original: pageUrl,
-        normalized: normalizedPageUrl.url,
-        source: "page",
-      });
+      result.seededUrls = processed.seededUrls;
+      result.skippedUrls = processed.skippedUrls;
 
-      if (canonical) {
-        const validated = this.#validateSecondaryUrl(
-          canonical,
-          normalizedPageUrl.url,
-          pageUrl,
-          "canonical"
-        );
-
-        if (validated.success) {
-          urlsToSeed.push(validated.normalizedUrl);
-          result.seededUrls.push({
-            original: canonical,
-            normalized: validated.normalizedUrl,
-            source: "canonical",
-          });
-        } else {
-          result.skippedUrls.push({
-            original: canonical,
-            source: "canonical",
-            reason: validated.reason,
-          });
-        }
-      }
-
-      if (ogUrl) {
-        const validated = this.#validateSecondaryUrl(
-          ogUrl,
-          normalizedPageUrl.url,
-          pageUrl,
-          "og:url"
-        );
-
-        if (validated.success) {
-          urlsToSeed.push(validated.normalizedUrl);
-          result.seededUrls.push({
-            original: ogUrl,
-            normalized: validated.normalizedUrl,
-            source: "og:url",
-          });
-        } else {
-          result.skippedUrls.push({
-            original: ogUrl,
-            source: "og:url",
-            reason: validated.reason,
-          });
-        }
-      }
-
-      sessionLedger.forTab(tabId).seed(urlsToSeed, pageUrl);
+      sessionLedger.forTab(tabId).seed(processed.urlsToSeed, metadata.pageUrl);
       result.success = true;
     } catch (error) {
       result.errors.push({
@@ -115,16 +59,86 @@ export class SmartWindowMetaParent extends JSWindowActorParent {
   }
 
   /**
+   * Processes page metadata URLs: normalizes page URL and validates secondary URLs.
+   *
+   * @param {object} metadata - Raw metadata from content process
+   * @param {string} metadata.pageUrl - The page's URL
+   * @param {string} [metadata.canonical] - The canonical URL from <link rel="canonical">
+   * @param {string} [metadata.ogUrl] - The og:url from <meta property="og:url">
+   * @returns {object} Processed result with urlsToSeed, seededUrls, skippedUrls, error
+   * @private
+   */
+  #processMetadataUrls(metadata) {
+    const { pageUrl, canonical, ogUrl } = metadata;
+    const urlsToSeed = [];
+    const seededUrls = [];
+    const skippedUrls = [];
+
+    // Normalize page URL first
+    const normalizedPageUrl = normalizeUrl(pageUrl);
+    if (!normalizedPageUrl.success) {
+      return {
+        error: {
+          url: pageUrl,
+          reason: "Page URL normalization failed",
+          error: normalizedPageUrl.error,
+        },
+      };
+    }
+
+    urlsToSeed.push(normalizedPageUrl.url);
+    seededUrls.push({
+      original: pageUrl,
+      normalized: normalizedPageUrl.url,
+      source: "page",
+    });
+
+    // Process secondary URLs (canonical, og:url)
+    const secondaryUrls = [
+      { url: canonical, source: "canonical" },
+      { url: ogUrl, source: "og:url" },
+    ];
+
+    for (const { url, source } of secondaryUrls) {
+      if (!url) {
+        continue;
+      }
+
+      const validated = this.#validateSecondaryUrl(
+        url,
+        normalizedPageUrl.url,
+        pageUrl,
+      );
+
+      if (validated.success) {
+        urlsToSeed.push(validated.normalizedUrl);
+        seededUrls.push({
+          original: url,
+          normalized: validated.normalizedUrl,
+          source,
+        });
+      } else {
+        skippedUrls.push({
+          original: url,
+          source,
+          reason: validated.reason,
+        });
+      }
+    }
+
+    return { urlsToSeed, seededUrls, skippedUrls };
+  }
+
+  /**
    * Validates a secondary URL (canonical or og:url) against the page's eTLD+1.
    *
    * @param {string} url - The URL to validate (may be relative)
    * @param {string} normalizedPageUrl - The normalized page URL for eTLD+1 comparison
    * @param {string} baseUrl - The original page URL for resolving relative URLs
-   * @param {string} source - Source identifier ("canonical" or "og:url")
    * @returns {object} Validation result with success flag and normalizedUrl or reason
    * @private
    */
-  #validateSecondaryUrl(url, normalizedPageUrl, baseUrl, source) {
+  #validateSecondaryUrl(url, normalizedPageUrl, baseUrl) {
     const normalized = normalizeUrl(url, baseUrl);
 
     if (!normalized.success) {

@@ -1004,6 +1004,10 @@ export async function* fetchWithHistory(messages, allowedUrls) {
         );
 
         if (!securityCheck.allowed) {
+          console.warn(
+            `[Security] Tool execution blocked: ${toolName}`,
+            securityCheck.reason
+          );
           result = {
             error: securityCheck.reason || "Security policy denied this action",
           };
@@ -1019,9 +1023,11 @@ export async function* fetchWithHistory(messages, allowedUrls) {
               // Get current tab ID from tool params or browser
               let currentTabId = toolParams.tabId;
               if (!currentTabId && toolParams.url) {
-                // Try to find tab by URL
                 let win = lazy.BrowserWindowTracker.getTopWindow();
                 let gBrowser = win.gBrowser;
+                // Find the tab whose URL matches the tool's target URL.
+                // Compare with trailing slashes stripped to handle inconsistencies
+                // between how URLs are stored vs. provided by the LLM.
                 let targetTab = gBrowser.tabs.find(tab => {
                   const tabUrl = tab.linkedBrowser.currentURI.spec;
                   return (
@@ -1069,6 +1075,10 @@ export async function* fetchWithHistory(messages, allowedUrls) {
               break;
             case DELETE_INSIGHT:
               result = await deleteRelevantInsight(toolParams);
+              break;
+            default:
+              console.error(`[Tools] Tool "${toolName}" is in TOOLS array but not implemented in switch`);
+              result = { error: `Tool "${toolName}" is not implemented` };
               break;
           }
         }
