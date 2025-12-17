@@ -596,6 +596,14 @@ export class PipelineOptions {
   staticEmbeddingsOptions = null;
 
   /**
+   * This option allows for extra headers to be passed to 
+   * OpenAI-API-compatable endpoints
+   * 
+   * @type {?Record<string, string>}
+   */
+  extraHeaders = null;
+
+  /**
    * Create a PipelineOptions instance.
    *
    * @param {object} options - The options for the pipeline. Must include mandatory fields.
@@ -801,6 +809,7 @@ export class PipelineOptions {
       "baseURL",
       "apiKey",
       "staticEmbeddingsOptions",
+      "extraHeaders"
     ];
 
     if (options instanceof PipelineOptions) {
@@ -946,6 +955,7 @@ export class PipelineOptions {
       baseURL: this.baseURL,
       apiKey: this.apiKey,
       staticEmbeddingsOptions: this.staticEmbeddingsOptions,
+      extraHeaders: this.extraHeaders,
     };
   }
 

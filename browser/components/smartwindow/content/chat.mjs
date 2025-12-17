@@ -1290,6 +1290,7 @@ Use them to personalized your response using the following guidelines:
         .filter(mention => mention.source == "history")
         .map(mention => mention.id)
     );
+    console.log(messagesForAPI)
     const stream = fetchWithHistory(messagesForAPI, allowedRemoteUrls);
     let fullResponse = "";
     try {

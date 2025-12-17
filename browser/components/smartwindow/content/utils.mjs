@@ -61,7 +61,6 @@ export async function detectQueryType(query, isFollowup = false) {
   }
 }
 
-
 class OpenAIEngine {
 
   /**
@@ -71,6 +70,19 @@ class OpenAIEngine {
    * @returns {Promise<object>} The configured engine instance
    */
   async createOpenAIEngine(engineId = "smart-openai") {
+    let extraHeaders = null;
+    const rawHeaders = Services.prefs.getStringPref(
+        "browser.smartwindow.extraHeaders",
+        ""
+      );
+    if ( rawHeaders ) {
+      try {
+        extraHeaders = JSON.parse(rawHeaders);
+      } catch (err) {
+        console.error("Bad extraHeaders pref", err);
+      }
+    }
+
     try {
       const engineInstance = await createEngine({
         apiKey: Services.prefs.getStringPref("browser.smartwindow.key"),
@@ -80,6 +92,7 @@ class OpenAIEngine {
         modelId: Services.prefs.getStringPref("browser.smartwindow.model"),
         modelRevision: "main",
         taskName: "text-generation",
+        extraHeaders: extraHeaders
       });
       this.engine = engineInstance;
     } catch (error) {

@@ -326,10 +326,11 @@ export class OpenAIPipeline {
   ) {
     lazy.console.debug("Running OpenAI pipeline");
     try {
-      const { baseURL, apiKey, modelId } = this.#options;
+      const { baseURL, apiKey, modelId, extraHeaders } = this.#options;
       const client = new OpenAIPipeline.OpenAILib.OpenAI({
         baseURL: baseURL ? baseURL : "http://localhost:11434/v1",
         apiKey: apiKey || "ollama",
+        defaultHeaders: extraHeaders,
         maxRetries: 10,
       });
       const stream = request.streamOptions?.enabled || false;
