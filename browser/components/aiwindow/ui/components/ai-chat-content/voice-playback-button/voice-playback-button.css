@@ -1,0 +1,61 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+
+:host {
+  --voice-button-active-fill: light-dark(var(--color-violet-50), var(--color-violet-20));
+  --voice-button-active-bg: rgba(191, 143, 204, 0.2);
+  --voice-highlight-color: #FFD60A;
+  --voice-highlight-thickness: 3px;
+  --voice-highlight-offset: 2px;
+  display: inline-flex;
+}
+
+.voice-button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: var(--space-xsmall);
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: var(--border-radius-small);
+  background: transparent;
+  cursor: pointer;
+  transition: transform 150ms ease;
+}
+
+.voice-button:hover {
+  background: var(--chat-assistant-footer-button-bg-hover, rgba(191, 143, 204, 0.2));
+  border-color: rgba(0, 0, 0, 0);
+}
+
+.voice-button:active {
+  background: var(--chat-assistant-footer-button-bg-active, rgba(191, 143, 204, 0.26));
+  border-color: rgba(0, 0, 0, 0);
+  transform: scale(0.93);
+}
+
+.voice-button[disabled] {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
+.voice-button.playing,
+.voice-button.paused {
+  background: var(--voice-button-active-bg);
+}
+
+.voice-button .icon {
+  width: 16px;
+  height: 16px;
+  fill: light-dark(var(--color-gray-70), var(--color-white));
+}
+
+.voice-button.playing .icon,
+.voice-button.paused .icon {
+  fill: var(--voice-button-active-fill);
+}

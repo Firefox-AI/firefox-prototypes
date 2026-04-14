@@ -6,6 +6,8 @@ import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
 import { html } from "chrome://global/content/vendor/lit.all.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/applied-memories-button.mjs";
+// eslint-disable-next-line import/no-unassigned-import
+import "chrome://browser/content/aiwindow/components/voice-playback-button.mjs";
 
 /**
  * AssistantMessageFooter
@@ -37,6 +39,7 @@ import "chrome://browser/content/aiwindow/components/applied-memories-button.mjs
 export class AssistantMessageFooter extends MozLitElement {
   static properties = {
     messageId: { type: String, attribute: "message-id" },
+    messageText: { type: String, attribute: false },
     appliedMemories: { attribute: false },
     showCallout: { type: Boolean },
   };
@@ -44,6 +47,7 @@ export class AssistantMessageFooter extends MozLitElement {
   constructor() {
     super();
     this.messageId = null;
+    this.messageText = "";
     this.appliedMemories = [];
     this.showCallout = false;
   }
@@ -108,6 +112,11 @@ export class AssistantMessageFooter extends MozLitElement {
           }}
         >
         </moz-button>
+        <voice-playback-button
+          .messageId=${this.messageId}
+          .messageText=${this.messageText}
+        >
+        </voice-playback-button>
         <applied-memories-button
           .messageId=${this.messageId}
           .appliedMemories=${this.appliedMemories ?? []}

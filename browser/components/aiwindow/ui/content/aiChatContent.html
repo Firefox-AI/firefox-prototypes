@@ -10,7 +10,7 @@
     <meta name="referrer" content="no-referrer" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src resource: chrome:; object-src 'none'; img-src chrome: page-icon:;"
+      content="default-src resource: chrome:; connect-src resource: chrome: http://127.0.0.1:8744; object-src 'none'; img-src chrome: page-icon:;"
     />
     <meta name="color-scheme" content="light dark" />
     <title data-l10n-id="smartwindow-messages-document-title"></title>
@@ -41,6 +41,10 @@
     <script
       type="module"
       src="chrome://browser/content/aiwindow/components/smartwindow-prompts.mjs"
+    ></script>
+    <script
+      type="module"
+      src="chrome://browser/content/aiwindow/components/voice-playback-button.mjs"
     ></script>
   </head>
   <body id="ai-window-wrapper">

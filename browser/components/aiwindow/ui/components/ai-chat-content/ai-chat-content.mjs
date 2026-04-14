@@ -121,6 +121,87 @@ export class AIChatContent extends MozLitElement {
       "aiChatError:sign-in",
       this.openAccountSignInAfterError.bind(this)
     );
+
+    this.addEventListener("voice-playback-start", e => {
+      this.#handleVoicePlaybackStart(e);
+    });
+    this.addEventListener("voice-playback-end", e => {
+      this.#clearWordHighlights(e.detail?.messageId);
+    });
+    this.addEventListener("voice-playback-boundary", e => {
+      this.#applyWordHighlight(e.detail);
+    });
+  }
+
+  #handleVoicePlaybackStart(event) {
+    const { messageId } = event.detail ?? {};
+    const buttons = this.shadowRoot.querySelectorAll("voice-playback-button");
+    for (const btn of buttons) {
+      if (btn.messageId !== messageId) {
+        btn.dispatchEvent(
+          new CustomEvent("voice-playback-cancel", { detail: { messageId } })
+        );
+      }
+    }
+    this.#clearAllWordHighlights();
+  }
+
+  #applyWordHighlight({ messageId, charIndex, charLength }) {
+    this.#clearAllWordHighlights();
+    const messages = this.shadowRoot.querySelectorAll("ai-chat-message");
+    for (const msg of messages) {
+      if (msg.messageId !== messageId) {
+        continue;
+      }
+      const article = msg.shadowRoot?.querySelector("article");
+      if (!article) {
+        break;
+      }
+      const root = article.querySelector(".message-assistant") || article;
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      let offset = 0;
+      while (walker.nextNode()) {
+        const node = walker.currentNode;
+        const len = node.textContent.length;
+        if (offset + len > charIndex) {
+          const start = charIndex - offset;
+          const end = Math.min(start + (charLength || 1), len);
+          const range = document.createRange();
+          range.setStart(node, start);
+          range.setEnd(node, end);
+          const mark = document.createElement("mark");
+          mark.className = "voice-highlight";
+          range.surroundContents(mark);
+          break;
+        }
+        offset += len;
+      }
+      break;
+    }
+  }
+
+  #clearWordHighlights(messageId) {
+    const messages = this.shadowRoot.querySelectorAll("ai-chat-message");
+    for (const msg of messages) {
+      if (messageId && msg.messageId !== messageId) {
+        continue;
+      }
+      const marks = msg.shadowRoot?.querySelectorAll("mark.voice-highlight");
+      if (marks) {
+        for (const mark of marks) {
+          const parent = mark.parentNode;
+          while (mark.firstChild) {
+            parent.insertBefore(mark.firstChild, mark);
+          }
+          parent.removeChild(mark);
+          parent.normalize();
+        }
+      }
+    }
+  }
+
+  #clearAllWordHighlights() {
+    this.#clearWordHighlights(null);
   }
 
   /**
@@ -484,6 +565,7 @@ export class AIChatContent extends MozLitElement {
           ? html`
               <assistant-message-footer
                 .messageId=${msg.messageId}
+                .messageText=${msg.body}
                 .appliedMemories=${msg.appliedMemories}
                 .showCallout=${msg.showCallout}
               ></assistant-message-footer>

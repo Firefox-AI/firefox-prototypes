@@ -34,3 +34,18 @@ aiwindow-retry =
 aiwindow-copy-message =
     .tooltiptext = Copy
     .aria-label = Copy message
+
+## Voice playback
+
+aiwindow-voice-read-aloud =
+    .title = Read aloud
+    .aria-label = Read aloud
+aiwindow-voice-pause =
+    .title = Pause reading
+    .aria-label = Pause reading
+aiwindow-voice-resume =
+    .title = Resume reading
+    .aria-label = Resume reading
+aiwindow-voice-unavailable =
+    .title = Speech not available in this browser
+    .aria-label = Speech not available
