@@ -1,0 +1,92 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+
+:host {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+}
+
+moz-button.voice-input-button {
+  --button-icon-fill: var(--smartbar-cta-icon-fill, var(--icon-color));
+  --button-background-color-ghost-selected: transparent;
+}
+
+:host([state="listening"]) moz-button.voice-input-button {
+  --button-icon-fill: var(--smartwindow-brand-accent);
+  --button-background-color-ghost: color-mix(
+    in srgb,
+    var(--smartwindow-brand-accent) 15%,
+    transparent
+  );
+  --button-background-color-ghost-hover: color-mix(
+    in srgb,
+    var(--smartwindow-brand-accent) 20%,
+    transparent
+  );
+  --button-background-color-ghost-active: color-mix(
+    in srgb,
+    var(--smartwindow-brand-accent) 25%,
+    transparent
+  );
+  border-radius: 50%;
+  animation: voice-pulse 1.5s ease-in-out infinite;
+}
+
+:host([state="error"]) moz-button.voice-input-button {
+  --button-icon-fill: var(--smartbar-cta-icon-fill, var(--icon-color));
+  opacity: 0.5;
+}
+
+@keyframes voice-pulse {
+  0% {
+    box-shadow: 0 0 0 0
+      color-mix(in srgb, var(--smartwindow-brand-accent) 40%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 6px
+      color-mix(in srgb, var(--smartwindow-brand-accent) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0
+      color-mix(in srgb, var(--smartwindow-brand-accent) 0%, transparent);
+  }
+}
+
+.voice-error-toast {
+  position: absolute;
+  bottom: calc(100% + var(--space-small));
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 280px;
+  width: max-content;
+  padding: var(--space-small) var(--space-medium);
+  border-radius: var(--border-radius-large);
+  font-size: var(--font-size-small);
+  line-height: 1.4;
+  white-space: normal;
+  text-align: center;
+  z-index: 10;
+  pointer-events: none;
+  background: light-dark(
+    var(--color-violet-0),
+    color-mix(in srgb, var(--color-violet-100) 85%, black)
+  );
+  color: light-dark(var(--color-violet-100), var(--color-violet-10));
+  border: var(--border-width) solid
+    light-dark(var(--color-violet-30), var(--color-violet-70));
+  box-shadow: var(--box-shadow-level-2);
+  animation: toast-enter 0.2s ease-out;
+}
+
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
