@@ -1,0 +1,130 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+:host {
+  display: block;
+  margin-block: var(--space-small);
+}
+
+.tab-scope-card {
+  background: var(--background-color-box-info, var(--color-surface-variant));
+  border: 1px solid
+    var(--aiwindow-callout-border-color, var(--border-color-default));
+  border-radius: var(--border-radius-medium);
+  padding: var(--space-medium);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-small);
+}
+
+.tab-scope-headline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-small);
+  font-size: var(--font-size-small);
+  color: var(--text-color);
+}
+
+.tab-scope-glyph {
+  font-size: 16px;
+}
+
+.tab-scope-favicons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tab-scope-favicon {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--border-radius-xsmall);
+  background: var(--color-surface-variant);
+}
+
+.tab-scope-more {
+  font-size: var(--font-size-xsmall);
+  color: var(--text-color-deemphasized);
+  padding: 2px 8px;
+  border: 1px solid var(--border-color-default);
+  border-radius: var(--border-radius-small);
+}
+
+.tab-scope-explainer {
+  font-size: var(--font-size-xsmall);
+  color: var(--disclaimer-text-color, var(--text-color-deemphasized));
+}
+
+.tab-scope-actions {
+  display: flex;
+  gap: var(--space-small);
+}
+
+.tab-scope-primary,
+.tab-scope-ghost {
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  padding: 6px 14px;
+  border-radius: var(--border-radius-small);
+  cursor: pointer;
+  border: 1px solid var(--border-color-default);
+}
+
+.tab-scope-primary {
+  background: var(--smartwindow-brand-accent);
+  color: var(--color-white, white);
+  border-color: transparent;
+}
+
+.tab-scope-primary:hover {
+  filter: brightness(0.95);
+}
+
+.tab-scope-ghost {
+  background: transparent;
+  color: var(--text-color);
+}
+
+.tab-scope-ghost:hover {
+  border-color: var(--smartwindow-brand-accent);
+  color: var(--smartwindow-brand-accent);
+}
+
+.tab-scope-primary:focus-visible,
+.tab-scope-ghost:focus-visible,
+.tab-scope-revoke:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-outline-offset);
+}
+
+.tab-scope-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-small);
+  font-size: var(--font-size-xsmall);
+  color: var(--text-color-deemphasized);
+  padding: 6px var(--space-medium);
+  background: var(--color-surface-variant);
+  border: 1px solid var(--border-color-default);
+  border-radius: var(--border-radius-small);
+}
+
+.tab-scope-summary.tab-scope-revoked {
+  font-style: italic;
+}
+
+.tab-scope-revoke {
+  margin-inline-start: auto;
+  background: transparent;
+  border: none;
+  color: var(--text-color-deemphasized);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.tab-scope-revoke:hover {
+  color: var(--text-color);
+}

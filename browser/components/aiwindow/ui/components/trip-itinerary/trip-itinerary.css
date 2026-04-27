@@ -1,0 +1,377 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+:host {
+  display: block;
+  margin-block: var(--space-small);
+  --mutation-flash-bg: color-mix(
+    in srgb,
+    var(--smartwindow-brand-accent) 18%,
+    transparent
+  );
+  --mutation-flash-duration: 1.6s;
+}
+
+.trip-card {
+  background: var(--color-surface-variant);
+  border: 1px solid var(--border-color-default);
+  border-radius: var(--border-radius-medium);
+  overflow: hidden;
+  font-size: var(--font-size-small);
+}
+
+/* ---- Loading ---- */
+
+.loading-state {
+  padding: var(--space-medium);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-small);
+}
+
+.loading-text {
+  font-size: var(--font-size-xsmall);
+  color: var(--text-color-deemphasized);
+}
+
+.loading-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border-color-default);
+  border-top-color: var(--smartwindow-brand-accent);
+  border-radius: 50%;
+  animation: trip-itin-spin 1s linear infinite;
+}
+
+@keyframes trip-itin-spin {
+  to { transform: rotate(360deg); }
+}
+
+.skeleton-block {
+  height: 14px;
+  border-radius: var(--border-radius-small);
+  background: color-mix(in srgb, var(--text-color-deemphasized) 18%, transparent);
+}
+
+.skeleton-block.short {
+  width: 60%;
+}
+
+/* ---- Error ---- */
+
+.error-state {
+  padding: var(--space-medium);
+}
+
+.error-title {
+  font-weight: var(--font-weight-bold);
+  color: var(--heading-text-color);
+  margin-bottom: 4px;
+}
+
+.error-text {
+  font-size: var(--font-size-xsmall);
+  color: var(--text-color-deemphasized);
+}
+
+/* ---- Header ---- */
+
+.trip-header {
+  padding: var(--space-medium);
+  background: color-mix(in srgb, var(--smartwindow-brand-accent) 8%, transparent);
+  border-bottom: 1px solid var(--border-color-default);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-small);
+}
+
+.trip-name {
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-large);
+  color: var(--heading-text-color);
+}
+
+.trip-meta {
+  font-size: var(--font-size-xsmall);
+  color: var(--text-color-deemphasized);
+  margin-top: 2px;
+}
+
+.grounding-badge {
+  font-size: var(--font-size-xsmall);
+  color: var(--text-color-deemphasized);
+  font-style: italic;
+  margin-top: 4px;
+}
+
+.tab-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.tab-chip-more {
+  align-self: center;
+  font-size: var(--font-size-xsmall);
+  color: var(--text-color-deemphasized);
+  padding: 2px 8px;
+  border-radius: var(--border-radius-small);
+  border: 1px solid var(--border-color-default);
+  background: var(--color-surface-variant);
+}
+
+/* ---- Body ---- */
+
+.trip-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-medium);
+  padding: var(--space-medium);
+}
+
+/* ---- Slot cards ---- */
+
+.slot-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-small) var(--space-medium);
+  background: var(--color-surface-variant);
+  border-radius: var(--border-radius-medium);
+  font: inherit;
+  text-align: start;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.slot-card[data-state="empty"] {
+  border: 2px dashed var(--border-color-default);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  flex-direction: row;
+  gap: var(--space-small);
+  min-height: 56px;
+  color: var(--smartwindow-brand-accent);
+  font-weight: var(--font-weight-semibold);
+}
+
+.slot-card[data-state="empty"]:hover {
+  border-color: var(--smartwindow-brand-accent);
+}
+
+.slot-card[data-state="empty"]:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-outline-offset);
+}
+
+.slot-card[data-state="filled"] {
+  border: 1px solid var(--border-color-default);
+}
+
+.slot-card[data-mutated="true"] {
+  background: var(--mutation-flash-bg);
+  transition: background var(--mutation-flash-duration) ease-out;
+}
+
+.slot-glyph {
+  font-size: 18px;
+}
+
+.slot-cta {
+  font-size: var(--font-size-small);
+}
+
+.slot-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-small);
+}
+
+.slot-name {
+  flex: 1;
+  font-weight: var(--font-weight-bold);
+  color: var(--text-color);
+  font-size: var(--font-size-small);
+}
+
+.slot-price {
+  font-size: var(--font-size-xsmall);
+  font-weight: var(--font-weight-bold);
+  color: var(--smartwindow-brand-accent);
+}
+
+.slot-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xsmall);
+  color: var(--text-color-deemphasized);
+}
+
+.slot-source {
+  color: var(--smartwindow-assistant-link-color, var(--smartwindow-brand-accent));
+  text-decoration: none;
+}
+
+.slot-source:hover {
+  text-decoration: underline;
+}
+
+.slot-replace {
+  margin-inline-start: auto;
+  background: transparent;
+  border: 1px solid var(--border-color-default);
+  border-radius: var(--border-radius-small);
+  padding: 2px 8px;
+  font-size: var(--font-size-xsmall);
+  color: var(--text-color-deemphasized);
+  cursor: pointer;
+}
+
+.slot-replace:hover {
+  border-color: var(--smartwindow-brand-accent);
+  color: var(--text-color);
+}
+
+/* ---- Weather strip ---- */
+
+.weather-strip {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow-x: auto;
+  padding-block: 2px;
+}
+
+.weather-cell {
+  flex: 1 0 auto;
+  min-width: 56px;
+  padding: 6px 4px;
+  border-radius: var(--border-radius-small);
+  background: color-mix(in srgb, var(--text-color-deemphasized) 6%, transparent);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.weather-day {
+  font-size: var(--font-size-xsmall);
+  color: var(--text-color-deemphasized);
+}
+
+.weather-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.weather-temps {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  font-size: var(--font-size-xsmall);
+}
+
+.weather-high {
+  color: var(--text-color);
+}
+
+.weather-low {
+  color: var(--text-color-deemphasized);
+}
+
+/* ---- Day list ---- */
+
+.day-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-small);
+}
+
+.day-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.day-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-bottom: 2px;
+}
+
+.day-label {
+  font-size: 9px;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--smartwindow-brand-accent);
+}
+
+.day-title {
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-color);
+}
+
+.activity-row {
+  display: flex;
+  gap: var(--space-small);
+  padding: var(--space-xsmall) var(--space-small);
+  background: var(--color-surface-variant);
+  border: 1px solid var(--border-color-default);
+  border-radius: var(--border-radius-small);
+  font-size: var(--font-size-xsmall);
+}
+
+.activity-row[data-mutated="true"] {
+  background: var(--mutation-flash-bg);
+  transition: background var(--mutation-flash-duration) ease-out;
+}
+
+.activity-time {
+  color: var(--smartwindow-brand-accent);
+  font-weight: var(--font-weight-bold);
+  min-width: 52px;
+  flex-shrink: 0;
+}
+
+.activity-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.activity-text {
+  color: var(--text-color);
+}
+
+.activity-note {
+  font-size: 10px;
+  color: var(--text-color-deemphasized);
+}
+
+.activity-empty {
+  border-style: dashed;
+}
+
+.activity-empty-cta {
+  color: var(--text-color-deemphasized);
+  font-style: italic;
+}
+
+/* ---- Map ---- */
+
+.trip-map {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--border-radius-small);
+  border: 1px solid var(--border-color-default);
+  object-fit: cover;
+}

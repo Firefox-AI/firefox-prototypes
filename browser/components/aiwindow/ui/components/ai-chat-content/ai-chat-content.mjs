@@ -32,6 +32,13 @@ export class AIChatContent extends MozLitElement {
 
   #lastScrollReq = null;
   #overflowObserver = null;
+  #pendingTripData = null;
+  #tripExpected = false;
+  #pendingTripPlanV1 = null;
+  #tripPlanV1Expected = false;
+  #pendingTabScopeProposal = null;
+  #tabScopeExpected = false;
+  #pendingMutation = null;
 
   constructor() {
     super();
@@ -110,6 +117,26 @@ export class AIChatContent extends MozLitElement {
     this.addEventListener(
       "aiChatContentActor:seen-urls",
       this.#handleSeenUrls.bind(this)
+    );
+
+    this.addEventListener(
+      "aiChatContentActor:tripData",
+      this.#handleTripData.bind(this)
+    );
+
+    this.addEventListener(
+      "aiChatContentActor:tripPlanV1",
+      this.#handleTripPlanV1.bind(this)
+    );
+
+    this.addEventListener(
+      "aiChatContentActor:tabScopeProposal",
+      this.#handleTabScopeProposal.bind(this)
+    );
+
+    this.addEventListener(
+      "aiChatContentActor:tripMutation",
+      this.#handleTripMutation.bind(this)
     );
 
     this.addEventListener(
@@ -388,6 +415,27 @@ export class AIChatContent extends MozLitElement {
       ? []
       : followUpSuggestions.slice(0, FOLLOW_UP_QTY);
 
+    let tripData = null;
+    if (this.#tripExpected && this.#pendingTripData) {
+      tripData = this.#pendingTripData;
+      this.#pendingTripData = null;
+      this.#tripExpected = false;
+    }
+
+    let tripPlanV1 = null;
+    if (this.#tripPlanV1Expected && this.#pendingTripPlanV1) {
+      tripPlanV1 = this.#pendingTripPlanV1;
+      this.#pendingTripPlanV1 = null;
+      this.#tripPlanV1Expected = false;
+    }
+
+    let tabScopeProposal = null;
+    if (this.#tabScopeExpected && this.#pendingTabScopeProposal) {
+      tabScopeProposal = this.#pendingTabScopeProposal;
+      this.#pendingTabScopeProposal = null;
+      this.#tabScopeExpected = false;
+    }
+
     this.conversationState[ordinal] = {
       role: "assistant",
       convId,
@@ -397,9 +445,74 @@ export class AIChatContent extends MozLitElement {
       showCallout: showMemoriesCallout ?? false,
       searchTokens: webSearchQueries ?? [],
       isLastChunk: !!isPreviousMessage,
+      tripData,
+      tripPlanV1,
+      tabScopeProposal,
     };
 
     this.requestUpdate();
+  }
+
+  #handleTripData(event) {
+    const data = event.detail;
+    const target = this.conversationState.findLast(
+      m => m?.role === "assistant"
+    );
+    if (target) {
+      target.tripData = data;
+    } else {
+      this.#pendingTripData = data;
+      this.#tripExpected = true;
+    }
+    this.requestUpdate();
+  }
+
+  #handleTripPlanV1(event) {
+    const data = event.detail;
+    const target = this.conversationState.findLast(
+      m => m?.role === "assistant"
+    );
+    if (target) {
+      target.tripPlanV1 = data;
+      // Clear v0 tripData so we don't render two artifacts in the same row.
+      target.tripData = null;
+    } else {
+      this.#pendingTripPlanV1 = data;
+      this.#tripPlanV1Expected = true;
+    }
+    this.requestUpdate();
+  }
+
+  #handleTabScopeProposal(event) {
+    const data = event.detail;
+    const target = this.conversationState.findLast(
+      m => m?.role === "assistant"
+    );
+    if (target) {
+      target.tabScopeProposal = data;
+    } else {
+      this.#pendingTabScopeProposal = data;
+      this.#tabScopeExpected = true;
+    }
+    this.requestUpdate();
+  }
+
+  #handleTripMutation(event) {
+    const data = event.detail;
+    // Update the last trip plan in place; flash the mutated path on the
+    // active <trip-itinerary>.
+    const target = this.conversationState.findLast(m => m?.tripPlanV1);
+    if (target && data?.updated_trip) {
+      target.tripPlanV1 = data.updated_trip;
+    }
+    this.requestUpdate();
+    // After re-render, locate the trip-itinerary element and flash the path.
+    this.updateComplete.then(() => {
+      const node = this.shadowRoot?.querySelector("trip-itinerary");
+      if (node && typeof node.flashMutation === "function") {
+        node.flashMutation(data?.mutated_path);
+      }
+    });
   }
 
   #scrollUserMessageIntoView() {
@@ -513,6 +626,20 @@ export class AIChatContent extends MozLitElement {
               .websites=${chips}
             ></website-chip-container>`
           : nothing}
+        ${msg.tabScopeProposal
+          ? html`<tab-scope-card
+              .proposal=${msg.tabScopeProposal}
+            ></tab-scope-card>`
+          : nothing}
+        ${msg.tripPlanV1
+          ? html`<trip-itinerary
+              .tripPlan=${msg.tripPlanV1}
+            ></trip-itinerary>`
+          : msg.tripData
+            ? html`<trip-artifact
+                .tripData=${msg.tripData}
+              ></trip-artifact>`
+            : nothing}
         <ai-chat-message
           .message=${msg.body}
           .role=${msg.role}
@@ -530,6 +657,50 @@ export class AIChatContent extends MozLitElement {
               ></assistant-message-footer>
             `
           : nothing}
+      </div>
+    `;
+  }
+
+  #hasTripArtifact() {
+    return this.conversationState.some(m => m?.tripData);
+  }
+
+  #shouldShowTravelCTA() {
+    if (this.#hasTripArtifact() || this.assistantIsLoading) {
+      return false;
+    }
+    const lastAssistant = this.conversationState.findLast(
+      m => m?.role === "assistant"
+    );
+    if (!lastAssistant?.body) {
+      return false;
+    }
+    const lower = lastAssistant.body.toLowerCase();
+    const travelTerms =
+      /\b(trip|travel|itinerary|vacation|flight|hotel|destination|day\s*\d|packing)\b/;
+    return travelTerms.test(lower);
+  }
+
+  #onGenerateTravelPlan() {
+    this.dispatchEvent(
+      new CustomEvent("AIChatContent:DispatchFollowUp", {
+        detail: {
+          text: "Generate the travel plan now. Call the generate_travel_plan tool with all the information we discussed. Include weather, flights, hotels, itinerary, budget, and packing list.",
+        },
+        bubbles: true,
+      })
+    );
+  }
+
+  #renderTravelCTA() {
+    if (!this.#shouldShowTravelCTA()) {
+      return nothing;
+    }
+    return html`
+      <div class="travel-cta-container">
+        <button class="travel-cta-btn" @click=${this.#onGenerateTravelPlan}>
+          Generate Travel Plan
+        </button>
       </div>
     `;
   }
@@ -584,8 +755,9 @@ export class AIChatContent extends MozLitElement {
       />
       <div class="chat-content-wrapper">
         <div class="chat-inner-wrapper">
-          ${this.#renderMessages()} ${this.#renderFollowUpSuggestions()}
-          ${this.#renderLoader()} ${this.#renderError()}
+          ${this.#renderMessages()} ${this.#renderTravelCTA()}
+          ${this.#renderFollowUpSuggestions()} ${this.#renderLoader()}
+          ${this.#renderError()}
         </div>
       </div>
     `;

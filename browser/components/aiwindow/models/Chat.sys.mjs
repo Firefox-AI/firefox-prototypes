@@ -23,6 +23,11 @@ import {
   RUN_SEARCH,
   GET_USER_MEMORIES,
   GET_NAVIGATION_INFO,
+  GENERATE_TRAVEL_PLAN,
+  PLAN_TRIP,
+  PROPOSE_TAB_SCOPE,
+  MUTATE_TRIP,
+  OPEN_SEARCH_SPLIT_VIEW,
 } from "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs";
 import {
   expandUrlTokensInToolParams,
@@ -384,6 +389,84 @@ Object.assign(Chat, {
             case GET_NAVIGATION_INFO:
               result = await toolFns.getNavigationInfo(toolParams);
               break;
+            case GENERATE_TRAVEL_PLAN:
+              result = await toolFns.generateTravelPlan(
+                toolParams,
+                conversation.securityProperties,
+                context
+              );
+              break;
+            case PLAN_TRIP: {
+              const startTime = new Date();
+              result = await toolFns.planTrip(
+                toolParams,
+                conversation,
+                context
+              );
+              try {
+                Glean.smartWindow.planTrip?.record({
+                  location: mode,
+                  chat_id: conversation.id,
+                  message_seq: conversation.messageCount,
+                  destination: String(toolParams.destination ?? ""),
+                  duration_days: parseInt(toolParams.duration_days, 10) || 0,
+                  use_tab_context: !!toolParams.use_tab_context,
+                  tab_count: Array.isArray(toolParams.tab_ids)
+                    ? toolParams.tab_ids.length
+                    : 0,
+                  grounding_source:
+                    result?.grounding?.source ?? "general",
+                  time: new Date() - startTime,
+                });
+              } catch (e) {
+                lazy.console.warn("planTrip Glean record failed", e);
+              }
+              break;
+            }
+            case PROPOSE_TAB_SCOPE: {
+              result = await toolFns.proposeTabScope(toolParams, conversation);
+              try {
+                Glean.smartWindow.proposeTabScope?.record({
+                  chat_id: conversation.id,
+                  matched_count: result?.match_count ?? 0,
+                });
+              } catch (e) {
+                lazy.console.warn("proposeTabScope Glean record failed", e);
+              }
+              break;
+            }
+            case MUTATE_TRIP: {
+              result = await toolFns.mutateTrip(toolParams, conversation);
+              try {
+                Glean.smartWindow.mutateTrip?.record({
+                  chat_id: conversation.id,
+                  mutation_type: String(toolParams.mutation_type ?? ""),
+                  affected_path:
+                    result?.mutated_path?.kind ?? "",
+                });
+              } catch (e) {
+                lazy.console.warn("mutateTrip Glean record failed", e);
+              }
+              break;
+            }
+            case OPEN_SEARCH_SPLIT_VIEW: {
+              result = await toolFns.openSearchSplitView(
+                toolParams,
+                conversation
+              );
+              try {
+                Glean.smartWindow.openSearchSplitView?.record({
+                  chat_id: conversation.id,
+                  slot_type: String(toolParams.slot_type ?? "hotel"),
+                });
+              } catch (e) {
+                lazy.console.warn(
+                  "openSearchSplitView Glean record failed",
+                  e
+                );
+              }
+              break;
+            }
             default:
               throw new Error(`No such tool: ${toolName}`);
           }
@@ -395,6 +478,58 @@ Object.assign(Chat, {
             { arguments: toolParams, result },
             toolName
           );
+
+          if (toolName === GENERATE_TRAVEL_PLAN && result && !result.error) {
+            try {
+              const browser = context?.browsingContext?.embedderElement;
+              const actor =
+                browser?.browsingContext?.currentWindowContext?.getActor?.(
+                  "AIChatContent"
+                );
+              actor?.sendAsyncMessage("AIChatContent:TripData", result);
+            } catch (e) {
+              lazy.console.error("Failed to dispatch trip data:", e);
+            }
+          }
+
+          if (toolName === PLAN_TRIP && result && !result.error) {
+            try {
+              const browser = context?.browsingContext?.embedderElement;
+              const actor =
+                browser?.browsingContext?.currentWindowContext?.getActor?.(
+                  "AIChatContent"
+                );
+              actor?.sendAsyncMessage("AIChatContent:TripPlanV1", result);
+            } catch (e) {
+              lazy.console.error("Failed to dispatch v1 trip plan:", e);
+            }
+          }
+
+          if (toolName === PROPOSE_TAB_SCOPE && result && !result.error) {
+            try {
+              const browser = context?.browsingContext?.embedderElement;
+              const actor =
+                browser?.browsingContext?.currentWindowContext?.getActor?.(
+                  "AIChatContent"
+                );
+              actor?.sendAsyncMessage("AIChatContent:TabScopeProposal", result);
+            } catch (e) {
+              lazy.console.error("Failed to dispatch tab scope proposal:", e);
+            }
+          }
+
+          if (toolName === MUTATE_TRIP && result && !result.error) {
+            try {
+              const browser = context?.browsingContext?.embedderElement;
+              const actor =
+                browser?.browsingContext?.currentWindowContext?.getActor?.(
+                  "AIChatContent"
+                );
+              actor?.sendAsyncMessage("AIChatContent:TripMutation", result);
+            } catch (e) {
+              lazy.console.error("Failed to dispatch trip mutation:", e);
+            }
+          }
 
           const content = { tool_call_id: id, body: result, name: toolName };
           conversation.addToolCallMessage(content, currentTurn, toolRoleOpts);

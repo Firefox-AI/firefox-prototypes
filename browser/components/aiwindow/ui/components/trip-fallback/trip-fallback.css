@@ -1,0 +1,51 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+:host {
+  display: block;
+  margin-block: var(--space-small);
+}
+
+.trip-fallback-card {
+  background: var(--color-surface-variant);
+  border: 1px solid var(--border-color-default);
+  border-radius: var(--border-radius-medium);
+  padding: var(--space-medium);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-small);
+}
+
+.fallback-heading {
+  font-size: var(--font-size-large);
+  font-weight: var(--font-weight-bold);
+  color: var(--heading-text-color);
+}
+
+.fallback-subtitle {
+  font-size: var(--font-size-xsmall);
+  color: var(--text-color-deemphasized);
+}
+
+.question-button {
+  background: var(--button-background, var(--color-surface-variant));
+  border: 1px solid var(--border-color-default);
+  border-radius: var(--border-radius-small);
+  padding: var(--space-small) var(--space-medium);
+  text-align: start;
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-color);
+  cursor: pointer;
+}
+
+.question-button:hover {
+  border-color: var(--smartwindow-brand-accent);
+  color: var(--smartwindow-brand-accent);
+}
+
+.question-button:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-outline-offset);
+}

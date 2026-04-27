@@ -1,0 +1,802 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this file,
+   - You can obtain one at http://mozilla.org/MPL/2.0/. -->
+<!doctype html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src resource: chrome: 'unsafe-inline'; object-src 'none'; img-src chrome: blob: data:; script-src 'unsafe-inline' chrome: resource:;"
+    />
+    <meta name="color-scheme" content="light" />
+    <title>Trip Plan</title>
+    <link rel="stylesheet" href="chrome://global/skin/in-content/common.css" />
+    <style>
+/* <![CDATA[ */
+*, *::before, *::after { box-sizing: border-box; }
+
+:root {
+  --accent: #7c5cfc;
+  --accent-light: #a78bfa;
+  --accent-pale: #f0edff;
+  --green: #10b981;
+  --green-pale: #d1fae5;
+  --orange: #f97316;
+  --orange-pale: #fff7ed;
+  --bg: #f8f9fa;
+  --card: #ffffff;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --text-2: #475569;
+  --text-3: #94a3b8;
+  --radius: 16px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.06);
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+  color-scheme: light;
+}
+
+.hero {
+  background: linear-gradient(160deg, #20123a 0%, #5b27d0 40%, #7c5cfc 65%, #a78bfa 85%, #c4b5fd 100%);
+  padding: 48px 24px 80px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 60px;
+  background: var(--bg);
+  clip-path: ellipse(60% 100% at 50% 100%);
+}
+
+.trip-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  letter-spacing: 0.5px;
+  margin-bottom: 20px;
+}
+
+.hero h1 {
+  font-size: clamp(28px, 5vw, 44px);
+  font-weight: 800;
+  color: white;
+  letter-spacing: -1px;
+  line-height: 1.1;
+  margin: 0 0 10px;
+  text-shadow: 0 2px 20px rgba(0,0,0,0.2);
+}
+
+.hero-sub { font-size: 16px; color: rgba(255,255,255,0.85); margin: 0 0 28px; }
+
+.hero-pills { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; }
+
+.hero-pill {
+  background: rgba(255,255,255,0.2);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: white;
+}
+
+.container {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 16px 60px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Tabs */
+.tabs-nav {
+  display: flex;
+  gap: 4px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px;
+  margin: -28px auto 28px;
+  max-width: 620px;
+  box-shadow: var(--shadow);
+}
+
+.tab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  border-radius: 9px;
+  padding: 9px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.tab-btn:hover { background: var(--bg); color: var(--text); }
+
+.tab-btn.active {
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 2px 8px rgba(124,92,252,0.3);
+}
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* Cards */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.card-body { padding: 20px; }
+
+/* Weather widget */
+.weather-widget {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+}
+
+.weather-icon-large { font-size: 36px; }
+.weather-condition-text { font-size: 15px; font-weight: 700; color: var(--text); }
+.weather-temps-text { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+.weather-season-note { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+
+/* Info tiles */
+.info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+@media (max-width: 500px) { .info-grid { grid-template-columns: 1fr 1fr; } }
+
+.info-tile {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
+}
+
+.info-tile-value { font-size: 16px; font-weight: 700; color: var(--text); }
+.info-tile-label { font-size: 11px; color: var(--text-3); margin-top: 2px; font-weight: 500; }
+
+/* Flight cards */
+.flight-card-fp {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px 20px;
+  margin-bottom: 12px;
+}
+
+.flight-header-fp { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.flight-airline-fp { font-size: 14px; font-weight: 700; color: var(--text); }
+.flight-number-fp { font-size: 12px; color: var(--text-3); }
+.flight-status-fp { margin-left: auto; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+.status-confirmed-fp { background: var(--green-pale); color: var(--green); }
+.status-researched-fp, .status-pending-fp { background: var(--orange-pale); color: var(--orange); }
+
+.flight-route-fp { display: flex; align-items: center; gap: 16px; }
+.flight-ep { flex: 1; }
+.flight-ep-city { font-size: 18px; font-weight: 800; color: var(--text); }
+.flight-ep-time { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.flight-arrow-fp { color: var(--accent); font-size: 20px; }
+.flight-price-fp { font-size: 16px; font-weight: 700; color: var(--accent); margin-top: 12px; text-align: right; }
+
+/* Hotel cards */
+.hotel-card-fp {
+  background: var(--card);
+  border: 2px solid var(--accent);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.hotel-card-header-fp { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; background: var(--accent-pale); }
+.hotel-label-fp { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); }
+.hotel-body-fp { padding: 14px 16px; }
+.hotel-main-fp { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+.hotel-detail-fp { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+.hotel-price-fp { font-size: 13px; font-weight: 700; color: var(--accent); margin-top: 8px; }
+
+/* Empty CTA */
+.empty-cta {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-3);
+}
+
+.empty-cta-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.empty-cta-btn {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 8px 18px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: none;
+  font-family: inherit;
+}
+
+/* Alert / tip cards */
+.alert-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  border: 1px solid #c4b5fd;
+  background: var(--accent-pale);
+}
+
+.alert-icon { flex-shrink: 0; margin-top: 1px; font-weight: 700; color: var(--accent); font-size: 14px; }
+.alert-title { font-size: 13px; font-weight: 700; margin-bottom: 2px; color: var(--accent); }
+.alert-text { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+
+/* Sources */
+.source-link { display: block; font-size: 12px; color: var(--accent); text-decoration: none; padding: 4px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.source-link:hover { text-decoration: underline; }
+
+/* Itinerary day cards */
+.day-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.day-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.day-header:hover { background: var(--bg); }
+
+.day-num {
+  width: 40px; height: 40px; border-radius: 12px;
+  background: linear-gradient(135deg, #5b27d0, #7c5cfc);
+  color: white; font-weight: 800; font-size: 13px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  flex-shrink: 0; line-height: 1.1;
+}
+
+.day-num-label { font-size: 8px; font-weight: 500; opacity: 0.8; }
+.day-info { flex: 1; }
+.day-title-fp { font-size: 14px; font-weight: 700; }
+.day-sub { font-size: 12px; color: var(--text-3); margin-top: 1px; }
+.day-count { font-size: 11px; color: var(--text-3); font-weight: 600; flex-shrink: 0; }
+
+.day-toggle { font-size: 14px; color: var(--text-3); transition: transform 0.2s; margin-left: 8px; }
+.day-card.open .day-toggle { transform: rotate(180deg); }
+.day-body { border-top: 1px solid var(--border); padding: 4px 0; display: none; }
+.day-card.open .day-body { display: block; }
+
+/* Activity items */
+.activity-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 11px 18px; border-bottom: 1px solid var(--border);
+}
+.activity-item:last-child { border-bottom: none; }
+
+.activity-time-fp {
+  font-size: 11px; color: var(--text-3); font-weight: 600;
+  min-width: 64px; padding-top: 2px; font-variant-numeric: tabular-nums;
+}
+
+.activity-content { flex: 1; }
+.activity-text-fp { font-size: 13px; color: var(--text); line-height: 1.4; }
+.activity-note-fp { font-size: 11px; color: var(--text-3); margin-top: 2px; line-height: 1.4; }
+
+/* Budget */
+.budget-hero {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+
+.budget-bar-track { height: 10px; background: var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 8px; }
+.budget-bar-fill {
+  height: 100%; border-radius: 10px;
+  background: linear-gradient(90deg, #5b27d0, #7c5cfc);
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.budget-bar-fill.over { background: linear-gradient(90deg, #f97316, #ef4444); }
+
+.budget-line {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 14px; border-radius: 10px; margin-bottom: 4px;
+}
+.budget-line:hover { background: var(--bg); }
+.budget-line-label { flex: 1; font-size: 13px; color: var(--text); }
+.budget-line-amount { font-size: 14px; font-weight: 700; color: var(--text); flex-shrink: 0; }
+
+/* Packing */
+.packing-section { margin-bottom: 20px; }
+.packing-section-title {
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; color: var(--text-3); margin-bottom: 8px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--border);
+}
+.packing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+@media (max-width: 400px) { .packing-grid { grid-template-columns: 1fr; } }
+
+.packing-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 10px; border-radius: 8px;
+}
+.pack-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.pack-label { font-size: 13px; color: var(--text); }
+
+/* Download button */
+.download-bar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--card); border-top: 1px solid var(--border);
+  padding: 12px 24px; display: flex; justify-content: center; gap: 12px;
+  z-index: 100; box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+}
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 20px; border-radius: 10px; font-size: 13px;
+  font-weight: 600; cursor: pointer; border: none;
+  transition: all 0.15s; font-family: inherit;
+}
+
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { background: #6d4fe0; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 80px; left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: #0f172a; color: white;
+  padding: 10px 20px; border-radius: 20px;
+  font-size: 13px; font-weight: 600;
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s;
+  opacity: 0; z-index: 1000; white-space: nowrap;
+}
+.toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+/* Empty state */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; min-height: 60vh; color: var(--text-2); text-align: center;
+}
+.empty-title { font-size: 18px; font-weight: 600; color: var(--text); }
+.empty-sub { font-size: 14px; max-width: 320px; line-height: 1.5; }
+/* ]]> */
+    </style>
+    <script>
+      // <![CDATA[
+      function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
+      function renderTrip(data) {
+        const root = document.getElementById("trip-root");
+        document.getElementById("empty-state").style.display = "none";
+        root.style.display = "";
+
+        document.title = data.name || "Trip Plan";
+        document.getElementById("hero-title").textContent = data.name || "Trip Plan";
+        document.getElementById("hero-sub").textContent =
+          [data.destination, data.dates, data.adults ? data.adults + " travelers" : ""].filter(Boolean).join(" | ");
+
+        const pills = document.getElementById("hero-pills");
+        pills.innerHTML = "";
+        const pillData = [
+          data.dates,
+          data.nights ? data.nights + " nights" : "",
+          data.adults ? data.adults + " travelers" : "",
+          data.budget_total ? "Budget: $" + Number(data.budget_total).toLocaleString() : ""
+        ].filter(Boolean);
+        pillData.forEach(function(t) {
+          var d = document.createElement("div");
+          d.className = "hero-pill";
+          d.textContent = t;
+          pills.appendChild(d);
+        });
+
+        renderOverview(data);
+        renderFlights(data);
+        renderHotels(data);
+        renderItinerary(data);
+        renderBudget(data);
+        renderPacking(data);
+        switchTab("overview");
+        document.getElementById("download-bar").style.display = "";
+      }
+
+      function tile(value, label) {
+        return '<div class="info-tile"><div class="info-tile-value">' + esc(value) + '</div><div class="info-tile-label">' + esc(label) + '</div></div>';
+      }
+
+      function renderOverview(data) {
+        var c = document.getElementById("overview-content");
+        var h = "";
+
+        // Weather widget
+        if (data.weather && data.weather.condition) {
+          h += '<div class="weather-widget">';
+          h += '<div class="weather-icon-large">' + weatherEmoji(data.weather.condition) + '</div>';
+          h += '<div><div class="weather-condition-text">' + esc(data.weather.condition) + '</div>';
+          var temps = [];
+          if (data.weather.temp_high != null) temps.push("H: " + data.weather.temp_high);
+          if (data.weather.temp_low != null) temps.push("L: " + data.weather.temp_low);
+          if (temps.length) h += '<div class="weather-temps-text">' + esc(temps.join("  ")) + '</div>';
+          if (data.weather.season_note) h += '<div class="weather-season-note">' + esc(data.weather.season_note) + '</div>';
+          h += '</div></div>';
+        }
+
+        // Info grid
+        h += '<div class="info-grid">';
+        h += tile(data.destination || "--", "Destination");
+        h += tile(data.nights ? data.nights + " nights" : "--", "Duration");
+        h += tile(data.adults ? String(data.adults) : "--", "Travelers");
+        h += '</div>';
+
+        // Alerts
+        var alerts = data.alerts || [];
+        for (var i = 0; i < alerts.length; i++) {
+          h += '<div class="alert-card"><div class="alert-icon">i</div><div><div class="alert-title">' +
+            esc(alerts[i].type || "Info") + '</div><div class="alert-text">' + esc(alerts[i].text) + '</div></div></div>';
+        }
+
+        // Sources
+        var sources = data.source_urls || [];
+        if (sources.length) {
+          h += '<div class="card"><div class="card-header"><div class="card-title">Sources</div></div><div class="card-body">';
+          for (var j = 0; j < sources.length; j++) {
+            h += '<a class="source-link" href="' + esc(sources[j]) + '" target="_blank">' + esc(sources[j]) + '</a>';
+          }
+          h += '</div></div>';
+        }
+
+        c.innerHTML = h;
+      }
+
+      function renderFlights(data) {
+        var c = document.getElementById("flights-content");
+        var flights = data.flights || [];
+        if (!flights.length) {
+          c.innerHTML = '<div class="empty-cta"><div class="empty-cta-title">No flight details found</div>' +
+            '<div>Add flight information to your plan by telling the assistant about your flights.</div></div>';
+          var btn = document.createElement("button");
+          btn.className = "empty-cta-btn";
+          btn.textContent = "+ Add flight details";
+          c.querySelector(".empty-cta").appendChild(btn);
+          return;
+        }
+        var h = '';
+        for (var i = 0; i < flights.length; i++) {
+          var f = flights[i];
+          var statusClass = (f.status || "").toLowerCase();
+          h += '<div class="flight-card-fp">';
+          h += '<div class="flight-header-fp"><span class="flight-airline-fp">' + esc(f.airline || "Airline") + '</span>';
+          h += '<span class="flight-number-fp">' + esc(f.flight_number || "") + '</span>';
+          if (f.status) h += '<span class="flight-status-fp status-' + esc(statusClass) + '-fp">' + esc(f.status) + '</span>';
+          h += '</div>';
+          h += '<div class="flight-route-fp">';
+          h += '<div class="flight-ep"><div class="flight-ep-city">' + esc(f.departure || "") + '</div>';
+          h += '<div class="flight-ep-time">' + esc(f.departure_time || "") + '</div></div>';
+          h += '<div class="flight-arrow-fp">&#8594;</div>';
+          h += '<div class="flight-ep"><div class="flight-ep-city">' + esc(f.arrival || "") + '</div>';
+          h += '<div class="flight-ep-time">' + esc(f.arrival_time || "") + '</div></div>';
+          h += '</div>';
+          if (f.price) h += '<div class="flight-price-fp">$' + esc(String(f.price)) + '</div>';
+          h += '</div>';
+        }
+        c.innerHTML = h;
+      }
+
+      function renderHotels(data) {
+        var c = document.getElementById("hotels-content");
+        var hotels = data.hotels || [];
+        if (!hotels.length) {
+          c.innerHTML = '<div class="empty-cta"><div class="empty-cta-title">No hotel details found</div>' +
+            '<div>Add accommodation information by telling the assistant about your hotel booking.</div></div>';
+          var btn = document.createElement("button");
+          btn.className = "empty-cta-btn";
+          btn.textContent = "+ Add hotel details";
+          c.querySelector(".empty-cta").appendChild(btn);
+          return;
+        }
+        var h = '';
+        for (var i = 0; i < hotels.length; i++) {
+          var ht = hotels[i];
+          h += '<div class="hotel-card-fp"><div class="hotel-card-header-fp"><span class="hotel-label-fp">Accommodation</span>';
+          if (ht.rating) h += '<span style="font-size:12px;font-weight:700;color:var(--accent);">' + esc(ht.rating) + '</span>';
+          h += '</div><div class="hotel-body-fp">';
+          h += '<div class="hotel-main-fp">' + esc(ht.name) + '</div>';
+          var details = [];
+          if (ht.check_in) details.push("Check-in: " + ht.check_in);
+          if (ht.check_out) details.push("Check-out: " + ht.check_out);
+          if (ht.address) details.push(ht.address);
+          if (details.length) h += '<div class="hotel-detail-fp">' + esc(details.join(" | ")) + '</div>';
+          var priceStr = [];
+          if (ht.price_per_night) priceStr.push("$" + ht.price_per_night + "/night");
+          if (ht.total_price) priceStr.push("$" + ht.total_price + " total");
+          if (priceStr.length) h += '<div class="hotel-price-fp">' + esc(priceStr.join(" - ")) + '</div>';
+          h += '</div></div>';
+        }
+        c.innerHTML = h;
+      }
+
+      function renderItinerary(data) {
+        var c = document.getElementById("itinerary-content");
+        var days = data.itinerary || [];
+        if (!days.length) { c.innerHTML = '<div style="text-align:center;color:var(--text-3);padding:40px;">No itinerary data.</div>'; return; }
+        var totalActs = days.reduce(function(s, d) { return s + (d.activities || []).length; }, 0);
+        var h = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">';
+        h += '<div><div style="font-size:15px;font-weight:700;">' + days.length + '-Day Itinerary</div>';
+        h += '<div style="font-size:12px;color:var(--text-3);">Expand each day to see activities</div></div>';
+        h += '<div style="font-size:12px;color:var(--text-3);background:var(--card);border:1px solid var(--border);border-radius:20px;padding:5px 12px;">';
+        h += totalActs + ' activities</div></div>';
+
+        days.forEach(function(day, idx) {
+          h += '<div class="day-card' + (idx === 0 ? ' open' : '') + '" id="day-' + day.day + '">';
+          h += '<div class="day-header">';
+          h += '<div class="day-num"><span>' + day.day + '</span><span class="day-num-label">DAY</span></div>';
+          h += '<div class="day-info"><div class="day-title-fp">' + esc(day.title || "Day " + day.day) + '</div></div>';
+          h += '<div class="day-count">' + (day.activities || []).length + ' activities</div>';
+          h += '<div class="day-toggle">\u25BE</div></div>';
+          h += '<div class="day-body">';
+          (day.activities || []).forEach(function(act) {
+            h += '<div class="activity-item"><div class="activity-time-fp">' + esc(act.time || "") + '</div>';
+            h += '<div class="activity-content"><div class="activity-text-fp">' + esc(act.text || "") + '</div>';
+            if (act.note) h += '<div class="activity-note-fp">' + esc(act.note) + '</div>';
+            h += '</div></div>';
+          });
+          h += '</div></div>';
+        });
+        c.innerHTML = h;
+        c.querySelectorAll(".day-header").forEach(function(hdr) {
+          hdr.addEventListener("click", function() {
+            hdr.parentElement.classList.toggle("open");
+          });
+        });
+      }
+
+      function renderBudget(data) {
+        var c = document.getElementById("budget-content");
+        var total = data.budget_estimated || 0;
+        var limit = data.budget_total || 0;
+        var bookings = data.bookings || [];
+        var h = "";
+
+        if (limit > 0 || total > 0) {
+          var pct = limit ? Math.min(100, Math.round(total / limit * 100)) : 100;
+          var rem = limit - total;
+          var over = rem < 0;
+          h += '<div class="budget-hero">';
+          h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;"><div>';
+          h += '<div style="font-size:13px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Total Estimated Cost</div>';
+          h += '<div style="font-size:32px;font-weight:800;color:var(--text);margin-top:2px;">$' + total.toLocaleString() + '</div>';
+          if (limit) h += '<div style="font-size:13px;color:var(' + (over ? '--orange' : '--green') + ');font-weight:600;margin-top:2px;">' +
+            (over ? '$' + Math.abs(rem).toLocaleString() + ' over budget' : '$' + rem.toLocaleString() + ' under budget') + '</div>';
+          h += '</div>';
+          if (limit) h += '<div style="text-align:right;"><div style="font-size:12px;color:var(--text-3);">Your budget</div><div style="font-size:20px;font-weight:700;">$' + limit.toLocaleString() + '</div></div>';
+          h += '</div><div class="budget-bar-track"><div class="budget-bar-fill' + (over ? ' over' : '') + '" style="width:' + pct + '%"></div></div></div>';
+        }
+
+        if (bookings.length) {
+          h += '<div class="card"><div class="card-header"><div class="card-title">Breakdown</div></div><div class="card-body" style="padding:8px 0;">';
+          for (var i = 0; i < bookings.length; i++) {
+            h += '<div class="budget-line"><div class="budget-line-label">' + esc(bookings[i].name) + '</div>';
+            h += '<div class="budget-line-amount">$' + (bookings[i].price || 0).toLocaleString() + '</div></div>';
+          }
+          h += '</div></div>';
+        }
+        c.innerHTML = h;
+      }
+
+      function renderPacking(data) {
+        var c = document.getElementById("packing-content");
+        var packing = data.packing || {};
+        var cats = Object.entries(packing);
+        if (!cats.length) { c.innerHTML = '<div style="text-align:center;color:var(--text-3);padding:40px;">No packing list in this plan.</div>'; return; }
+        var totalItems = cats.reduce(function(s, e) { return s + (e[1] || []).length; }, 0);
+        var h = '<div style="font-size:15px;font-weight:700;margin-bottom:4px;">Packing List</div>';
+        h += '<div style="font-size:12px;color:var(--text-3);margin-bottom:20px;">' + totalItems + ' items</div>';
+
+        for (var i = 0; i < cats.length; i++) {
+          h += '<div class="packing-section"><div class="packing-section-title">' + esc(cats[i][0]) + '</div><div class="packing-grid">';
+          var items = cats[i][1] || [];
+          for (var j = 0; j < items.length; j++) {
+            var name = typeof items[j] === "string" ? items[j] : (items[j].name || "");
+            h += '<div class="packing-item"><div class="pack-dot"></div><div class="pack-label">' + esc(name) + '</div></div>';
+          }
+          h += '</div></div>';
+        }
+        c.innerHTML = h;
+      }
+
+      function switchTab(name) {
+        document.querySelectorAll(".tab-panel").forEach(function(p) { p.classList.remove("active"); });
+        document.querySelectorAll(".tab-btn").forEach(function(b) { b.classList.remove("active"); });
+        var panel = document.getElementById("tab-" + name);
+        if (panel) panel.classList.add("active");
+        var btn = document.querySelector('[data-tab="' + name + '"]');
+        if (btn) btn.classList.add("active");
+      }
+
+      function weatherEmoji(condition) {
+        if (!condition) return "\ud83c\udf24\ufe0f";
+        var c = condition.toLowerCase();
+        if (c.includes("sun") || c.includes("clear")) return "\u2600\ufe0f";
+        if (c.includes("cloud") && c.includes("part")) return "\u26c5";
+        if (c.includes("cloud") || c.includes("overcast")) return "\u2601\ufe0f";
+        if (c.includes("rain") || c.includes("shower")) return "\ud83c\udf27\ufe0f";
+        if (c.includes("snow")) return "\u2744\ufe0f";
+        if (c.includes("storm") || c.includes("thunder")) return "\u26c8\ufe0f";
+        if (c.includes("fog") || c.includes("mist")) return "\ud83c\udf2b\ufe0f";
+        return "\ud83c\udf24\ufe0f";
+      }
+
+      function downloadHtml() {
+        var root = document.getElementById("trip-root");
+        var clone = root.cloneNode(true);
+        clone.querySelectorAll(".download-bar, #download-bar").forEach(function(el) { el.remove(); });
+        var styles = document.querySelector("style").textContent;
+        var scripts = "function switchTab(n){document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active')});document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active')});var p=document.getElementById('tab-'+n);if(p)p.classList.add('active');var b=document.querySelector('[data-tab=\"'+n+'\"]');if(b)b.classList.add('active');}document.querySelectorAll('.tab-btn').forEach(function(b){b.addEventListener('click',function(){switchTab(b.dataset.tab)})});document.querySelectorAll('.day-header').forEach(function(h){h.addEventListener('click',function(){h.parentElement.classList.toggle('open')})});";
+        var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">' +
+          '<title>' + esc(document.title) + '</title><style>' + styles + '</style></head><body>' +
+          clone.innerHTML + '<script>' + scripts + '<\/script></body></html>';
+        var blob = new Blob([html], { type: "text/html" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = (document.title || "trip-plan").replace(/[^a-zA-Z0-9\s-]/g, "").replace(/\s+/g, "-").toLowerCase() + ".html";
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast("Downloaded!");
+      }
+
+      var toastTimer;
+      function showToast(msg) {
+        var t = document.getElementById("toast");
+        t.textContent = msg; t.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function() { t.classList.remove("show"); }, 2200);
+      }
+
+      function loadTripPlan() {
+        try {
+          var raw = Services.prefs.getStringPref("browser.smartwindow.tripPlanData", "");
+          if (!raw) {
+            document.title = "Trip Plan (no data)";
+            return;
+          }
+          var data = JSON.parse(raw);
+          renderTrip(data);
+        } catch (e) {
+          document.title = "ERROR: " + e.message;
+          console.error("Failed to load trip plan:", e);
+        }
+      }
+
+      var obs = { observe: function() { loadTripPlan(); } };
+
+      window.addEventListener("DOMContentLoaded", function() {
+        Services.obs.addObserver(obs, "trip-plan-data-updated");
+        document.querySelectorAll(".tab-btn").forEach(function(b) {
+          b.addEventListener("click", function() { switchTab(b.dataset.tab); });
+        });
+        document.getElementById("download-btn").addEventListener("click", downloadHtml);
+        loadTripPlan();
+      });
+
+      window.addEventListener("unload", function() {
+        Services.obs.removeObserver(obs, "trip-plan-data-updated");
+      });
+      // ]]>
+    </script>
+  </head>
+  <body>
+    <div id="empty-state" class="empty-state">
+      <div class="empty-title">Trip plan will appear here</div>
+      <div class="empty-sub">Ask the assistant in Smart Window to plan a trip and the itinerary will render here.</div>
+    </div>
+
+    <div id="trip-root" style="display: none">
+      <div class="hero">
+        <div class="trip-badge">Smart Window Travel Planner</div>
+        <h1 id="hero-title"></h1>
+        <p class="hero-sub" id="hero-sub"></p>
+        <div class="hero-pills" id="hero-pills"></div>
+      </div>
+      <div class="container">
+        <div class="tabs-nav">
+          <button class="tab-btn active" data-tab="overview">Overview</button>
+          <button class="tab-btn" data-tab="flights">Flights</button>
+          <button class="tab-btn" data-tab="hotels">Hotels</button>
+          <button class="tab-btn" data-tab="itinerary">Itinerary</button>
+          <button class="tab-btn" data-tab="budget">Budget</button>
+          <button class="tab-btn" data-tab="packing">Packing</button>
+        </div>
+        <div id="tab-overview" class="tab-panel active"><div id="overview-content"></div></div>
+        <div id="tab-flights" class="tab-panel"><div id="flights-content"></div></div>
+        <div id="tab-hotels" class="tab-panel"><div id="hotels-content"></div></div>
+        <div id="tab-itinerary" class="tab-panel"><div id="itinerary-content"></div></div>
+        <div id="tab-budget" class="tab-panel"><div id="budget-content"></div></div>
+        <div id="tab-packing" class="tab-panel"><div id="packing-content"></div></div>
+      </div>
+    </div>
+
+    <div id="download-bar" class="download-bar" style="display: none">
+      <button class="btn btn-primary" id="download-btn">Download Trip Plan</button>
+    </div>
+    <div class="toast" id="toast"></div>
+  </body>
+</html>

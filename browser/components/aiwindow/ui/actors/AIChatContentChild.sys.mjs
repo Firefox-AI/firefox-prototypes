@@ -118,6 +118,43 @@ export class AIChatContentChild extends JSWindowActorChild {
   }
 
   async receiveMessage(message) {
+    if (message.name === "AIChatContent:TrustedUrlsUpdated") {
+      this.#handleTrustedUrlsUpdated(message.data);
+      return undefined;
+    }
+
+    if (message.name === "AIChatContent:TripData") {
+      this.#dispatchToChatContent(
+        "aiChatContentActor:tripData",
+        message.data
+      );
+      return undefined;
+    }
+
+    if (message.name === "AIChatContent:TripPlanV1") {
+      this.#dispatchToChatContent(
+        "aiChatContentActor:tripPlanV1",
+        message.data
+      );
+      return undefined;
+    }
+
+    if (message.name === "AIChatContent:TabScopeProposal") {
+      this.#dispatchToChatContent(
+        "aiChatContentActor:tabScopeProposal",
+        message.data
+      );
+      return undefined;
+    }
+
+    if (message.name === "AIChatContent:TripMutation") {
+      this.#dispatchToChatContent(
+        "aiChatContentActor:tripMutation",
+        message.data
+      );
+      return undefined;
+    }
+
     const mapping =
       AIChatContentChild.#EVENT_MAPPINGS_FROM_PARENT[message.name];
 

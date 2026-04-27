@@ -91,6 +91,12 @@ export const GET_PAGE_CONTENT = "get_page_content";
 export const RUN_SEARCH = "run_search";
 export const GET_USER_MEMORIES = "get_user_memories";
 export const GET_NAVIGATION_INFO = "get_navigation_info";
+export const GENERATE_TRAVEL_PLAN = "generate_travel_plan";
+// Trip Planner v1 tools.
+export const PLAN_TRIP = "plan_trip";
+export const PROPOSE_TAB_SCOPE = "propose_tab_scope";
+export const MUTATE_TRIP = "mutate_trip";
+export const OPEN_SEARCH_SPLIT_VIEW = "open_search_split_view";
 
 export const TOOLS = [
   GET_OPEN_TABS,
@@ -99,6 +105,11 @@ export const TOOLS = [
   RUN_SEARCH,
   GET_USER_MEMORIES,
   GET_NAVIGATION_INFO,
+  GENERATE_TRAVEL_PLAN,
+  PLAN_TRIP,
+  PROPOSE_TAB_SCOPE,
+  MUTATE_TRIP,
+  OPEN_SEARCH_SPLIT_VIEW,
 ];
 
 export const RUN_SEARCH_VERBATIM_QUERY_DESCRIPTION =
@@ -245,6 +256,130 @@ export const toolsConfig = [
       parameters: {
         type: "object",
         properties: {},
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: GENERATE_TRAVEL_PLAN,
+      description:
+        "Generate a self-contained interactive HTML travel plan and open it in a new tab. " +
+        "IMPORTANT: Call this tool AUTOMATICALLY as soon as you have enough information to build " +
+        "an itinerary (at minimum: destination and duration). Do NOT ask the user for permission " +
+        "before calling this tool — just call it. First use get_open_tabs and search_browsing_history " +
+        "to find travel-related pages, extract details with get_page_content, then call this tool " +
+        "with a complete plan. The plan parameter must be a JSON string.",
+      parameters: {
+        type: "object",
+        properties: {
+          plan: {
+            type: "string",
+            description:
+              'A JSON string containing the travel plan data with fields: ' +
+              'name (string), destination (string), dates (string), nights (number), ' +
+              'adults (number), budget_total (number), budget_estimated (number), ' +
+              'preferences (array of strings), bookings (array of {name, detail, price, status}), ' +
+              'itinerary (array of {day, title, activities: [{time, text, note}]}), ' +
+              'packing (object with category keys mapping to arrays of {name, important}), ' +
+              'alerts (array of {type, text}), source_urls (array of strings), ' +
+              'weather ({location, temp_high, temp_low, condition, season_note}), ' +
+              'flights (array of {airline, flight_number, departure, arrival, departure_time, arrival_time, price, status, source_url}), ' +
+              'hotels (array of {name, check_in, check_out, price_per_night, total_price, rating, address, source_url}).',
+          },
+        },
+        required: ["plan"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: PLAN_TRIP,
+      description:
+        "Trip Planner v1: produce a structured TripPlan and render it as an interactive itinerary " +
+        "artifact in the chat. Empty hotel/flight slots are intentional — do NOT fabricate hotel " +
+        "names, flight numbers, or prices. Slots fill only via open_search_split_view (user picks) " +
+        "or mutate_trip (user provided full details inline).",
+      parameters: {
+        type: "object",
+        properties: {
+          destination: { type: "string" },
+          duration_days: { type: "integer", minimum: 1, maximum: 14 },
+          start_date: { type: "string" },
+          interests: { type: "array", items: { type: "string" } },
+          use_tab_context: { type: "boolean" },
+          tab_ids: { type: "array", items: { type: "string" } },
+        },
+        required: ["destination", "duration_days"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: PROPOSE_TAB_SCOPE,
+      description:
+        "Returns currently open Firefox tabs whose titles or URLs match the trip destination or a " +
+        "travel-domain allowlist. Surfaces the in-chat permission card. Returns titles and URLs only.",
+      parameters: {
+        type: "object",
+        properties: {
+          destination: { type: "string" },
+          start_date: { type: "string" },
+          duration_days: { type: "integer" },
+        },
+        required: ["destination"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: MUTATE_TRIP,
+      description:
+        "Apply a targeted slot mutation to the active trip. Use replace_flight / replace_hotel " +
+        "directly when the user provides full inline details. Otherwise call open_search_split_view " +
+        "first. Never invent missing fields.",
+      parameters: {
+        type: "object",
+        properties: {
+          trip_id: { type: "string" },
+          mutation_type: {
+            type: "string",
+            enum: [
+              "swap_activity",
+              "replace_hotel",
+              "replace_flight",
+              "clear_hotel",
+              "clear_flight",
+              "reorder_days",
+              "change_duration",
+            ],
+          },
+          payload: { type: "object" },
+        },
+        required: ["trip_id", "mutation_type", "payload"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: OPEN_SEARCH_SPLIT_VIEW,
+      description:
+        "Open a side-by-side stubbed search view (hotel or flight) pre-filtered to trip dates. " +
+        "Returns 5 sample results labeled 'Sample results - real search coming in v1.1'. Use when " +
+        "user wants to add a slot but did not provide full details inline.",
+      parameters: {
+        type: "object",
+        properties: {
+          slot_type: { type: "string", enum: ["hotel", "flight"] },
+          destination: { type: "string" },
+          dates: { type: "object" },
+          trip_id: { type: "string" },
+        },
+        required: ["slot_type", "destination", "trip_id"],
       },
     },
   },
@@ -848,9 +983,788 @@ export async function getUserMemories(conversation) {
   return result;
 }
 
+/**
+ * Generates a travel plan, stores the data for the full-page HTML view,
+ * opens the trip plan page in a new tab, and returns the plan data for
+ * the sidebar artifact.
+ *
+ * @param {object} toolParams
+ * @param {string} toolParams.plan - JSON string of the travel plan data
+ * @param {SecurityProperties} securityProperties
+ * @param {object} context
+ * @returns {Promise<object>}
+ */
+export async function generateTravelPlan(toolParams, securityProperties, context) {
+  let planData;
+  try {
+    planData = typeof toolParams.plan === "string"
+      ? JSON.parse(toolParams.plan)
+      : toolParams.plan;
+  } catch {
+    return { error: "Invalid JSON in plan parameter" };
+  }
+
+  if (!planData.destination) {
+    return { error: "Destination is required" };
+  }
+
+  // Store the plan data in a pref for the full-page HTML to read
+  try {
+    Services.prefs.setStringPref(
+      "browser.smartwindow.tripPlanData",
+      JSON.stringify(planData)
+    );
+    Services.obs.notifyObservers(null, "trip-plan-data-updated");
+  } catch (e) {
+    lazy.console.error("[Tool] generateTravelPlan pref error:", e);
+  }
+
+  // Open the trip plan page in split view with the user's content tab
+  try {
+    const win = lazy.BrowserWindowTracker.getTopWindow();
+    if (win?.gBrowser) {
+      // Find the user's actual content tab (http/https), not an internal page
+      let contentTab = null;
+      const selected = win.gBrowser.selectedTab;
+      const selectedUrl = selected.linkedBrowser?.currentURI?.spec || "";
+      if (
+        selectedUrl.startsWith("http://") ||
+        selectedUrl.startsWith("https://")
+      ) {
+        contentTab = selected;
+      } else {
+        // Fall back to the most recent tab with a web URL
+        const tabs = [...win.gBrowser.tabs].reverse();
+        for (const tab of tabs) {
+          const url = tab.linkedBrowser?.currentURI?.spec || "";
+          if (url.startsWith("http://") || url.startsWith("https://")) {
+            contentTab = tab;
+            break;
+          }
+        }
+      }
+
+      const planTab = win.gBrowser.addTab(
+        "chrome://browser/content/aiwindow/tripPlan.html",
+        {
+          triggeringPrincipal:
+            Services.scriptSecurityManager.getSystemPrincipal(),
+          inBackground: true,
+        }
+      );
+
+      if (contentTab) {
+        // If content tab is already in a split view, unsplit first
+        if (contentTab.splitView) {
+          contentTab.splitView.unsplitTabs();
+        }
+        // Create split view: user's page on the left, plan on the right
+        win.gBrowser.addTabSplitView([contentTab, planTab]);
+      } else {
+        // No web content tab found — just select the plan tab
+        win.gBrowser.selectedTab = planTab;
+      }
+    }
+  } catch (e) {
+    lazy.console.error("[Tool] generateTravelPlan tab open error:", e);
+  }
+
+  securityProperties.setPrivateData();
+  lazy.console.log("[Tool] generateTravelPlan", planData);
+  return planData;
+}
+
+// ---------------------------------------------------------------------------
+// Trip Planner v1 — see _prototype/2026-04-26-trip-planner/spec.md
+// ---------------------------------------------------------------------------
+
+const TRAVEL_DOMAIN_ALLOWLIST = [
+  "booking.com",
+  "airbnb.com",
+  "kayak.com",
+  "google.com/flights",
+  "google.com/travel",
+  "expedia.com",
+  "tripadvisor.com",
+  "maps.google.com",
+  "weather.com",
+];
+
+const SF_HOTEL_STUBS = [
+  {
+    id: "hotel-zephyr",
+    name: "Hotel Zephyr",
+    rating: 4.2,
+    price: "$189",
+    priceNight: 189,
+    amenities: ["Wharf", "Pet-friendly", "Bay view"],
+    source_url: "https://www.google.com/search?q=Hotel+Zephyr+San+Francisco",
+  },
+  {
+    id: "hotel-vitale",
+    name: "Hotel Vitale",
+    rating: 4.5,
+    price: "$245",
+    priceNight: 245,
+    amenities: ["Embarcadero", "Spa", "Skyline view"],
+    source_url: "https://www.google.com/search?q=Hotel+Vitale+San+Francisco",
+  },
+  {
+    id: "kimpton-buchanan",
+    name: "Kimpton Buchanan",
+    rating: 4.3,
+    price: "$172",
+    priceNight: 172,
+    amenities: ["Japantown", "Free Wi-Fi", "Bike rentals"],
+    source_url:
+      "https://www.google.com/search?q=Kimpton+Buchanan+San+Francisco",
+  },
+  {
+    id: "hotel-via",
+    name: "Hotel Via",
+    rating: 4.4,
+    price: "$219",
+    priceNight: 219,
+    amenities: ["South Beach", "Rooftop bar", "Steps from ballpark"],
+    source_url: "https://www.google.com/search?q=Hotel+Via+San+Francisco",
+  },
+  {
+    id: "stanford-court",
+    name: "Stanford Court",
+    rating: 4.0,
+    price: "$159",
+    priceNight: 159,
+    amenities: ["Nob Hill", "Cable car stop", "Quiet"],
+    source_url: "https://www.google.com/search?q=Stanford+Court+San+Francisco",
+  },
+];
+
+const SF_FLIGHT_STUBS = [
+  {
+    id: "ua-230",
+    carrier: "United",
+    flight_no: "UA 230",
+    depart: "JFK 06:30",
+    arrive: "SFO 09:45",
+    price: "$340",
+    notes: "Nonstop, 6h 15m",
+    source_url: "https://www.google.com/flights",
+  },
+  {
+    id: "aa-178",
+    carrier: "American",
+    flight_no: "AA 178",
+    depart: "JFK 08:00",
+    arrive: "SFO 11:25",
+    price: "$312",
+    notes: "Nonstop, 6h 25m",
+    source_url: "https://www.google.com/flights",
+  },
+  {
+    id: "dl-415",
+    carrier: "Delta",
+    flight_no: "DL 415",
+    depart: "JFK 09:15",
+    arrive: "SFO 12:38",
+    price: "$365",
+    notes: "Nonstop, 6h 23m",
+    source_url: "https://www.google.com/flights",
+  },
+  {
+    id: "b6-1241",
+    carrier: "JetBlue",
+    flight_no: "B6 1241",
+    depart: "JFK 17:00",
+    arrive: "SFO 20:30",
+    price: "$289",
+    notes: "Nonstop, 6h 30m",
+    source_url: "https://www.google.com/flights",
+  },
+  {
+    id: "as-89",
+    carrier: "Alaska",
+    flight_no: "AS 89",
+    depart: "JFK 12:45",
+    arrive: "SFO 16:12",
+    price: "$321",
+    notes: "Nonstop, 6h 27m",
+    source_url: "https://www.google.com/flights",
+  },
+];
+
+function makeStubTripPlan({
+  destination,
+  duration_days,
+  start_date,
+  use_tab_context,
+  tabs = [],
+}) {
+  const isoStart = (() => {
+    if (start_date) {
+      const d = new Date(start_date);
+      if (!isNaN(d)) {
+        return d;
+      }
+    }
+    const fallback = new Date();
+    fallback.setHours(0, 0, 0, 0);
+    return fallback;
+  })();
+  const days = Math.max(1, Math.min(14, parseInt(duration_days, 10) || 3));
+  const isoEnd = new Date(isoStart);
+  isoEnd.setDate(isoEnd.getDate() + days);
+
+  // SF-flavored stub itinerary if destination matches; otherwise a generic
+  // template. v1 demo seed targets San Francisco.
+  const isSF = /\bs(an\s*f(rancisco)?|f)\b/i.test(destination || "");
+
+  const sfDays = [
+    {
+      day: 1,
+      title: "The Mission",
+      activities: [
+        {
+          id: "d1-a1",
+          time: "09:00",
+          title: "Tartine bakery",
+          location: "Mission District",
+          lat: 37.7614,
+          lng: -122.4241,
+        },
+        {
+          id: "d1-a2",
+          time: "12:00",
+          title: "Mission murals walk",
+          location: "Balmy Alley",
+          lat: 37.7541,
+          lng: -122.4115,
+        },
+        {
+          id: "d1-a3",
+          time: "19:00",
+          title: "Foreign Cinema dinner",
+          location: "Mission District",
+          lat: 37.7559,
+          lng: -122.4196,
+        },
+      ],
+    },
+    {
+      day: 2,
+      title: "Golden Gate",
+      activities: [
+        {
+          id: "d2-a1",
+          time: "10:00",
+          title: "SFMOMA",
+          location: "SoMa",
+          lat: 37.7857,
+          lng: -122.401,
+        },
+        {
+          id: "d2-a2",
+          time: "14:00",
+          title: "Golden Gate Park",
+          location: "Richmond",
+          lat: 37.7694,
+          lng: -122.4862,
+        },
+        {
+          id: "d2-a3",
+          time: "18:00",
+          title: "Cliff House sunset",
+          location: "Outer Richmond",
+          lat: 37.7787,
+          lng: -122.5138,
+        },
+      ],
+    },
+    {
+      day: 3,
+      title: "Wharf & Alcatraz",
+      activities: [
+        {
+          id: "d3-a1",
+          time: "09:30",
+          title: "Alcatraz tour",
+          location: "Pier 33",
+          lat: 37.8267,
+          lng: -122.4233,
+        },
+        {
+          id: "d3-a2",
+          time: "13:00",
+          title: "Fisherman's Wharf",
+          location: "Wharf",
+          lat: 37.808,
+          lng: -122.4177,
+        },
+        {
+          id: "d3-a3",
+          time: "17:00",
+          title: "Pier 39 sea lions",
+          location: "Pier 39",
+          lat: 37.8087,
+          lng: -122.4098,
+        },
+      ],
+    },
+  ];
+
+  const dayTemplates = isSF
+    ? sfDays.slice(0, days)
+    : Array.from({ length: days }, (_, i) => ({
+        day: i + 1,
+        title: `Day ${i + 1}`,
+        activities: [
+          {
+            id: `d${i + 1}-a1`,
+            time: "10:00",
+            title: "Plan this day",
+            location: destination,
+          },
+        ],
+      }));
+  // Pad with empty placeholders if days > template length.
+  while (dayTemplates.length < days) {
+    const i = dayTemplates.length;
+    dayTemplates.push({
+      day: i + 1,
+      title: `Day ${i + 1}`,
+      activities: [],
+    });
+  }
+
+  const weather = dayTemplates.map((_, i) => ({
+    day: i + 1,
+    high_f: 68 + ((i * 3) % 7),
+    low_f: 52 + ((i * 2) % 5),
+    condition: ["sunny", "cloudy", "rain", "partly-cloudy"][i % 4],
+  }));
+
+  const tripId = `trip-${Date.now()}`;
+  return {
+    schema: "TripPlanV1",
+    trip_id: tripId,
+    destination,
+    date_range: {
+      start: isoStart.toISOString().slice(0, 10),
+      end: isoEnd.toISOString().slice(0, 10),
+    },
+    day_count: days,
+    flight_slot: { filled: false, placeholder: "Pick a flight" },
+    hotel_slot: { filled: false, placeholder: "Add a hotel" },
+    weather,
+    days: dayTemplates,
+    map_bbox: { north: 37.835, south: 37.74, east: -122.36, west: -122.52 },
+    grounding: {
+      source: use_tab_context ? "tabs" : "general",
+      tab_count: tabs.length,
+    },
+    tabs: tabs.slice(0, 10).map(t => ({
+      id: t.url || t.id,
+      title: t.title,
+      url: t.url,
+      favicon: t.url ? `page-icon:${t.url}` : null,
+    })),
+  };
+}
+
+/**
+ * propose_tab_scope: returns the matched-tab list for the in-chat permission card.
+ *
+ * @param {object} toolParams
+ * @param {ChatConversation} conversation
+ * @returns {Promise<object>}
+ */
+export async function proposeTabScope(toolParams, conversation) {
+  const params = toolParams && typeof toolParams === "object" ? toolParams : {};
+  const destination = String(params.destination || "").trim();
+  const tabs = await getOpenTabs(conversation);
+
+  const destLower = destination.toLowerCase();
+  const matched = tabs.filter(t => {
+    const title = (t.title || "").toLowerCase();
+    let host = "";
+    try {
+      host = new URL(t.url).hostname.toLowerCase();
+    } catch {}
+    if (destLower && (title.includes(destLower) || host.includes(destLower))) {
+      return true;
+    }
+    if (TRAVEL_DOMAIN_ALLOWLIST.some(d => (host + t.url).includes(d))) {
+      return true;
+    }
+    return false;
+  });
+
+  const result = {
+    schema: "TabScopeV1",
+    matched_tabs: matched.slice(0, 10).map(t => ({
+      id: t.url,
+      title: t.title,
+      url: t.url,
+      favicon: `page-icon:${t.url}`,
+    })),
+    match_count: matched.length,
+    destination,
+  };
+  conversation.securityProperties.setPrivateData();
+  lazy.console.log("[Tool] proposeTabScope", result);
+  return result;
+}
+
+/**
+ * plan_trip: build a structured TripPlan and dispatch the v1 artifact.
+ *
+ * @param {object} toolParams
+ * @param {ChatConversation} conversation
+ * @param {object} context
+ * @returns {Promise<object>}
+ */
+export async function planTrip(toolParams, conversation, context) {
+  const params = toolParams && typeof toolParams === "object" ? toolParams : {};
+  if (!params.destination) {
+    return { error: "Destination is required" };
+  }
+
+  let tabs = [];
+  if (params.use_tab_context) {
+    if (Array.isArray(params.tab_ids) && params.tab_ids.length) {
+      const allTabs = await getOpenTabs(conversation);
+      const ids = new Set(params.tab_ids);
+      tabs = allTabs.filter(t => ids.has(t.url));
+    } else {
+      const proposal = await proposeTabScope({ destination: params.destination }, conversation);
+      tabs = proposal.matched_tabs.map(t => ({ url: t.url, title: t.title }));
+    }
+  }
+
+  const plan = makeStubTripPlan({
+    destination: params.destination,
+    duration_days: params.duration_days,
+    start_date: params.start_date,
+    use_tab_context: !!params.use_tab_context,
+    tabs,
+  });
+
+  conversation.securityProperties.setPrivateData();
+  lazy.console.log("[Tool] planTrip", plan);
+
+  // Stash the live trip on the conversation so mutate_trip / open_search can find it.
+  conversation._tripPlanV1 = plan;
+  return plan;
+}
+
+/**
+ * mutate_trip: apply a slot-targeted diff to the active TripPlan.
+ *
+ * @param {object} toolParams
+ * @param {ChatConversation} conversation
+ * @returns {Promise<object>}
+ */
+export async function mutateTrip(toolParams, conversation) {
+  const params = toolParams && typeof toolParams === "object" ? toolParams : {};
+  const plan = conversation._tripPlanV1;
+  if (!plan) {
+    return { error: "No active trip to mutate." };
+  }
+  if (params.trip_id && params.trip_id !== plan.trip_id) {
+    return { error: "trip_id does not match the active trip." };
+  }
+
+  const diff = [];
+  let mutatedPath = null;
+  const { mutation_type: type, payload = {} } = params;
+
+  switch (type) {
+    case "swap_activity": {
+      const dayIdx = plan.days.findIndex(d => d.day === payload.day);
+      if (dayIdx === -1) {
+        return { error: `Day ${payload.day} not found.` };
+      }
+      const day = plan.days[dayIdx];
+      let actIdx = day.activities.findIndex(a => a.id === payload.activity_id);
+      if (actIdx === -1 && payload.activity_index != null) {
+        actIdx = payload.activity_index;
+      }
+      if (actIdx < 0 || actIdx >= day.activities.length) {
+        return { error: "Activity not found." };
+      }
+      const before = { ...day.activities[actIdx] };
+      day.activities[actIdx] = {
+        ...before,
+        title: payload.new_title || before.title,
+        location: payload.new_location ?? before.location,
+      };
+      diff.push({
+        op: "replace",
+        path: `days[${dayIdx}].activities[${actIdx}]`,
+        value: day.activities[actIdx],
+      });
+      mutatedPath = { kind: "activity", activity_id: day.activities[actIdx].id };
+      break;
+    }
+    case "replace_hotel": {
+      plan.hotel_slot = {
+        filled: true,
+        name: payload.name,
+        price: payload.price,
+        check_in: payload.check_in,
+        check_out: payload.check_out,
+        source_url: payload.source_url,
+      };
+      diff.push({ op: "replace", path: "hotel_slot", value: plan.hotel_slot });
+      mutatedPath = { kind: "hotel" };
+      break;
+    }
+    case "replace_flight": {
+      plan.flight_slot = {
+        filled: true,
+        carrier: payload.carrier,
+        flight_no: payload.flight_no,
+        depart: payload.depart,
+        arrive: payload.arrive,
+        price: payload.price,
+        source_url: payload.source_url,
+      };
+      diff.push({ op: "replace", path: "flight_slot", value: plan.flight_slot });
+      mutatedPath = { kind: "flight" };
+      break;
+    }
+    case "clear_hotel": {
+      plan.hotel_slot = { filled: false, placeholder: "Add a hotel" };
+      diff.push({ op: "replace", path: "hotel_slot", value: plan.hotel_slot });
+      mutatedPath = { kind: "hotel" };
+      break;
+    }
+    case "clear_flight": {
+      plan.flight_slot = { filled: false, placeholder: "Pick a flight" };
+      diff.push({ op: "replace", path: "flight_slot", value: plan.flight_slot });
+      mutatedPath = { kind: "flight" };
+      break;
+    }
+    case "change_duration": {
+      const newDuration = Math.max(
+        1,
+        Math.min(14, parseInt(payload.new_duration, 10) || plan.day_count)
+      );
+      while (plan.days.length < newDuration) {
+        const i = plan.days.length;
+        plan.days.push({
+          day: i + 1,
+          title: `Day ${i + 1}`,
+          activities: [],
+        });
+        plan.weather.push({
+          day: i + 1,
+          high_f: 68,
+          low_f: 54,
+          condition: "partly-cloudy",
+        });
+      }
+      while (plan.days.length > newDuration) {
+        plan.days.pop();
+        plan.weather.pop();
+      }
+      plan.day_count = newDuration;
+      diff.push({ op: "replace", path: "day_count", value: newDuration });
+      mutatedPath = { kind: "duration" };
+      break;
+    }
+    case "reorder_days": {
+      if (!Array.isArray(payload.new_order)) {
+        return { error: "reorder_days requires payload.new_order array." };
+      }
+      const reordered = payload.new_order
+        .map(n => plan.days.find(d => d.day === n))
+        .filter(Boolean);
+      if (reordered.length !== plan.days.length) {
+        return { error: "new_order must list every day exactly once." };
+      }
+      reordered.forEach((d, i) => (d.day = i + 1));
+      plan.days = reordered;
+      diff.push({ op: "replace", path: "days", value: plan.days });
+      mutatedPath = { kind: "days" };
+      break;
+    }
+    default:
+      return { error: `Unknown mutation_type: ${type}` };
+  }
+
+  conversation._tripPlanV1 = plan;
+  conversation.securityProperties.setPrivateData();
+  lazy.console.log("[Tool] mutateTrip", { type, diff });
+  return {
+    diff,
+    updated_trip: plan,
+    mutated_path: mutatedPath,
+    mutation_type: type,
+  };
+}
+
+/**
+ * open_search_split_view: open a sibling chrome page with stubbed search results.
+ *
+ * @param {object} toolParams
+ * @param {ChatConversation} conversation
+ * @returns {Promise<object>}
+ */
+export async function openSearchSplitView(toolParams, conversation) {
+  const params = toolParams && typeof toolParams === "object" ? toolParams : {};
+  const slotType = params.slot_type === "flight" ? "flight" : "hotel";
+  const stubResults = slotType === "hotel" ? SF_HOTEL_STUBS : SF_FLIGHT_STUBS;
+  const splitViewId = `split-${Date.now()}`;
+
+  const payload = {
+    schema: "SampleSearchV1",
+    split_view_id: splitViewId,
+    slot_type: slotType,
+    destination: params.destination,
+    dates: params.dates ?? null,
+    trip_id: params.trip_id,
+    stub_results: stubResults,
+  };
+
+  try {
+    Services.prefs.setStringPref(
+      "browser.smartwindow.tripSampleSearchData",
+      JSON.stringify(payload)
+    );
+    Services.obs.notifyObservers(null, "trip-sample-search-data-updated");
+  } catch (e) {
+    lazy.console.error("[Tool] openSearchSplitView pref error:", e);
+  }
+
+  // Open the sample search page in the top normal window's tab strip in
+  // split-view alongside the user's current content tab. Mirrors the v0
+  // generateTravelPlan pattern.
+  try {
+    const win = lazy.BrowserWindowTracker.getTopWindow();
+    if (win?.gBrowser) {
+      let contentTab = null;
+      const selected = win.gBrowser.selectedTab;
+      const selectedUrl = selected.linkedBrowser?.currentURI?.spec || "";
+      if (
+        selectedUrl.startsWith("http://") ||
+        selectedUrl.startsWith("https://")
+      ) {
+        contentTab = selected;
+      } else {
+        const tabs = [...win.gBrowser.tabs].reverse();
+        for (const tab of tabs) {
+          const url = tab.linkedBrowser?.currentURI?.spec || "";
+          if (url.startsWith("http://") || url.startsWith("https://")) {
+            contentTab = tab;
+            break;
+          }
+        }
+      }
+
+      const searchTab = win.gBrowser.addTab(
+        "chrome://browser/content/aiwindow/sampleSearch.html",
+        {
+          triggeringPrincipal:
+            Services.scriptSecurityManager.getSystemPrincipal(),
+          inBackground: true,
+        }
+      );
+
+      if (contentTab) {
+        if (contentTab.splitView) {
+          contentTab.splitView.unsplitTabs();
+        }
+        win.gBrowser.addTabSplitView([contentTab, searchTab]);
+      } else {
+        win.gBrowser.selectedTab = searchTab;
+      }
+    }
+  } catch (e) {
+    lazy.console.error("[Tool] openSearchSplitView tab open error:", e);
+  }
+
+  conversation.securityProperties.setPrivateData();
+  lazy.console.log("[Tool] openSearchSplitView", payload);
+  return payload;
+}
+
 export const toolFns = {
   getOpenTabs,
   searchBrowsingHistory,
   getUserMemories,
   getNavigationInfo,
+  generateTravelPlan,
+  planTrip,
+  proposeTabScope,
+  mutateTrip,
+  openSearchSplitView,
 };
+
+// Global observer: when sampleSearch.html "Add to trip" fires, route the pick
+// back into the active Smart Window as a follow-up that the LLM will pick up
+// and call mutate_trip on. v1 demo glue.
+let _tripPickObserverRegistered = false;
+function registerTripPickObserver() {
+  if (_tripPickObserverRegistered) {
+    return;
+  }
+  _tripPickObserverRegistered = true;
+  const observer = {
+    observe(_subject, topic) {
+      if (topic !== "trip-sample-search-pick") {
+        return;
+      }
+      let pick = null;
+      try {
+        const raw = Services.prefs.getStringPref(
+          "browser.smartwindow.tripSampleSearchPick",
+          ""
+        );
+        if (!raw) {
+          return;
+        }
+        pick = JSON.parse(raw);
+      } catch (e) {
+        lazy.console.warn("trip pick parse failed", e);
+        return;
+      }
+
+      // Find the Smart Window's chat browser and dispatch a follow-up.
+      try {
+        for (const win of lazy.BrowserWindowTracker.orderedWindows) {
+          if (!lazy.AIWindow.isAIWindowActive(win)) {
+            continue;
+          }
+          const browser = win.document.getElementById?.("aichat-browser");
+          if (!browser) {
+            continue;
+          }
+          const text = pick.slot_type === "flight"
+            ? `Add ${pick.result.carrier} ${pick.result.flight_no} ${pick.result.depart} -> ${pick.result.arrive} for ${pick.result.price} to my trip.`
+            : `Add ${pick.result.name} at ${pick.result.price}/night to my trip.`;
+          const actor =
+            browser?.browsingContext?.currentWindowContext?.getActor?.(
+              "AIChatContent"
+            );
+          actor?.sendAsyncMessage("AIChatContent:DispatchMessage", {
+            content: { body: text, type: "text" },
+            kind: "follow-up",
+          });
+          break;
+        }
+      } catch (e) {
+        lazy.console.warn("trip pick dispatch failed", e);
+      }
+    },
+  };
+  try {
+    Services.obs.addObserver(observer, "trip-sample-search-pick");
+  } catch (e) {
+    lazy.console.warn("trip pick observer registration failed", e);
+  }
+}
+
+// Lazily register the observer on module load.
+try {
+  registerTripPickObserver();
+} catch (_) {}

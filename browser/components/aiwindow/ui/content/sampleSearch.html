@@ -1,0 +1,357 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this file,
+   - You can obtain one at http://mozilla.org/MPL/2.0/. -->
+<!doctype html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src resource: chrome: 'unsafe-inline'; object-src 'none'; img-src chrome: blob: data: page-icon:; script-src 'unsafe-inline' chrome: resource:;"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <title>Trip Planner - Sample Search</title>
+    <link rel="stylesheet" href="chrome://global/skin/in-content/common.css" />
+    <style>
+      :root {
+        --accent: #7c5cfc;
+        --bg: #f8f9fa;
+        --card: #ffffff;
+        --border: #e2e8f0;
+        --text: #0f172a;
+        --text-2: #475569;
+        --text-3: #94a3b8;
+        --radius: 12px;
+        color-scheme: light;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        font-size: 14px;
+        min-height: 100vh;
+      }
+
+      .sample-banner {
+        background: linear-gradient(90deg, #ede9fe, #ddd6fe);
+        color: #4c1d95;
+        padding: 12px 24px;
+        font-size: 13px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-bottom: 1px solid #c4b5fd;
+      }
+
+      .sample-banner-glyph {
+        font-size: 16px;
+      }
+
+      .sample-banner-sub {
+        font-weight: 400;
+        color: #5b21b6;
+      }
+
+      .filter-bar {
+        background: var(--card);
+        padding: 12px 24px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+        font-size: 13px;
+      }
+
+      .filter-chip {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 4px 12px;
+        color: var(--text-2);
+      }
+
+      .filter-chip strong {
+        color: var(--text);
+      }
+
+      .results {
+        padding: 16px 24px 64px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-width: 720px;
+      }
+
+      .results h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+
+      .result-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 14px 16px;
+        display: grid;
+        grid-template-columns: 96px 1fr auto;
+        gap: 14px;
+        align-items: center;
+      }
+
+      .result-photo {
+        width: 96px;
+        height: 96px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #ede9fe, #c4b5fd);
+        display: grid;
+        place-items: center;
+        font-size: 32px;
+        position: relative;
+      }
+
+      .result-photo::after {
+        content: 'SAMPLE';
+        position: absolute;
+        bottom: 6px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        background: rgba(76, 29, 149, 0.85);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+
+      .result-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+      }
+
+      .result-name {
+        font-weight: 600;
+        font-size: 15px;
+      }
+
+      .result-rating {
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .result-price {
+        font-size: 13px;
+        color: var(--text-2);
+      }
+
+      .result-amenities {
+        font-size: 12px;
+        color: var(--text-3);
+      }
+
+      .add-btn {
+        background: var(--accent);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 8px 14px;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      .add-btn:hover {
+        filter: brightness(0.95);
+      }
+
+      .add-btn[data-state="added"] {
+        background: #10b981;
+        cursor: default;
+      }
+
+      .empty {
+        padding: 48px 24px;
+        color: var(--text-3);
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sample-banner">
+      <span class="sample-banner-glyph" aria-hidden="true">ⓘ</span>
+      <span>Sample results · v1.1 will integrate live search</span>
+      <span class="sample-banner-sub" id="sample-context"></span>
+    </div>
+    <div class="filter-bar" id="filter-bar"></div>
+    <div class="results" id="results">
+      <div class="empty" id="empty-state">Loading sample results...</div>
+    </div>
+    <script>
+      /* eslint-disable */
+      (function () {
+        function readPref() {
+          try {
+            const raw = Services.prefs.getStringPref(
+              "browser.smartwindow.tripSampleSearchData",
+              ""
+            );
+            return raw ? JSON.parse(raw) : null;
+          } catch (e) {
+            return null;
+          }
+        }
+
+        function render(data) {
+          const ctx = document.getElementById("sample-context");
+          const filter = document.getElementById("filter-bar");
+          const list = document.getElementById("results");
+          const empty = document.getElementById("empty-state");
+
+          if (!data) {
+            empty.textContent =
+              "No search context yet. Open a trip in Smart Window first.";
+            return;
+          }
+
+          const slot = data.slot_type === "flight" ? "Flights" : "Hotels";
+          ctx.textContent = "· " + slot + " in " + (data.destination || "");
+
+          const dates = data.dates || {};
+          const datesStr = data.slot_type === "flight"
+            ? (dates.depart || "") + (dates.return ? " - " + dates.return : "")
+            : (dates.check_in || "") + (dates.check_out ? " - " + dates.check_out : "");
+
+          filter.innerHTML =
+            '<span class="filter-chip"><strong>' +
+            slot +
+            "</strong> in " +
+            (data.destination || "") +
+            "</span>" +
+            (datesStr
+              ? '<span class="filter-chip">' + datesStr + "</span>"
+              : "");
+
+          const results = data.stub_results || [];
+          if (!results.length) {
+            empty.textContent = "No sample results.";
+            return;
+          }
+          empty.remove();
+
+          for (const r of results) {
+            const card = document.createElement("div");
+            card.className = "result-card";
+
+            const photo = document.createElement("div");
+            photo.className = "result-photo";
+            photo.textContent = data.slot_type === "flight" ? "✈" : "🏨";
+            card.appendChild(photo);
+
+            const info = document.createElement("div");
+            info.className = "result-info";
+
+            const name = document.createElement("div");
+            name.className = "result-name";
+            name.textContent = data.slot_type === "flight"
+              ? r.carrier + " " + r.flight_no
+              : r.name;
+            info.appendChild(name);
+
+            if (r.rating) {
+              const rating = document.createElement("div");
+              rating.className = "result-rating";
+              rating.textContent = "★".repeat(Math.round(r.rating)) + " · " + r.rating;
+              info.appendChild(rating);
+            }
+
+            const price = document.createElement("div");
+            price.className = "result-price";
+            price.textContent = data.slot_type === "flight"
+              ? r.price + " · " + (r.notes || "")
+              : r.price + " / night";
+            info.appendChild(price);
+
+            const ameneties = document.createElement("div");
+            ameneties.className = "result-amenities";
+            ameneties.textContent = data.slot_type === "flight"
+              ? r.depart + " → " + r.arrive
+              : (r.amenities || []).join(" · ");
+            info.appendChild(ameneties);
+
+            card.appendChild(info);
+
+            const btn = document.createElement("button");
+            btn.className = "add-btn";
+            btn.textContent = "Add to trip";
+            btn.addEventListener("click", function () {
+              addToTrip(data, r, btn);
+            });
+            card.appendChild(btn);
+
+            list.appendChild(card);
+          }
+        }
+
+        function addToTrip(data, result, btn) {
+          try {
+            const pick = {
+              slot_type: data.slot_type,
+              trip_id: data.trip_id,
+              result,
+            };
+            Services.prefs.setStringPref(
+              "browser.smartwindow.tripSampleSearchPick",
+              JSON.stringify(pick)
+            );
+            Services.obs.notifyObservers(null, "trip-sample-search-pick");
+            btn.textContent = "Added ✓";
+            btn.dataset.state = "added";
+            btn.disabled = true;
+          } catch (e) {
+            console.error("addToTrip failed", e);
+          }
+        }
+
+        let observer = null;
+        function attachObserver() {
+          observer = function (subject, topic) {
+            if (topic === "trip-sample-search-data-updated") {
+              location.reload();
+            }
+          };
+          Services.obs.addObserver(observer, "trip-sample-search-data-updated");
+          window.addEventListener("unload", function () {
+            try {
+              Services.obs.removeObserver(
+                observer,
+                "trip-sample-search-data-updated"
+              );
+            } catch (e) {}
+          });
+        }
+
+        function init() {
+          try {
+            attachObserver();
+          } catch (e) {}
+          render(readPref());
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", init);
+        } else {
+          init();
+        }
+      })();
+    </script>
+  </body>
+</html>

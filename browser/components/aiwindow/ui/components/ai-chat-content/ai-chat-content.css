@@ -91,3 +91,36 @@
   gap: var(--space-small);
   width: 100%;
 }
+
+.travel-cta-container {
+  display: flex;
+  justify-content: center;
+  padding-block: var(--space-medium);
+  padding-inline: var(--space-xlarge);
+}
+
+.travel-cta-btn {
+  appearance: none;
+  border: none;
+  border-radius: var(--border-radius-medium);
+  background: linear-gradient(135deg, #7c5cfc, #a78bfa);
+  color: white;
+  cursor: pointer;
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-bold);
+  padding: 10px 24px;
+  transition: opacity 0.15s, transform 0.15s;
+  width: 100%;
+  max-width: 280px;
+  text-align: center;
+}
+
+.travel-cta-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.travel-cta-btn:active {
+  opacity: 0.8;
+  transform: translateY(0);
+}

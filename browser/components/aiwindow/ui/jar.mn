@@ -3,6 +3,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 browser.jar:
+  content/browser/aiwindow/tripPlan.html                            (content/tripPlan.html)
   content/browser/aiwindow/aiChatContent.html                       (content/aiChatContent.html)
   content/browser/aiwindow/aiWindow.html                            (content/aiWindow.html)
   content/browser/aiwindow/assets/ask-icon.svg                      (assets/ask-icon.svg)
@@ -55,3 +56,12 @@ browser.jar:
   content/browser/aiwindow/components/smartwindow-footer.css        (components/smartwindow-footer/smartwindow-footer.css)
   content/browser/aiwindow/components/smartwindow-heading.mjs       (components/smartwindow-heading/smartwindow-heading.mjs)
   content/browser/aiwindow/components/smartwindow-heading.css       (components/smartwindow-heading/smartwindow-heading.css)
+  content/browser/aiwindow/components/trip-artifact.mjs             (components/trip-artifact/trip-artifact.mjs)
+  content/browser/aiwindow/components/trip-artifact.css             (components/trip-artifact/trip-artifact.css)
+  content/browser/aiwindow/components/trip-itinerary.mjs            (components/trip-itinerary/trip-itinerary.mjs)
+  content/browser/aiwindow/components/trip-itinerary.css            (components/trip-itinerary/trip-itinerary.css)
+  content/browser/aiwindow/components/trip-fallback.mjs             (components/trip-fallback/trip-fallback.mjs)
+  content/browser/aiwindow/components/trip-fallback.css             (components/trip-fallback/trip-fallback.css)
+  content/browser/aiwindow/components/tab-scope-card.mjs            (components/tab-scope-card/tab-scope-card.mjs)
+  content/browser/aiwindow/components/tab-scope-card.css            (components/tab-scope-card/tab-scope-card.css)
+  content/browser/aiwindow/sampleSearch.html                        (content/sampleSearch.html)

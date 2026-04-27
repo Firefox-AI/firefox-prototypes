@@ -1014,3 +1014,103 @@ smart_window:
     notification_emails:
       - gcardieri@mozilla.com
     expires: never
+
+  plan_trip:
+    type: event
+    description: |
+      Recorded when the plan_trip tool returns a TripPlan for the v1 prototype.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=0
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=0
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - jhuang@mozilla.com
+    expires: never
+    extra_keys:
+      location: *location
+      chat_id: *chat_id
+      message_seq: *message_seq
+      destination:
+        type: string
+        description: Trip destination string.
+      duration_days:
+        type: quantity
+        unit: days
+        description: Number of days (1-14).
+      use_tab_context:
+        type: boolean
+        description: Whether the user confirmed tab-scope.
+      tab_count:
+        type: quantity
+        unit: count
+        description: Number of tabs included in scope.
+      grounding_source:
+        type: string
+        description: tabs or general.
+      time:
+        type: quantity
+        unit: ms
+        description: Time to produce the trip plan.
+
+  propose_tab_scope:
+    type: event
+    description: |
+      Recorded when propose_tab_scope returns matched tabs to the chat.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=0
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=0
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - jhuang@mozilla.com
+    expires: never
+    extra_keys:
+      chat_id: *chat_id
+      matched_count:
+        type: quantity
+        unit: count
+        description: Number of tabs matched.
+
+  mutate_trip:
+    type: event
+    description: |
+      Recorded when the mutate_trip tool applies a slot-targeted mutation.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=0
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=0
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - jhuang@mozilla.com
+    expires: never
+    extra_keys:
+      chat_id: *chat_id
+      mutation_type:
+        type: string
+        description: One of swap_activity, replace_hotel, replace_flight, etc.
+      affected_path:
+        type: string
+        description: e.g. activity, hotel, flight, days, duration.
+
+  open_search_split_view:
+    type: event
+    description: |
+      Recorded when open_search_split_view opens the stub search side panel.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=0
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=0
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - jhuang@mozilla.com
+    expires: never
+    extra_keys:
+      chat_id: *chat_id
+      slot_type:
+        type: string
+        description: hotel or flight.

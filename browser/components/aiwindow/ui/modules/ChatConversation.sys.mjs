@@ -593,6 +593,34 @@ export class ChatConversation extends EventEmitter {
     if (!this.messages.length) {
       const systemPrompt = await engineInstance.loadPrompt(MODEL_FEATURES.CHAT);
       this.addSystemMessage(SYSTEM_PROMPT_TYPE.TEXT, systemPrompt);
+      this.addSystemMessage(
+        SYSTEM_PROMPT_TYPE.TEXT,
+        "TRAVEL PLANNER: When the user asks about planning a trip or travel, " +
+          "follow this workflow: 1) Call get_open_tabs to find travel-related tabs. " +
+          "2) Call search_browsing_history with travel keywords and a 14-day lookback. " +
+          "3) Call get_page_content on relevant URLs (up to 5). " +
+          "4) Ask 1-2 clarifying questions if needed (dates, budget, preferences). " +
+          "5) Call generate_travel_plan IMMEDIATELY once you have destination and " +
+          "duration — do NOT ask the user for permission first. Build the most " +
+          "complete plan you can from the context gathered. Include weather, " +
+          "flights, hotels, day-by-day itinerary, budget breakdown, and packing list."
+      );
+      this.addSystemMessage(
+        SYSTEM_PROMPT_TYPE.TEXT,
+        "TRIP PLANNER V1: For requests like 'plan a trip to X for N days', prefer the " +
+          "v1 trip planner tools: 1) First call propose_tab_scope with the destination — " +
+          "this will surface a permission card to the user listing matched tabs. " +
+          "2) When the user confirms (or skips) the tab-scope card, call plan_trip with " +
+          "destination + duration_days (and use_tab_context=true if the user accepted). " +
+          "plan_trip returns a TripPlan with EMPTY hotel_slot and flight_slot — do NOT " +
+          "fabricate hotels, flight numbers, or prices. Empty slots are intentional. " +
+          "3) When the user asks to add a hotel or flight WITHOUT giving full details, " +
+          "call open_search_split_view. " +
+          "4) When the user gives full slot details inline (e.g. 'add United 230 SFO->JFK " +
+          "for $340'), call mutate_trip with replace_flight directly. " +
+          "5) For day-level edits ('swap day 2 museum for a hike'), call mutate_trip " +
+          "with swap_activity. Never invent flight numbers, hotel names, or prices."
+      );
     }
 
     // userContext starts empty so the user message can be added and dispatched
