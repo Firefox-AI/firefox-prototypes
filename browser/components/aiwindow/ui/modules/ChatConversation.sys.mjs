@@ -53,6 +53,11 @@ ChromeUtils.defineLazyGetter(lazy, "console", function () {
 const CHAT_ROLES = [MESSAGE_ROLE.USER, MESSAGE_ROLE.ASSISTANT];
 const TABLES_PREF = "browser.smartwindow.allowTables";
 
+function summarizeReasoning(reasoning) {
+  const summary = reasoning.trim().replace(/\s+/g, " ");
+  return summary || "Thinking through the response";
+}
+
 /**
  * A conversation containing messages.
  */
@@ -297,6 +302,7 @@ export class ChatConversation extends EventEmitter {
   async receiveResponse(stream) {
     const parserState = createParserState();
     const currentMessage = this.#getCurrentAssistantResponse();
+    const initialBody = currentMessage?.content?.body ?? "";
 
     if (currentMessage?.content?.body) {
       currentMessage.content.body += "\n\n";
@@ -311,6 +317,16 @@ export class ChatConversation extends EventEmitter {
       if (chunk.text) {
         fullResponseText += chunk.text;
         this.handleChunk(chunk.text, currentMessage, parserState);
+      }
+
+      if (chunk.reasoning) {
+        this.emitThinkingUpdate({
+          type: "model-thinking",
+          turnIndex: currentMessage?.turnIndex ?? this.currentTurnIndex(),
+          summary: summarizeReasoning(chunk.reasoning),
+          body: chunk.reasoning,
+          appendToLast: true,
+        });
       }
 
       if (chunk?.toolCalls?.length) {
@@ -345,10 +361,21 @@ export class ChatConversation extends EventEmitter {
       }
     }
 
-    await lazy.ChatStore.updateConversation(this);
-    this.emit("chat-conversation:message-complete", currentMessage);
+    let toolRequestText = "";
+    if (pendingToolCalls?.length) {
+      toolRequestText = currentMessage.content.body
+        .slice(initialBody.length)
+        .trim();
+      currentMessage.content.body = initialBody;
+      this.emit("chat-conversation:message-update", currentMessage);
+    }
 
-    return { pendingToolCalls, fullResponseText, usage };
+    await lazy.ChatStore.updateConversation(this);
+    if (!pendingToolCalls?.length) {
+      this.emit("chat-conversation:message-complete", currentMessage);
+    }
+
+    return { pendingToolCalls, fullResponseText, toolRequestText, usage };
   }
 
   #getCurrentAssistantResponse() {
@@ -396,6 +423,20 @@ export class ChatConversation extends EventEmitter {
     return this.#messages.reduce((turnIndex, message) => {
       return Math.max(turnIndex, message.turnIndex);
     }, 0);
+  }
+
+  emitThinkingUpdate(detail) {
+    const update = {
+      convId: this.id,
+      ...detail,
+    };
+    const turnIndex = update.turnIndex ?? this.currentTurnIndex();
+    if (this._thinkingTurnIndex !== turnIndex) {
+      this._thinkingTurnIndex = turnIndex;
+      this._thinkingMessages = [];
+    }
+    this._thinkingMessages.push({ ...update, turnIndex });
+    this.emit("chat-conversation:thinking-update", update);
   }
 
   /**
@@ -493,6 +534,10 @@ export class ChatConversation extends EventEmitter {
       content.contextMentions = userOpts.contextMentions;
     }
 
+    if (userOpts.reasoningMode) {
+      content.reasoningMode = userOpts.reasoningMode;
+    }
+
     if (pageUrl) {
       content.contextPageUrl = pageUrl.href;
     }
@@ -500,6 +545,8 @@ export class ChatConversation extends EventEmitter {
     let currentTurn = this.currentTurnIndex();
     const newTurnIndex =
       this.#messages.length === 1 ? currentTurn : currentTurn + 1;
+    this._thinkingTurnIndex = newTurnIndex;
+    this._thinkingMessages = [];
 
     this.addMessage(
       MESSAGE_ROLE.USER,

@@ -2259,6 +2259,9 @@ pref("browser.smartwindow.firstrun.modelChoice", "");
 pref("browser.smartwindow.model", "");
 pref("browser.smartwindow.preferences.endpoint", "");
 pref("browser.smartwindow.firstrun.explainerURL", "https://www.firefox.com/en-US/smart-window/?v=product");
+pref("browser.smartwindow.reasoning.customOffParams", "{\"chat_template_kwargs\":{\"enable_thinking\":false}}");
+pref("browser.smartwindow.reasoning.customOnParams", "{\"chat_template_kwargs\":{\"enable_thinking\":true}}");
+pref("browser.smartwindow.reasoning.mode", "auto");
 
 // Smart Window Logging
 pref("browser.smartwindow.chatHistory.loglevel", "Error");

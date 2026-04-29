@@ -21,6 +21,8 @@ const TOKEN_LABELS = {
  * @property {string} body - The body of the content.
  * @property {Array<ContextWebsite>} [contextMentions] - The mentioned websites.
  * @property {string} [contextPageUrl] - The URL of the context.
+ * @property {"auto"|"think"|"quick"} [reasoningMode] - Per-message
+ * reasoning mode selected in the composer.
  */
 
 /**
@@ -258,6 +260,7 @@ export class UserRoleOpts {
   memoriesEnabled;
   memoriesFlagSource;
   contextMentions;
+  reasoningMode;
 
   /**
    * @param {string|object} [opts]
@@ -267,6 +270,7 @@ export class UserRoleOpts {
     memoriesEnabled = null,
     memoriesFlagSource = null,
     contextMentions = null,
+    reasoningMode = "auto",
   } = {}) {
     if (revisionRootMessageId) {
       this.revisionRootMessageId = revisionRootMessageId;
@@ -274,6 +278,7 @@ export class UserRoleOpts {
     this.memoriesEnabled = memoriesEnabled;
     this.memoriesFlagSource = memoriesFlagSource;
     this.contextMentions = contextMentions;
+    this.reasoningMode = reasoningMode;
   }
 }
 

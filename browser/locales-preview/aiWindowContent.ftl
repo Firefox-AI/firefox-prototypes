@@ -50,6 +50,12 @@ aiwindow-jump-to-bottom =
     .tooltiptext = Jump to bottom
     .aria-label = Jump to bottom of chat
 
+## Thinking status
+
+aiwindow-thinking-summary = Thinking…
+aiwindow-thinking-quick-summary = Quick response…
+aiwindow-thinking-complete = Response ready
+
 ## Natural Language Action
 
 smartwindow-nl-thinking = Looking for matching tabs…

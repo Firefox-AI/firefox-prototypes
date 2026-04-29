@@ -1,0 +1,36 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+:host {
+  display: inline-flex;
+  flex: 0 0 auto;
+  inline-size: calc(var(--size-item-large) + 6ch + var(--space-large));
+  max-inline-size: 100%;
+}
+
+:host([menuopen]) {
+  overflow: hidden;
+}
+
+moz-button.reasoning-mode-button {
+  --button-font-weight: var(--font-weight);
+  --button-icon-fill: var(--smartbar-cta-icon-fill, var(--icon-color));
+  --button-background-color-ghost-selected: transparent;
+  inline-size: 100%;
+}
+
+moz-button.reasoning-mode-button::part(button) {
+  inline-size: 100%;
+}
+
+moz-button.reasoning-mode-button::part(moz-button-label) {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+panel-list[popover] {
+  position: fixed;
+}

@@ -3515,7 +3515,7 @@ export class UrlbarView {
     } else {
       tabGroupAction?.remove();
     }
-    let splitview = this.window.gBrowser.selectedTab.splitview;
+    let splitview = this.window.gBrowser?.selectedTab?.splitview;
     let shouldMoveTabToSplitView =
       splitview &&
       !splitview.tabs.some(
@@ -3579,7 +3579,9 @@ export class UrlbarView {
   }
 
   #addGroupToSwitchTabChiclet(result, actionNode) {
-    const group = this.window.gBrowser.getTabGroupById(result.payload.tabGroup);
+    const group = this.window.gBrowser?.getTabGroupById(
+      result.payload.tabGroup
+    );
     if (!group) {
       actionNode.remove();
       return;

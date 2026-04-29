@@ -10,6 +10,8 @@ import "chrome://browser/content/aiwindow/components/input-cta.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/memories-icon-button.mjs";
 // eslint-disable-next-line import/no-unassigned-import
+import "chrome://browser/content/aiwindow/components/reasoning-mode-button.mjs";
+// eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/context-icon-button.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/smartwindow-panel-list.mjs";
@@ -121,6 +123,45 @@ let px = number => number.toFixed(2) + "px";
  */
 
 const MAX_CONTEXT_WEBSITES = 5;
+const ENDPOINT_PREF = "browser.smartwindow.endpoint";
+const REASONING_MODE_PREF = "browser.smartwindow.reasoning.mode";
+const REASONING_CUSTOM_ON_PARAMS_PREF =
+  "browser.smartwindow.reasoning.customOnParams";
+const REASONING_MODES = Object.freeze(["auto", "think", "quick"]);
+
+function getDefaultReasoningMode() {
+  const mode = Services.prefs.getStringPref(REASONING_MODE_PREF, "auto");
+  return REASONING_MODES.includes(mode) ? mode : "auto";
+}
+
+function supportsReasoningModeControl() {
+  return (
+    Services.prefs.prefHasUserValue(ENDPOINT_PREF) ||
+    (Services.prefs.prefHasUserValue(REASONING_CUSTOM_ON_PARAMS_PREF) &&
+      !!Services.prefs
+        .getStringPref(REASONING_CUSTOM_ON_PARAMS_PREF, "")
+        .trim())
+  );
+}
+
+function getBrowserChromeWindow(ownerWindow) {
+  if (ownerWindow.gBrowser) {
+    return ownerWindow;
+  }
+
+  const topChromeWindow = ownerWindow.browsingContext?.topChromeWindow;
+  if (topChromeWindow?.gBrowser) {
+    return topChromeWindow;
+  }
+
+  for (const win of Services.wm.getEnumerator("navigator:browser")) {
+    if (win.gBrowser) {
+      return win;
+    }
+  }
+
+  return topChromeWindow || ownerWindow;
+}
 
 /**
  * Implements the text input part of the address bar UI.
@@ -205,6 +246,7 @@ ${
       <html:div class="smartbar-button-container">
         <html:context-icon-button></html:context-icon-button>
         <html:memories-icon-button></html:memories-icon-button>
+        <html:reasoning-mode-button></html:reasoning-mode-button>
         <html:input-cta action=""></html:input-cta>
       </html:div>
     `;
@@ -272,6 +314,7 @@ ${
   // Stores the smartbar action in effect before generation started, so it can
   // be restored when generation ends or is stopped.
   #smartbarActionSaved = "";
+  #reasoningMode = getDefaultReasoningMode();
   #detectedIntent = "";
   #smartbarAssistantIsGenerating = false;
   #smartbarEditor = null;
@@ -315,12 +358,9 @@ ${
   constructor() {
     super();
 
-    // If the current window context does not have gBrowser,
-    // get the main browser window.
-    this.window = this.ownerGlobal;
+    this.window = getBrowserChromeWindow(this.ownerGlobal);
     if (!this.window.gBrowser) {
-      lazy.logger.debug(`gBrowser not available, get the browser window.`);
-      this.window = window.browsingContext.topChromeWindow;
+      lazy.logger.debug("gBrowser not available for SmartbarInput.");
     }
 
     this.document = this.window.document;
@@ -419,6 +459,17 @@ ${
         this
       );
       this._inputCta.addEventListener("shown", this);
+      this._reasoningModeButton = this.querySelector("reasoning-mode-button");
+      const reasoningModeControlSupported = supportsReasoningModeControl();
+      if (!reasoningModeControlSupported) {
+        this.#reasoningMode = "auto";
+      }
+      this._reasoningModeButton.mode = this.#reasoningMode;
+      this._reasoningModeButton.hidden = !reasoningModeControlSupported;
+      this._reasoningModeButton.addEventListener(
+        "aiwindow-reasoning-mode:on-change",
+        this
+      );
       this.addEventListener("ai-website-chip:remove", this);
       this.#findWebsiteContextChipsContainer();
       this.#updateContextChips();
@@ -647,6 +698,10 @@ ${
         this
       );
       this._inputCta.removeEventListener("shown", this);
+      this._reasoningModeButton?.removeEventListener(
+        "aiwindow-reasoning-mode:on-change",
+        this
+      );
       this.removeEventListener("ai-website-chip:remove", this);
     }
 
@@ -1382,6 +1437,19 @@ ${
       return;
     }
 
+    if (event.type === "aiwindow-reasoning-mode:on-change") {
+      const { mode } = /** @type {CustomEvent} */ (event).detail;
+      this.#reasoningMode = getDefaultReasoningMode();
+      if (REASONING_MODES.includes(mode)) {
+        this.#reasoningMode = mode;
+      }
+      if (this._reasoningModeButton) {
+        this._reasoningModeButton.mode = this.#reasoningMode;
+      }
+      Services.prefs.setStringPref(REASONING_MODE_PREF, this.#reasoningMode);
+      return;
+    }
+
     // Handle website chip remove events.
     if (event.type === "ai-website-chip:remove") {
       const { url } = /** @type {CustomEvent} */ (event).detail;
@@ -1484,6 +1552,7 @@ ${
           action,
           contextMentions,
           contextPageUrl: this.#getContextPageUrl(),
+          reasoningMode: this.#reasoningMode,
         },
       })
     );
@@ -6564,6 +6633,7 @@ ${
     return {
       pageUrl: this.#getContextPageUrl(),
       contextWebsites: this.#getResolvedContextWebsites(),
+      reasoningMode: this.#reasoningMode,
     };
   }
 

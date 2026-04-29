@@ -48,6 +48,8 @@ browser.jar:
   content/browser/aiwindow/components/context-icon-button.css       (components/context-icon-button/context-icon-button.css)
   content/browser/aiwindow/components/memories-icon-button.mjs      (components/memories-icon-button/memories-icon-button.mjs)
   content/browser/aiwindow/components/memories-icon-button.css      (components/memories-icon-button/memories-icon-button.css)
+  content/browser/aiwindow/components/reasoning-mode-button.mjs     (components/reasoning-mode-button/reasoning-mode-button.mjs)
+  content/browser/aiwindow/components/reasoning-mode-button.css     (components/reasoning-mode-button/reasoning-mode-button.css)
   content/browser/aiwindow/assets/memories-on.svg                   (assets/memories-on.svg)
   content/browser/aiwindow/assets/memories-off.svg                  (assets/memories-off.svg)
   content/browser/aiwindow/components/smartwindow-panel-list.css    (components/smartwindow-panel-list/smartwindow-panel-list.css)

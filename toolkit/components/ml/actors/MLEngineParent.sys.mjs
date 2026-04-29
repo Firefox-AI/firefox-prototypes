@@ -1707,6 +1707,7 @@ export class MLEngine {
           isPrompt: chunk.metadata.isPrompt,
           toolCalls: chunk.metadata.toolCalls,
           usage: chunk.metadata.usage,
+          reasoning: chunk.metadata.reasoning,
         };
 
         // Be a bit defensive here in getting the metadata, as different engines may

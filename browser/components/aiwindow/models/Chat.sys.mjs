@@ -7,6 +7,7 @@
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
 import { ToolRoleOpts } from "moz-src:///browser/components/aiwindow/ui/modules/ChatMessage.sys.mjs";
+import { MESSAGE_ROLE } from "moz-src:///browser/components/aiwindow/ui/modules/AIWindowConstants.sys.mjs";
 import {
   openAIEngine,
   DEFAULT_MODEL,
@@ -34,6 +35,25 @@ import { compactMessages } from "moz-src:///browser/components/aiwindow/models/P
 // Prevents infinite tool-call loops when the model repeatedly requests search.
 // Bug 2024006.
 const MAX_RUN_SEARCH_PER_TURN = 3;
+const ENDPOINT_PREF = "browser.smartwindow.endpoint";
+const REASONING_MODE_PREF = "browser.smartwindow.reasoning.mode";
+const REASONING_CUSTOM_ON_PARAMS_PREF =
+  "browser.smartwindow.reasoning.customOnParams";
+const REASONING_CUSTOM_OFF_PARAMS_PREF =
+  "browser.smartwindow.reasoning.customOffParams";
+const REASONING_MODES = Object.freeze({
+  AUTO: "auto",
+  THINK: "think",
+  QUICK: "quick",
+});
+const VALID_REASONING_MODES = Object.values(REASONING_MODES);
+const REASONING_PARAM_KEYS = [
+  "reasoning",
+  "reasoning_effort",
+  "enable_thinking",
+  "thinking_budget",
+];
+const unsupportedReasoningTargets = new Set();
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -107,6 +127,364 @@ function logConversationStream(turn, action, data = null, extraText = "") {
   }
 }
 
+function formatToolName(toolName) {
+  return toolName
+    .split("_")
+    .filter(Boolean)
+    .map(part => part[0]?.toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function getToolNames(toolCalls) {
+  return toolCalls
+    .map(toolCall => toolCall.function?.name)
+    .filter(Boolean)
+    .map(formatToolName)
+    .join(", ");
+}
+
+function getToolRequestSummary(toolCalls) {
+  const requestedToolNames = getToolNames(toolCalls);
+  return requestedToolNames
+    ? `Requested ${requestedToolNames}`
+    : "Requested tool";
+}
+
+function emitThinkingUpdate(conversation, detail) {
+  if (conversation.emitThinkingUpdate) {
+    conversation.emitThinkingUpdate(detail);
+    return;
+  }
+  conversation.emit("chat-conversation:thinking-update", {
+    convId: conversation.id,
+    ...detail,
+  });
+}
+
+function getReasoningTargetKey() {
+  return `${openAIEngine.endpoint || ""}::${Chat.modelId || ""}`;
+}
+
+function hasCustomEndpoint() {
+  return Services.prefs.prefHasUserValue(ENDPOINT_PREF);
+}
+
+function getDefaultReasoningMode() {
+  return normalizeReasoningMode(
+    Services.prefs.getStringPref(REASONING_MODE_PREF, REASONING_MODES.AUTO)
+  );
+}
+
+function normalizeReasoningMode(mode) {
+  return VALID_REASONING_MODES.includes(mode) ? mode : REASONING_MODES.AUTO;
+}
+
+function parseReasoningParamsPref(prefName) {
+  const raw = Services.prefs.getStringPref(prefName, "");
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed
+      : null;
+  } catch (error) {
+    console.warn(`Failed to parse ${prefName}:`, error);
+    return null;
+  }
+}
+
+function removeReasoningParams(params) {
+  const completionParams = { ...params };
+  for (const key of REASONING_PARAM_KEYS) {
+    delete completionParams[key];
+  }
+  if (completionParams.chat_template_kwargs) {
+    const chatTemplateKwargs = { ...completionParams.chat_template_kwargs };
+    delete chatTemplateKwargs.enable_thinking;
+    if (Object.keys(chatTemplateKwargs).length) {
+      completionParams.chat_template_kwargs = chatTemplateKwargs;
+    } else {
+      delete completionParams.chat_template_kwargs;
+    }
+  }
+  return completionParams;
+}
+
+function hasReasoningParams(params) {
+  return (
+    REASONING_PARAM_KEYS.some(key => Object.hasOwn(params, key)) ||
+    Object.hasOwn(params.chat_template_kwargs || {}, "enable_thinking")
+  );
+}
+
+function getReasoningParamsForLog(params) {
+  const reasoningParams = {};
+  for (const key of REASONING_PARAM_KEYS) {
+    if (Object.hasOwn(params, key)) {
+      reasoningParams[key] = params[key];
+    }
+  }
+  if (Object.hasOwn(params.chat_template_kwargs || {}, "enable_thinking")) {
+    reasoningParams.chat_template_kwargs = {
+      enable_thinking: params.chat_template_kwargs.enable_thinking,
+    };
+  }
+  return reasoningParams;
+}
+
+function shouldUseReasoningParamsPref(prefName) {
+  return hasCustomEndpoint() || Services.prefs.prefHasUserValue(prefName);
+}
+
+function getCustomReasoningParams(prefName) {
+  if (!shouldUseReasoningParamsPref(prefName)) {
+    return null;
+  }
+  if (Services.prefs.prefHasUserValue(prefName)) {
+    return parseReasoningParamsPref(prefName);
+  }
+  return getDefaultCustomReasoningParams(prefName);
+}
+
+function hasCustomReasoningParams() {
+  return !!getCustomReasoningParams(REASONING_CUSTOM_ON_PARAMS_PREF);
+}
+
+function getDefaultCustomReasoningParams(prefName) {
+  if (prefName === REASONING_CUSTOM_ON_PARAMS_PREF) {
+    return { chat_template_kwargs: { enable_thinking: true } };
+  }
+  if (prefName === REASONING_CUSTOM_OFF_PARAMS_PREF) {
+    return { chat_template_kwargs: { enable_thinking: false } };
+  }
+  return null;
+}
+
+function getLastUserMessage(conversation) {
+  return conversation.messages.findLast(
+    message => message.role === MESSAGE_ROLE.USER
+  );
+}
+
+function getReasoningMode(conversation) {
+  return normalizeReasoningMode(
+    getLastUserMessage(conversation)?.content?.reasoningMode ??
+      getDefaultReasoningMode()
+  );
+}
+
+function shouldUseReasoningForAuto(conversation) {
+  if (conversation.messages.at(-1)?.role === MESSAGE_ROLE.TOOL) {
+    return true;
+  }
+
+  const lastUserMessage = getLastUserMessage(conversation);
+  const prompt = lastUserMessage?.content?.body ?? "";
+  const text = prompt.toLowerCase().trim();
+  if (!text) {
+    return false;
+  }
+
+  if (
+    /^(hi|hello|hey|thanks|thank you|ok|okay|cool|yes|no|yep|nope|sure)[.!? ]*$/.test(
+      text
+    )
+  ) {
+    return false;
+  }
+
+  let score = 0;
+  if (lastUserMessage.content?.contextMentions?.length) {
+    score += 2;
+  }
+  if (
+    lastUserMessage.content?.contextPageUrl &&
+    /\b(this|page|site|tab|article|summari[sz]e|explain)\b/.test(text)
+  ) {
+    score += 2;
+  }
+  if (
+    /\b(search|find|look up|browse|history|tab|tabs|page|url|website|memory|memories|current page)\b/.test(
+      text
+    )
+  ) {
+    score += 3;
+  }
+  if (
+    /\b(debug|bug|fix|code|implement|refactor|test|lint|error|stack|trace|crash|investigate|diagnose)\b/.test(
+      text
+    )
+  ) {
+    score += 2;
+  }
+  if (
+    /\b(compare|analy[sz]e|plan|evaluate|decide|why|reason|carefully|deeply|step by step|tradeoff|pros and cons)\b/.test(
+      text
+    )
+  ) {
+    score += 2;
+  }
+  if (
+    /[?].*[?]/s.test(prompt) ||
+    /\b(first|second|third|also|and then|after that)\b/.test(text)
+  ) {
+    score += 1;
+  }
+  if (prompt.length > 220) {
+    score += 1;
+  }
+  if (
+    /\b(quick|brief|short|no thinking|don't think|dont think|fast)\b/.test(text)
+  ) {
+    score -= 3;
+  }
+  if (/\b(think|think deeply|carefully|step by step)\b/.test(text)) {
+    score += 4;
+  }
+
+  return score >= 2;
+}
+
+function shouldEnableReasoning(conversation, inferenceParams, forceDisabled) {
+  if (
+    forceDisabled ||
+    unsupportedReasoningTargets.has(getReasoningTargetKey())
+  ) {
+    return false;
+  }
+
+  const reasoningMode = getReasoningMode(conversation);
+  if (reasoningMode === REASONING_MODES.QUICK) {
+    return false;
+  }
+  if (reasoningMode === REASONING_MODES.THINK) {
+    return (
+      hasCustomEndpoint() ||
+      hasReasoningParams(inferenceParams) ||
+      hasCustomReasoningParams()
+    );
+  }
+  if (hasReasoningParams(inferenceParams)) {
+    return true;
+  }
+  if (!hasCustomEndpoint() && !hasCustomReasoningParams()) {
+    return false;
+  }
+  return shouldUseReasoningForAuto(conversation);
+}
+
+function getCompletionParams(
+  inferenceParams,
+  conversation,
+  { forceReasoningDisabled = false } = {}
+) {
+  const shouldReason = shouldEnableReasoning(
+    conversation,
+    inferenceParams,
+    forceReasoningDisabled
+  );
+  const baseParams = shouldReason
+    ? { ...inferenceParams }
+    : removeReasoningParams(inferenceParams);
+
+  if (shouldReason) {
+    const customOnParams = getCustomReasoningParams(
+      REASONING_CUSTOM_ON_PARAMS_PREF
+    );
+    return {
+      ...(hasCustomEndpoint() && !hasReasoningParams(baseParams)
+        ? customOnParams
+        : {}),
+      ...baseParams,
+      ...customOnParams,
+    };
+  }
+
+  const customOffParams =
+    forceReasoningDisabled ||
+    unsupportedReasoningTargets.has(getReasoningTargetKey())
+      ? null
+      : getCustomReasoningParams(REASONING_CUSTOM_OFF_PARAMS_PREF);
+  return {
+    ...baseParams,
+    ...customOffParams,
+  };
+}
+
+function getReasoningStatusL10nId(reasoningEnabled) {
+  return reasoningEnabled
+    ? "aiwindow-thinking-summary"
+    : "aiwindow-thinking-quick-summary";
+}
+
+function logReasoningDecision(
+  turn,
+  conversation,
+  completionParams,
+  forceReasoningDisabled,
+  reasoningEnabled
+) {
+  logConversationStream(turn, "REASON", {
+    mode: getReasoningMode(conversation),
+    enabled: reasoningEnabled,
+    forceDisabled: forceReasoningDisabled,
+    unsupportedTarget: unsupportedReasoningTargets.has(getReasoningTargetKey()),
+    customOnUserPref: Services.prefs.prefHasUserValue(
+      REASONING_CUSTOM_ON_PARAMS_PREF
+    ),
+    customOffUserPref: Services.prefs.prefHasUserValue(
+      REASONING_CUSTOM_OFF_PARAMS_PREF
+    ),
+    params: getReasoningParamsForLog(completionParams),
+  });
+}
+
+function isUnsupportedReasoningError(error) {
+  const message = [
+    error?.message,
+    error?.metadata?.errorMessage,
+    error?.statusText,
+    error?.errorMessage,
+    String(error),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return (
+    /reasoning|reasoning_effort|enable_thinking|chat_template_kwargs/.test(
+      message
+    ) &&
+    /unsupported|not supported|unknown|unrecognized|invalid|bad request|extra/.test(
+      message
+    )
+  );
+}
+
+async function receiveResponseWithReasoningFallback(
+  conversation,
+  streamModelResponse,
+  forceReasoningDisabled
+) {
+  try {
+    return {
+      response: await conversation.receiveResponse(streamModelResponse()),
+      forceReasoningDisabled,
+    };
+  } catch (error) {
+    if (forceReasoningDisabled || !isUnsupportedReasoningError(error)) {
+      throw error;
+    }
+    unsupportedReasoningTargets.add(getReasoningTargetKey());
+    return {
+      response: await conversation.receiveResponse(streamModelResponse()),
+      forceReasoningDisabled: true,
+    };
+  }
+}
+
 Object.assign(Chat, {
   lastUsage: null,
 
@@ -147,6 +525,7 @@ Object.assign(Chat, {
     const currentTurn = conversation.currentTurnIndex();
     const config = engineInstance.getConfig(engineInstance.feature);
     const inferenceParams = config?.parameters || {};
+    let forceReasoningDisabled = false;
 
     /**
      * For the first turn only, we use exactly what the user typed as the `run_search` search query.
@@ -177,6 +556,31 @@ Object.assign(Chat, {
 
       // Debug logging: Record only the latest message being sent to the model
       logConversationStream(currentTurn, "CHAT SEND", messages.at(-1));
+      const reasoningEnabled = shouldEnableReasoning(
+        conversation,
+        inferenceParams,
+        forceReasoningDisabled
+      );
+      const completionParams = getCompletionParams(
+        inferenceParams,
+        conversation,
+        {
+          forceReasoningDisabled,
+        }
+      );
+      emitThinkingUpdate(conversation, {
+        type: "thinking",
+        turnIndex: currentTurn,
+        summaryL10nId: getReasoningStatusL10nId(reasoningEnabled),
+        replaceLast: true,
+      });
+      logReasoningDecision(
+        currentTurn,
+        conversation,
+        completionParams,
+        forceReasoningDisabled,
+        reasoningEnabled
+      );
 
       return engineInstance.runWithGenerator({
         streamOptions: { enabled: true },
@@ -185,22 +589,28 @@ Object.assign(Chat, {
         tool_choice: "auto",
         tools: chatToolsConfig,
         args: messages,
+        completionParams,
         signal,
-        ...inferenceParams,
       });
     };
 
     while (true) {
       /** @type {ToolCall[] | null} */
       let pendingToolCalls = null;
+      let toolRequestText = "";
 
       try {
         this.lastUsage = null;
-        const response = await conversation.receiveResponse(
-          streamModelResponse()
+        const result = await receiveResponseWithReasoningFallback(
+          conversation,
+          streamModelResponse,
+          forceReasoningDisabled
         );
+        const { response } = result;
+        forceReasoningDisabled = result.forceReasoningDisabled;
         fullResponseText = response.fullResponseText;
         pendingToolCalls = response.pendingToolCalls;
+        toolRequestText = response.toolRequestText;
         lazy.console.log("Response", { fullResponseText, pendingToolCalls });
 
         // Debug logging: Record the raw text and requested tool calls from the model
@@ -223,6 +633,18 @@ Object.assign(Chat, {
         return;
       }
 
+      emitThinkingUpdate(conversation, {
+        type: "tool-request",
+        turnIndex: currentTurn,
+        summary: getToolRequestSummary(pendingToolCalls),
+        body: toolRequestText,
+        toolCalls: pendingToolCalls.map(toolCall => ({
+          id: toolCall.id,
+          name: toolCall.function?.name || "",
+          arguments: toolCall.function?.arguments || "{}",
+        })),
+      });
+
       if (signal?.aborted) {
         logConversationStream(currentTurn, "STREAM END", null, "aborted");
         return;
@@ -237,6 +659,12 @@ Object.assign(Chat, {
       const firstPending = pendingToolCalls[0]?.function;
       if (firstPending?.name === RUN_SEARCH && searchExecuted) {
         blockedSearchAttempts++;
+        emitThinkingUpdate(conversation, {
+          type: "tool-error",
+          turnIndex: currentTurn,
+          summary: `${formatToolName(RUN_SEARCH)} unavailable`,
+          toolName: RUN_SEARCH,
+        });
 
         const blockedCalls = pendingToolCalls.slice(0, 1).map(tc => ({
           id: tc.id,
@@ -272,6 +700,12 @@ Object.assign(Chat, {
         const lastUserMessage =
           conversation.messages.findLast(m => m.role === 0) ?? null;
         if (lastUserMessage.memoriesEnabled === false) {
+          emitThinkingUpdate(conversation, {
+            type: "tool-error",
+            turnIndex: currentTurn,
+            summary: `${formatToolName(GET_USER_MEMORIES)} unavailable`,
+            toolName: GET_USER_MEMORIES,
+          });
           for (const tc of pendingToolCalls.slice(0, 1)) {
             const content = {
               tool_call_id: tc.id,
@@ -316,9 +750,16 @@ Object.assign(Chat, {
 
           expandUrlTokensInToolParams(toolParams, conversation.tokenToUrl);
         } catch {
+          emitThinkingUpdate(conversation, {
+            type: "tool-error",
+            turnIndex: currentTurn,
+            summary: `Invalid ${formatToolName(toolName)} arguments`,
+            toolName,
+          });
           const content = {
             tool_call_id: id,
             body: { error: "Invalid JSON arguments" },
+            name: toolName,
           };
           conversation.addToolCallMessage(content, currentTurn, toolRoleOpts);
           continue;
@@ -332,6 +773,14 @@ Object.assign(Chat, {
         ) {
           delete toolParams.query;
         }
+
+        emitThinkingUpdate(conversation, {
+          type: "tool-running",
+          turnIndex: currentTurn,
+          summary: `Running ${formatToolName(toolName)}`,
+          toolName,
+          arguments: toolParams,
+        });
 
         // Capture the embedder element before running tools, as navigation during
         // a tool call such as search handoff can replace the browsing context.
@@ -406,11 +855,23 @@ Object.assign(Chat, {
 
           const content = { tool_call_id: id, body: result, name: toolName };
           conversation.addToolCallMessage(content, currentTurn, toolRoleOpts);
+          emitThinkingUpdate(conversation, {
+            type: "tool-complete",
+            turnIndex: currentTurn,
+            summary: `Finished ${formatToolName(toolName)}`,
+            toolName,
+          });
         } catch (error) {
           console.error(error);
           result = { error: `Tool execution failed: ${String(error)}` };
-          const content = { tool_call_id: id, body: result };
+          const content = { tool_call_id: id, body: result, name: toolName };
           conversation.addToolCallMessage(content, currentTurn, toolRoleOpts);
+          emitThinkingUpdate(conversation, {
+            type: "tool-error",
+            turnIndex: currentTurn,
+            summary: `${formatToolName(toolName)} failed`,
+            toolName,
+          });
         }
 
         lazy.AIWindow.chatStore

@@ -25,6 +25,7 @@
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   width: 100%;
 
   &[overflowing] {
@@ -77,6 +78,13 @@
   padding-block: var(--space-large);
 }
 
+.chat-turn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-small);
+  width: 100%;
+}
+
 .chat-bubble-user {
   --chat-bubble-inset-color: color-mix(in srgb, var(--color-violet-30) 12%, transparent);
 
@@ -91,6 +99,200 @@
   overflow-wrap: anywhere;
   padding-inline: var(--space-large);
   width: fit-content;
+}
+
+.thinking-panel {
+  --thinking-panel-border-color: light-dark(var(--color-gray-30), var(--color-gray-70));
+  --thinking-panel-bg-color: light-dark(var(--color-white), var(--color-gray-90));
+  --thinking-panel-code-bg-color: light-dark(var(--color-gray-05), var(--color-gray-100));
+  --thinking-panel-light-pink: color-mix(in srgb, var(--color-blue-40) 38.74%, var(--color-purple-10) 61.26%);
+  --thinking-panel-dark-pink: var(--color-purple-60);
+  --thinking-panel-text-color: light-dark(var(--color-gray-80), var(--color-gray-20));
+  --thinking-panel-muted-color: light-dark(var(--color-gray-60), var(--color-gray-40));
+
+  align-self: flex-start;
+  box-sizing: border-box;
+  color: var(--thinking-panel-text-color);
+  font-size: var(--font-size-small);
+  inline-size: 100%;
+  max-inline-size: 100%;
+}
+
+.thinking-summary {
+  align-items: center;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: grid;
+  gap: calc(var(--space-xxsmall) + var(--space-xsmall));
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  inline-size: 100%;
+  list-style: none;
+  min-inline-size: 0;
+  padding: 0;
+}
+
+.thinking-summary::-webkit-details-marker {
+  display: none;
+}
+
+.thinking-summary::marker {
+  content: "";
+}
+
+.thinking-summary::after {
+  background: currentColor;
+  content: "";
+  height: var(--icon-size-small);
+  mask: url("chrome://global/skin/icons/arrow-right.svg") center / var(--icon-size-small) no-repeat;
+  opacity: 0.72;
+  transform-origin: center;
+  width: var(--icon-size-small);
+}
+
+.thinking-panel[open] .thinking-summary::after {
+  transform: rotate(90deg);
+}
+
+.thinking-status-dot {
+  background-image: url("chrome://browser/content/aiwindow/assets/loader.svg");
+  background-size: var(--size-item-small);
+  height: var(--size-item-small);
+  width: var(--size-item-small);
+}
+
+.thinking-panel-active .thinking-status-dot {
+  animation: 0.9s thinking-spin infinite linear;
+  will-change: transform;
+}
+
+.thinking-panel-complete .thinking-status-dot {
+  background-color: currentColor;
+  background-image: none;
+  mask: url("chrome://global/skin/icons/check.svg") center / var(--icon-size-small) no-repeat;
+}
+
+@media (prefers-reduced-motion) {
+  .thinking-panel-active .thinking-status-dot {
+    animation: none;
+  }
+}
+
+.thinking-summary-text {
+  background-clip: text;
+  background-image: linear-gradient(90deg, var(--thinking-panel-light-pink) 14.17%, var(--thinking-panel-dark-pink) 91.21%);
+  color: transparent;
+  font-weight: var(--font-weight-semibold);
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thinking-count {
+  background: var(--thinking-panel-bg-color);
+  border: 1px solid var(--thinking-panel-border-color);
+  border-radius: var(--border-radius-small);
+  color: var(--thinking-panel-muted-color);
+  font-size: var(--font-size-small);
+  min-inline-size: var(--size-item-small);
+  padding-inline: var(--space-xsmall);
+  text-align: center;
+}
+
+.thinking-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-small);
+  list-style: none;
+  margin-block: var(--space-small) 0;
+  margin-inline: 0;
+  padding: 0;
+}
+
+.thinking-item {
+  background: var(--thinking-panel-bg-color);
+  border: 1px solid var(--thinking-panel-border-color);
+  border-radius: var(--border-radius-medium);
+  padding: var(--space-small);
+}
+
+.thinking-item-header {
+  align-items: center;
+  display: grid;
+  gap: var(--space-small);
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.thinking-item-index {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-blue-50) 16%, transparent);
+  border-radius: 50%;
+  color: light-dark(var(--color-blue-60), var(--color-blue-20));
+  display: inline-flex;
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-bold);
+  height: var(--size-item-small);
+  justify-content: center;
+  width: var(--size-item-small);
+}
+
+.thinking-item-body {
+  color: var(--thinking-panel-muted-color);
+  margin-block: var(--space-small) 0;
+  margin-inline: 0;
+  overflow-wrap: anywhere;
+}
+
+.thinking-item-code {
+  background: var(--thinking-panel-code-bg-color);
+  border: 1px solid var(--thinking-panel-border-color);
+  border-radius: var(--border-radius-small);
+  font-family: monospace;
+  font-size: var(--font-size-small);
+  margin-block: var(--space-small) 0;
+  margin-inline: 0;
+  max-inline-size: 100%;
+  overflow: auto;
+  padding: var(--space-small);
+  white-space: pre-wrap;
+}
+
+.thinking-tool-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-small);
+  list-style: none;
+  margin-block: var(--space-small) 0;
+  margin-inline: 0;
+  padding: 0;
+}
+
+.thinking-tool {
+  border-inline-start: 2px solid light-dark(var(--color-blue-50), var(--color-blue-30));
+  padding-inline-start: var(--space-small);
+}
+
+.thinking-tool-name {
+  color: var(--thinking-panel-text-color);
+  font-weight: var(--font-weight-bold);
+}
+
+@media (forced-colors: active) {
+  .thinking-summary-text {
+    background-image: none;
+    background-clip: unset;
+    color: var(--link-color);
+  }
+}
+
+@keyframes thinking-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .chat-bubble-assistant {

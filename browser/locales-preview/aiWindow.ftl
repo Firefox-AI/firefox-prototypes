@@ -72,6 +72,24 @@ aiwindow-input-cta-menu-label-search-with = Search with…
 
 aiwindow-input-cta-search-submenu-header = Search
 
+## Reasoning mode button
+
+aiwindow-reasoning-mode-button-auto =
+    .label = Auto
+    .tooltiptext = Thinking: Auto
+    .aria-label = Thinking: Auto
+aiwindow-reasoning-mode-button-think =
+    .label = Think
+    .tooltiptext = Thinking: Think
+    .aria-label = Thinking: Think
+aiwindow-reasoning-mode-button-quick =
+    .label = Quick
+    .tooltiptext = Thinking: Quick
+    .aria-label = Thinking: Quick
+aiwindow-reasoning-mode-menu-auto = Auto
+aiwindow-reasoning-mode-menu-think = Think
+aiwindow-reasoning-mode-menu-quick = Quick
+
 ## Smartbar
 
 smartbar-placeholder =

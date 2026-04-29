@@ -328,6 +328,10 @@ export class AIWindow extends MozLitElement {
       this.#onMessageComplete
     );
     this.#conversation.on(
+      "chat-conversation:thinking-update",
+      this.#onThinkingUpdate
+    );
+    this.#conversation.on(
       "chat-conversation:seen-urls-updated",
       this.#onSeenUrlsUpdated
     );
@@ -347,6 +351,10 @@ export class AIWindow extends MozLitElement {
       this.#onMessageComplete
     );
     this.#conversation.off(
+      "chat-conversation:thinking-update",
+      this.#onThinkingUpdate
+    );
+    this.#conversation.off(
       "chat-conversation:seen-urls-updated",
       this.#onSeenUrlsUpdated
     );
@@ -361,6 +369,14 @@ export class AIWindow extends MozLitElement {
 
   #onMessageUpdate = (_event, message) => {
     this.#dispatchMessageToChatContent(message);
+  };
+
+  #onThinkingUpdate = (_event, detail) => {
+    this.#dispatchMessageToChatContent({
+      role: "thinking",
+      convId: this.conversationId,
+      ...detail,
+    });
   };
 
   onMemoriesApplied() {
@@ -1019,6 +1035,7 @@ export class AIWindow extends MozLitElement {
       contextPageUrl,
       event: triggeringEvent,
       location: sourceLocation,
+      reasoningMode,
     } = event.detail;
     if (action === ACTION.CHAT) {
       const { mergedMentions, allUrls, inlineMentions } =
@@ -1036,6 +1053,7 @@ export class AIWindow extends MozLitElement {
         submitType: isButtonClick ? "button" : "enter",
         inlineMentionsCount: inlineMentions.length,
         sourceLocation,
+        reasoningMode,
       });
     } else if (
       this.mode === MODE.SIDEBAR &&
@@ -1103,6 +1121,8 @@ export class AIWindow extends MozLitElement {
    *   state. null means the user removed page context
    * @param {number} [options.inlineMentionsCount] - Number of inline mentions
    * @param {string} [options.sourceLocation] - Override smartbar location
+   * @param {"auto"|"think"|"quick"} [options.reasoningMode] - Per-message
+   * reasoning mode selected in the composer.
    */
   submitChatMessage({
     text,
@@ -1111,6 +1131,7 @@ export class AIWindow extends MozLitElement {
     contextPageUrl,
     inlineMentionsCount = 0,
     sourceLocation,
+    reasoningMode,
   }) {
     const trimmed = String(text ?? "").trim();
     if (!trimmed) {
@@ -1131,7 +1152,7 @@ export class AIWindow extends MozLitElement {
 
     this.#recordChatInteraction();
     this.#fetchAIResponse(trimmed, {
-      ...this.#createUserRoleOpts(contextMentions),
+      ...this.#createUserRoleOpts(contextMentions, reasoningMode),
       pageUrl: contextPageUrl,
     });
     this.#dispatchChromeEvent(
@@ -1218,15 +1239,19 @@ export class AIWindow extends MozLitElement {
       starter,
     });
 
-    const { pageUrl: contextPageUrl, contextWebsites } =
-      this.#smartbar.getCurrentContextData();
+    const {
+      pageUrl: contextPageUrl,
+      contextWebsites,
+      reasoningMode,
+    } = this.#smartbar.getCurrentContextData();
 
     const submitType = starter ? "starter" : "follow-up";
     this.submitChatMessage({
       text,
-      contextWebsites,
+      contextMentions: contextWebsites,
       contextPageUrl,
       submitType,
+      reasoningMode,
     });
   }
 
@@ -1242,10 +1267,11 @@ export class AIWindow extends MozLitElement {
    * Creates a UserRoleOpts object with current memories settings.
    *
    * @param {ContextWebsite[]} [contextMentions]
+   * @param {"auto"|"think"|"quick"} [reasoningMode]
    * @returns {UserRoleOpts} Options object with memories configuration
    * @private
    */
-  #createUserRoleOpts(contextMentions) {
+  #createUserRoleOpts(contextMentions, reasoningMode = undefined) {
     return new lazy.UserRoleOpts({
       memoriesEnabled: this.#memoriesToggled ?? this.#memoriesIconShown,
       memoriesFlagSource:
@@ -1253,6 +1279,7 @@ export class AIWindow extends MozLitElement {
           ? lazy.MEMORIES_FLAG_SOURCE.GLOBAL
           : lazy.MEMORIES_FLAG_SOURCE.CONVERSATION,
       contextMentions,
+      reasoningMode,
     });
   }
 
@@ -1691,6 +1718,21 @@ export class AIWindow extends MozLitElement {
       this.#dispatchMessageToActor(actor, {
         ...message,
         isPreviousMessage: true,
+      });
+    });
+    this.#dispatchThinkingMessages(actor);
+  }
+
+  #dispatchThinkingMessages(actor) {
+    const thinkingMessages = this.#conversation?._thinkingMessages;
+    if (!thinkingMessages?.length) {
+      return;
+    }
+    thinkingMessages.forEach(message => {
+      this.#dispatchMessageToActor(actor, {
+        role: "thinking",
+        convId: this.conversationId,
+        ...message,
       });
     });
   }

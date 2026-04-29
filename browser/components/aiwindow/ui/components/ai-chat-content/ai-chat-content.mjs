@@ -28,6 +28,9 @@ export class AIChatContent extends MozLitElement {
     tokens: { type: Object },
     seenUrls: { type: Object },
     conversationId: { type: String },
+    thinkingMessages: { type: Array },
+    thinkingUserOrdinal: { type: Number },
+    thinkingPanelOpen: { type: Boolean },
   };
 
   #lastScrollReq = null;
@@ -43,6 +46,9 @@ export class AIChatContent extends MozLitElement {
     this.followUpSuggestions = [];
     this.errorObj = null;
     this.isSearching = false;
+    this.thinkingMessages = [];
+    this.thinkingUserOrdinal = null;
+    this.thinkingPanelOpen = false;
 
     /**
      * The set of URLs that have been seen by the conversation. Used for determining
@@ -325,6 +331,10 @@ export class AIChatContent extends MozLitElement {
         this.#checkConversationState(message);
         this.handleLoadingEvent(event);
         break;
+      case "thinking":
+        this.#checkConversationState(message);
+        this.handleThinkingEvent(event);
+        break;
       case "assistant":
         this.#checkConversationState(message);
         this.handleAIResponseEvent(event);
@@ -344,6 +354,7 @@ export class AIChatContent extends MozLitElement {
 
   #setMessageCompleteAttr(message) {
     this.assistantIsLoading = false;
+    this.#markThinkingComplete();
     const assistantLastMessage = this.conversationState.findLast(
       msg => msg?.messageId === message.content.id
     );
@@ -376,6 +387,7 @@ export class AIChatContent extends MozLitElement {
       this.followUpSuggestions = [];
       this.assistantIsLoading = false;
       this.isSearching = false;
+      this.#clearThinkingState();
       if (convIdChanged) {
         this.shadowRoot
           ?.querySelector(".chat-inner-wrapper")
@@ -389,6 +401,15 @@ export class AIChatContent extends MozLitElement {
     const { isSearching } = event.detail;
     this.isSearching = !!isSearching;
     this.assistantIsLoading = true;
+    if (isSearching) {
+      this.#appendThinkingMessage({
+        type: "tool-running",
+        summary: event.detail.searchQuery
+          ? `Searching ${event.detail.searchQuery}`
+          : "Analyzing web search",
+        body: event.detail.searchQuery,
+      });
+    }
     this.requestUpdate();
   }
 
@@ -410,6 +431,7 @@ export class AIChatContent extends MozLitElement {
     const { convId, content, ordinal, isPreviousMessage } = event.detail;
     if (!isPreviousMessage) {
       this.assistantIsLoading = true;
+      this.#resetThinkingState(ordinal);
     }
     this.conversationState[ordinal] = {
       role: "user",
@@ -465,6 +487,10 @@ export class AIChatContent extends MozLitElement {
     } = event.detail;
 
     if (typeof content.body !== "string" || !content.body) {
+      if (this.conversationState[ordinal]?.role === "assistant") {
+        delete this.conversationState[ordinal];
+        this.requestUpdate();
+      }
       return;
     }
 
@@ -487,6 +513,197 @@ export class AIChatContent extends MozLitElement {
     this.requestUpdate();
   }
 
+  handleThinkingEvent(event) {
+    this.assistantIsLoading = true;
+    this.#appendThinkingMessage(this.#normalizeThinkingMessage(event.detail));
+  }
+
+  #clearThinkingState() {
+    this.thinkingMessages = [];
+    this.thinkingUserOrdinal = null;
+    this.thinkingPanelOpen = false;
+  }
+
+  #resetThinkingState(ordinal) {
+    this.thinkingUserOrdinal = ordinal;
+    this.thinkingPanelOpen = false;
+    this.thinkingMessages = [
+      {
+        type: "thinking",
+        summaryL10nId: "aiwindow-thinking-summary",
+      },
+    ];
+  }
+
+  #ensureThinkingState() {
+    if (this.thinkingUserOrdinal != null) {
+      return true;
+    }
+    const lastUserMessage = this.conversationState.findLast(
+      msg => msg?.role === "user"
+    );
+    if (!lastUserMessage) {
+      return false;
+    }
+    this.thinkingUserOrdinal = lastUserMessage.ordinal;
+    this.thinkingMessages = [
+      {
+        type: "thinking",
+        summaryL10nId: "aiwindow-thinking-summary",
+      },
+    ];
+    return true;
+  }
+
+  #appendThinkingMessage(message) {
+    if (!message || !this.#ensureThinkingState()) {
+      return;
+    }
+    const lastMessage = this.thinkingMessages.at(-1);
+    if (message.replaceLast && lastMessage?.type === message.type) {
+      this.thinkingMessages = [
+        ...this.thinkingMessages.slice(0, -1),
+        {
+          ...lastMessage,
+          ...message,
+        },
+      ];
+      this.requestUpdate();
+      return;
+    }
+    if (message.appendToLast && lastMessage?.type === message.type) {
+      const body = `${lastMessage.body || ""}${message.body || ""}`;
+      const summary =
+        message.type === "model-thinking"
+          ? this.#normalizeThinkingText(
+              body,
+              lastMessage.summary || message.summary
+            )
+          : lastMessage.summary || message.summary;
+      this.thinkingMessages = [
+        ...this.thinkingMessages.slice(0, -1),
+        {
+          ...lastMessage,
+          ...message,
+          body,
+          summary,
+          summaryL10nId:
+            message.type === "model-thinking"
+              ? ""
+              : lastMessage.summaryL10nId || message.summaryL10nId,
+        },
+      ];
+      this.requestUpdate();
+      return;
+    }
+    this.thinkingMessages = [...this.thinkingMessages, message];
+    this.requestUpdate();
+  }
+
+  #normalizeThinkingText(body, fallback = "") {
+    return body.trim().replace(/\s+/g, " ") || fallback;
+  }
+
+  #getCollapsedSummaryMaxLength() {
+    const summaryEl = this.shadowRoot?.querySelector(
+      ".thinking-summary .thinking-summary-text"
+    );
+    if (!summaryEl?.clientWidth) {
+      return 48;
+    }
+    const win = summaryEl.ownerDocument?.documentGlobal;
+    if (!win) {
+      return 48;
+    }
+    const fontSize =
+      Number.parseFloat(win.getComputedStyle(summaryEl).fontSize) || 12;
+    return Math.max(
+      24,
+      Math.floor(summaryEl.clientWidth / (fontSize * 0.66)) - 3
+    );
+  }
+
+  #truncateAtWord(text, maxLength) {
+    if (!text || text.length <= maxLength) {
+      return text;
+    }
+    const ellipsis = "...";
+    let truncated = text.slice(0, maxLength - ellipsis.length).trimEnd();
+    const wordBreakIndex = truncated.search(/\s+\S*$/);
+    if (wordBreakIndex > 0) {
+      truncated = truncated.slice(0, wordBreakIndex).trimEnd();
+    }
+    return `${truncated}${ellipsis}`;
+  }
+
+  #markThinkingComplete() {
+    if (
+      !this.thinkingMessages.length ||
+      this.thinkingMessages.at(-1).type === "complete"
+    ) {
+      return;
+    }
+    this.thinkingMessages = [
+      ...this.thinkingMessages,
+      {
+        type: "complete",
+        summaryL10nId: "aiwindow-thinking-complete",
+      },
+    ];
+  }
+
+  #normalizeThinkingMessage(detail) {
+    return {
+      type: detail.type || "thinking",
+      appendToLast: !!detail.appendToLast,
+      replaceLast: !!detail.replaceLast,
+      summaryL10nId: detail.summaryL10nId || "",
+      summary:
+        detail.summary ||
+        (detail.toolName
+          ? this.#formatToolName(detail.toolName)
+          : "Thinking..."),
+      body: detail.body || "",
+      toolName: detail.toolName || "",
+      argumentsText: this.#formatStructuredValue(detail.arguments),
+      toolCalls: (detail.toolCalls || []).map(toolCall => ({
+        id: toolCall.id,
+        name: toolCall.name,
+        label: this.#formatToolName(toolCall.name),
+        argumentsText: this.#formatStructuredValue(toolCall.arguments),
+      })),
+    };
+  }
+
+  #formatToolName(toolName) {
+    return (toolName || "tool")
+      .split("_")
+      .filter(Boolean)
+      .map(part => part[0]?.toUpperCase() + part.slice(1))
+      .join(" ");
+  }
+
+  #formatStructuredValue(value) {
+    if (!value) {
+      return "";
+    }
+    let parsed = value;
+    if (typeof value === "string") {
+      try {
+        parsed = JSON.parse(value);
+      } catch {
+        return value;
+      }
+    }
+    if (typeof parsed !== "object" || parsed === null) {
+      return String(parsed);
+    }
+    if (!Object.keys(parsed).length) {
+      return "";
+    }
+    return JSON.stringify(parsed, null, 2);
+  }
+
   #scrollUserMessageIntoView() {
     let scrollReq = {};
     this.#lastScrollReq = scrollReq;
@@ -501,10 +718,12 @@ export class AIChatContent extends MozLitElement {
           return;
         }
         let elTop = lastMessage.offsetTop;
-        lastMessage.parentNode.style.setProperty(
-          "--content-height",
-          `calc(${elTop}px + 100% - var(--smart-window-top-spacing-chat))`
-        );
+        this.shadowRoot
+          ?.querySelector(".chat-inner-wrapper")
+          ?.style.setProperty(
+            "--content-height",
+            `calc(${elTop}px + 100% - var(--smart-window-top-spacing-chat))`
+          );
 
         requestAnimationFrame(() => {
           if (scrollReq == this.#lastScrollReq) {
@@ -587,11 +806,116 @@ export class AIChatContent extends MozLitElement {
     this.dispatchEvent(event);
   }
 
+  #handleThinkingToggle(event) {
+    this.thinkingPanelOpen = event.currentTarget.open;
+  }
+
+  #renderThinkingSummary(message, collapsed = false) {
+    if (message.summaryL10nId) {
+      return html`
+        <span
+          class="thinking-summary-text"
+          data-l10n-id=${message.summaryL10nId}
+        ></span>
+      `;
+    }
+    const fullSummary = message.summary || "";
+    const summary = collapsed
+      ? this.#truncateAtWord(fullSummary, this.#getCollapsedSummaryMaxLength())
+      : fullSummary;
+    return html`
+      <span
+        class="thinking-summary-text"
+        title=${collapsed && fullSummary ? fullSummary : nothing}
+        >${summary}</span
+      >
+    `;
+  }
+
+  #renderThinkingCode(text) {
+    if (!text) {
+      return nothing;
+    }
+    return html`<pre class="thinking-item-code">${text}</pre>`;
+  }
+
+  #renderThinkingItem(message, index) {
+    return html`
+      <li class=${`thinking-item thinking-item-${message.type}`}>
+        <div class="thinking-item-header">
+          <span class="thinking-item-index">${index + 1}</span>
+          ${this.#renderThinkingSummary(message)}
+        </div>
+        ${message.body &&
+        (message.body !== message.summary || message.type === "tool-request")
+          ? html`<p class="thinking-item-body">${message.body}</p>`
+          : nothing}
+        ${this.#renderThinkingCode(message.argumentsText)}
+        ${message.toolCalls?.length
+          ? html`
+              <ul class="thinking-tool-list">
+                ${message.toolCalls.map(
+                  toolCall => html`
+                    <li class="thinking-tool">
+                      <span class="thinking-tool-name">${toolCall.label}</span>
+                      ${this.#renderThinkingCode(toolCall.argumentsText)}
+                    </li>
+                  `
+                )}
+              </ul>
+            `
+          : nothing}
+      </li>
+    `;
+  }
+
+  #getThinkingPanelStateClass(latestMessage) {
+    if (latestMessage.type === "complete") {
+      return "thinking-panel-complete";
+    }
+    if (this.assistantIsLoading) {
+      return "thinking-panel-active";
+    }
+    return "thinking-panel-idle";
+  }
+
+  #renderThinkingPanel(msg) {
+    if (
+      msg.role !== "user" ||
+      msg.ordinal !== this.thinkingUserOrdinal ||
+      !this.thinkingMessages.length
+    ) {
+      return nothing;
+    }
+
+    const latestMessage = this.thinkingMessages.at(-1);
+    const stateClass = this.#getThinkingPanelStateClass(latestMessage);
+
+    return html`
+      <details
+        class=${`thinking-panel ${stateClass}`}
+        ?open=${this.thinkingPanelOpen}
+        @toggle=${event => this.#handleThinkingToggle(event)}
+      >
+        <summary class="thinking-summary" aria-live="polite">
+          <span class="thinking-status-dot"></span>
+          ${this.#renderThinkingSummary(latestMessage, true)}
+          <span class="thinking-count">${this.thinkingMessages.length}</span>
+        </summary>
+        <ol class="thinking-list">
+          ${this.thinkingMessages.map((message, index) =>
+            this.#renderThinkingItem(message, index)
+          )}
+        </ol>
+      </details>
+    `;
+  }
+
   #renderMessage(msg, chips) {
     if (!msg) {
       return nothing;
     }
-    return html`
+    const bubble = html`
       <div class=${`chat-bubble chat-bubble-${msg.role}`}>
         ${chips?.length
           ? html`<website-chip-container
@@ -617,6 +941,16 @@ export class AIChatContent extends MozLitElement {
           : nothing}
       </div>
     `;
+
+    if (msg.role !== "user") {
+      return bubble;
+    }
+
+    return html`
+      <div class="chat-turn chat-turn-user">
+        ${bubble} ${this.#renderThinkingPanel(msg)}
+      </div>
+    `;
   }
 
   #renderFollowUpSuggestions() {
@@ -633,7 +967,7 @@ export class AIChatContent extends MozLitElement {
   }
 
   #renderLoader() {
-    if (!this.assistantIsLoading) {
+    if (!this.assistantIsLoading || this.thinkingUserOrdinal != null) {
       return nothing;
     }
     return html`<chat-assistant-loader

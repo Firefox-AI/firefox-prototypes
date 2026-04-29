@@ -110,10 +110,12 @@ export class OpenAIPipeline {
       isDone,
       toolCalls,
       usage,
+      reasoning,
     } = args;
     port?.postMessage({
       text: content,
       ...(toolCalls ? { toolCalls } : {}),
+      ...(reasoning ? { reasoning } : {}),
       ...(isDone && { done: true, finalOutput: content }),
       ok: true,
     });
@@ -125,6 +127,7 @@ export class OpenAIPipeline {
         tokens: [],
         ...(toolCalls ? { toolCalls } : {}),
         ...(usage ? { usage } : {}),
+        ...(reasoning ? { reasoning } : {}),
       },
       type: Progress.ProgressType.INFERENCE,
       statusText: isDone
@@ -238,6 +241,18 @@ export class OpenAIPipeline {
         });
       }
 
+      const reasoning = delta.reasoning ?? delta.reasoning_content;
+      if (reasoning) {
+        this.#sendProgress({
+          content: "",
+          reasoning,
+          requestId,
+          inferenceProgressCallback,
+          port,
+          isDone: false,
+        });
+      }
+
       if (Array.isArray(delta.tool_calls) && delta.tool_calls.length) {
         toolAcc = this.#mergeToolDeltas(toolAcc, delta.tool_calls);
       }
@@ -310,6 +325,7 @@ export class OpenAIPipeline {
     const message = completion.choices[0].message;
     const output = message.content || "";
     const toolCalls = message.tool_calls || null;
+    const reasoning = message.reasoning ?? message.reasoning_content;
 
     this.#sendProgress({
       content: output,
@@ -318,6 +334,7 @@ export class OpenAIPipeline {
       port,
       isDone: true,
       toolCalls,
+      reasoning,
     });
 
     return {
@@ -380,6 +397,8 @@ export class OpenAIPipeline {
         messages: request.args,
         stream,
         tools,
+        ...(request.tool_choice ? { tool_choice: request.tool_choice } : {}),
+        ...request.completionParams,
       };
       if (stream) {
         completionParams.stream_options = { include_usage: true };
