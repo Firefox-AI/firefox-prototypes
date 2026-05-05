@@ -1,4 +1,5 @@
 # Trip Planner — Lightweight Brief
+This brief is written by Claude Code.
 
 **Owner:** Jolie · **Last updated:** 2026-05-05 · **Status:** Prototype shipped (v1.7), ready for demo
 
