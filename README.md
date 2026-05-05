@@ -1,4 +1,4 @@
-# Trip Planner — Lightweight PRD
+# Trip Planner — Lightweight Brief
 
 **Owner:** Jolie · **Last updated:** 2026-05-05 · **Status:** Prototype shipped (v1.7), ready for demo
 
