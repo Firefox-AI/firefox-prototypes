@@ -67,6 +67,19 @@ export class AIChatContentParent extends JSWindowActorParent {
     this.sendAsyncMessage("AIChatContent:SeenUrls", payload);
   }
 
+  /**
+   * Round-trip a smoke-test query into the remote about:aichatcontent process.
+   * Used by TripPlannerSmokeTest.sys.mjs to drive planTrip + verify
+   * <trip-itinerary> shadow-DOM render without leaving the chrome process.
+   *
+   * @param {object} opts
+   * @returns {Promise<object>} Structured PASS/FAIL summary with checks +
+   *   rendered shadow-DOM facts (see AIChatContentChild#runSmokeTest).
+   */
+  runSmokeTest(opts = {}) {
+    return this.sendQuery("AIChatContent:RunSmokeTest", opts);
+  }
+
   receiveMessage({ data, name }) {
     switch (name) {
       case "aiChatContentActor:search":

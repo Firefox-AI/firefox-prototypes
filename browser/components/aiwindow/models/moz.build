@@ -18,6 +18,7 @@ MOZ_SRC_FILES += [
     "Chat.sys.mjs",
     "ChatUtils.sys.mjs",
     "ConversationSuggestions.sys.mjs",
+    "HistoryQuery.sys.mjs",
     "IntentClassifier.sys.mjs",
     "PreferencesNavMap.sys.mjs",
     "PromptOptimizer.sys.mjs",
@@ -27,6 +28,7 @@ MOZ_SRC_FILES += [
     "SmartWindowNavigationInfo.sys.mjs",
     "TitleGeneration.sys.mjs",
     "Tools.sys.mjs",
+    "TripPlannerSmokeTest.sys.mjs",
     "Utils.sys.mjs",
 ]
 

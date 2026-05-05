@@ -28,6 +28,7 @@ import {
   PROPOSE_TAB_SCOPE,
   MUTATE_TRIP,
   OPEN_SEARCH_SPLIT_VIEW,
+  LOOKUP_LODGING_HISTORY,
 } from "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs";
 import {
   expandUrlTokensInToolParams,
@@ -39,6 +40,26 @@ import { compactMessages } from "moz-src:///browser/components/aiwindow/models/P
 // Prevents infinite tool-call loops when the model repeatedly requests search.
 // Bug 2024006.
 const MAX_RUN_SEARCH_PER_TURN = 3;
+
+function getAIChatContentActor(browsingContext) {
+  function findBC(bc) {
+    if (!bc) {
+      return null;
+    }
+    if (bc.currentURI?.spec === "about:aichatcontent") {
+      return bc;
+    }
+    for (const child of bc.children || []) {
+      const found = findBC(child);
+      if (found) {
+        return found;
+      }
+    }
+    return null;
+  }
+  const target = findBC(browsingContext);
+  return target?.currentWindowGlobal?.getActor?.("AIChatContent") || null;
+}
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -393,7 +414,7 @@ Object.assign(Chat, {
               result = await toolFns.generateTravelPlan(
                 toolParams,
                 conversation.securityProperties,
-                context
+                browsingContext
               );
               break;
             case PLAN_TRIP: {
@@ -401,7 +422,7 @@ Object.assign(Chat, {
               result = await toolFns.planTrip(
                 toolParams,
                 conversation,
-                context
+                browsingContext
               );
               try {
                 Glean.smartWindow.planTrip?.record({
@@ -467,6 +488,10 @@ Object.assign(Chat, {
               }
               break;
             }
+            case LOOKUP_LODGING_HISTORY: {
+              result = await toolFns.lookupLodgingHistory(toolParams);
+              break;
+            }
             default:
               throw new Error(`No such tool: ${toolName}`);
           }
@@ -481,11 +506,7 @@ Object.assign(Chat, {
 
           if (toolName === GENERATE_TRAVEL_PLAN && result && !result.error) {
             try {
-              const browser = context?.browsingContext?.embedderElement;
-              const actor =
-                browser?.browsingContext?.currentWindowContext?.getActor?.(
-                  "AIChatContent"
-                );
+              const actor = getAIChatContentActor(browsingContext);
               actor?.sendAsyncMessage("AIChatContent:TripData", result);
             } catch (e) {
               lazy.console.error("Failed to dispatch trip data:", e);
@@ -494,11 +515,7 @@ Object.assign(Chat, {
 
           if (toolName === PLAN_TRIP && result && !result.error) {
             try {
-              const browser = context?.browsingContext?.embedderElement;
-              const actor =
-                browser?.browsingContext?.currentWindowContext?.getActor?.(
-                  "AIChatContent"
-                );
+              const actor = getAIChatContentActor(browsingContext);
               actor?.sendAsyncMessage("AIChatContent:TripPlanV1", result);
             } catch (e) {
               lazy.console.error("Failed to dispatch v1 trip plan:", e);
@@ -507,11 +524,7 @@ Object.assign(Chat, {
 
           if (toolName === PROPOSE_TAB_SCOPE && result && !result.error) {
             try {
-              const browser = context?.browsingContext?.embedderElement;
-              const actor =
-                browser?.browsingContext?.currentWindowContext?.getActor?.(
-                  "AIChatContent"
-                );
+              const actor = getAIChatContentActor(browsingContext);
               actor?.sendAsyncMessage("AIChatContent:TabScopeProposal", result);
             } catch (e) {
               lazy.console.error("Failed to dispatch tab scope proposal:", e);
@@ -520,11 +533,7 @@ Object.assign(Chat, {
 
           if (toolName === MUTATE_TRIP && result && !result.error) {
             try {
-              const browser = context?.browsingContext?.embedderElement;
-              const actor =
-                browser?.browsingContext?.currentWindowContext?.getActor?.(
-                  "AIChatContent"
-                );
+              const actor = getAIChatContentActor(browsingContext);
               actor?.sendAsyncMessage("AIChatContent:TripMutation", result);
             } catch (e) {
               lazy.console.error("Failed to dispatch trip mutation:", e);

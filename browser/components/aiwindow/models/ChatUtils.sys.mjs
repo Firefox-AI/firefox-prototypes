@@ -301,10 +301,12 @@ export function stripUnresolvedUrlTokens(text) {
 }
 
 /**
- * Expands URL tokens in tool call parameters in-place.
- * Handles both string values and arrays of strings.
+ * Expands URL tokens in tool call parameters in-place. Recurses into nested
+ * objects and arrays so structured payloads (e.g. mutate_trip's
+ * { payload: { source_url: "§url_token:...§" } }) get expanded too, not just
+ * top-level string fields.
  *
- * @param {{ name: string, arguments: unknown }} toolParams
+ * @param {object} toolParams
  * @param {Map<string, string>} tokenToUrl
  */
 export function expandUrlTokensInToolParams(toolParams, tokenToUrl) {
@@ -315,9 +317,17 @@ export function expandUrlTokensInToolParams(toolParams, tokenToUrl) {
     if (typeof value === "string") {
       toolParams[key] = expandUrlTokens(value, tokenToUrl);
     } else if (Array.isArray(value)) {
-      toolParams[key] = value.map(item =>
-        typeof item === "string" ? expandUrlTokens(item, tokenToUrl) : item
-      );
+      toolParams[key] = value.map(item => {
+        if (typeof item === "string") {
+          return expandUrlTokens(item, tokenToUrl);
+        }
+        if (item && typeof item === "object") {
+          expandUrlTokensInToolParams(item, tokenToUrl);
+        }
+        return item;
+      });
+    } else if (value && typeof value === "object") {
+      expandUrlTokensInToolParams(value, tokenToUrl);
     }
   }
 }

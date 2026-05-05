@@ -30,6 +30,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
   clearTimeout: "resource://gre/modules/Timer.sys.mjs",
   setTimeout: "resource://gre/modules/Timer.sys.mjs",
+  HistoryQuery:
+    "moz-src:///browser/components/aiwindow/models/HistoryQuery.sys.mjs",
   MemoriesManager:
     "moz-src:///browser/components/aiwindow/models/memories/MemoriesManager.sys.mjs",
   SmartWindowNavigationInfo:
@@ -97,6 +99,7 @@ export const PLAN_TRIP = "plan_trip";
 export const PROPOSE_TAB_SCOPE = "propose_tab_scope";
 export const MUTATE_TRIP = "mutate_trip";
 export const OPEN_SEARCH_SPLIT_VIEW = "open_search_split_view";
+export const LOOKUP_LODGING_HISTORY = "lookup_lodging_history";
 
 export const TOOLS = [
   GET_OPEN_TABS,
@@ -110,6 +113,7 @@ export const TOOLS = [
   PROPOSE_TAB_SCOPE,
   MUTATE_TRIP,
   OPEN_SEARCH_SPLIT_VIEW,
+  LOOKUP_LODGING_HISTORY,
 ];
 
 export const RUN_SEARCH_VERBATIM_QUERY_DESCRIPTION =
@@ -264,12 +268,13 @@ export const toolsConfig = [
     function: {
       name: GENERATE_TRAVEL_PLAN,
       description:
-        "Generate a self-contained interactive HTML travel plan and open it in a new tab. " +
-        "IMPORTANT: Call this tool AUTOMATICALLY as soon as you have enough information to build " +
-        "an itinerary (at minimum: destination and duration). Do NOT ask the user for permission " +
-        "before calling this tool — just call it. First use get_open_tabs and search_browsing_history " +
-        "to find travel-related pages, extract details with get_page_content, then call this tool " +
-        "with a complete plan. The plan parameter must be a JSON string.",
+        "Open a self-contained interactive HTML travel plan in a new tab and switch the AI Window " +
+        "to sidebar mode. The plan is a SKELETON — flights, hotels, and activities can be empty; " +
+        "the user fills them in conversationally afterward. Call this AS SOON AS you have a " +
+        "destination (and dates if mentioned). Do NOT block on hotel/flight/activity details; " +
+        "do NOT fabricate any. Empty fields render as 'Click to add ...' placeholders that the " +
+        "user fills via follow-up chat. The plan parameter must be a JSON string with at minimum " +
+        "{ destination }. Other fields (dates, flights, hotels, itinerary, etc.) are optional.",
       parameters: {
         type: "object",
         properties: {
@@ -340,7 +345,9 @@ export const toolsConfig = [
       description:
         "Apply a targeted slot mutation to the active trip. Use replace_flight / replace_hotel " +
         "directly when the user provides full inline details. Otherwise call open_search_split_view " +
-        "first. Never invent missing fields.",
+        "first. Never invent missing fields. The `trip_id` parameter is OPTIONAL — only pass it " +
+        "if the active plan explicitly exposed one. If you don't have a trip_id, omit the field; " +
+        "the system will mutate the single active trip.",
       parameters: {
         type: "object",
         properties: {
@@ -349,6 +356,7 @@ export const toolsConfig = [
             type: "string",
             enum: [
               "swap_activity",
+              "replace_day",
               "replace_hotel",
               "replace_flight",
               "clear_hotel",
@@ -359,7 +367,7 @@ export const toolsConfig = [
           },
           payload: { type: "object" },
         },
-        required: ["trip_id", "mutation_type", "payload"],
+        required: ["mutation_type", "payload"],
       },
     },
   },
@@ -380,6 +388,42 @@ export const toolsConfig = [
           trip_id: { type: "string" },
         },
         required: ["slot_type", "destination", "trip_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: LOOKUP_LODGING_HISTORY,
+      description:
+        "Search the user's local browsing history (last 30 days) for lodging-related " +
+        "pages they've already viewed (Airbnb, Vrbo, Booking, hotel chains). Use this " +
+        "when the user mentions where they're staying ('I'm staying at an airbnb', " +
+        "'we booked the Marriott'). Returns matching pages so the user can pick which " +
+        "one they actually booked. NEVER fabricate matches — if 0 results, ask the " +
+        "user for the booking URL. Local Places query only, never hits the network.",
+      parameters: {
+        type: "object",
+        properties: {
+          keyword: {
+            type: "string",
+            description:
+              "The lodging brand or type the user mentioned ('airbnb', 'marriott', " +
+              "'hotel'). Drives the domain filter. Generic words fall back to a full " +
+              "lodging-domain allowlist.",
+          },
+          destination: {
+            type: "string",
+            description:
+              "The trip destination, used to rank matches whose title or URL " +
+              "mentions the destination higher. Optional but recommended when known.",
+          },
+          days: {
+            type: "number",
+            description: "Lookback window in days. Defaults to 30.",
+          },
+        },
+        required: ["keyword"],
       },
     },
   },
@@ -433,7 +477,21 @@ export async function getOpenTabs(conversation) {
 
   tabs.sort((a, b) => b.lastAccessed - a.lastAccessed);
 
-  const recentTabs = tabs.slice(0, MAX_TABS);
+  // De-duplicate by canonical URL. Keep the most-recently-accessed entry
+  // (tabs is already sorted desc by lastAccessed). Pinned-and-content
+  // duplicate URLs would otherwise produce duplicate chips downstream
+  // (BUILD-2 in qa-report-1.md: "2 chips for same URL").
+  const seenUrls = new Set();
+  const dedupedTabs = [];
+  for (const t of tabs) {
+    if (seenUrls.has(t.url)) {
+      continue;
+    }
+    seenUrls.add(t.url);
+    dedupedTabs.push(t);
+  }
+
+  const recentTabs = dedupedTabs.slice(0, MAX_TABS);
 
   // Tab titles are truncated to 100 characters and therefore not expected to
   // contain enough untrusted data for a prompt injection attack.
@@ -994,21 +1052,717 @@ export async function getUserMemories(conversation) {
  * @param {object} context
  * @returns {Promise<object>}
  */
-export async function generateTravelPlan(toolParams, securityProperties, context) {
-  let planData;
+// WMO weather code → human-readable condition. Subset covering the common cases.
+const WMO_CONDITION = {
+  0: "Clear",
+  1: "Mainly clear",
+  2: "Partly cloudy",
+  3: "Overcast",
+  45: "Foggy",
+  48: "Rime fog",
+  51: "Light drizzle",
+  53: "Drizzle",
+  55: "Heavy drizzle",
+  61: "Light rain",
+  63: "Rain",
+  65: "Heavy rain",
+  71: "Light snow",
+  73: "Snow",
+  75: "Heavy snow",
+  77: "Snow grains",
+  80: "Rain showers",
+  81: "Heavy showers",
+  82: "Violent showers",
+  85: "Snow showers",
+  86: "Heavy snow showers",
+  95: "Thunderstorm",
+  96: "Thunderstorm with hail",
+  99: "Severe thunderstorm",
+};
+
+function seasonForLatitude(lat, isoDate) {
+  const month = new Date(isoDate || Date.now()).getMonth();
+  const north = lat >= 0;
+  if ([2, 3, 4].includes(month)) {
+    return north ? "Spring" : "Autumn";
+  }
+  if ([5, 6, 7].includes(month)) {
+    return north ? "Summer" : "Winter";
+  }
+  if ([8, 9, 10].includes(month)) {
+    return north ? "Autumn" : "Spring";
+  }
+  return north ? "Winter" : "Summer";
+}
+
+/**
+ * Fetch live weather for a destination via Open-Meteo (no auth required).
+ * Returns null on any failure (offline, geocoding miss, parse error). Callers
+ * MUST tolerate null — never fabricate.
+ *
+ * @param {string} destination
+ * @returns {Promise<{condition: string, temp_high: number, temp_low: number, season_note: string}|null>}
+ */
+async function fetchDestinationWeather(destination) {
+  if (
+    !destination ||
+    typeof destination !== "string" ||
+    destination.trim().toLowerCase() === "trip"
+  ) {
+    return null;
+  }
+  // Hard cap so a slow Open-Meteo can never block generate_travel_plan.
+  const TIMEOUT_MS = 4000;
+  const timeout = ms =>
+    new Promise(resolve => lazy.setTimeout(() => resolve(null), ms));
+  const fetchJson = async url => {
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      return null;
+    }
+    return resp.json();
+  };
   try {
-    planData = typeof toolParams.plan === "string"
-      ? JSON.parse(toolParams.plan)
-      : toolParams.plan;
-  } catch {
-    return { error: "Invalid JSON in plan parameter" };
+    const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(destination)}&count=1&format=json`;
+    const geo = await Promise.race([fetchJson(geoUrl), timeout(TIMEOUT_MS)]);
+    const place = geo?.results?.[0];
+    if (!place) {
+      return null;
+    }
+    const { latitude, longitude } = place;
+    const fcUrl =
+      `https://api.open-meteo.com/v1/forecast?latitude=${latitude}` +
+      `&longitude=${longitude}&current_weather=true&temperature_unit=fahrenheit` +
+      `&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=auto`;
+    const fc = await Promise.race([fetchJson(fcUrl), timeout(TIMEOUT_MS)]);
+    const code =
+      fc?.current_weather?.weathercode ?? fc?.daily?.weathercode?.[0];
+    const high = Math.round(fc?.daily?.temperature_2m_max?.[0] ?? NaN);
+    const low = Math.round(fc?.daily?.temperature_2m_min?.[0] ?? NaN);
+    if (!Number.isFinite(high) || !Number.isFinite(low)) {
+      return null;
+    }
+    const dayCount = Math.min(
+      5,
+      fc?.daily?.time?.length || 0,
+      fc?.daily?.temperature_2m_max?.length || 0
+    );
+    const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const forecast = [];
+    for (let i = 0; i < dayCount; i++) {
+      const isoDay = fc.daily.time[i];
+      const dayHigh = Math.round(fc.daily.temperature_2m_max[i]);
+      const dayLow = Math.round(fc.daily.temperature_2m_min[i]);
+      const dayCode = fc.daily.weathercode?.[i];
+      if (!Number.isFinite(dayHigh) || !Number.isFinite(dayLow)) {
+        continue;
+      }
+      const dt = new Date(isoDay + "T12:00:00");
+      forecast.push({
+        date: i === 0 ? "Today" : dayLabels[dt.getUTCDay()] || isoDay,
+        condition: WMO_CONDITION[dayCode] || "Mixed",
+        high: dayHigh,
+        low: dayLow,
+      });
+    }
+    return {
+      condition: WMO_CONDITION[code] || "Mixed",
+      temp_high: high,
+      temp_low: low,
+      season_note: seasonForLatitude(latitude, fc?.daily?.time?.[0]),
+      forecast,
+    };
+  } catch (e) {
+    lazy.console.warn("[Tool] fetchDestinationWeather failed:", e);
+    return null;
+  }
+}
+
+/**
+ * Fetch Open Graph metadata for a URL. Returns null on any failure.
+ * Used to enrich hotel cards with hero images + canonical titles when the
+ * user pastes a booking URL.
+ *
+ * @param {string} url
+ * @returns {Promise<{image_url: string|null, title: string|null, description: string|null, site_name: string|null}|null>}
+ */
+async function fetchOgMeta(url) {
+  if (!url || typeof url !== "string" || !/^https?:\/\//i.test(url)) {
+    return null;
+  }
+  const TIMEOUT_MS = 3000;
+  const timeout = ms =>
+    new Promise(resolve => lazy.setTimeout(() => resolve(null), ms));
+  // Many sites (Expedia, Airbnb, Booking) gate scraping by User-Agent and
+  // return either a 403 or a stub page when called without a real browser UA.
+  // Forward a desktop Chrome UA so the response actually contains og:* tags.
+  const headers = {
+    "User-Agent":
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
+      "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    Accept: "text/html,application/xhtml+xml",
+  };
+  try {
+    const resp = await Promise.race([
+      fetch(url, { redirect: "follow", headers }),
+      timeout(TIMEOUT_MS),
+    ]);
+    if (!resp || !resp.ok) {
+      return null;
+    }
+    const html = await Promise.race([resp.text(), timeout(TIMEOUT_MS)]);
+    if (!html || typeof html !== "string") {
+      return null;
+    }
+    // Cap the slice we scan to avoid running regex on multi-MB pages.
+    const head = html.slice(0, 200000);
+    const meta = prop => {
+      const re = new RegExp(
+        `<meta[^>]+(?:property|name)=["']${prop}["'][^>]*>`,
+        "i"
+      );
+      const tag = head.match(re);
+      if (!tag) {
+        return null;
+      }
+      const content = tag[0].match(/content=["']([^"']+)["']/i);
+      return content ? content[1] : null;
+    };
+    let imageUrl = meta("og:image") || meta("twitter:image") || null;
+    if (imageUrl && imageUrl.startsWith("//")) {
+      imageUrl = "https:" + imageUrl;
+    }
+    return {
+      image_url: imageUrl,
+      title: meta("og:title") || null,
+      description: meta("og:description") || null,
+      site_name: meta("og:site_name") || null,
+    };
+  } catch (e) {
+    lazy.console.warn("[Tool] fetchOgMeta failed:", e);
+    return null;
+  }
+}
+
+// Destination-keyed activity pools for mock itineraries. Slots per day are
+// chosen from a 6-slot template and the day's activities are picked
+// deterministically by day index so the same trip stays stable across renders.
+const ITIN_TIMESLOTS = [
+  "9:00 AM",
+  "11:30 AM",
+  "1:00 PM",
+  "3:00 PM",
+  "6:00 PM",
+  "8:30 PM",
+];
+const ITIN_POOLS = {
+  nyc: [
+    { title: "Breakfast at Russ & Daughters", note: "Iconic appetizing shop, classic NYC bagel" },
+    { title: "Statue of Liberty + Ellis Island ferry", note: "Book Crown access in advance" },
+    { title: "The Met museum", note: "Suggested $30; allow 3+ hours" },
+    { title: "Central Park stroll + Bethesda Terrace", note: "Rent a bike at Columbus Circle" },
+    { title: "Lunch at Katz's Deli", note: "Pastrami on rye, no compromises" },
+    { title: "Top of the Rock observation deck", note: "Sunset slot has the best view" },
+    { title: "Broadway show at Richard Rodgers", note: "Hamilton, last-minute lottery $10" },
+    { title: "High Line + Chelsea Market dinner", note: "Walk the elevated park then graze" },
+    { title: "Brooklyn Bridge walk at golden hour", note: "Start from Manhattan side" },
+    { title: "9/11 Memorial + Oculus", note: "Contemplative; book museum 30-min entry" },
+    { title: "MoMA visit", note: "Free Friday evenings 4-8 PM" },
+    { title: "Jazz at the Village Vanguard", note: "Reservations strongly recommended" },
+    { title: "SoHo shopping + Joe's Pizza slice", note: "Window shop, then a perfect $4 slice" },
+    { title: "Greenwich Village walking tour", note: "Folk history + Washington Square" },
+    { title: "Williamsburg dinner at Lilia", note: "Take the L train; pasta worth the wait" },
+  ],
+  sf: [
+    { title: "Coffee at Sightglass", note: "SOMA roastery, third-wave classic" },
+    { title: "Golden Gate Bridge walk + Battery Spencer", note: "Bus 30 to Marin side for the view" },
+    { title: "Alcatraz tour", note: "Book 2+ weeks ahead" },
+    { title: "Mission District burrito at La Taqueria", note: "Carnitas, no rice — local rules" },
+    { title: "Lands End coastal trail", note: "Sutro Baths ruins at the end" },
+    { title: "SFMOMA visit", note: "Free for 18 and under" },
+    { title: "Cable car to Ghirardelli Square", note: "Powell-Hyde line for the steep hills" },
+    { title: "Dim sum in Chinatown at Hang Ah", note: "Oldest in SF — har gow + char siu bao" },
+    { title: "Painted Ladies + Alamo Square", note: "Full House row, photo-op" },
+    { title: "Ferry Building farmers market", note: "Saturday mornings only" },
+    { title: "Sunset at Twin Peaks", note: "Drive or Muni 37" },
+    { title: "Jazz at SFJAZZ Center", note: "Hayes Valley, world-class lineups" },
+  ],
+  tokyo: [
+    { title: "Sushi breakfast at Tsukiji outer market", note: "Aim for 7 AM, beat the lines" },
+    { title: "Senso-ji temple + Nakamise shopping street", note: "Asakusa; wear walking shoes" },
+    { title: "Shibuya scramble + Hachiko statue", note: "Best from Starbucks 2nd floor" },
+    { title: "Ramen at Ichiran Shinjuku", note: "Tonkotsu broth, solo booth experience" },
+    { title: "TeamLab Borderless / Planets", note: "Reserve timed entry online" },
+    { title: "Meiji Shrine + Yoyogi Park", note: "Forested oasis in central Tokyo" },
+    { title: "Robot show or izakaya in Shinjuku Golden Gai", note: "Tiny bars, big personality" },
+    { title: "Ueno Park + Tokyo National Museum", note: "Cherry blossoms in spring" },
+    { title: "Dinner in Ginza — sukiyaki or kaiseki", note: "Reserve weeks ahead at Kanesaka" },
+    { title: "Kabuki at Kabuki-za theater", note: "Single-act tickets available same-day" },
+    { title: "Akihabara electronics + arcade hop", note: "Don Quijote for souvenirs" },
+    { title: "Day trip to Kamakura Big Buddha", note: "Easy 1hr train from Tokyo Station" },
+  ],
+  generic: [
+    { title: "Walking tour of the historic center", note: "Most cities offer free morning tours" },
+    { title: "Local breakfast spot recommended by hotel", note: "Ask the front desk for a tip" },
+    { title: "Top-rated museum visit", note: "Buy timed entry online if popular" },
+    { title: "Lunch at a local market", note: "Cheaper, more authentic than restaurants" },
+    { title: "Iconic neighborhood stroll", note: "Pick the most walkable district" },
+    { title: "Sunset viewpoint", note: "Search for 'best sunset view' + city name" },
+    { title: "Dinner at a regional specialty restaurant", note: "Avoid tourist-trap zones" },
+    { title: "Live music or theater night", note: "Check Time Out + local listings" },
+    { title: "Coffee at a famous cafe", note: "Most cities have at least one institution" },
+    { title: "Day trip to nearby town", note: "30-90 min away by train or bus" },
+    { title: "Park or waterfront walk", note: "Pack a snack" },
+    { title: "Local cooking class", note: "Hands-on, bring an appetite" },
+  ],
+};
+function poolForDestination(destination) {
+  const k = String(destination || "").toLowerCase();
+  if (/new york|nyc|manhattan|brooklyn/.test(k)) {
+    return ITIN_POOLS.nyc;
+  }
+  if (/san francisco|sf|bay area/.test(k)) {
+    return ITIN_POOLS.sf;
+  }
+  if (/tokyo|japan/.test(k)) {
+    return ITIN_POOLS.tokyo;
+  }
+  return ITIN_POOLS.generic;
+}
+function mockItinerary(destination, dayCount) {
+  const pool = poolForDestination(destination);
+  const dayTitles = pool === ITIN_POOLS.generic ? null : null;
+  const itinerary = [];
+  let activityIdx = 0;
+  for (let d = 0; d < dayCount; d++) {
+    // 3-6 activities per day, varying so it doesn't feel uniform.
+    const slotCount = 3 + ((d * 7) % 4); // 3, 4, 5, 6, 3, 4, ...
+    const activities = [];
+    const slots = ITIN_TIMESLOTS.slice(0, slotCount);
+    for (let s = 0; s < slotCount; s++) {
+      const item = pool[activityIdx % pool.length];
+      activityIdx++;
+      activities.push({
+        time: slots[s],
+        text: item.title,
+        note: item.note,
+      });
+    }
+    itinerary.push({
+      day: d + 1,
+      title: dayTitles ? dayTitles[d] : `Day ${d + 1}`,
+      activities,
+    });
+  }
+  return itinerary;
+}
+
+function mockFlight(destination) {
+  const k = String(destination || "").toLowerCase();
+  let arrivalCode = "LGA";
+  let arrivalCity = "New York";
+  if (/san francisco|sf|bay area/.test(k)) {
+    arrivalCode = "SFO";
+    arrivalCity = "San Francisco";
+  } else if (/tokyo|japan/.test(k)) {
+    arrivalCode = "NRT";
+    arrivalCity = "Tokyo";
+  } else if (/los angeles|la\b/.test(k)) {
+    arrivalCode = "LAX";
+    arrivalCity = "Los Angeles";
+  } else if (/london|uk/.test(k)) {
+    arrivalCode = "LHR";
+    arrivalCity = "London";
+  } else if (/paris|france/.test(k)) {
+    arrivalCode = "CDG";
+    arrivalCity = "Paris";
+  } else if (/new york|nyc|manhattan/.test(k)) {
+    arrivalCode = "JFK";
+    arrivalCity = "New York";
+  }
+  return {
+    airline: "United",
+    flight_number: "UA1116",
+    status: "Ticketed",
+    departure: "San Francisco",
+    departure_code: "SFO",
+    departure_time: "12:35 pm",
+    arrival: arrivalCity,
+    arrival_code: arrivalCode,
+    arrival_time: "6:16 pm",
+    price: "350",
+    confirmation: "DT3P56",
+    fare: "Economy",
+    class: "Economy (W)",
+    duration: "3h 41m",
+    terminal: "3",
+    gate: "--",
+    mocked: true,
+  };
+}
+
+// Per-night spend ranges (USD) used to derive the budget mock from
+// destination + nights + adults. Keep these conservative for the prototype.
+const BUDGET_DAILY = {
+  nyc: { food: 90, transit: 25, activities: 60 },
+  sf: { food: 80, transit: 20, activities: 55 },
+  tokyo: { food: 60, transit: 15, activities: 50 },
+  generic: { food: 70, transit: 20, activities: 50 },
+};
+function budgetKeyForDestination(destination) {
+  const k = String(destination || "").toLowerCase();
+  if (/new york|nyc|manhattan/.test(k)) {
+    return "nyc";
+  }
+  if (/san francisco|sf|bay area/.test(k)) {
+    return "sf";
+  }
+  if (/tokyo|japan/.test(k)) {
+    return "tokyo";
+  }
+  return "generic";
+}
+function mockBudget(destination, nights, adults, flights, hotels) {
+  const safeNights = Math.max(1, Number(nights) || 3);
+  const safeAdults = Math.max(1, Number(adults) || 1);
+  const rates = BUDGET_DAILY[budgetKeyForDestination(destination)];
+
+  const flightCost =
+    (flights || []).reduce(
+      (sum, f) => sum + (Number(String(f.price).replace(/[^\d]/g, "")) || 0),
+      0
+    ) * safeAdults || 350 * safeAdults;
+  const hotelNightly =
+    Number((hotels || [])[0]?.price_per_night) ||
+    (budgetKeyForDestination(destination) === "tokyo" ? 220 : 320);
+  const hotelCost = hotelNightly * safeNights;
+  const foodCost = rates.food * safeNights * safeAdults;
+  const transitCost = rates.transit * safeNights * safeAdults;
+  const activitiesCost = rates.activities * safeNights * safeAdults;
+  const miscCost = Math.round((foodCost + transitCost + activitiesCost) * 0.1);
+
+  const bookings = [
+    { name: "Flights", price: flightCost },
+    { name: "Hotel", price: hotelCost },
+    { name: "Food & dining", price: foodCost },
+    { name: "Local transit", price: transitCost },
+    { name: "Activities & tickets", price: activitiesCost },
+    { name: "Misc + buffer", price: miscCost },
+  ];
+  const estimated = bookings.reduce((s, b) => s + b.price, 0);
+  // Set the "limit" 12% above estimate so the user reads as under budget.
+  const total = Math.round((estimated * 1.12) / 50) * 50;
+  return { bookings, estimated, total };
+}
+
+function mockPacking(destination, nights) {
+  const safeNights = Math.max(1, Number(nights) || 3);
+  const k = String(destination || "").toLowerCase();
+  const isCold = /tokyo|japan|london|paris/.test(k);
+  const isWarm = !isCold;
+  const tops = Math.min(8, Math.max(3, safeNights));
+  const bottoms = Math.min(4, Math.ceil(safeNights / 2));
+
+  const clothing = [
+    `${tops} shirts / tops`,
+    `${bottoms} pairs of pants or shorts`,
+    "Underwear + socks for each day",
+    "Light jacket or hoodie",
+    "Comfortable walking shoes",
+  ];
+  if (isWarm) {
+    clothing.push("Sunglasses + hat");
+    clothing.push("Sandals or sneakers");
+  }
+  if (isCold) {
+    clothing.push("Warm coat");
+    clothing.push("Scarf + gloves");
+  }
+  const dressy =
+    /new york|nyc|manhattan|san francisco|sf|tokyo|paris/.test(k);
+  if (dressy) {
+    clothing.push("One nicer outfit for dinner");
   }
 
-  if (!planData.destination) {
-    return { error: "Destination is required" };
+  return {
+    Documents: [
+      "Passport / ID",
+      "Travel insurance card",
+      "Booking confirmations (printed + on phone)",
+      "Credit + debit cards",
+      "Some local cash",
+    ],
+    Clothing: clothing,
+    Toiletries: [
+      "Toothbrush + toothpaste",
+      "Deodorant",
+      "Shampoo + conditioner",
+      "Sunscreen",
+      "Any prescription medication",
+      "Contact lenses / glasses",
+    ],
+    Electronics: [
+      "Phone + charger",
+      "Portable battery pack",
+      "Headphones",
+      "Camera (optional)",
+      "Travel adapter (if international)",
+    ],
+    "Day bag": [
+      "Reusable water bottle",
+      "Refillable snacks",
+      "Light umbrella or rain shell",
+      "Hand sanitizer",
+      "Notebook + pen",
+    ],
+  };
+}
+
+function mockHotel(destination) {
+  const k = String(destination || "").toLowerCase();
+  if (/new york|nyc|manhattan/.test(k)) {
+    return {
+      name: "The Plaza",
+      check_in: "2026-05-19",
+      check_out: "2026-05-20",
+      address: "768 5th Ave, New York, NY 10019",
+      price_per_night: "",
+      total_price: "",
+      source_url:
+        "https://www.expedia.com/New-York-Hotels-The-Plaza-Hotel.h28044.Hotel-Information?chkin=2026-05-19&chkout=2026-05-20&x_pwa=1&rfrr=HSR&pwa_ts=1778016852293&referrerUrl=aHR0cHM6Ly93d3cuZXhwZWRpYS5jb20vSG90ZWwtU2VhcmNo&useRewards=false&rm1=a2&regionId=2621&destination=New+York%2C+New+York%2C+United+States+of+America&destType=MARKET&neighborhoodId=553248633938969338&selected=28044&latLong=40.712843%2C-74.005966&sort=RECOMMENDED&top_dp=2138&top_cur=USD&gclid=CjwKCAjwqubPBhBOEiwAzgZX2pXVHTFhLp2Ce-3lVN3qLm_otC6DKGEFbtxjThen9vhG0uMA7pRY2hoCFA0QAvD_BwE&semcid=US.B.GOOGLE.BD-c-EN.HOTEL&semdtl=a118930182577.b1150843516384.g1kwd-309376493642.e1c.m1CjwKCAjwqubPBhBOEiwAzgZX2pXVHTFhLp2Ce-3lVN3qLm_otC6DKGEFbtxjThen9vhG0uMA7pRY2hoCFA0QAvD_BwE.r18593aef9e30cb6ef591574221b22d031edc381296cf844ef2ea416870ead5161.c16CpyebuuOcfC9YnvBqLSQA.j11013697.k1.d1640987373014.h1p.i1.l1.n1.o1.p1.q1.s1expedia+new+york.t1.x1.f1.u1.v1.w1&userIntent=&selectedRoomType=201286654&selectedRatePlan=206233023&categorySearch=any_option&searchId=b7a1f963-d594-4f2a-ab8c-2244d082110f",
+      // Wikimedia photo of The Plaza — rendered immediately so the card
+      // isn't blank when Expedia rate-limits the OG fetch (it usually does).
+      // The async OG fetch can still upgrade this if it succeeds.
+      image_url:
+        "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Plaza_Hotel_May_2010.JPG/1280px-Plaza_Hotel_May_2010.JPG",
+      site_name: "expedia.com",
+      rating: "4.5",
+      mocked: true,
+    };
+  }
+  return {
+    name: "Hotel placeholder",
+    check_in: "",
+    check_out: "",
+    address: "",
+    price_per_night: "",
+    total_price: "",
+    source_url: "",
+    image_url: "",
+    site_name: "",
+    mocked: true,
+  };
+}
+
+export async function generateTravelPlan(toolParams, securityProperties, context) {
+  // Be permissive: a parse failure or missing param should never block the
+  // user. Default to {} and let the skeleton-fill below produce a usable
+  // plan from the destination alone.
+  let planData = {};
+  try {
+    if (typeof toolParams?.plan === "string") {
+      planData = JSON.parse(toolParams.plan);
+    } else if (toolParams?.plan && typeof toolParams.plan === "object") {
+      planData = toolParams.plan;
+    }
+  } catch (e) {
+    lazy.console.warn("[Tool] generateTravelPlan parse failed; using empty plan:", e);
+    planData = {};
+  }
+  planData = planData && typeof planData === "object" ? planData : {};
+
+  // Don't clobber a populated plan with a skeleton. If the LLM called with
+  // no destination but the user already has an active trip in the pref,
+  // inherit the existing destination + any fields the LLM didn't supply.
+  // This protects against the "click Generate again, plan goes blank" trap.
+  const incomingHasDestination =
+    planData.destination &&
+    String(planData.destination).trim() &&
+    String(planData.destination).trim().toLowerCase() !== "trip";
+  if (!incomingHasDestination) {
+    try {
+      const existingRaw = Services.prefs.getStringPref(
+        "browser.smartwindow.tripPlanData",
+        ""
+      );
+      const existing = existingRaw ? JSON.parse(existingRaw) : null;
+      if (
+        existing &&
+        existing.destination &&
+        String(existing.destination).trim().toLowerCase() !== "trip"
+      ) {
+        planData.destination = planData.destination || existing.destination;
+        if (!planData.name && existing.name) {
+          planData.name = existing.name;
+        }
+        if (!planData.dates && existing.dates) {
+          planData.dates = existing.dates;
+        }
+        if (!planData.nights && existing.nights) {
+          planData.nights = existing.nights;
+        }
+        if (!planData.adults && existing.adults) {
+          planData.adults = existing.adults;
+        }
+        if (
+          (!Array.isArray(planData.itinerary) || !planData.itinerary.length) &&
+          Array.isArray(existing.itinerary) &&
+          existing.itinerary.length
+        ) {
+          planData.itinerary = existing.itinerary;
+        }
+        if (
+          (!Array.isArray(planData.flights) || !planData.flights.length) &&
+          Array.isArray(existing.flights) &&
+          existing.flights.length
+        ) {
+          planData.flights = existing.flights;
+        }
+        if (
+          (!Array.isArray(planData.hotels) || !planData.hotels.length) &&
+          Array.isArray(existing.hotels) &&
+          existing.hotels.length
+        ) {
+          planData.hotels = existing.hotels;
+        }
+        if (!planData.weather && existing.weather) {
+          planData.weather = existing.weather;
+        }
+        if (
+          (!Array.isArray(planData.alerts) || !planData.alerts.length) &&
+          Array.isArray(existing.alerts) &&
+          existing.alerts.length
+        ) {
+          planData.alerts = existing.alerts;
+        }
+      }
+    } catch (e) {
+      lazy.console.warn("[Tool] generateTravelPlan: pref restore failed:", e);
+    }
   }
 
-  // Store the plan data in a pref for the full-page HTML to read
+  // Skeleton-fill: every field is optional. Only requirement is *some*
+  // identifying string — destination preferred, otherwise plan name.
+  const destination = String(planData.destination || planData.name || "Trip");
+  planData.destination = destination;
+  planData.name = String(planData.name || `Trip to ${destination}`);
+  planData.dates = String(planData.dates || "");
+  planData.nights = Number(planData.nights) || 0;
+  planData.adults = Number(planData.adults) || 1;
+  planData.budget_total = Number(planData.budget_total) || 0;
+  planData.budget_estimated = Number(planData.budget_estimated) || 0;
+  planData.preferences = Array.isArray(planData.preferences)
+    ? planData.preferences
+    : [];
+  planData.bookings = Array.isArray(planData.bookings) ? planData.bookings : [];
+  planData.flights = Array.isArray(planData.flights) ? planData.flights : [];
+  planData.hotels = Array.isArray(planData.hotels) ? planData.hotels : [];
+  planData.alerts = Array.isArray(planData.alerts) ? planData.alerts : [];
+  planData.source_urls = Array.isArray(planData.source_urls)
+    ? planData.source_urls
+    : [];
+  planData.weather =
+    planData.weather && typeof planData.weather === "object"
+      ? planData.weather
+      : null;
+  if (!planData.weather || !planData.weather.condition) {
+    const live = await fetchDestinationWeather(destination);
+    if (live) {
+      planData.weather = live;
+    }
+  }
+  planData.packing =
+    planData.packing && typeof planData.packing === "object"
+      ? planData.packing
+      : {};
+
+  // Mock itinerary: 3-6 activities per day with realistic timeslots and
+  // destination-aware suggestions. Marked as mock so the LLM can replace
+  // them when the user provides specifics.
+  if (!Array.isArray(planData.itinerary) || !planData.itinerary.length) {
+    const dayCount = Math.max(1, Number(planData.nights) || 3);
+    planData.itinerary = mockItinerary(destination, dayCount);
+  }
+
+  // Mock flight: a single round-trip-leg flight from a major hub. The user
+  // can replace via mutate_trip when they have real booking details.
+  if (!planData.flights.length) {
+    planData.flights = [mockFlight(destination)];
+  }
+
+  // Mock hotel: when the destination is NYC-flavored, default to The Plaza
+  // and kick off an OG-image fetch in the background. Other destinations get
+  // a generic placeholder; the user can paste a booking URL to update.
+  if (!planData.hotels.length) {
+    const seedHotel = mockHotel(destination);
+    planData.hotels = [seedHotel];
+    if (seedHotel.source_url) {
+      // Background OG fetch — same pattern as replace_hotel. Best-effort.
+      (async () => {
+        try {
+          const og = await fetchOgMeta(seedHotel.source_url);
+          if (!og) {
+            return;
+          }
+          let changed = false;
+          if (og.image_url && !seedHotel.image_url) {
+            seedHotel.image_url = og.image_url;
+            changed = true;
+          }
+          if (og.site_name && !seedHotel.site_name) {
+            seedHotel.site_name = og.site_name;
+            changed = true;
+          }
+          if (changed) {
+            Services.prefs.setStringPref(
+              "browser.smartwindow.tripPlanData",
+              JSON.stringify(planData)
+            );
+            Services.obs.notifyObservers(null, "trip-plan-data-updated");
+          }
+        } catch (e) {
+          lazy.console.warn("[Tool] mock-hotel OG fetch failed:", e);
+        }
+      })();
+    }
+  }
+
+  // Mock budget breakdown using flights + hotel costs computed above.
+  if (
+    !Array.isArray(planData.bookings) ||
+    !planData.bookings.length ||
+    !Number(planData.budget_estimated) ||
+    !Number(planData.budget_total)
+  ) {
+    const b = mockBudget(
+      destination,
+      planData.nights,
+      planData.adults,
+      planData.flights,
+      planData.hotels
+    );
+    if (!planData.bookings.length) {
+      planData.bookings = b.bookings;
+    }
+    if (!Number(planData.budget_estimated)) {
+      planData.budget_estimated = b.estimated;
+    }
+    if (!Number(planData.budget_total)) {
+      planData.budget_total = b.total;
+    }
+  }
+
+  // Mock packing list keyed by destination + duration.
+  if (
+    !planData.packing ||
+    typeof planData.packing !== "object" ||
+    !Object.keys(planData.packing).length
+  ) {
+    planData.packing = mockPacking(destination, planData.nights);
+  }
+
+  planData.is_skeleton = false;
+
   try {
     Services.prefs.setStringPref(
       "browser.smartwindow.tripPlanData",
@@ -1019,26 +1773,23 @@ export async function generateTravelPlan(toolParams, securityProperties, context
     lazy.console.error("[Tool] generateTravelPlan pref error:", e);
   }
 
-  // Open the trip plan page in split view with the user's content tab
+  let openedPlanTab = null;
+  let aiWindowTab = null;
+  let groupedTravelTabs = [];
   try {
     const win = lazy.BrowserWindowTracker.getTopWindow();
     if (win?.gBrowser) {
-      // Find the user's actual content tab (http/https), not an internal page
-      let contentTab = null;
+      const isAiWindowUrl = url =>
+        url === "chrome://browser/content/aiwindow/aiWindow.html";
       const selected = win.gBrowser.selectedTab;
       const selectedUrl = selected.linkedBrowser?.currentURI?.spec || "";
-      if (
-        selectedUrl.startsWith("http://") ||
-        selectedUrl.startsWith("https://")
-      ) {
-        contentTab = selected;
+      if (isAiWindowUrl(selectedUrl)) {
+        aiWindowTab = selected;
       } else {
-        // Fall back to the most recent tab with a web URL
-        const tabs = [...win.gBrowser.tabs].reverse();
-        for (const tab of tabs) {
+        for (const tab of win.gBrowser.tabs) {
           const url = tab.linkedBrowser?.currentURI?.spec || "";
-          if (url.startsWith("http://") || url.startsWith("https://")) {
-            contentTab = tab;
+          if (isAiWindowUrl(url)) {
+            aiWindowTab = tab;
             break;
           }
         }
@@ -1052,17 +1803,79 @@ export async function generateTravelPlan(toolParams, securityProperties, context
           inBackground: true,
         }
       );
+      openedPlanTab = planTab;
+      // Open the plan tab front-and-center. No split view — the user sees
+      // a single trip plan page with the conversation continuing in the
+      // sidebar on the right.
+      win.gBrowser.selectedTab = planTab;
 
-      if (contentTab) {
-        // If content tab is already in a split view, unsplit first
-        if (contentTab.splitView) {
-          contentTab.splitView.unsplitTabs();
+      // Tab grouping: collect travel-related tabs by domain match + the plan
+      // tab itself. Place them in a single colored group named after the trip.
+      try {
+        const TRAVEL_HINTS = [
+          ...TRAVEL_DOMAIN_ALLOWLIST,
+          destination.toLowerCase(),
+        ];
+        const matchesTravel = url => {
+          if (!url) {
+            return false;
+          }
+          const lower = url.toLowerCase();
+          return TRAVEL_HINTS.some(h => lower.includes(h));
+        };
+        const travelTabs = [...win.gBrowser.tabs].filter(
+          t =>
+            t !== planTab &&
+            t !== aiWindowTab &&
+            !t.group &&
+            !t.splitView &&
+            matchesTravel(t.linkedBrowser?.currentURI?.spec)
+        );
+        const tabsToGroup = [...travelTabs];
+        if (!planTab.group) {
+          tabsToGroup.push(planTab);
         }
-        // Create split view: user's page on the left, plan on the right
-        win.gBrowser.addTabSplitView([contentTab, planTab]);
-      } else {
-        // No web content tab found — just select the plan tab
-        win.gBrowser.selectedTab = planTab;
+        if (tabsToGroup.length >= 2) {
+          win.gBrowser.addTabGroup(tabsToGroup, {
+            label: `Trip: ${destination}`,
+            color: "blue",
+          });
+          groupedTravelTabs = travelTabs.map(
+            t => t.linkedBrowser?.currentURI?.spec
+          );
+        }
+      } catch (e) {
+        lazy.console.error("[Tool] generateTravelPlan tab-group error:", e);
+      }
+
+      // Collapse the full-page AI Window into the sidebar so the chat
+      // anchors next to the artifact, then CLOSE the now-redundant
+      // full-page tab. Otherwise the user sees two chat surfaces
+      // (the original full-page tab + the sidebar) and the plan tab feels
+      // disconnected.
+      try {
+        if (aiWindowTab) {
+          await lazy.AIWindow.moveConversationToSidebar(win, aiWindowTab);
+          // Defer the tab close to next tick so the sidebar has a moment to
+          // mount the conversation before the source tab is removed.
+          win.setTimeout(() => {
+            try {
+              if (aiWindowTab.isConnected !== false) {
+                win.gBrowser.removeTab(aiWindowTab, {
+                  animate: false,
+                  skipPermitUnload: true,
+                });
+              }
+            } catch (e) {
+              lazy.console.warn(
+                "[Tool] generateTravelPlan: could not close full-page tab:",
+                e
+              );
+            }
+          }, 300);
+        }
+      } catch (e) {
+        lazy.console.error("[Tool] generateTravelPlan sidebar switch:", e);
       }
     }
   } catch (e) {
@@ -1070,7 +1883,12 @@ export async function generateTravelPlan(toolParams, securityProperties, context
   }
 
   securityProperties.setPrivateData();
-  lazy.console.log("[Tool] generateTravelPlan", planData);
+  lazy.console.log("[Tool] generateTravelPlan", {
+    destination,
+    is_skeleton: planData.is_skeleton,
+    grouped: groupedTravelTabs.length,
+    planTabOpened: !!openedPlanTab,
+  });
   return planData;
 }
 
@@ -1361,12 +2179,30 @@ function makeStubTripPlan({
       source: use_tab_context ? "tabs" : "general",
       tab_count: tabs.length,
     },
-    tabs: tabs.slice(0, 10).map(t => ({
-      id: t.url || t.id,
-      title: t.title,
-      url: t.url,
-      favicon: t.url ? `page-icon:${t.url}` : null,
-    })),
+    tabs: (() => {
+      // Defense-in-depth de-dup by URL — even though getOpenTabs / proposeTabScope
+      // already de-dup, this guards against future callers passing pre-merged
+      // tab arrays.
+      const seen = new Set();
+      const out = [];
+      for (const t of tabs) {
+        const key = t.url || t.id;
+        if (!key || seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        out.push({
+          id: key,
+          title: t.title,
+          url: t.url,
+          favicon: t.url ? `page-icon:${t.url}` : null,
+        });
+        if (out.length >= 10) {
+          break;
+        }
+      }
+      return out;
+    })(),
   };
 }
 
@@ -1469,7 +2305,10 @@ export async function mutateTrip(toolParams, conversation) {
   if (!plan) {
     return { error: "No active trip to mutate." };
   }
-  if (params.trip_id && params.trip_id !== plan.trip_id) {
+  // Only enforce the trip_id check when BOTH sides have one. The chrome-page
+  // (v0) plan has no trip_id, and the LLM may pass a stale id from prior
+  // context — that's a no-op cross-check for a single active trip.
+  if (params.trip_id && plan.trip_id && params.trip_id !== plan.trip_id) {
     return { error: "trip_id does not match the active trip." };
   }
 
@@ -1479,43 +2318,210 @@ export async function mutateTrip(toolParams, conversation) {
 
   switch (type) {
     case "swap_activity": {
-      const dayIdx = plan.days.findIndex(d => d.day === payload.day);
-      if (dayIdx === -1) {
+      // Mutate BOTH shapes when present: v1 plan.days (in-chat artifact) and
+      // v0 plan.itinerary (chrome trip-plan page). Either may be missing
+      // depending on which surface created the plan.
+      const v1Days = Array.isArray(plan.days) ? plan.days : [];
+      const v0It = Array.isArray(plan.itinerary) ? plan.itinerary : [];
+      const v1Idx = v1Days.findIndex(d => d.day === payload.day);
+      const v0Idx = v0It.findIndex(d => d.day === payload.day);
+      if (v1Idx === -1 && v0Idx === -1) {
         return { error: `Day ${payload.day} not found.` };
       }
-      const day = plan.days[dayIdx];
-      let actIdx = day.activities.findIndex(a => a.id === payload.activity_id);
-      if (actIdx === -1 && payload.activity_index != null) {
-        actIdx = payload.activity_index;
+      const newTitle = payload.new_title || payload.new_text || "";
+      const newLocation = payload.new_location ?? "";
+      const newNote = payload.new_note ?? "";
+      let touched = false;
+      if (v1Idx !== -1) {
+        const day = v1Days[v1Idx];
+        let actIdx = day.activities.findIndex(
+          a => a.id === payload.activity_id
+        );
+        if (actIdx === -1 && payload.activity_index != null) {
+          actIdx = payload.activity_index;
+        }
+        if (actIdx >= 0 && actIdx < day.activities.length) {
+          const before = { ...day.activities[actIdx] };
+          day.activities[actIdx] = {
+            ...before,
+            title: newTitle || before.title,
+            location: newLocation || before.location,
+          };
+          diff.push({
+            op: "replace",
+            path: `days[${v1Idx}].activities[${actIdx}]`,
+            value: day.activities[actIdx],
+          });
+          touched = true;
+        }
       }
-      if (actIdx < 0 || actIdx >= day.activities.length) {
+      if (v0Idx !== -1) {
+        const day = v0It[v0Idx];
+        let actIdx = -1;
+        if (payload.activity_index != null) {
+          actIdx = payload.activity_index;
+        }
+        if (actIdx === -1 && payload.activity_time) {
+          actIdx = day.activities.findIndex(
+            a =>
+              String(a.time).toLowerCase() ===
+              String(payload.activity_time).toLowerCase()
+          );
+        }
+        if (actIdx === -1) {
+          actIdx = 0;
+        }
+        if (actIdx >= 0 && actIdx < day.activities.length) {
+          const before = { ...day.activities[actIdx] };
+          day.activities[actIdx] = {
+            ...before,
+            text: newTitle || before.text,
+            note: newNote || before.note,
+          };
+          diff.push({
+            op: "replace",
+            path: `itinerary[${v0Idx}].activities[${actIdx}]`,
+            value: day.activities[actIdx],
+          });
+          touched = true;
+        }
+      }
+      if (!touched) {
         return { error: "Activity not found." };
       }
-      const before = { ...day.activities[actIdx] };
-      day.activities[actIdx] = {
-        ...before,
-        title: payload.new_title || before.title,
-        location: payload.new_location ?? before.location,
-      };
-      diff.push({
-        op: "replace",
-        path: `days[${dayIdx}].activities[${actIdx}]`,
-        value: day.activities[actIdx],
-      });
-      mutatedPath = { kind: "activity", activity_id: day.activities[actIdx].id };
+      mutatedPath = { kind: "activity", day: payload.day };
+      break;
+    }
+    case "replace_day": {
+      // Full-day rebrand: replace title and/or all activities for a given day.
+      // Used for asks like "swap day 1 to upper west side" or "make day 3 a
+      // beach day". Writes to BOTH v0 itinerary and v1 days.
+      const targetDay = Number(payload.day);
+      if (!Number.isFinite(targetDay)) {
+        return { error: "replace_day requires payload.day (integer)." };
+      }
+      const newTitle = payload.title || payload.theme || "";
+      const newActsRaw = Array.isArray(payload.activities)
+        ? payload.activities
+        : [];
+      if (!newTitle && !newActsRaw.length) {
+        return { error: "replace_day requires title or activities." };
+      }
+      const v0Acts = newActsRaw.map(a => ({
+        time: a.time || a.slot || "",
+        text: a.text || a.title || "",
+        note: a.note || "",
+      }));
+      const v1Acts = newActsRaw.map((a, i) => ({
+        id: `d${targetDay}-a${i + 1}`,
+        time: a.time || a.slot || "",
+        title: a.text || a.title || "",
+        location: a.location || "",
+      }));
+      let touched = false;
+      const it = Array.isArray(plan.itinerary) ? plan.itinerary : [];
+      const v0Idx = it.findIndex(d => d.day === targetDay);
+      if (v0Idx !== -1) {
+        if (newTitle) {
+          it[v0Idx].title = newTitle;
+        }
+        if (v0Acts.length) {
+          it[v0Idx].activities = v0Acts;
+        }
+        touched = true;
+      }
+      const days = Array.isArray(plan.days) ? plan.days : [];
+      const v1Idx = days.findIndex(d => d.day === targetDay);
+      if (v1Idx !== -1) {
+        if (newTitle) {
+          days[v1Idx].title = newTitle;
+        }
+        if (v1Acts.length) {
+          days[v1Idx].activities = v1Acts;
+        }
+        touched = true;
+      }
+      if (!touched) {
+        return { error: `Day ${targetDay} not found.` };
+      }
+      diff.push({ op: "replace", path: `day_${targetDay}`, value: { title: newTitle, activities: v0Acts } });
+      mutatedPath = { kind: "day", day: targetDay };
       break;
     }
     case "replace_hotel": {
+      // Apply the mutation IMMEDIATELY with whatever data we have; do NOT
+      // block the LLM tool result on the OG fetch. Otherwise the chat
+      // appears to hang for 3-6s while we scrape the booking site.
+      const initialName = payload.name || "Hotel";
+      const initialImage = payload.image_url || "";
       plan.hotel_slot = {
         filled: true,
-        name: payload.name,
+        name: initialName,
         price: payload.price,
         check_in: payload.check_in,
         check_out: payload.check_out,
         source_url: payload.source_url,
+        image_url: initialImage,
+        site_name: "",
       };
+      plan.hotels = [
+        {
+          name: initialName,
+          check_in: payload.check_in || "",
+          check_out: payload.check_out || "",
+          address: payload.address || "",
+          price_per_night: payload.price_per_night || "",
+          total_price: payload.price || "",
+          source_url: payload.source_url || "",
+          image_url: initialImage,
+          site_name: "",
+        },
+      ];
       diff.push({ op: "replace", path: "hotel_slot", value: plan.hotel_slot });
+      diff.push({ op: "replace", path: "hotels", value: plan.hotels });
       mutatedPath = { kind: "hotel" };
+
+      // Background enrichment: fetch OG metadata, then patch the live plan
+      // and re-propagate. The chrome page observer picks up the second
+      // pref write and re-renders with the image + canonical title.
+      if (payload.source_url) {
+        (async () => {
+          try {
+            const og = await fetchOgMeta(payload.source_url);
+            if (!og) {
+              return;
+            }
+            let changed = false;
+            if (og.image_url && !plan.hotels[0].image_url) {
+              plan.hotels[0].image_url = og.image_url;
+              plan.hotel_slot.image_url = og.image_url;
+              changed = true;
+            }
+            if (
+              og.title &&
+              (!payload.name || plan.hotels[0].name === "Hotel")
+            ) {
+              plan.hotels[0].name = og.title;
+              plan.hotel_slot.name = og.title;
+              changed = true;
+            }
+            if (og.site_name) {
+              plan.hotels[0].site_name = og.site_name;
+              plan.hotel_slot.site_name = og.site_name;
+              changed = true;
+            }
+            if (changed) {
+              Services.prefs.setStringPref(
+                "browser.smartwindow.tripPlanData",
+                JSON.stringify(plan)
+              );
+              Services.obs.notifyObservers(null, "trip-plan-data-updated");
+            }
+          } catch (e) {
+            lazy.console.warn("[Tool] OG enrichment background failed:", e);
+          }
+        })();
+      }
       break;
     }
     case "replace_flight": {
@@ -1528,19 +2534,35 @@ export async function mutateTrip(toolParams, conversation) {
         price: payload.price,
         source_url: payload.source_url,
       };
+      // v0 chrome page renders from plan.flights[] — mirror the slot.
+      plan.flights = [
+        {
+          carrier: payload.carrier || "",
+          flight_no: payload.flight_no || "",
+          depart: payload.depart || "",
+          arrive: payload.arrive || "",
+          price: payload.price || "",
+          source_url: payload.source_url || "",
+        },
+      ];
       diff.push({ op: "replace", path: "flight_slot", value: plan.flight_slot });
+      diff.push({ op: "replace", path: "flights", value: plan.flights });
       mutatedPath = { kind: "flight" };
       break;
     }
     case "clear_hotel": {
       plan.hotel_slot = { filled: false, placeholder: "Add a hotel" };
+      plan.hotels = [];
       diff.push({ op: "replace", path: "hotel_slot", value: plan.hotel_slot });
+      diff.push({ op: "replace", path: "hotels", value: plan.hotels });
       mutatedPath = { kind: "hotel" };
       break;
     }
     case "clear_flight": {
       plan.flight_slot = { filled: false, placeholder: "Pick a flight" };
+      plan.flights = [];
       diff.push({ op: "replace", path: "flight_slot", value: plan.flight_slot });
+      diff.push({ op: "replace", path: "flights", value: plan.flights });
       mutatedPath = { kind: "flight" };
       break;
     }
@@ -1594,6 +2616,18 @@ export async function mutateTrip(toolParams, conversation) {
 
   conversation._tripPlanV1 = plan;
   conversation.securityProperties.setPrivateData();
+  // Propagate to the chrome-page renderer (tripPlan.html). The page observes
+  // "trip-plan-data-updated" and re-renders from the pref. Keeps the in-chat
+  // artifact and the open chrome page in sync — single source of truth.
+  try {
+    Services.prefs.setStringPref(
+      "browser.smartwindow.tripPlanData",
+      JSON.stringify(plan)
+    );
+    Services.obs.notifyObservers(null, "trip-plan-data-updated");
+  } catch (e) {
+    lazy.console.warn("[Tool] mutateTrip propagation failed:", e);
+  }
   lazy.console.log("[Tool] mutateTrip", { type, diff });
   return {
     diff,
@@ -1688,6 +2722,35 @@ export async function openSearchSplitView(toolParams, conversation) {
   return payload;
 }
 
+/**
+ * lookup_lodging_history: search local Places for lodging-domain pages the user
+ * viewed in the last N days. Used by the LLM when the user mentions where
+ * they're staying. Local-only, no network.
+ *
+ * @param {object} toolParams
+ * @returns {Promise<object>}
+ */
+export async function lookupLodgingHistory(toolParams) {
+  const params = toolParams && typeof toolParams === "object" ? toolParams : {};
+  try {
+    const result = await lazy.HistoryQuery.lookupLodging({
+      keyword: typeof params.keyword === "string" ? params.keyword : "",
+      destination:
+        typeof params.destination === "string" ? params.destination : "",
+      days: Number(params.days) || 30,
+      limit: 5,
+    });
+    return result;
+  } catch (e) {
+    lazy.console.error("[Tool] lookupLodgingHistory error:", e);
+    return {
+      matches: [],
+      domain_filter: [],
+      message: "Lookup failed — share the booking URL?",
+    };
+  }
+}
+
 export const toolFns = {
   getOpenTabs,
   searchBrowsingHistory,
@@ -1698,6 +2761,7 @@ export const toolFns = {
   proposeTabScope,
   mutateTrip,
   openSearchSplitView,
+  lookupLodgingHistory,
 };
 
 // Global observer: when sampleSearch.html "Add to trip" fires, route the pick
@@ -1767,4 +2831,61 @@ function registerTripPickObserver() {
 // Lazily register the observer on module load.
 try {
   registerTripPickObserver();
+} catch (_) {}
+
+// Local-edit observer: lets the AI Window content (sidebar) trigger a trip
+// mutation without going through the LLM. The content side notifies via
+// Services.obs with topic "smartwindow-trip-edit" and an nsISupportsString
+// JSON payload of the same shape mutate_trip expects. We hydrate a minimal
+// conversation context from the live tripPlanData pref so mutateTrip can
+// run in the chrome process.
+let _tripEditObserverRegistered = false;
+function registerTripEditObserver() {
+  if (_tripEditObserverRegistered) {
+    return;
+  }
+  const observer = {
+    observe(subject, topic) {
+      if (topic !== "smartwindow-trip-edit") {
+        return;
+      }
+      let params;
+      try {
+        const data = subject.QueryInterface(Ci.nsISupportsString).data;
+        params = JSON.parse(data);
+      } catch (e) {
+        lazy.console.warn("[TripEdit] bad subject:", e);
+        return;
+      }
+      const pref = Services.prefs.getStringPref(
+        "browser.smartwindow.tripPlanData",
+        ""
+      );
+      if (!pref) {
+        return;
+      }
+      let plan;
+      try {
+        plan = JSON.parse(pref);
+      } catch {
+        return;
+      }
+      const conv = {
+        _tripPlanV1: plan,
+        securityProperties: { setPrivateData() {} },
+      };
+      mutateTrip(params, conv).catch(e =>
+        lazy.console.warn("[TripEdit] mutateTrip failed:", e)
+      );
+    },
+  };
+  try {
+    Services.obs.addObserver(observer, "smartwindow-trip-edit");
+    _tripEditObserverRegistered = true;
+  } catch (e) {
+    lazy.console.warn("[TripEdit] observer registration failed:", e);
+  }
+}
+try {
+  registerTripEditObserver();
 } catch (_) {}

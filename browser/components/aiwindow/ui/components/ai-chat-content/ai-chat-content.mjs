@@ -415,21 +415,36 @@ export class AIChatContent extends MozLitElement {
       ? []
       : followUpSuggestions.slice(0, FOLLOW_UP_QTY);
 
-    let tripData = null;
+    // Preserve any artifact data already stashed on this assistant entry
+    // from a prior streaming chunk OR from a tool actor message that arrived
+    // before this chunk. Without this, a tool result that fires mid-stream
+    // (e.g. plan_trip emitting AIChatContent:TripPlanV1 between two chunks
+    // of streamed assistant text) is wiped on the next chunk because the
+    // entry is replaced wholesale. This was the BUILD-1 root cause in
+    // qa-report-1.md: the actor message arrived, set target.tripPlanV1,
+    // and was then overwritten by the next streaming chunk before the
+    // user could see it.
+    const existing = this.conversationState[ordinal];
+    let tripData = existing?.tripData ?? null;
     if (this.#tripExpected && this.#pendingTripData) {
       tripData = this.#pendingTripData;
       this.#pendingTripData = null;
       this.#tripExpected = false;
     }
 
-    let tripPlanV1 = null;
+    let tripPlanV1 = existing?.tripPlanV1 ?? null;
     if (this.#tripPlanV1Expected && this.#pendingTripPlanV1) {
       tripPlanV1 = this.#pendingTripPlanV1;
       this.#pendingTripPlanV1 = null;
       this.#tripPlanV1Expected = false;
     }
+    // If both v0 tripData and v1 tripPlanV1 are set, prefer v1 (matches the
+    // #handleTripPlanV1 policy of clearing v0 on v1 arrival).
+    if (tripPlanV1) {
+      tripData = null;
+    }
 
-    let tabScopeProposal = null;
+    let tabScopeProposal = existing?.tabScopeProposal ?? null;
     if (this.#tabScopeExpected && this.#pendingTabScopeProposal) {
       tabScopeProposal = this.#pendingTabScopeProposal;
       this.#pendingTabScopeProposal = null;

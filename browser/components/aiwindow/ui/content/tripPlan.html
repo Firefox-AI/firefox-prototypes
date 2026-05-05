@@ -7,7 +7,7 @@
     <meta charset="utf-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src resource: chrome: 'unsafe-inline'; object-src 'none'; img-src chrome: blob: data:; script-src 'unsafe-inline' chrome: resource:;"
+      content="default-src resource: chrome: 'unsafe-inline'; object-src 'none'; img-src chrome: blob: data: https:; script-src 'unsafe-inline' chrome: resource:;"
     />
     <meta name="color-scheme" content="light" />
     <title>Trip Plan</title>
@@ -201,8 +201,48 @@ body {
 .weather-temps-text { font-size: 13px; color: var(--text-2); margin-top: 2px; }
 .weather-season-note { font-size: 12px; color: var(--text-3); margin-top: 2px; }
 
+.weather-forecast {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  padding: 12px 20px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  margin-top: -16px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+.weather-forecast-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border-radius: 8px;
+}
+.weather-forecast-day:hover { background: var(--accent-pale); }
+.weather-forecast-date { font-size: 12px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.4px; }
+.weather-forecast-icon { font-size: 22px; line-height: 1; }
+.weather-forecast-temps { font-size: 12px; color: var(--text); font-weight: 600; }
+.weather-forecast-temps .lo { color: var(--text-3); font-weight: 500; margin-left: 4px; }
+
+.weather-stack { margin-bottom: 16px; }
+.weather-stack .weather-widget { margin-bottom: 0; border-radius: var(--radius) var(--radius) 0 0; }
+.weather-stack .weather-forecast { margin-top: 0; }
+
 /* Info tiles */
 .info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+
+.overview-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin: 24px 0 10px;
+}
 @media (max-width: 500px) { .info-grid { grid-template-columns: 1fr 1fr; } }
 
 .info-tile {
@@ -217,44 +257,167 @@ body {
 .info-tile-label { font-size: 11px; color: var(--text-3); margin-top: 2px; font-weight: 500; }
 
 /* Flight cards */
+/* Flight cards — clean polished style */
 .flight-card-fp {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 18px 20px;
+  padding: 20px 22px;
   margin-bottom: 12px;
 }
 
-.flight-header-fp { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-.flight-airline-fp { font-size: 14px; font-weight: 700; color: var(--text); }
-.flight-number-fp { font-size: 12px; color: var(--text-3); }
-.flight-status-fp { margin-left: auto; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
-.status-confirmed-fp { background: var(--green-pale); color: var(--green); }
-.status-researched-fp, .status-pending-fp { background: var(--orange-pale); color: var(--orange); }
-
-.flight-route-fp { display: flex; align-items: center; gap: 16px; }
-.flight-ep { flex: 1; }
-.flight-ep-city { font-size: 18px; font-weight: 800; color: var(--text); }
-.flight-ep-time { font-size: 12px; color: var(--text-3); margin-top: 2px; }
-.flight-arrow-fp { color: var(--accent); font-size: 20px; }
-.flight-price-fp { font-size: 16px; font-weight: 700; color: var(--accent); margin-top: 12px; text-align: right; }
-
-/* Hotel cards */
-.hotel-card-fp {
-  background: var(--card);
-  border: 2px solid var(--accent);
-  border-radius: 14px;
-  overflow: hidden;
+.flight-card-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
   margin-bottom: 16px;
 }
+.flight-airline-logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #1a3a8c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.flight-airline-logo svg { width: 22px; height: 22px; color: #fff; }
+.flight-airline-info { display: flex; align-items: baseline; gap: 8px; flex: 1; }
+.flight-airline-fp { font-size: 16px; font-weight: 700; color: var(--text); }
+.flight-number-fp { font-size: 14px; color: var(--text); font-weight: 600; letter-spacing: 0.2px; }
+.flight-status-fp {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--green);
+  color: var(--green);
+  background: var(--green-pale);
+}
+.status-pending-fp, .status-researched-fp {
+  border-color: var(--orange);
+  color: var(--orange);
+  background: var(--orange-pale);
+}
 
-.hotel-card-header-fp { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; background: var(--accent-pale); }
-.hotel-label-fp { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); }
-.hotel-body-fp { padding: 14px 16px; }
-.hotel-main-fp { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
-.hotel-detail-fp { font-size: 12px; color: var(--text-2); line-height: 1.5; }
-.hotel-price-fp { font-size: 13px; font-weight: 700; color: var(--accent); margin-top: 8px; }
+.flight-times-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+.flight-time-cell {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.flight-time-cell.right { justify-content: flex-end; }
+.flight-time-large { font-size: 26px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
+.flight-time-date { font-size: 13px; color: var(--text-3); font-weight: 500; }
+
+.flight-route-fp {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding-top: 4px;
+}
+.flight-ep { display: flex; flex-direction: column; }
+.flight-ep.right { align-items: flex-end; }
+.flight-ep-code { font-size: 18px; font-weight: 700; color: var(--text); letter-spacing: 0.5px; }
+.flight-ep-city { font-size: 13px; color: var(--text-3); margin-top: 2px; font-weight: 500; }
+.flight-route-line { height: 1px; background: var(--border); width: 100%; }
+
+.flight-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 28px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.flight-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  font-size: 14px;
+}
+.flight-detail-label { color: var(--text-3); font-weight: 500; }
+.flight-detail-value { color: var(--text); font-weight: 600; }
+.flight-amenity-icons { display: flex; gap: 8px; align-items: center; }
+.flight-amenity-icons svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-2);
+}
+.flight-amenity-icons .amenity-icon-bg {
+  width: 22px; height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--text-2);
+  border-radius: 4px;
+}
+.flight-amenity-icons .amenity-icon-bg svg { color: #fff; width: 14px; height: 14px; }
+.flight-price-fp { font-size: 16px; font-weight: 700; color: var(--accent); margin-top: 12px; text-align: right; }
+
+/* Hotel cards — match the same clean style as flights/weather */
+.hotel-card-fp {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.hotel-card-header-fp {
+  padding: 14px 20px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.hotel-label-fp {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-3);
+}
+.hotel-image-fp {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.hotel-body-fp { padding: 14px 20px 18px; }
+.hotel-main-fp {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: var(--text);
+  text-decoration: none;
+}
+a.hotel-main-fp:hover { color: var(--accent); text-decoration: underline; }
+.hotel-detail-fp { font-size: 13px; color: var(--text-2); line-height: 1.55; }
+.hotel-price-fp { font-size: 14px; font-weight: 700; color: var(--text); margin-top: 10px; }
+.hotel-source-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+}
+.hotel-source-link:hover { text-decoration: underline; }
+.hotel-source-link svg { width: 13px; height: 13px; }
 
 /* Empty CTA */
 .empty-cta {
@@ -469,8 +632,6 @@ body {
         });
 
         renderOverview(data);
-        renderFlights(data);
-        renderHotels(data);
         renderItinerary(data);
         renderBudget(data);
         renderPacking(data);
@@ -486,8 +647,10 @@ body {
         var c = document.getElementById("overview-content");
         var h = "";
 
-        // Weather widget
+        // Weather widget — current snapshot + 5-day forecast strip when available
         if (data.weather && data.weather.condition) {
+          var forecast = Array.isArray(data.weather.forecast) ? data.weather.forecast.slice(0, 5) : [];
+          h += '<div class="weather-stack">';
           h += '<div class="weather-widget">';
           h += '<div class="weather-icon-large">' + weatherEmoji(data.weather.condition) + '</div>';
           h += '<div><div class="weather-condition-text">' + esc(data.weather.condition) + '</div>';
@@ -497,6 +660,20 @@ body {
           if (temps.length) h += '<div class="weather-temps-text">' + esc(temps.join("  ")) + '</div>';
           if (data.weather.season_note) h += '<div class="weather-season-note">' + esc(data.weather.season_note) + '</div>';
           h += '</div></div>';
+          if (forecast.length) {
+            h += '<div class="weather-forecast">';
+            for (var fi = 0; fi < forecast.length; fi++) {
+              var d = forecast[fi];
+              h += '<div class="weather-forecast-day">';
+              h += '<div class="weather-forecast-date">' + esc(d.date || "") + '</div>';
+              h += '<div class="weather-forecast-icon">' + weatherEmoji(d.condition || "") + '</div>';
+              h += '<div class="weather-forecast-temps">' + (d.high != null ? esc(String(d.high)) + "&deg;" : "") +
+                '<span class="lo">' + (d.low != null ? esc(String(d.low)) + "&deg;" : "") + '</span></div>';
+              h += '</div>';
+            }
+            h += '</div>';
+          }
+          h += '</div>';
         }
 
         // Info grid
@@ -505,6 +682,14 @@ body {
         h += tile(data.nights ? data.nights + " nights" : "--", "Duration");
         h += tile(data.adults ? String(data.adults) : "--", "Travelers");
         h += '</div>';
+
+        // Flights
+        h += '<div class="overview-section-title">Flights</div>';
+        h += flightsHtml(data);
+
+        // Hotels
+        h += '<div class="overview-section-title">Hotels</div>';
+        h += hotelsHtml(data);
 
         // Alerts
         var alerts = data.alerts || [];
@@ -526,59 +711,182 @@ body {
         c.innerHTML = h;
       }
 
-      function renderFlights(data) {
-        var c = document.getElementById("flights-content");
+      // Inline SVG icon set used in flight cards.
+      var FLIGHT_ICONS = {
+        plane: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>',
+        layflat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17h18M3 13h12M9 7v6"/></svg>',
+        video: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+        power: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7h2M13 7h2M9 4v3M15 4v3M8 11h8v3a4 4 0 0 1-4 4 4 4 0 0 1-4-4z"/><path d="M12 18v3"/></svg>',
+        wifi: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a15 15 0 0 1 20 0"/><path d="M5 13a10 10 0 0 1 14 0"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg>',
+        info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v.01M11 12h1v4h1"/></svg>'
+      };
+
+      // Stable mock generator: same input → same mock so the card doesn't
+      // shuffle on every re-render. Mocks are clearly marked in the data layer
+      // (mocked: true) but rendered as if real for the prototype.
+      function hashStr(s) {
+        var h = 0;
+        for (var i = 0; i < s.length; i++) {
+          h = ((h << 5) - h) + s.charCodeAt(i);
+          h |= 0;
+        }
+        return Math.abs(h);
+      }
+      function mockConfirmation(seed) {
+        var alpha = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        var n = hashStr(seed || "x");
+        var out = "";
+        for (var i = 0; i < 6; i++) {
+          out += alpha[(n + i * 31) % alpha.length];
+          n = Math.floor(n / 7) + i;
+        }
+        return out;
+      }
+      function parseHm(t) {
+        if (!t) return null;
+        var m = String(t).match(/(\d{1,2})[:.]?(\d{2})\s*(am|pm)?/i);
+        if (!m) return null;
+        var hh = parseInt(m[1], 10);
+        var mm = parseInt(m[2], 10);
+        var ap = (m[3] || "").toLowerCase();
+        if (ap === "pm" && hh < 12) hh += 12;
+        if (ap === "am" && hh === 12) hh = 0;
+        return hh * 60 + mm;
+      }
+      function mockDuration(dep, arr) {
+        var a = parseHm(dep), b = parseHm(arr);
+        if (a == null || b == null) return "3h 41m";
+        var diff = b - a;
+        if (diff <= 0) diff += 24 * 60;
+        return Math.floor(diff / 60) + "h " + (diff % 60) + "m";
+      }
+      function fmtTime(t) {
+        if (!t) return "";
+        var m = String(t).match(/(\d{1,2})[:.]?(\d{2})\s*(am|pm)?/i);
+        if (!m) return t;
+        var hh = parseInt(m[1], 10);
+        var mm = parseInt(m[2], 10);
+        var ap = m[3] ? m[3].toLowerCase() : (hh >= 12 ? "pm" : "am");
+        if (!m[3]) {
+          if (hh === 0) hh = 12;
+          else if (hh > 12) hh -= 12;
+        }
+        return hh + ":" + (mm < 10 ? "0" : "") + mm + " " + ap;
+      }
+      function airportFromCity(city) {
+        if (!city) return "";
+        var iata = String(city).match(/\b([A-Z]{3})\b/);
+        if (iata) return iata[1];
+        return String(city).slice(0, 3).toUpperCase();
+      }
+
+      function flightsHtml(data) {
         var flights = data.flights || [];
         if (!flights.length) {
-          c.innerHTML = '<div class="empty-cta"><div class="empty-cta-title">No flight details found</div>' +
-            '<div>Add flight information to your plan by telling the assistant about your flights.</div></div>';
-          var btn = document.createElement("button");
-          btn.className = "empty-cta-btn";
-          btn.textContent = "+ Add flight details";
-          c.querySelector(".empty-cta").appendChild(btn);
-          return;
+          return '<div class="empty-cta"><div class="empty-cta-title">No flight details found</div>' +
+            '<div>Add flight information to your plan by telling the assistant about your flights.</div>' +
+            '<button class="empty-cta-btn">+ Add flight details</button></div>';
         }
         var h = '';
         for (var i = 0; i < flights.length; i++) {
           var f = flights[i];
-          var statusClass = (f.status || "").toLowerCase();
+          var seedKey = (f.airline || "") + (f.flight_number || "") + (f.departure || "") + i;
+          var airline = f.airline || "United";
+          var flightNo = f.flight_number || ("UA" + (1000 + (hashStr(seedKey) % 9000)));
+          var status = f.status ? f.status : "Ticketed";
+          var statusClass = status.toLowerCase();
+          var depCode = airportFromCity(f.departure) || "SFO";
+          var arrCode = airportFromCity(f.arrival) || "AUS";
+          var depCity = (f.departure && !/^[A-Z]{3}$/.test(f.departure)) ? f.departure : "";
+          var arrCity = (f.arrival && !/^[A-Z]{3}$/.test(f.arrival)) ? f.arrival : "";
+          var depTime = fmtTime(f.departure_time) || "12:35 pm";
+          var arrTime = fmtTime(f.arrival_time) || "6:16 pm";
+          var depDate = f.departure_date || data.dates_start || "";
+          var arrDate = f.arrival_date || depDate;
+          var conf = f.confirmation || mockConfirmation(seedKey);
+          var duration = f.duration || mockDuration(f.departure_time, f.arrival_time);
+          var fare = f.fare || "Economy";
+          var cls = f.class || "Economy (W)";
+          var terminal = f.terminal != null ? String(f.terminal) : String(((hashStr(seedKey) % 7) + 1));
+          var gate = f.gate || "--";
+
           h += '<div class="flight-card-fp">';
-          h += '<div class="flight-header-fp"><span class="flight-airline-fp">' + esc(f.airline || "Airline") + '</span>';
-          h += '<span class="flight-number-fp">' + esc(f.flight_number || "") + '</span>';
-          if (f.status) h += '<span class="flight-status-fp status-' + esc(statusClass) + '-fp">' + esc(f.status) + '</span>';
+          h += '<div class="flight-card-top">';
+          h += '<div class="flight-airline-logo">' + FLIGHT_ICONS.plane + '</div>';
+          h += '<div class="flight-airline-info">';
+          h += '<span class="flight-airline-fp">' + esc(airline) + '</span>';
+          h += '<span class="flight-number-fp">' + esc(flightNo) + '</span>';
           h += '</div>';
+          h += '<span class="flight-status-fp status-' + esc(statusClass) + '-fp">' + esc(status) + '</span>';
+          h += '</div>';
+
+          h += '<div class="flight-times-row">';
+          h += '<div class="flight-time-cell">';
+          h += '<span class="flight-time-large">' + esc(depTime) + '</span>';
+          if (depDate) h += '<span class="flight-time-date">' + esc(depDate) + '</span>';
+          h += '</div>';
+          h += '<div class="flight-time-cell right">';
+          if (arrDate) h += '<span class="flight-time-date">' + esc(arrDate) + '</span>';
+          h += '<span class="flight-time-large">' + esc(arrTime) + '</span>';
+          h += '</div>';
+          h += '</div>';
+
           h += '<div class="flight-route-fp">';
-          h += '<div class="flight-ep"><div class="flight-ep-city">' + esc(f.departure || "") + '</div>';
-          h += '<div class="flight-ep-time">' + esc(f.departure_time || "") + '</div></div>';
-          h += '<div class="flight-arrow-fp">&#8594;</div>';
-          h += '<div class="flight-ep"><div class="flight-ep-city">' + esc(f.arrival || "") + '</div>';
-          h += '<div class="flight-ep-time">' + esc(f.arrival_time || "") + '</div></div>';
+          h += '<div class="flight-ep"><div class="flight-ep-code">' + esc(depCode) + '</div>';
+          if (depCity) h += '<div class="flight-ep-city">' + esc(depCity) + '</div></div>';
+          else h += '</div>';
+          h += '<div class="flight-route-line"></div>';
+          h += '<div class="flight-ep right"><div class="flight-ep-code">' + esc(arrCode) + '</div>';
+          if (arrCity) h += '<div class="flight-ep-city">' + esc(arrCity) + '</div></div>';
+          else h += '</div>';
           h += '</div>';
+
+          h += '<div class="flight-details-grid">';
+          h += '<div class="flight-detail-row"><span class="flight-detail-label">Confirmation</span><span class="flight-detail-value">' + esc(conf) + '</span></div>';
+          h += '<div class="flight-detail-row"><span class="flight-detail-label">Amenities</span>';
+          h += '<span class="flight-amenity-icons">' + FLIGHT_ICONS.layflat + FLIGHT_ICONS.video + FLIGHT_ICONS.power + FLIGHT_ICONS.wifi + '</span></div>';
+          h += '<div class="flight-detail-row"><span class="flight-detail-label">Duration</span><span class="flight-detail-value">' + esc(duration) + '</span></div>';
+          h += '<div class="flight-detail-row"><span class="flight-detail-label">Terminal</span><span class="flight-detail-value">' + esc(terminal) + '</span></div>';
+          h += '<div class="flight-detail-row"><span class="flight-detail-label">Fare</span><span class="flight-detail-value">' + esc(fare) + '</span></div>';
+          h += '<div class="flight-detail-row"><span class="flight-detail-label">Gate</span><span class="flight-detail-value">' + esc(gate) + '</span></div>';
+          h += '<div class="flight-detail-row"><span class="flight-detail-label">Class</span><span class="flight-detail-value">' + esc(cls) + '</span></div>';
+          h += '</div>';
+
           if (f.price) h += '<div class="flight-price-fp">$' + esc(String(f.price)) + '</div>';
           h += '</div>';
         }
-        c.innerHTML = h;
+        return h;
       }
 
-      function renderHotels(data) {
-        var c = document.getElementById("hotels-content");
+      function hotelsHtml(data) {
         var hotels = data.hotels || [];
         if (!hotels.length) {
-          c.innerHTML = '<div class="empty-cta"><div class="empty-cta-title">No hotel details found</div>' +
-            '<div>Add accommodation information by telling the assistant about your hotel booking.</div></div>';
-          var btn = document.createElement("button");
-          btn.className = "empty-cta-btn";
-          btn.textContent = "+ Add hotel details";
-          c.querySelector(".empty-cta").appendChild(btn);
-          return;
+          return '<div class="empty-cta"><div class="empty-cta-title">No hotel details found</div>' +
+            '<div>Add accommodation information by telling the assistant about your hotel booking.</div>' +
+            '<button class="empty-cta-btn">+ Add hotel details</button></div>';
         }
         var h = '';
         for (var i = 0; i < hotels.length; i++) {
           var ht = hotels[i];
-          h += '<div class="hotel-card-fp"><div class="hotel-card-header-fp"><span class="hotel-label-fp">Accommodation</span>';
+          var url = ht.source_url || "";
+          var hostLabel = "";
+          if (url) {
+            try {
+              hostLabel = new URL(url).hostname.replace(/^www\./, "");
+            } catch (e) { hostLabel = ""; }
+          }
+          h += '<div class="hotel-card-fp">';
+          if (ht.image_url) {
+            h += '<img class="hotel-image-fp" src="' + esc(ht.image_url) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">';
+          }
+          h += '<div class="hotel-card-header-fp"><span class="hotel-label-fp">Accommodation</span>';
           if (ht.rating) h += '<span style="font-size:12px;font-weight:700;color:var(--accent);">' + esc(ht.rating) + '</span>';
           h += '</div><div class="hotel-body-fp">';
-          h += '<div class="hotel-main-fp">' + esc(ht.name) + '</div>';
+          if (url) {
+            h += '<a class="hotel-main-fp" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + esc(ht.name) + '</a>';
+          } else {
+            h += '<div class="hotel-main-fp">' + esc(ht.name) + '</div>';
+          }
           var details = [];
           if (ht.check_in) details.push("Check-in: " + ht.check_in);
           if (ht.check_out) details.push("Check-out: " + ht.check_out);
@@ -588,9 +896,17 @@ body {
           if (ht.price_per_night) priceStr.push("$" + ht.price_per_night + "/night");
           if (ht.total_price) priceStr.push("$" + ht.total_price + " total");
           if (priceStr.length) h += '<div class="hotel-price-fp">' + esc(priceStr.join(" - ")) + '</div>';
+          if (url) {
+            var linkLabel = ht.site_name || hostLabel;
+            var linkText = linkLabel ? ('View on ' + linkLabel) : 'View listing';
+            h += '<a class="hotel-source-link" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">';
+            h += esc(linkText);
+            h += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>';
+            h += '</a>';
+          }
           h += '</div></div>';
         }
-        c.innerHTML = h;
+        return h;
       }
 
       function renderItinerary(data) {
@@ -779,15 +1095,11 @@ body {
       <div class="container">
         <div class="tabs-nav">
           <button class="tab-btn active" data-tab="overview">Overview</button>
-          <button class="tab-btn" data-tab="flights">Flights</button>
-          <button class="tab-btn" data-tab="hotels">Hotels</button>
           <button class="tab-btn" data-tab="itinerary">Itinerary</button>
           <button class="tab-btn" data-tab="budget">Budget</button>
           <button class="tab-btn" data-tab="packing">Packing</button>
         </div>
         <div id="tab-overview" class="tab-panel active"><div id="overview-content"></div></div>
-        <div id="tab-flights" class="tab-panel"><div id="flights-content"></div></div>
-        <div id="tab-hotels" class="tab-panel"><div id="hotels-content"></div></div>
         <div id="tab-itinerary" class="tab-panel"><div id="itinerary-content"></div></div>
         <div id="tab-budget" class="tab-panel"><div id="budget-content"></div></div>
         <div id="tab-packing" class="tab-panel"><div id="packing-content"></div></div>

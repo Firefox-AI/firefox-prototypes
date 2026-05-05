@@ -1066,6 +1066,13 @@ export class AIWindow extends MozLitElement {
       return;
     }
 
+    // Optimistic local trip-plan edit. If the message matches a common edit
+    // pattern AND there's an active plan, mutate the plan immediately so the
+    // chrome page updates without waiting on the LLM. The LLM still runs in
+    // parallel; this just guarantees the page reflects the user's intent
+    // even if the local model engine crashes or stalls.
+    this.#tryLocalTripEdit(trimmed);
+
     Glean.smartWindow.chatSubmit.record({
       chat_id: this.conversationId,
       detected_intent: this.#smartbar.detectedIntent,
@@ -1087,6 +1094,60 @@ export class AIWindow extends MozLitElement {
       "ai-window:smartbar-input",
       this.#getAIWindowEventOptions("", true)
     );
+  }
+
+  /**
+   * Best-effort: detect simple "modify the open trip plan" intents and mutate
+   * the plan locally before (and in parallel with) the LLM call. Patterns:
+   *   - "swap day N to X" / "change day N to X" / "make day N a beach day"
+   *   - "rename day N to X"
+   * No-op when no active plan exists or the text doesn't match.
+   *
+   * Routed via a Services.obs topic so the chrome process performs the
+   * mutation (the AI Window page's CSP blocks moz-src dynamic imports).
+   */
+  #tryLocalTripEdit(text) {
+    try {
+      const pref = Services.prefs.getStringPref(
+        "browser.smartwindow.tripPlanData",
+        ""
+      );
+      if (!pref || pref.length < 50) {
+        return;
+      }
+      let plan;
+      try {
+        plan = JSON.parse(pref);
+      } catch {
+        return;
+      }
+      if (!plan?.destination || plan.destination === "Trip") {
+        return;
+      }
+      const m = text.match(
+        /^(?:swap|change|make|set|rename|update)\s+day\s+(\d+)\s+(?:to|into|as|for|about|like|a)\s+(.+?)\.?$/i
+      );
+      if (!m) {
+        return;
+      }
+      const day = parseInt(m[1], 10);
+      const themeRaw = m[2].trim();
+      if (!Number.isFinite(day) || !themeRaw) {
+        return;
+      }
+      const theme = themeRaw.replace(/\b\w/g, c => c.toUpperCase());
+      const params = {
+        mutation_type: "replace_day",
+        payload: { day, title: theme },
+      };
+      const supports = Cc[
+        "@mozilla.org/supports-string;1"
+      ].createInstance(Ci.nsISupportsString);
+      supports.data = JSON.stringify(params);
+      Services.obs.notifyObservers(supports, "smartwindow-trip-edit");
+    } catch (e) {
+      console.warn("local trip edit failed:", e);
+    }
   }
 
   #handleMemoriesToggle = async event => {
