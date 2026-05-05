@@ -12,6 +12,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowUI.sys.mjs",
   BrowserUtils: "resource://gre/modules/BrowserUtils.sys.mjs",
   URILoadingHelper: "resource:///modules/URILoadingHelper.sys.mjs",
+  WorldCup:
+    "moz-src:///browser/components/aiwindow/models/WorldCup.sys.mjs",
 });
 
 /**
@@ -33,6 +35,18 @@ export class AIChatContentParent extends JSWindowActorParent {
       uri.equalsExceptRef(this.#settingsURI) ||
       uri.equalsExceptRef(this.#prefsURI)
     );
+  }
+
+  /**
+   * Resolve a World Cup match and dispatch the result to the child actor.
+   * Also returns the resolved match so callers (e.g. ChatConversation)
+   * can reuse it for LLM context — the single-fetcher contract.
+   *
+   * @param {{scope: string, team?: string}} request
+   * @returns {Promise<object|null>} resolved match (incl. mock fallback)
+   */
+  async requestWorldCup(request) {
+    return this.#handleRequestWorldCup(request, /* dispatch */ true);
   }
 
   dispatchMessageToChatContent(message) {
@@ -95,6 +109,10 @@ export class AIChatContentParent extends JSWindowActorParent {
 
       case "AIChatContent:AccountSignIn":
         this.#handleAccountSignIn();
+        break;
+
+      case "AIChatContent:RequestWorldCup":
+        this.#handleRequestWorldCup(data, /* dispatch */ true);
         break;
 
       default:
@@ -193,6 +211,32 @@ export class AIChatContentParent extends JSWindowActorParent {
     } catch (e) {
       console.warn("Could not open link from AI Window chat", e);
     }
+  }
+
+  async #handleRequestWorldCup(data, dispatch) {
+    const scope = data?.scope || null;
+    const team = data?.team || null;
+    if (!scope) {
+      return null;
+    }
+    let match = null;
+    try {
+      match = await lazy.WorldCup.fetchMatch({ scope, team });
+    } catch (e) {
+      console.warn("WorldCup: fetch error", e);
+      match = lazy.WorldCup.errorPayload(scope);
+    }
+    if (dispatch) {
+      try {
+        this.sendAsyncMessage("AIChatContent:WorldCupResult", {
+          scope,
+          match,
+        });
+      } catch (e) {
+        console.warn("WorldCup: dispatch failed", e);
+      }
+    }
+    return match;
   }
 
   async #handleAccountSignIn() {

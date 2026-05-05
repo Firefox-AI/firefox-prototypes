@@ -12,8 +12,83 @@ import "chrome://browser/content/aiwindow/components/chat-assistant-error.mjs";
 import "chrome://browser/content/aiwindow/components/chat-assistant-loader.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/website-chip-container.mjs";
+// eslint-disable-next-line import/no-unassigned-import
+import "chrome://browser/content/aiwindow/components/world-cup-match-card.mjs";
 
 const FOLLOW_UP_QTY = 2;
+
+const WORLD_CUP_TEAMS = [
+  "Brazil",
+  "Colombia",
+  "Argentina",
+  "France",
+  "Germany",
+  "England",
+  "Spain",
+  "Portugal",
+  "Italy",
+  "Netherlands",
+  "Croatia",
+  "Belgium",
+  "Mexico",
+  "USA",
+  "United States",
+  "Canada",
+  "Japan",
+  "Korea",
+  "South Korea",
+  "Australia",
+  "Morocco",
+  "Senegal",
+  "Uruguay",
+  "Switzerland",
+  "Denmark",
+  "Poland",
+  "Ecuador",
+  "Saudi Arabia",
+  "Iran",
+  "Tunisia",
+  "Cameroon",
+  "Ghana",
+];
+
+function detectWorldCupQuery(text) {
+  if (!text || typeof text !== "string") {
+    return null;
+  }
+  const lower = text.toLowerCase();
+  let team = null;
+  for (const t of WORLD_CUP_TEAMS) {
+    if (lower.includes(t.toLowerCase())) {
+      team = t;
+      break;
+    }
+  }
+  if (
+    /\byesterday\b/.test(lower) &&
+    /(won|win|wins|score|result|results|game|match|play(ed)?)/.test(lower)
+  ) {
+    return { scope: "yesterday", team };
+  }
+  if (
+    /(\blive\b|\bright now\b|\bcurrent(ly)?\b|\bin progress\b|\bhappening\b)/.test(
+      lower
+    ) &&
+    /(match|game|score)/.test(lower)
+  ) {
+    return { scope: "live", team };
+  }
+  if (
+    (/\bnext\b/.test(lower) ||
+      /\bwhen does\b.*\bplay\b/.test(lower) ||
+      /\bupcoming\b/.test(lower) ||
+      /\btomorrow\b/.test(lower)) &&
+    team
+  ) {
+    return { scope: "next", team };
+  }
+  return null;
+}
 
 /**
  * A custom element for managing AI Chat Content
@@ -32,6 +107,8 @@ export class AIChatContent extends MozLitElement {
 
   #lastScrollReq = null;
   #overflowObserver = null;
+  #pendingWorldCup = null;
+  #worldCupExpected = false;
 
   constructor() {
     super();
@@ -110,6 +187,11 @@ export class AIChatContent extends MozLitElement {
     this.addEventListener(
       "aiChatContentActor:seen-urls",
       this.#handleSeenUrls.bind(this)
+    );
+
+    this.addEventListener(
+      "aiChatContentActor:worldCupData",
+      this.#handleWorldCupData.bind(this)
     );
 
     this.addEventListener(
@@ -326,6 +408,21 @@ export class AIChatContent extends MozLitElement {
     if (!isPreviousMessage) {
       this.assistantIsLoading = true;
     }
+
+    const wcDetect = !isPreviousMessage
+      ? detectWorldCupQuery(content.body)
+      : null;
+    if (wcDetect) {
+      this.#worldCupExpected = true;
+      this.#pendingWorldCup = null;
+      this.dispatchEvent(
+        new CustomEvent("AIChatContent:RequestWorldCup", {
+          bubbles: true,
+          detail: { scope: wcDetect.scope, team: wcDetect.team },
+        })
+      );
+    }
+
     this.conversationState[ordinal] = {
       role: "user",
       body: content.body,
@@ -388,6 +485,22 @@ export class AIChatContent extends MozLitElement {
       ? []
       : followUpSuggestions.slice(0, FOLLOW_UP_QTY);
 
+    let widgetData = this.conversationState[ordinal]?.widgetData || null;
+    if (this.#worldCupExpected && this.#pendingWorldCup) {
+      widgetData = this.#pendingWorldCup;
+      this.#pendingWorldCup = null;
+      this.#worldCupExpected = false;
+    }
+    if (!widgetData) {
+      const idx = this.conversationState.findLastIndex(
+        m => m?.role === "assistant" && m.widgetData && !m.body
+      );
+      if (idx >= 0) {
+        widgetData = this.conversationState[idx].widgetData;
+        delete this.conversationState[idx];
+      }
+    }
+
     this.conversationState[ordinal] = {
       role: "assistant",
       convId,
@@ -397,8 +510,43 @@ export class AIChatContent extends MozLitElement {
       showCallout: showMemoriesCallout ?? false,
       searchTokens: webSearchQueries ?? [],
       isLastChunk: !!isPreviousMessage,
+      widgetData,
+      widgetExpected: this.#worldCupExpected,
     };
 
+    this.requestUpdate();
+  }
+
+  #handleWorldCupData(event) {
+    const data = event.detail;
+    const target = this.conversationState.findLast(
+      m => m?.role === "assistant" && m.widgetExpected
+    );
+    if (target) {
+      target.widgetData = data;
+      target.widgetExpected = false;
+      this.#worldCupExpected = false;
+    } else if (this.#worldCupExpected) {
+      const lastUser = this.conversationState.findLast(
+        m => m?.role === "user"
+      );
+      const ordinal = lastUser
+        ? lastUser.ordinal + 1
+        : this.conversationState.length;
+      this.conversationState[ordinal] = {
+        role: "assistant",
+        convId: lastUser?.convId,
+        ordinal,
+        body: "",
+        widgetData: data,
+        widgetExpected: false,
+      };
+      this.#worldCupExpected = false;
+      this.assistantIsLoading = false;
+      this.errorObj = null;
+    } else {
+      this.#pendingWorldCup = data;
+    }
     this.requestUpdate();
   }
 
@@ -506,12 +654,30 @@ export class AIChatContent extends MozLitElement {
     if (!msg) {
       return nothing;
     }
+    const showWorldCup =
+      msg.role === "assistant" && (msg.widgetData || msg.widgetExpected);
+    let showMockHint = false;
+    if (showWorldCup) {
+      try {
+        showMockHint = Services.prefs.getBoolPref(
+          "browser.smartwindow.worldcup.showMockHint",
+          false
+        );
+      } catch {}
+    }
     return html`
       <div class=${`chat-bubble chat-bubble-${msg.role}`}>
         ${chips?.length
           ? html`<website-chip-container
               .websites=${chips}
             ></website-chip-container>`
+          : nothing}
+        ${showWorldCup
+          ? html`<world-cup-match-card
+              .data=${msg.widgetData?.match ?? null}
+              .scope=${msg.widgetData?.scope ?? null}
+              .showMockHint=${showMockHint}
+            ></world-cup-match-card>`
           : nothing}
         <ai-chat-message
           .message=${msg.body}

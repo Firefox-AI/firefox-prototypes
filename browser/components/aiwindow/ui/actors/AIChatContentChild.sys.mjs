@@ -31,6 +31,9 @@ export class AIChatContentChild extends JSWindowActorChild {
     "AIChatContent:SeenUrls": {
       event: "aiChatContentActor:seen-urls",
     },
+    "AIChatContent:WorldCupResult": {
+      event: "aiChatContentActor:worldCupData",
+    },
   };
 
   static #VALID_EVENTS_FROM_CONTENT = new Set([
@@ -41,6 +44,7 @@ export class AIChatContentChild extends JSWindowActorChild {
     "AIChatContent:OpenLink",
     "AIChatContent:DispatchNewChat",
     "AIChatContent:AccountSignIn",
+    "AIChatContent:RequestWorldCup",
   ]);
 
   /**
@@ -88,6 +92,13 @@ export class AIChatContentChild extends JSWindowActorChild {
 
       case "AIChatContent:AccountSignIn":
         this.sendAsyncMessage("AIChatContent:AccountSignIn", event.detail);
+        break;
+
+      case "AIChatContent:RequestWorldCup":
+        this.sendAsyncMessage("AIChatContent:RequestWorldCup", {
+          scope: event.detail?.scope || null,
+          team: event.detail?.team || null,
+        });
         break;
 
       default:

@@ -42,6 +42,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/ChatStore.sys.mjs",
   MemoriesManager:
     "moz-src:///browser/components/aiwindow/models/memories/MemoriesManager.sys.mjs",
+  WorldCup:
+    "moz-src:///browser/components/aiwindow/models/WorldCup.sys.mjs",
 });
 
 ChromeUtils.defineLazyGetter(lazy, "console", function () {
@@ -606,6 +608,10 @@ export class ChatConversation extends EventEmitter {
       this.emit("chat-conversation:message-update", this.messages.at(-1));
     }
 
+    // World Cup widget context fetch runs in parallel with the engine-dependent
+    // contexts below — the widget data path is engine-independent.
+    const worldCupPromise = userOpts?.worldCupMatchPromise || null;
+
     const realTimeContext = await ChatConversation.getRealTimeInfo(
       engineInstance,
       {
@@ -632,6 +638,23 @@ export class ChatConversation extends EventEmitter {
         lazy.console.error(
           `Failed to generate memories context message: ${memoriesContextError}`
         );
+      }
+    }
+
+    if (worldCupPromise) {
+      try {
+        const match = await worldCupPromise;
+        if (match) {
+          const ctx = lazy.WorldCup.buildLlmContext({
+            scope: userOpts?.worldCupRequest?.scope,
+            match,
+          });
+          if (ctx) {
+            userContext.worldCupContext = ctx;
+          }
+        }
+      } catch (e) {
+        lazy.console.error(`Failed to fetch World Cup context: ${e}`);
       }
     }
 

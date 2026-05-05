@@ -55,3 +55,5 @@ browser.jar:
   content/browser/aiwindow/components/smartwindow-footer.css        (components/smartwindow-footer/smartwindow-footer.css)
   content/browser/aiwindow/components/smartwindow-heading.mjs       (components/smartwindow-heading/smartwindow-heading.mjs)
   content/browser/aiwindow/components/smartwindow-heading.css       (components/smartwindow-heading/smartwindow-heading.css)
+  content/browser/aiwindow/components/world-cup-match-card.mjs      (components/world-cup-match-card/world-cup-match-card.mjs)
+  content/browser/aiwindow/components/world-cup-match-card.css      (components/world-cup-match-card/world-cup-match-card.css)

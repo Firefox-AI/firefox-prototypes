@@ -1053,6 +1053,91 @@ export class AIWindow extends MozLitElement {
    * @param {number} [options.inlineMentionsCount] - Number of inline mentions
    * @param {string} [options.sourceLocation] - Override smartbar location
    */
+  static #WORLD_CUP_TEAMS = [
+    "Brazil",
+    "Colombia",
+    "Argentina",
+    "France",
+    "Germany",
+    "England",
+    "Spain",
+    "Portugal",
+    "Italy",
+    "Netherlands",
+    "Croatia",
+    "Belgium",
+    "Mexico",
+    "USA",
+    "United States",
+    "Canada",
+    "Japan",
+    "Korea",
+    "South Korea",
+    "Australia",
+    "Morocco",
+    "Senegal",
+    "Uruguay",
+    "Switzerland",
+    "Denmark",
+    "Poland",
+    "Ecuador",
+    "Saudi Arabia",
+    "Iran",
+    "Tunisia",
+    "Cameroon",
+    "Ghana",
+  ];
+
+  static detectWorldCupQuery(text) {
+    if (!text || typeof text !== "string") {
+      return null;
+    }
+    const lower = text.toLowerCase();
+    let team = null;
+    for (const t of AIWindow.#WORLD_CUP_TEAMS) {
+      if (lower.includes(t.toLowerCase())) {
+        team = t;
+        break;
+      }
+    }
+    if (
+      /\byesterday\b/.test(lower) &&
+      /(won|win|wins|score|result|results|game|match|play(ed)?)/.test(lower)
+    ) {
+      return { scope: "yesterday", team };
+    }
+    if (
+      /(\blive\b|\bright now\b|\bcurrent(ly)?\b|\bin progress\b|\bhappening\b)/.test(
+        lower
+      ) &&
+      /(match|game|score)/.test(lower)
+    ) {
+      return { scope: "live", team };
+    }
+    if (
+      (/\bnext\b/.test(lower) ||
+        /\bwhen does\b.*\bplay\b/.test(lower) ||
+        /\bupcoming\b/.test(lower) ||
+        /\btomorrow\b/.test(lower)) &&
+      team
+    ) {
+      return { scope: "next", team };
+    }
+    return null;
+  }
+
+  #requestWorldCupForSidebar(worldCupRequest) {
+    try {
+      const actor = this.#getAIChatContentActor();
+      if (actor && typeof actor.requestWorldCup === "function") {
+        return actor.requestWorldCup(worldCupRequest);
+      }
+    } catch (e) {
+      console.warn("WorldCup: failed to request match data", e);
+    }
+    return Promise.resolve(null);
+  }
+
   submitChatMessage({
     text,
     submitType,
@@ -1064,6 +1149,12 @@ export class AIWindow extends MozLitElement {
     const trimmed = String(text ?? "").trim();
     if (!trimmed) {
       return;
+    }
+
+    const worldCupRequest = AIWindow.detectWorldCupQuery(trimmed);
+    let worldCupMatchPromise = null;
+    if (worldCupRequest) {
+      worldCupMatchPromise = this.#requestWorldCupForSidebar(worldCupRequest);
     }
 
     Glean.smartWindow.chatSubmit.record({
@@ -1082,6 +1173,8 @@ export class AIWindow extends MozLitElement {
     this.#fetchAIResponse(trimmed, {
       ...this.#createUserRoleOpts(contextMentions),
       pageUrl: contextPageUrl,
+      worldCupRequest,
+      worldCupMatchPromise,
     });
     this.#dispatchChromeEvent(
       "ai-window:smartbar-input",
@@ -1320,12 +1413,38 @@ export class AIWindow extends MozLitElement {
     };
     this.#conversation.on("chat-conversation:message-update", onUpdate);
 
+    let engineBuildFailed = false;
     try {
-      const engineInstance = await lazy.openAIEngine.build(
-        lazy.MODEL_FEATURES.CHAT,
-        lazy.DEFAULT_ENGINE_ID,
-        this.conversationId
-      );
+      let engineInstance;
+      try {
+        engineInstance = await lazy.openAIEngine.build(
+          lazy.MODEL_FEATURES.CHAT,
+          lazy.DEFAULT_ENGINE_ID,
+          this.conversationId
+        );
+      } catch (engineError) {
+        engineBuildFailed = true;
+        if (inputText) {
+          this.#conversation.addUserMessage(
+            inputText,
+            pageUrl ? new URL(pageUrl) : null,
+            new lazy.UserRoleOpts(userOpts)
+          );
+          if (!skipUserDispatch) {
+            this.#conversation.emit(
+              "chat-conversation:message-update",
+              this.#conversation.messages.at(-1)
+            );
+          }
+          const assistantRoleOpts = new lazy.AssistantRoleOpts();
+          this.#conversation.addAssistantMessage(
+            "text",
+            "",
+            assistantRoleOpts
+          );
+        }
+        throw engineError;
+      }
 
       if (inputText) {
         await this.#conversation.generatePrompt(
@@ -1356,10 +1475,14 @@ export class AIWindow extends MozLitElement {
       );
     } catch (e) {
       this.showSearchingIndicator(false, null);
-      this.#handleError(
-        e,
-        this.#getModelRequestLatencyAndDuration(requestStart, firstTokenTime)
-      );
+      const suppressForWorldCup =
+        engineBuildFailed && userOpts?.worldCupRequest;
+      if (!suppressForWorldCup) {
+        this.#handleError(
+          e,
+          this.#getModelRequestLatencyAndDuration(requestStart, firstTokenTime)
+        );
+      }
       this.requestUpdate?.();
     }
   }

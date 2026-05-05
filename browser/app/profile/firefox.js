@@ -2250,6 +2250,9 @@ pref("browser.smartwindow.showThemesNotice", true);
 pref("browser.smartwindow.sidebar.openByDefault", true);
 pref("browser.smartwindow.firstrun.modelChoice", "");
 pref("browser.smartwindow.model", "");
+pref("browser.smartwindow.worldcup.forceMock", true);
+pref("browser.smartwindow.worldcup.showMockHint", false);
+pref("browser.smartwindow.worldcup.debug", false);
 pref("browser.smartwindow.preferences.endpoint", "");
 pref("browser.smartwindow.firstrun.explainerURL", "https://www.firefox.com/en-US/smart-window/?v=product");
 

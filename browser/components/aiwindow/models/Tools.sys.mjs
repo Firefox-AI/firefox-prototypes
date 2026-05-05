@@ -91,6 +91,7 @@ export const GET_PAGE_CONTENT = "get_page_content";
 export const RUN_SEARCH = "run_search";
 export const GET_USER_MEMORIES = "get_user_memories";
 export const GET_NAVIGATION_INFO = "get_navigation_info";
+export const GET_WORLD_CUP_MATCH = "get_world_cup_match";
 
 export const TOOLS = [
   GET_OPEN_TABS,
@@ -99,6 +100,7 @@ export const TOOLS = [
   RUN_SEARCH,
   GET_USER_MEMORIES,
   GET_NAVIGATION_INFO,
+  GET_WORLD_CUP_MATCH,
 ];
 
 export const RUN_SEARCH_VERBATIM_QUERY_DESCRIPTION =
@@ -245,6 +247,31 @@ export const toolsConfig = [
       parameters: {
         type: "object",
         properties: {},
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: GET_WORLD_CUP_MATCH,
+      description:
+        "Fetch a single World Cup match (live, most-recent finished, or next upcoming) for a team or date scope. Use when the user asks about live World Cup scores, yesterday's match results, or a team's next fixture.",
+      parameters: {
+        type: "object",
+        properties: {
+          scope: {
+            type: "string",
+            enum: ["live", "yesterday", "next"],
+            description:
+              "Which match to fetch: live (currently playing), yesterday (most recent finished match), or next (next upcoming fixture for a given team).",
+          },
+          team: {
+            type: "string",
+            description:
+              "Team name (e.g. 'Brazil'). Required when scope is 'next'. Optional otherwise.",
+          },
+        },
+        required: ["scope"],
       },
     },
   },
