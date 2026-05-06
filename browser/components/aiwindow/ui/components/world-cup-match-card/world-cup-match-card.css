@@ -125,13 +125,7 @@
   justify-content: center;
   font-size: 38px;
   line-height: 1;
-  border: 1px solid #b7b6ba;
-  border-radius: 4px;
-  overflow: hidden;
-  background: #ffffff;
-  box-shadow:
-    0 0.25px 0.375px rgba(0, 0, 0, 0.02),
-    0 2px 4px rgba(0, 0, 0, 0.04);
+  background: transparent;
 }
 
 .wc-card__flag-fallback {
@@ -299,13 +293,7 @@
   height: 24px;
   font-size: 22px;
   line-height: 1;
-  border: 1px solid #b7b6ba;
-  border-radius: 2.5px;
-  overflow: hidden;
-  background: #ffffff;
-  box-shadow:
-    0 0.154px 0.231px rgba(0, 0, 0, 0.02),
-    0 1.228px 2.456px rgba(0, 0, 0, 0.04);
+  background: transparent;
   flex-shrink: 0;
 }
 
@@ -385,19 +373,15 @@
   height: 40px;
   font-size: 38px;
   line-height: 1;
-  border: 1px solid #b7b6ba;
-  border-radius: 4px;
-  overflow: hidden;
-  background: #ffffff;
-  box-shadow:
-    0 0.25px 0.375px rgba(0, 0, 0, 0.02),
-    0 2px 4px rgba(0, 0, 0, 0.04);
+  background: transparent;
   flex-shrink: 0;
 }
 
 .wc-row__flag--placeholder {
+  width: 57px;
+  height: 40px;
+  border-radius: 4px;
   background: #d6d6d6;
-  border-color: #c0c0c0;
 }
 
 .wc-row__center {
