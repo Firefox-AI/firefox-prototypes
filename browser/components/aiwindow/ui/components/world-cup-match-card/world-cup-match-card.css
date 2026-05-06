@@ -8,18 +8,33 @@
 }
 
 .wc-card {
-  background: var(--color-surface-variant);
-  border: 1px solid var(--border-color-default);
-  border-radius: var(--border-radius-medium);
+  display: flex;
+  width: min(100%, 332px);
+  max-width: 332px;
+  min-height: 276px;
+  padding: 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  border-radius: 16px;
+  backdrop-filter: blur(50px);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #e8e7ec;
   overflow: hidden;
-  padding: var(--space-medium);
   font-size: var(--font-size-small);
-  color: var(--text-color);
-  transition: box-shadow 150ms ease;
+  color: #180e30;
+  box-shadow:
+    0 0.25px 0.375px rgba(0, 0, 0, 0.02),
+    0 2px 4px rgba(0, 0, 0, 0.04);
+  box-sizing: border-box;
 }
 
-.wc-card:hover {
-  box-shadow: var(--box-shadow-level-1);
+.wc-card__header,
+.wc-card__rows,
+.wc-card__teams,
+.wc-card__footer,
+.wc-pagination {
+  width: 100%;
 }
 
 .visually-hidden {
@@ -45,8 +60,8 @@
 }
 
 .wc-card__eyebrow {
-  font-size: var(--font-size-xsmall);
-  color: var(--text-color-deemphasized);
+  font-size: 13px;
+  color: rgba(20, 9, 43, 0.7);
 }
 
 .wc-card__status-pill {
@@ -103,28 +118,44 @@
 }
 
 .wc-card__flag {
-  font-size: 40px;
+  width: 57px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 38px;
   line-height: 1;
-  display: inline-block;
+  border: 1px solid #b7b6ba;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow:
+    0 0.25px 0.375px rgba(0, 0, 0, 0.02),
+    0 2px 4px rgba(0, 0, 0, 0.04);
 }
 
 .wc-card__flag-fallback {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
+  width: 57px;
   height: 40px;
-  border-radius: 9999px;
-  background: var(--color-gray-30, #d7d7db);
-  color: var(--text-color);
-  font-weight: var(--font-weight-semibold);
-  font-size: var(--font-size-xsmall);
+  border-radius: 4px;
+  border: 1px solid #b7b6ba;
+  background: #f5f4f7;
+  color: #180e30;
+  font-weight: 590;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  box-shadow:
+    0 0.25px 0.375px rgba(0, 0, 0, 0.02),
+    0 2px 4px rgba(0, 0, 0, 0.04);
 }
 
 .wc-card__team-name {
-  font-size: var(--font-size-small);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-color);
+  font-size: 15px;
+  font-weight: 400;
+  color: #180e30;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -146,44 +177,44 @@
   display: inline-flex;
   align-items: baseline;
   gap: 4px;
-  padding: 8px 16px;
+  padding: 4px 12px;
   border-radius: 9999px;
-  background: var(--background-color-box);
+  background: transparent;
   min-width: 84px;
   justify-content: center;
 }
 
 .wc-card__score-num {
-  font-size: 32px;
-  font-weight: 600;
+  font-size: 26px;
+  font-weight: 590;
   line-height: 1;
-  color: var(--text-color);
+  color: #180e30;
 }
 
 .wc-card__score-sep {
-  font-size: 24px;
-  font-weight: 600;
+  font-size: 22px;
+  font-weight: 590;
   line-height: 1;
-  color: var(--text-color-deemphasized);
+  color: rgba(20, 9, 43, 0.4);
   margin: 0 4px;
 }
 
 .wc-card__kickoff-time {
-  font-size: 22px;
-  font-weight: 600;
+  font-size: 26px;
+  font-weight: 590;
   line-height: 1;
-  color: var(--text-color);
+  color: rgba(21, 20, 26, 0.4);
 }
 
 .wc-card__center-meta {
-  font-size: var(--font-size-xsmall);
+  font-size: 13px;
   text-align: center;
-  color: var(--text-color-deemphasized);
+  color: rgba(20, 9, 43, 0.7);
 }
 
 .wc-card__center-meta--live {
-  color: var(--text-color);
-  font-weight: var(--font-weight-semibold);
+  color: #180e30;
+  font-weight: 590;
 }
 
 /* --- Empty / error / message states --- */
@@ -216,8 +247,8 @@
 
 .wc-card__divider {
   border: 0;
-  border-top: 1px solid var(--border-color-default);
-  margin-block: var(--space-small);
+  border-top: 1px solid #e8e7ec;
+  margin-block: 8px;
 }
 
 .wc-card__footer {
@@ -227,8 +258,8 @@
 }
 
 .wc-card__footer-label {
-  font-size: var(--font-size-xsmall);
-  color: var(--text-color-deemphasized);
+  font-size: 13px;
+  color: rgba(20, 9, 43, 0.7);
 }
 
 .wc-card__next-row {
@@ -238,16 +269,224 @@
   gap: 12px;
 }
 
-.wc-card__team-code {
-  font-size: var(--font-size-small);
-  font-weight: var(--font-weight-semibold);
-  text-align: center;
+.wc-card__next-team {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wc-card__next-team--home {
+  justify-content: flex-start;
+}
+
+.wc-card__next-team--away {
+  justify-content: flex-end;
+}
+
+.wc-card__next-code {
+  font-size: 15px;
+  font-weight: 590;
+  color: #180e30;
+  white-space: nowrap;
+}
+
+.wc-card__next-flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 35px;
+  height: 24px;
+  font-size: 22px;
+  line-height: 1;
+  border: 1px solid #b7b6ba;
+  border-radius: 2.5px;
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow:
+    0 0.154px 0.231px rgba(0, 0, 0, 0.02),
+    0 1.228px 2.456px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+}
+
+.wc-card__next-when {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.15;
 }
 
 .wc-card__next-time {
-  font-size: var(--font-size-small);
-  font-weight: var(--font-weight-semibold);
+  font-size: 15px;
+  font-weight: 590;
+  color: #180e30;
   text-align: center;
+}
+
+.wc-card__next-date {
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(20, 9, 43, 0.7);
+  text-align: center;
+}
+
+.wc-card__team-code {
+  font-size: 15px;
+  font-weight: 590;
+  color: #180e30;
+  text-align: center;
+}
+
+/* --- Multi-row Results layout --- */
+
+.wc-card__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+.wc-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.wc-row__team {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.wc-row__team--home {
+  justify-content: flex-start;
+}
+
+.wc-row__team--away {
+  justify-content: flex-end;
+}
+
+.wc-row__code {
+  font-size: 15px;
+  font-weight: 590;
+  color: #180e30;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.wc-row__flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 57px;
+  height: 40px;
+  font-size: 38px;
+  line-height: 1;
+  border: 1px solid #b7b6ba;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow:
+    0 0.25px 0.375px rgba(0, 0, 0, 0.02),
+    0 2px 4px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+}
+
+.wc-row__flag--placeholder {
+  background: #d6d6d6;
+  border-color: #c0c0c0;
+}
+
+.wc-row__center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 90px;
+}
+
+.wc-row__score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+  font-size: 22px;
+  font-weight: 590;
+  line-height: 1.1;
+  color: #180e30;
+  letter-spacing: 0.01em;
+}
+
+.wc-row__score-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.wc-row__score-sep {
+  color: #180e30;
+  margin: 0;
+}
+
+.wc-row__status {
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(20, 9, 43, 0.7);
+  text-align: center;
+}
+
+/* --- Pagination control --- */
+
+.wc-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.wc-pagination__arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 9999px;
+  color: #180e30;
+  cursor: pointer;
+}
+
+.wc-pagination__arrow:hover:not(:disabled) {
+  background: rgba(20, 9, 43, 0.06);
+}
+
+.wc-pagination__arrow:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-outline-offset);
+}
+
+.wc-pagination__arrow:disabled {
+  color: rgba(20, 9, 43, 0.25);
+  cursor: default;
+}
+
+.wc-pagination__dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wc-pagination__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: rgba(20, 9, 43, 0.2);
+}
+
+.wc-pagination__dot--active {
+  background: #7542e5;
 }
 
 /* --- isMock footnote --- */

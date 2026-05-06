@@ -7,13 +7,72 @@ const MERINO_BASE = "https://merino.services.allizom.org/api/v1/wcs";
 const PREF_FORCE_MOCK = "browser.smartwindow.worldcup.forceMock";
 const PREF_DEBUG = "browser.smartwindow.worldcup.debug";
 
-const MOCK_YESTERDAY = Object.freeze({
-  id: "mock-yesterday",
-  status: "final",
-  kickoff: "2026-05-04T20:00:00Z",
-  homeTeam: { name: "Brazil", code: "BRA", flag: "\u{1F1E7}\u{1F1F7}", score: 3 },
-  awayTeam: { name: "Colombia", code: "COL", flag: "\u{1F1E8}\u{1F1F4}", score: 1 },
+const MOCK_NEXT = Object.freeze({
+  id: "mock-next",
+  status: "upcoming",
+  kickoff: "2026-05-06T19:00:00Z",
+  homeTeam: { name: "Argentina", code: "ARG", flag: "\u{1F1E6}\u{1F1F7}" },
+  awayTeam: { name: "Germany", code: "GER", flag: "\u{1F1E9}\u{1F1EA}" },
   isMock: true,
+});
+
+const MOCK_RESULTS = Object.freeze([
+  Object.freeze({
+    id: "mock-bra-col",
+    status: "final",
+    kickoff: "2026-05-04T20:00:00Z",
+    homeTeam: { name: "Brazil", code: "BRA", flag: "\u{1F1E7}\u{1F1F7}", score: 3 },
+    awayTeam: { name: "Colombia", code: "COL", flag: "\u{1F1E8}\u{1F1F4}", score: 1 },
+    isMock: true,
+  }),
+  Object.freeze({
+    id: "mock-arg-alg",
+    status: "final",
+    kickoff: "2026-05-04T17:00:00Z",
+    homeTeam: { name: "Argentina", code: "ARG", flag: "\u{1F1E6}\u{1F1F7}", score: 3 },
+    awayTeam: { name: "Algeria", code: "ALG", flag: "\u{1F1E9}\u{1F1FF}", score: 0 },
+    isMock: true,
+  }),
+  Object.freeze({
+    id: "mock-mex-aus",
+    status: "final",
+    kickoff: "2026-05-04T14:00:00Z",
+    homeTeam: { name: "Mexico", code: "MEX", flag: "\u{1F1F2}\u{1F1FD}", score: 1 },
+    awayTeam: { name: "Australia", code: "AUS", flag: "\u{1F1E6}\u{1F1FA}", score: 2 },
+    isMock: true,
+  }),
+  Object.freeze({
+    id: "mock-fra-usa",
+    status: "final",
+    kickoff: "2026-05-04T11:00:00Z",
+    homeTeam: { name: "France", code: "FRA", flag: "\u{1F1EB}\u{1F1F7}", score: 2 },
+    awayTeam: { name: "USA", code: "USA", flag: "\u{1F1FA}\u{1F1F8}", score: 1 },
+    isMock: true,
+  }),
+  Object.freeze({
+    id: "mock-ger-jpn",
+    status: "final-penalties",
+    kickoff: "2026-05-04T08:00:00Z",
+    homeTeam: { name: "Germany", code: "GER", flag: "\u{1F1E9}\u{1F1EA}", score: 2 },
+    awayTeam: { name: "Japan", code: "JPN", flag: "\u{1F1EF}\u{1F1F5}", score: 2 },
+    penalties: { home: 4, away: 3 },
+    isMock: true,
+  }),
+  Object.freeze({
+    id: "mock-eng-ita",
+    status: "final-penalties",
+    kickoff: "2026-05-04T05:00:00Z",
+    homeTeam: { name: "England", code: "ENG", flag: "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}", score: 0 },
+    awayTeam: { name: "Italy", code: "ITA", flag: "\u{1F1EE}\u{1F1F9}", score: 0 },
+    penalties: { home: 3, away: 4 },
+    isMock: true,
+  }),
+]);
+
+const MOCK_YESTERDAY = Object.freeze({
+  ...MOCK_RESULTS[0],
+  matches: MOCK_RESULTS,
+  next: MOCK_NEXT,
 });
 
 function dbg(...args) {
