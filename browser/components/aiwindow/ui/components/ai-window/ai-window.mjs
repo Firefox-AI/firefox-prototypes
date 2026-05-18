@@ -51,6 +51,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   getCurrentModelName:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowConstants.sys.mjs",
   ToolUI: "moz-src:///browser/components/aiwindow/ui/modules/ToolUI.sys.mjs",
+  SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
 });
 
 ChromeUtils.defineLazyGetter(lazy, "log", function () {
@@ -1053,6 +1054,25 @@ export class AIWindow extends MozLitElement {
   #onGuardrailGoalChanged = event => {
     this.#guardrailGoal = String(event.detail?.goal ?? "");
     this.#runFocusAlignment();
+  };
+
+  #onGuardrailSearchClicked = async event => {
+    const query = String(event.detail?.query ?? "").trim();
+    const win = window.browsingContext?.topChromeWindow;
+    if (!query || !win) {
+      return;
+    }
+    try {
+      const engine = await lazy.SearchService.getDefault();
+      const submission = engine.getSubmission(
+        query,
+        null,
+        "smartwindow-focus-guardrail"
+      );
+      win.openTrustedLinkIn(submission.uri.spec, "current");
+    } catch (e) {
+      console.warn("Focus guardrail search failed:", e);
+    }
   };
 
   /**
@@ -2419,8 +2439,11 @@ export class AIWindow extends MozLitElement {
               .score=${this.#guardrailLastResult?.alignment_score ?? 0}
               .explanation=${this.#guardrailLastResult
                 ?.one_sentence_explanation ?? ""}
+              .recoverySearches=${this.#guardrailLastResult
+                ?.recovery_searches ?? []}
               ?pending=${this.#guardrailPending}
               @focus-guardrail:goal-changed=${this.#onGuardrailGoalChanged}
+              @focus-guardrail:search-clicked=${this.#onGuardrailSearchClicked}
             ></focus-guardrail>
             ${this.showStarters
               ? html`

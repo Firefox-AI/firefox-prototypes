@@ -29,6 +29,7 @@ export class FocusGuardrail extends MozLitElement {
     status: { type: String, reflect: true },
     score: { type: Number },
     explanation: { type: String },
+    recoverySearches: { type: Array },
     pending: { type: Boolean, reflect: true },
   };
 
@@ -40,6 +41,7 @@ export class FocusGuardrail extends MozLitElement {
     this.status = "idle";
     this.score = 0;
     this.explanation = "";
+    this.recoverySearches = [];
     this.pending = false;
   }
 
@@ -78,7 +80,41 @@ export class FocusGuardrail extends MozLitElement {
         Set a mission above to track how this tab aligns with your goal.
       </p>`;
     }
-    return html`<p class="explanation">${this.explanation}</p>`;
+    const showRecovery =
+      (this.status === "drifting" || this.status === "off_track") &&
+      Array.isArray(this.recoverySearches) &&
+      !!this.recoverySearches.length;
+    return html`
+      <p class="explanation">${this.explanation}</p>
+      ${showRecovery
+        ? html`<div
+            class="recovery-searches"
+            role="group"
+            aria-label="Suggested searches to get back on task"
+          >
+            ${this.recoverySearches.map(
+              q =>
+                html`<button
+                  type="button"
+                  class="recovery-search"
+                  @click=${() => this.#onSearchClicked(q)}
+                >
+                  ${q}
+                </button>`
+            )}
+          </div>`
+        : nothing}
+    `;
+  }
+
+  #onSearchClicked(query) {
+    this.dispatchEvent(
+      new CustomEvent("focus-guardrail:search-clicked", {
+        bubbles: true,
+        composed: true,
+        detail: { query },
+      })
+    );
   }
 
   render() {

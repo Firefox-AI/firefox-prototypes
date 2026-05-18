@@ -294,7 +294,8 @@ Respond with ONLY a single JSON object — no markdown fences, no commentary, no
 {
   "alignment_score": <integer 0-100>,
   "status": "on_task" | "drifting" | "off_track",
-  "one_sentence_explanation": "<one short sentence under 140 chars>"
+  "one_sentence_explanation": "<one short sentence under 140 chars>",
+  "recovery_searches": [<2 or 3 short web-search queries that would help the user get back on task>]
 }
 
 Scoring guidance:
@@ -302,7 +303,14 @@ Scoring guidance:
 - 50-79  = drifting (tangentially related)
 - 0-49   = off_track (unrelated to the goal)
 
-If the goal is empty, return alignment_score: 0, status: "off_track", explanation: "No mission set — set a goal to track focus.".`;
+Recovery searches:
+- Each query should be 2-6 words, the kind of thing the user would type into a search bar.
+- Bridge the current tab back to the goal: if the user is reading X but their goal is about Y, suggest queries that pivot from X to Y (e.g. lessons-learned, comparisons, next-step searches grounded in what they're already looking at).
+- Use concrete nouns/entities from the current tab's title or domain when they make the query more useful; otherwise fall back to the goal alone.
+- For on_task pages, return an empty array.
+- For drifting / off_track pages, return 2 or 3 queries.
+
+If the goal is empty, return alignment_score: 0, status: "off_track", explanation: "No mission set — set a goal to track focus.", recovery_searches: [].`;
 
 const FOCUS_ALIGNMENT_USER_PROMPT_TEMPLATE = `Goal: {goal}
 
@@ -352,10 +360,17 @@ function parseFocusAlignmentResponse(raw) {
     0,
     240
   );
+  const recoverySearches = Array.isArray(parsed?.recovery_searches)
+    ? parsed.recovery_searches
+        .map(q => String(q ?? "").trim())
+        .filter(q => !!q.length && q.length <= 80)
+        .slice(0, 3)
+    : [];
   return {
     alignment_score: score,
     status,
     one_sentence_explanation: explanation,
+    recovery_searches: recoverySearches,
   };
 }
 

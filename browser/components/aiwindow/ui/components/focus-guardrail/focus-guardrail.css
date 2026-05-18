@@ -112,6 +112,35 @@
   opacity: 0.7;
 }
 
+.recovery-searches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xsmall);
+  margin-top: var(--space-xsmall);
+}
+
+.recovery-search {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-xxsmall) var(--space-small);
+  font-size: var(--font-size-xsmall);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius-circle);
+  background-color: transparent;
+  color: var(--text-color);
+  cursor: pointer;
+  font: inherit;
+}
+
+.recovery-search:hover {
+  background-color: var(--button-background-color-hover, var(--color-gray-20));
+}
+
+.recovery-search:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-outline-offset);
+}
+
 :host([pending]) .orb {
   animation: focus-guardrail-pulse 1.4s ease-in-out infinite;
 }
