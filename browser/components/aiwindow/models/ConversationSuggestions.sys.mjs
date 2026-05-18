@@ -299,9 +299,21 @@ Respond with ONLY a single JSON object — no markdown fences, no commentary, no
 }
 
 Scoring guidance:
-- 80-100 = on_task (current tab directly supports the goal)
-- 50-79  = drifting (tangentially related)
-- 0-49   = off_track (unrelated to the goal)
+- 80-100 = on_task: tab is clearly on the same topic, product, or domain as the goal. Any reasonable form of engaging with that topic — reading, shopping, comparing, browsing reviews, watching a video about it — counts as on-task. You do NOT need an exact verb match with the goal.
+- 50-79  = drifting: same broad area but a noticeably different focus (e.g. goal "evs" + a generic ICE-car news page; goal "tax stuff" + a personal-finance budgeting article).
+- 0-49   = off_track: unrelated topic or domain (social feeds, sports scores, unrelated shopping, etc.).
+
+Interpret goals generously:
+- The goal text is often short or informal ("evs", "tax stuff", "marathon training"). Expand it to the obvious broader topic.
+- Don't penalize "browsing" vs. "researching" — if the page is about the goal's topic, it's on-task.
+- Topic overlap matters more than activity verbs.
+
+Calibration examples:
+- Goal "evs", page = Edmunds EV review or Tesla Model Y spec page → 90 on_task.
+- Goal "evs", page = generic Reuters automotive news with no EV focus → 60 drifting.
+- Goal "evs", page = Twitter timeline → 5 off_track.
+- Goal "tax stuff", page = IRS Form 1040 instructions → 95 on_task.
+- Goal "tax stuff", page = Etsy storefront → 5 off_track.
 
 Trajectory awareness:
 - You will receive the user's recent alignment scores (oldest → newest). Use them to ground your explanation, not the absolute score. For example a jump from 10 to 55 is meaningful improvement even though 55 still lands in "drifting", and a drop from 90 to 70 is a regression even though 70 is still "drifting".
