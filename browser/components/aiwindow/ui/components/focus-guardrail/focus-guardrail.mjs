@@ -2,10 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { html, nothing } from "chrome://global/content/vendor/lit.all.mjs";
+import { html, nothing, svg } from "chrome://global/content/vendor/lit.all.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
 
 const GOAL_INPUT_DEBOUNCE_MS = 400;
+const SPARKLINE_W = 56;
+const SPARKLINE_H = 14;
+const TREND_DELTA = 10;
 
 const STATUS_LABELS = {
   idle: "Awaiting evaluation",
@@ -13,6 +16,8 @@ const STATUS_LABELS = {
   drifting: "Drifting",
   off_track: "Off Track",
 };
+
+const TREND_GLYPH = { up: "↑", down: "↓", flat: "→" };
 
 /**
  * Always-visible focus alignment panel for the AI Sidebar. Renders the user's
@@ -30,6 +35,7 @@ export class FocusGuardrail extends MozLitElement {
     score: { type: Number },
     explanation: { type: String },
     recoverySearches: { type: Array },
+    sparkline: { type: Array },
     pending: { type: Boolean, reflect: true },
   };
 
@@ -42,7 +48,46 @@ export class FocusGuardrail extends MozLitElement {
     this.score = 0;
     this.explanation = "";
     this.recoverySearches = [];
+    this.sparkline = [];
     this.pending = false;
+  }
+
+  #computeTrend() {
+    const pts = (this.sparkline ?? []).filter(Number.isFinite);
+    if (pts.length < 2) {
+      return null;
+    }
+    const delta = pts.at(-1) - pts.at(-2);
+    if (delta >= TREND_DELTA) {
+      return "up";
+    }
+    if (delta <= -TREND_DELTA) {
+      return "down";
+    }
+    return "flat";
+  }
+
+  #renderSparkline() {
+    const pts = (this.sparkline ?? []).filter(Number.isFinite);
+    if (pts.length < 2) {
+      return nothing;
+    }
+    const n = pts.length;
+    const points = pts
+      .map((v, i) => {
+        const x = (i / (n - 1)) * SPARKLINE_W;
+        const clamped = Math.max(0, Math.min(100, v));
+        const y = SPARKLINE_H - (clamped / 100) * SPARKLINE_H;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(" ");
+    return svg`<svg
+        class="sparkline"
+        viewBox="0 0 ${SPARKLINE_W} ${SPARKLINE_H}"
+        width=${SPARKLINE_W}
+        height=${SPARKLINE_H}
+        aria-hidden="true"
+      ><polyline points=${points} /></svg>`;
   }
 
   disconnectedCallback() {
@@ -128,9 +173,18 @@ export class FocusGuardrail extends MozLitElement {
       />
       <div class="header">
         <span class="orb" data-status=${this.status} aria-hidden="true"></span>
-        <span class="status-label"
-          >${showScore ? html`${clamped}% ` : nothing}${label}</span
-        >
+        <span class="status-label">
+          ${showScore ? html`${clamped}% ` : nothing}${label}
+          ${(() => {
+            const trend = this.#computeTrend();
+            return trend
+              ? html`<span class="trend" data-trend=${trend} aria-hidden="true"
+                  >${TREND_GLYPH[trend]}</span
+                >`
+              : nothing;
+          })()}
+        </span>
+        ${this.#renderSparkline()}
       </div>
       <input
         class="goal-input"

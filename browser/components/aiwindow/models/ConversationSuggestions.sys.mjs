@@ -303,6 +303,12 @@ Scoring guidance:
 - 50-79  = drifting (tangentially related)
 - 0-49   = off_track (unrelated to the goal)
 
+Trajectory awareness:
+- You will receive the user's recent alignment scores (oldest → newest). Use them to ground your explanation, not the absolute score. For example a jump from 10 to 55 is meaningful improvement even though 55 still lands in "drifting", and a drop from 90 to 70 is a regression even though 70 is still "drifting".
+- If the new score is clearly higher than the recent average, acknowledge the improvement in the explanation ("getting closer", "back on track" etc.).
+- If it's clearly lower, acknowledge the regression ("losing focus", "drifting further").
+- Otherwise just describe the current state.
+
 Recovery searches:
 - Each query should be 2-6 words, the kind of thing the user would type into a search bar.
 - Bridge the current tab back to the goal: if the user is reading X but their goal is about Y, suggest queries that pivot from X to Y (e.g. lessons-learned, comparisons, next-step searches grounded in what they're already looking at).
@@ -317,6 +323,8 @@ const FOCUS_ALIGNMENT_USER_PROMPT_TEMPLATE = `Goal: {goal}
 Current tab: {current_tab}
 
 Other open tabs: {open_tabs}
+
+Recent alignment scores for this session (oldest → newest): {prior_scores}
 
 Date: {date}
 
@@ -382,6 +390,7 @@ function parseFocusAlignmentResponse(raw) {
  *
  * @param {Array} contextTabs - Array of tab objects with title, url; first entry is the current tab
  * @param {string} goal - User's mission/goal text (may be empty)
+ * @param priorScores
  * @param {string | null} flowId - Flow ID for correlating with firefox_ai_runtime telemetry
  * @param {AbortSignal} signal - Signal to cancel the inference request
  * @returns {Promise<{alignment_score: number, status: string, one_sentence_explanation: string}|null>}
@@ -389,6 +398,7 @@ function parseFocusAlignmentResponse(raw) {
 export async function generateFocusAlignment(
   contextTabs = [],
   goal = "",
+  priorScores = [],
   flowId = null,
   signal = new AbortController().signal
 ) {
@@ -421,10 +431,14 @@ export async function generateFocusAlignment(
     const engine = await openAIEngine.build(MODEL_FEATURES.CHAT, flowId);
     const inferenceParams = engine.getConfig(engine.feature)?.parameters || {};
 
+    const cleanedScores = Array.isArray(priorScores)
+      ? priorScores.filter(Number.isFinite).map(n => Math.round(n))
+      : [];
     const userPrompt = renderPrompt(FOCUS_ALIGNMENT_USER_PROMPT_TEMPLATE, {
       goal: String(goal ?? "").trim() || "(no mission set)",
       current_tab: currentTab,
       open_tabs: openedTabs,
+      prior_scores: cleanedScores.length ? cleanedScores.join(", ") : "(none)",
       date: today,
     });
 

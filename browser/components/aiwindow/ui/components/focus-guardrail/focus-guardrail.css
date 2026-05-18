@@ -48,9 +48,36 @@
 }
 
 .status-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxsmall);
   font-size: var(--font-size-small);
   font-weight: var(--font-weight-bold);
   flex-grow: 1;
+}
+
+.trend {
+  font-weight: var(--font-weight);
+}
+
+.trend[data-trend="up"] {
+  color: var(--guardrail-on-task);
+}
+
+.trend[data-trend="down"] {
+  color: var(--guardrail-off-track);
+}
+
+.trend[data-trend="flat"] {
+  opacity: 0.6;
+}
+
+.sparkline {
+  stroke: currentColor;
+  stroke-width: 1.25;
+  fill: none;
+  opacity: 0.75;
+  flex-shrink: 0;
 }
 
 .goal-input {

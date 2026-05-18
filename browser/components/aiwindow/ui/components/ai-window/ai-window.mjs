@@ -204,6 +204,9 @@ export class AIWindow extends MozLitElement {
   #guardrailLastResult = null;
   #guardrailPending = false;
   #guardrailAbortController = null;
+  #guardrailScores = [];
+
+  static #GUARDRAIL_MAX_SCORES = 12;
 
   get #memoriesIconShown() {
     return (
@@ -1029,6 +1032,7 @@ export class AIWindow extends MozLitElement {
       result = await lazy.generateFocusAlignment(
         contextTabs,
         this.#guardrailGoal,
+        this.#guardrailScores,
         this.conversationId,
         controller.signal
       );
@@ -1043,6 +1047,15 @@ export class AIWindow extends MozLitElement {
     }
     if (result) {
       this.#guardrailLastResult = result;
+      if (
+        Number.isFinite(result.alignment_score) &&
+        result.status !== "no_goal"
+      ) {
+        this.#guardrailScores = [
+          ...this.#guardrailScores,
+          result.alignment_score,
+        ].slice(-AIWindow.#GUARDRAIL_MAX_SCORES);
+      }
     }
     if (this.#guardrailAbortController === controller) {
       this.#guardrailAbortController = null;
@@ -1052,7 +1065,14 @@ export class AIWindow extends MozLitElement {
   }
 
   #onGuardrailGoalChanged = event => {
-    this.#guardrailGoal = String(event.detail?.goal ?? "");
+    const next = String(event.detail?.goal ?? "");
+    if (next !== this.#guardrailGoal) {
+      // Different goal = different baseline; the old trajectory is no longer
+      // meaningful, so wipe the sparkline.
+      this.#guardrailScores = [];
+      this.#guardrailLastResult = null;
+    }
+    this.#guardrailGoal = next;
     this.#runFocusAlignment();
   };
 
@@ -2441,6 +2461,7 @@ export class AIWindow extends MozLitElement {
                 ?.one_sentence_explanation ?? ""}
               .recoverySearches=${this.#guardrailLastResult
                 ?.recovery_searches ?? []}
+              .sparkline=${this.#guardrailScores}
               ?pending=${this.#guardrailPending}
               @focus-guardrail:goal-changed=${this.#onGuardrailGoalChanged}
               @focus-guardrail:search-clicked=${this.#onGuardrailSearchClicked}
