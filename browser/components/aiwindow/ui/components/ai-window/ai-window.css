@@ -34,11 +34,18 @@
 :host([mode="sidebar"]) {
   grid-template-areas:
     "browser"
+    "guardrail"
     "prompts"
     "smartbar"
     "disclaimer";
-  grid-template-rows: 1fr auto auto auto;
+  grid-template-rows: 1fr auto auto auto auto;
   --smartbar-width: calc(100% - var(--space-large));
+}
+
+.ai-window-guardrail {
+  grid-area: guardrail;
+  width: var(--smartbar-width);
+  margin-block-start: var(--space-small);
 }
 
 /* Expands browser to full height and removes prompts from grid when chat starts */
@@ -66,9 +73,10 @@
 :host([mode="sidebar"].chat-active) {
   grid-template-areas:
     "browser"
+    "guardrail"
     "smartbar"
     "disclaimer";
-  grid-template-rows: 1fr auto auto;
+  grid-template-rows: 1fr auto auto auto;
 }
 
 #browser-container {

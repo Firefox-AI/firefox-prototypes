@@ -67,3 +67,5 @@ browser.jar:
   content/browser/aiwindow/components/smartwindow-heading.css       (components/smartwindow-heading/smartwindow-heading.css)
   content/browser/aiwindow/components/ai-action-result.mjs          (components/ai-action-result/ai-action-result.mjs)
   content/browser/aiwindow/components/ai-action-result.css          (components/ai-action-result/ai-action-result.css)
+  content/browser/aiwindow/components/focus-guardrail.mjs           (components/focus-guardrail/focus-guardrail.mjs)
+  content/browser/aiwindow/components/focus-guardrail.css           (components/focus-guardrail/focus-guardrail.css)

@@ -1,0 +1,127 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/* stylelint-disable stylelint-plugin-mozilla/use-design-tokens */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-small);
+  padding: var(--space-small) var(--space-medium);
+  border-radius: var(--border-radius-medium);
+  background-color: var(--background-color-canvas);
+  color: var(--text-color);
+  box-sizing: border-box;
+  --guardrail-on-task: light-dark(#1f9d55, #58c08e);
+  --guardrail-drifting: light-dark(#d97706, #f5b454);
+  --guardrail-off-track: light-dark(#c1372b, #ec6058);
+  --guardrail-idle: var(--color-gray-50);
+  --guardrail-orb-size: 10px;
+  --guardrail-track-height: 6px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-small);
+}
+
+.orb {
+  width: var(--guardrail-orb-size);
+  height: var(--guardrail-orb-size);
+  border-radius: var(--border-radius-circle);
+  background-color: var(--guardrail-idle);
+  flex-shrink: 0;
+}
+
+.orb[data-status="on_task"] {
+  background-color: var(--guardrail-on-task);
+}
+
+.orb[data-status="drifting"] {
+  background-color: var(--guardrail-drifting);
+}
+
+.orb[data-status="off_track"] {
+  background-color: var(--guardrail-off-track);
+}
+
+.status-label {
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-bold);
+  flex-grow: 1;
+}
+
+.goal-input {
+  width: 100%;
+  padding: var(--space-small);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius-small);
+  background-color: var(--background-color-canvas);
+  color: var(--text-color);
+  font-size: var(--font-size-small);
+  box-sizing: border-box;
+}
+
+.goal-input:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-outline-offset);
+}
+
+.track {
+  position: relative;
+  height: var(--guardrail-track-height);
+  border-radius: var(--border-radius-small);
+  background: linear-gradient(90deg, var(--guardrail-off-track) 0%, var(--guardrail-drifting) 50%, var(--guardrail-on-task) 100%);
+  overflow: visible;
+}
+
+.thumb {
+  position: absolute;
+  top: 50%;
+  left: attr(data-pos type(<percentage>), 0%);
+  width: var(--guardrail-orb-size);
+  height: var(--guardrail-orb-size);
+  border-radius: var(--border-radius-circle);
+  background-color: var(--background-color-canvas);
+  border: 2px solid var(--text-color);
+  transform: translate(-50%, -50%);
+  transition: left 200ms ease-out;
+}
+
+:host([status="idle"]) .track {
+  opacity: 0.5;
+}
+
+.explanation {
+  margin: 0;
+  font-size: var(--font-size-small);
+  color: var(--text-color-deemphasized, var(--text-color));
+  line-height: 1.35;
+}
+
+.explanation.placeholder {
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.analyzing {
+  font-size: var(--font-size-small);
+  font-style: italic;
+  opacity: 0.7;
+}
+
+:host([pending]) .orb {
+  animation: focus-guardrail-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes focus-guardrail-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}

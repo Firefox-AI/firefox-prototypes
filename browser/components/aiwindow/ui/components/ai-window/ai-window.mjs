@@ -8,6 +8,8 @@ import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
 import "chrome://browser/content/aiwindow/components/smartwindow-prompts.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/smartwindow-promo.mjs";
+// eslint-disable-next-line import/no-unassigned-import
+import "chrome://browser/content/aiwindow/components/focus-guardrail.mjs";
 
 const { XPCOMUtils } = ChromeUtils.importESModule(
   "resource://gre/modules/XPCOMUtils.sys.mjs"
@@ -41,6 +43,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   NewTabStarterGenerator:
     "moz-src:///browser/components/aiwindow/models/ConversationSuggestions.sys.mjs",
   generateConversationStartersSidebar:
+    "moz-src:///browser/components/aiwindow/models/ConversationSuggestions.sys.mjs",
+  generateFocusAlignment:
     "moz-src:///browser/components/aiwindow/models/ConversationSuggestions.sys.mjs",
   MemoriesManager:
     "moz-src:///browser/components/aiwindow/models/memories/MemoriesManager.sys.mjs",
@@ -194,6 +198,11 @@ export class AIWindow extends MozLitElement {
   #windowModeObserver = null;
   #swapDocShellsChromeWindow = null;
   #hasMemories = false;
+
+  #guardrailGoal = "";
+  #guardrailLastResult = null;
+  #guardrailPending = false;
+  #guardrailAbortController = null;
 
   get #memoriesIconShown() {
     return (
@@ -905,6 +914,10 @@ export class AIWindow extends MozLitElement {
           url: contextWebsite.url,
         }));
 
+        // Fire-and-forget: piggy-back the focus alignment eval on the same
+        // starter-prompts cycle so we reuse all of its tab-switch triggers.
+        this.#runFocusAlignment(contextTabs);
+
         // Get memories setting from user preferences
         const memoriesEnabled =
           this.#memoriesToggled ?? this.#memoriesIconShown;
@@ -984,6 +997,63 @@ export class AIWindow extends MozLitElement {
     }
     this.requestUpdate();
   }
+
+  /**
+   * Runs the focus alignment evaluation against the supplied context tabs.
+   * Maintains its own AbortController so a new call cleanly cancels any
+   * in-flight one. Fire-and-forget; the parent invokes this without await.
+   *
+   * @param {Array<{title: string, url: string}>} [contextTabs] - tab list;
+   *   if omitted, derived from the smartbar's current context.
+   * @private
+   */
+  async #runFocusAlignment(contextTabs) {
+    if (this.mode !== MODE.SIDEBAR || !this.isConnected) {
+      return;
+    }
+    if (!contextTabs) {
+      const data = this.#smartbar?.getCurrentContextData?.();
+      const websites = data?.contextWebsites ?? [];
+      contextTabs = websites.map(w => ({ title: w.label, url: w.url }));
+    }
+
+    this.#guardrailAbortController?.abort();
+    const controller = new AbortController();
+    this.#guardrailAbortController = controller;
+    this.#guardrailPending = true;
+    this.requestUpdate();
+
+    let result = null;
+    try {
+      result = await lazy.generateFocusAlignment(
+        contextTabs,
+        this.#guardrailGoal,
+        this.conversationId,
+        controller.signal
+      );
+    } catch (e) {
+      if (e?.name !== "AbortError") {
+        console.warn("Focus guardrail evaluation failed:", e);
+      }
+    }
+
+    if (controller.signal.aborted) {
+      return;
+    }
+    if (result) {
+      this.#guardrailLastResult = result;
+    }
+    if (this.#guardrailAbortController === controller) {
+      this.#guardrailAbortController = null;
+    }
+    this.#guardrailPending = false;
+    this.requestUpdate();
+  }
+
+  #onGuardrailGoalChanged = event => {
+    this.#guardrailGoal = String(event.detail?.goal ?? "");
+    this.#runFocusAlignment();
+  };
 
   /**
    * Helper method to get or create the smartbar element
@@ -2342,6 +2412,16 @@ export class AIWindow extends MozLitElement {
       <div id="browser-container"></div>
       ${this.mode === MODE.SIDEBAR
         ? html`
+            <focus-guardrail
+              class="ai-window-guardrail"
+              .goal=${this.#guardrailGoal}
+              .status=${this.#guardrailLastResult?.status ?? "idle"}
+              .score=${this.#guardrailLastResult?.alignment_score ?? 0}
+              .explanation=${this.#guardrailLastResult
+                ?.one_sentence_explanation ?? ""}
+              ?pending=${this.#guardrailPending}
+              @focus-guardrail:goal-changed=${this.#onGuardrailGoalChanged}
+            ></focus-guardrail>
             ${this.showStarters
               ? html`
                   <smartwindow-prompts

@@ -288,6 +288,165 @@ export async function generateConversationStartersSidebar(
   }
 }
 
+const FOCUS_ALIGNMENT_SYSTEM_PROMPT = `You are a focus coach. Evaluate how well the user's current browser tab aligns with their stated mission/goal.
+
+Respond with ONLY a single JSON object — no markdown fences, no commentary, no prose around it — in this exact schema:
+{
+  "alignment_score": <integer 0-100>,
+  "status": "on_task" | "drifting" | "off_track",
+  "one_sentence_explanation": "<one short sentence under 140 chars>"
+}
+
+Scoring guidance:
+- 80-100 = on_task (current tab directly supports the goal)
+- 50-79  = drifting (tangentially related)
+- 0-49   = off_track (unrelated to the goal)
+
+If the goal is empty, return alignment_score: 0, status: "off_track", explanation: "No mission set — set a goal to track focus.".`;
+
+const FOCUS_ALIGNMENT_USER_PROMPT_TEMPLATE = `Goal: {goal}
+
+Current tab: {current_tab}
+
+Other open tabs: {open_tabs}
+
+Date: {date}
+
+Respond with JSON only.`;
+
+const FOCUS_VALID_STATUSES = new Set(["on_task", "drifting", "off_track"]);
+
+function parseFocusAlignmentResponse(raw) {
+  const text = String(raw ?? "").trim();
+  if (!text) {
+    return null;
+  }
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end <= start) {
+    return null;
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(text.slice(start, end + 1));
+  } catch (e) {
+    console.warn("[FocusAlignment] invalid JSON response:", e, raw);
+    return null;
+  }
+  let score = Number(parsed?.alignment_score);
+  if (!Number.isFinite(score)) {
+    return null;
+  }
+  score = Math.max(0, Math.min(100, Math.round(score)));
+  let status = String(parsed?.status ?? "").toLowerCase();
+  if (!FOCUS_VALID_STATUSES.has(status)) {
+    if (score >= 80) {
+      status = "on_task";
+    } else if (score >= 50) {
+      status = "drifting";
+    } else {
+      status = "off_track";
+    }
+  }
+  const explanation = String(parsed?.one_sentence_explanation ?? "").slice(
+    0,
+    240
+  );
+  return {
+    alignment_score: score,
+    status,
+    one_sentence_explanation: explanation,
+  };
+}
+
+/**
+ * Asks the LLM to score how well the current tab aligns with the user's
+ * stated mission/goal. Mirrors generateConversationStartersSidebar's
+ * scaffolding (engine build, formatJson tab structuring, AbortSignal race)
+ * but with an inline prompt and JSON-only output.
+ *
+ * @param {Array} contextTabs - Array of tab objects with title, url; first entry is the current tab
+ * @param {string} goal - User's mission/goal text (may be empty)
+ * @param {string | null} flowId - Flow ID for correlating with firefox_ai_runtime telemetry
+ * @param {AbortSignal} signal - Signal to cancel the inference request
+ * @returns {Promise<{alignment_score: number, status: string, one_sentence_explanation: string}|null>}
+ */
+export async function generateFocusAlignment(
+  contextTabs = [],
+  goal = "",
+  flowId = null,
+  signal = new AbortController().signal
+) {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+
+    const currentTab = contextTabs.length
+      ? formatJson({
+          title: sanitizeUntrustedContent(contextTabs[0].title),
+          url: contextTabs[0].url,
+        })
+      : "No current tab";
+
+    let openedTabs;
+    if (contextTabs.length >= 1) {
+      openedTabs =
+        contextTabs.length === 1
+          ? "Only current tab is open"
+          : formatJson(
+              contextTabs.slice(1).map(t => ({
+                title: sanitizeUntrustedContent(t.title),
+                url: t.url,
+              }))
+            );
+    } else {
+      openedTabs = "No tabs available";
+    }
+    contextTabs = null;
+
+    const engine = await openAIEngine.build(MODEL_FEATURES.CHAT, flowId);
+    const inferenceParams = engine.getConfig(engine.feature)?.parameters || {};
+
+    const userPrompt = renderPrompt(FOCUS_ALIGNMENT_USER_PROMPT_TEMPLATE, {
+      goal: String(goal ?? "").trim() || "(no mission set)",
+      current_tab: currentTab,
+      open_tabs: openedTabs,
+      date: today,
+    });
+
+    const fxAccountToken = await openAIEngine.getFxAccountToken();
+    signal.throwIfAborted();
+
+    let runPromise = engine.run({
+      args: [
+        { role: "system", content: FOCUS_ALIGNMENT_SYSTEM_PROMPT },
+        { role: "user", content: userPrompt },
+      ],
+      fxAccountToken,
+      ...inferenceParams,
+    });
+    runPromise = Promise.race([
+      runPromise,
+      new Promise((_, reject) => {
+        if (signal.aborted) {
+          reject(signal.reason);
+        } else {
+          signal.addEventListener("abort", () => reject(signal.reason), {
+            once: true,
+          });
+        }
+      }),
+    ]);
+
+    const result = await runPromise;
+    return parseFocusAlignmentResponse(result?.finalOutput);
+  } catch (e) {
+    if (e?.name !== "AbortError") {
+      console.warn("[FocusAlignment] generateFocusAlignment failed:", e);
+    }
+    return null;
+  }
+}
+
 /**
  * Generates followup prompt suggestions based on conversation history
  *
