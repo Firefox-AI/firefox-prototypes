@@ -12,6 +12,8 @@ import "chrome://browser/content/aiwindow/components/chat-assistant-error.mjs";
 import "chrome://browser/content/aiwindow/components/chat-assistant-loader.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/website-chip-container.mjs";
+// eslint-disable-next-line import/no-unassigned-import
+import "chrome://browser/content/aiwindow/components/product-comparison-artifact.mjs";
 
 const FOLLOW_UP_QTY = 2;
 
@@ -32,6 +34,7 @@ export class AIChatContent extends MozLitElement {
 
   #lastScrollReq = null;
   #overflowObserver = null;
+  #pendingComparisonData = null;
 
   constructor() {
     super();
@@ -131,6 +134,37 @@ export class AIChatContent extends MozLitElement {
       "aiChatError:sign-in",
       this.openAccountSignInAfterError.bind(this)
     );
+
+    this.addEventListener(
+      "aiChatContentActor:product-comparison",
+      this.#handleProductComparison.bind(this)
+    );
+  }
+
+  /**
+   * Receive a product-comparison payload from the parent actor and stash it on
+   * the most-recent assistant entry (server-replace semantics). If no assistant
+   * entry exists yet, queue the data for the next handleAIResponseEvent.
+   *
+   * @param {CustomEvent} event
+   */
+  #handleProductComparison(event) {
+    const payload = event.detail;
+    if (!payload || !payload.data) {
+      return;
+    }
+    const data = payload.data;
+    const target = this.conversationState.findLast(
+      m => m?.role === "assistant"
+    );
+    if (target) {
+      target.comparisonData = data;
+      this.assistantIsLoading = false;
+      this.errorObj = null;
+      this.requestUpdate();
+    } else {
+      this.#pendingComparisonData = data;
+    }
   }
 
   /**
@@ -388,6 +422,13 @@ export class AIChatContent extends MozLitElement {
       ? []
       : followUpSuggestions.slice(0, FOLLOW_UP_QTY);
 
+    const existing = this.conversationState[ordinal];
+    const preservedComparison =
+      existing?.comparisonData ?? this.#pendingComparisonData ?? null;
+    if (preservedComparison && this.#pendingComparisonData) {
+      this.#pendingComparisonData = null;
+    }
+
     this.conversationState[ordinal] = {
       role: "assistant",
       convId,
@@ -397,6 +438,7 @@ export class AIChatContent extends MozLitElement {
       showCallout: showMemoriesCallout ?? false,
       searchTokens: webSearchQueries ?? [],
       isLastChunk: !!isPreviousMessage,
+      comparisonData: preservedComparison,
     };
 
     this.requestUpdate();
@@ -521,6 +563,11 @@ export class AIChatContent extends MozLitElement {
           .conversationId=${this.conversationId}
           .seenUrls=${this.seenUrls}
         ></ai-chat-message>
+        ${msg.role === "assistant" && msg.comparisonData
+          ? html`<product-comparison-artifact
+              .data=${msg.comparisonData}
+            ></product-comparison-artifact>`
+          : nothing}
         ${msg.role === "assistant" && msg.isLastChunk
           ? html`
               <assistant-message-footer

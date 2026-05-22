@@ -67,6 +67,19 @@ export class AIChatContentParent extends JSWindowActorParent {
     this.sendAsyncMessage("AIChatContent:SeenUrls", payload);
   }
 
+  /**
+   * Dispatch a product-comparison payload to the chat content. The payload is
+   * the full comparison set produced by compare_products / refine_comparison;
+   * the child re-dispatches it as a DOM event the artifact subscribes to.
+   *
+   * @param {object} payload
+   * @param {"initial"|"refined"} payload.kind
+   * @param {object} payload.data
+   */
+  dispatchComparisonToChatContent(payload) {
+    this.sendAsyncMessage("AIChatContent:ProductComparison", payload);
+  }
+
   receiveMessage({ data, name }) {
     switch (name) {
       case "aiChatContentActor:search":
@@ -91,6 +104,10 @@ export class AIChatContentParent extends JSWindowActorParent {
 
       case "AIChatContent:OpenLink":
         this.#handleOpenLink(data);
+        break;
+
+      case "AIChatContent:OpenFullComparison":
+        this.#handleOpenFullComparison(data);
         break;
 
       case "AIChatContent:AccountSignIn":
@@ -192,6 +209,70 @@ export class AIChatContentParent extends JSWindowActorParent {
       });
     } catch (e) {
       console.warn("Could not open link from AI Window chat", e);
+    }
+  }
+
+  async #handleOpenFullComparison(data) {
+    try {
+      const window = this.browsingContext.topChromeWindow;
+      if (!window) {
+        return;
+      }
+      const payload = data?.data;
+      if (!payload) {
+        return;
+      }
+      const json = JSON.stringify(payload);
+      let encoded;
+      try {
+        encoded = btoa(unescape(encodeURIComponent(json)));
+      } catch {
+        encoded = "";
+      }
+      const url =
+        "chrome://browser/content/aiwindow/product-comparison-full.html#data=" +
+        encoded;
+      const triggeringPrincipal =
+        Services.scriptSecurityManager.getSystemPrincipal();
+
+      // After run_search has handed off the chat to the sidebar, the current
+      // tab is showing the SERP. Navigate it in place so browser back returns
+      // to the SERP. If we're still in fullpage AI mode (no run_search yet),
+      // hand off the chat to the sidebar first, then navigate the now-empty
+      // tab.
+      let fullpageTab = null;
+      for (const tab of window.gBrowser.tabs) {
+        const browser = tab.linkedBrowser;
+        if (
+          browser?.currentURI &&
+          lazy.AIWindow.isAIWindowContentPage(browser.currentURI)
+        ) {
+          fullpageTab = tab;
+          break;
+        }
+      }
+
+      if (fullpageTab) {
+        if (window.gBrowser.selectedTab !== fullpageTab) {
+          window.gBrowser.selectedTab = fullpageTab;
+        }
+        await lazy.AIWindow.moveConversationToSidebar(window, fullpageTab);
+        fullpageTab.linkedBrowser.fixupAndLoadURIString(url, {
+          triggeringPrincipal,
+        });
+      } else {
+        // Sidebar mode: navigate the current tab in place (replaces SERP).
+        // openTrustedLinkIn with "current" creates a session-history entry so
+        // the browser back arrow returns to the previous page.
+        lazy.URILoadingHelper.openTrustedLinkIn(window, url, "current", {
+          triggeringPrincipal,
+        });
+        if (!lazy.AIWindowUI.isSidebarOpen(window)) {
+          lazy.AIWindowUI.toggleSidebar(window);
+        }
+      }
+    } catch (e) {
+      console.warn("Could not open full comparison view", e);
     }
   }
 

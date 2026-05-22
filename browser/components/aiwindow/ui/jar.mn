@@ -55,3 +55,8 @@ browser.jar:
   content/browser/aiwindow/components/smartwindow-footer.css        (components/smartwindow-footer/smartwindow-footer.css)
   content/browser/aiwindow/components/smartwindow-heading.mjs       (components/smartwindow-heading/smartwindow-heading.mjs)
   content/browser/aiwindow/components/smartwindow-heading.css       (components/smartwindow-heading/smartwindow-heading.css)
+  content/browser/aiwindow/components/product-comparison-artifact.mjs (components/product-comparison-artifact/product-comparison-artifact.mjs)
+  content/browser/aiwindow/components/product-comparison-artifact.css (components/product-comparison-artifact/product-comparison-artifact.css)
+  content/browser/aiwindow/product-comparison-full.html             (content/product-comparison-full.html)
+  content/browser/aiwindow/product-comparison-full.css              (content/product-comparison-full.css)
+  content/browser/aiwindow/product-comparison-full.js               (content/product-comparison-full.js)

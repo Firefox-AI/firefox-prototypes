@@ -31,6 +31,9 @@ export class AIChatContentChild extends JSWindowActorChild {
     "AIChatContent:SeenUrls": {
       event: "aiChatContentActor:seen-urls",
     },
+    "AIChatContent:ProductComparison": {
+      event: "aiChatContentActor:product-comparison",
+    },
   };
 
   static #VALID_EVENTS_FROM_CONTENT = new Set([
@@ -41,6 +44,7 @@ export class AIChatContentChild extends JSWindowActorChild {
     "AIChatContent:OpenLink",
     "AIChatContent:DispatchNewChat",
     "AIChatContent:AccountSignIn",
+    "AIChatContent:OpenFullComparison",
   ]);
 
   /**
@@ -84,6 +88,13 @@ export class AIChatContentChild extends JSWindowActorChild {
 
       case "AIChatContent:OpenLink":
         this.sendAsyncMessage("AIChatContent:OpenLink", event.detail);
+        break;
+
+      case "AIChatContent:OpenFullComparison":
+        this.sendAsyncMessage(
+          "AIChatContent:OpenFullComparison",
+          event.detail
+        );
         break;
 
       case "AIChatContent:AccountSignIn":

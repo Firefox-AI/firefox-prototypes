@@ -239,6 +239,7 @@ let JSWINDOWACTORS = {
         "AIChatContent:OpenLink": { wantUntrusted: true },
         "AIChatContent:DispatchNewChat": { wantUntrusted: true },
         "AIChatContent:AccountSignIn": { wantUntrusted: true },
+        "AIChatContent:OpenFullComparison": { wantUntrusted: true },
       },
     },
     allFrames: true,

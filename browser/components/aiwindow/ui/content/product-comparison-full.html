@@ -1,0 +1,68 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this file,
+   - You can obtain one at http://mozilla.org/MPL/2.0/. -->
+<!doctype html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="referrer" content="no-referrer" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src chrome: resource:; script-src chrome:; style-src chrome: 'unsafe-inline'; img-src chrome: https: data:; frame-src https:; object-src 'none';"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <title>Side-by-side product comparison</title>
+    <link rel="stylesheet" href="chrome://global/skin/in-content/common.css" />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/aiwindow/product-comparison-full.css"
+    />
+  </head>
+  <body>
+    <div id="pcf-app">
+      <header class="pcf-topbar">
+        <div class="pcf-brand">
+          <span class="pcf-brand-mark"></span>
+          <span class="pcf-brand-text">Smart Window · Product Comparison</span>
+        </div>
+        <div class="pcf-meta">
+          <span id="pcf-summary-query"></span>
+          <span id="pcf-summary-count"></span>
+        </div>
+      </header>
+      <section class="pcf-table-wrap" id="pcf-table-wrap">
+        <div class="pcf-loading" id="pcf-loading">Loading comparison…</div>
+      </section>
+      <section class="pcf-preview" id="pcf-preview" hidden="hidden">
+        <div class="pcf-preview-header">
+          <span class="pcf-preview-title" id="pcf-preview-title"></span>
+          <div class="pcf-preview-actions">
+            <button id="pcf-preview-newtab" class="pcf-btn">
+              Open in new tab
+            </button>
+            <button id="pcf-preview-close" class="pcf-btn pcf-btn-ghost">
+              Close preview
+            </button>
+          </div>
+        </div>
+        <div class="pcf-preview-body">
+          <div class="pcf-preview-blocked" id="pcf-preview-blocked" hidden="hidden">
+            This site blocks embedding (X-Frame-Options or CSP).
+            <button id="pcf-preview-fallback" class="pcf-btn pcf-btn-primary">
+              Open product page in new tab
+            </button>
+          </div>
+          <iframe
+            id="pcf-preview-frame"
+            sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+            referrerpolicy="no-referrer"
+          ></iframe>
+        </div>
+      </section>
+    </div>
+    <script
+      type="module"
+      src="chrome://browser/content/aiwindow/product-comparison-full.js"
+    ></script>
+  </body>
+</html>

@@ -329,6 +329,10 @@ export class AIWindow extends MozLitElement {
       "chat-conversation:seen-urls-updated",
       this.#onSeenUrlsUpdated
     );
+    this.#conversation.on(
+      "chat-conversation:comparison-data",
+      this.#onComparisonData
+    );
   }
 
   #removeConversationListeners() {
@@ -348,6 +352,10 @@ export class AIWindow extends MozLitElement {
       "chat-conversation:seen-urls-updated",
       this.#onSeenUrlsUpdated
     );
+    this.#conversation.off(
+      "chat-conversation:comparison-data",
+      this.#onComparisonData
+    );
   }
 
   #onSeenUrlsUpdated = () => {
@@ -359,6 +367,17 @@ export class AIWindow extends MozLitElement {
 
   #onMessageUpdate = (_event, message) => {
     this.#dispatchMessageToChatContent(message);
+  };
+
+  #onComparisonData = (_event, payload) => {
+    const actor = this.#getAIChatContentActor();
+    if (actor && actor.dispatchComparisonToChatContent) {
+      try {
+        actor.dispatchComparisonToChatContent(payload);
+      } catch (e) {
+        console.warn("Could not dispatch comparison data", e);
+      }
+    }
   };
 
   onMemoriesApplied() {
@@ -1579,6 +1598,31 @@ export class AIWindow extends MozLitElement {
         this.#pendingMessageDelivery = true;
       }
       this.#deliverConversationMessages(actor);
+      this.#dispatchPendingComparisonData(actor);
+    }
+  }
+
+  /**
+   * Dispatch any comparison data that was set on the conversation before the
+   * chat content was ready (e.g., during run_search → compareProducts handoff).
+   * Called from both onContentReady and openConversation since either may
+   * arrive first depending on whether the embedded browser is already loaded.
+   *
+   * @param {JSWindowActor} actor
+   */
+  #dispatchPendingComparisonData(actor) {
+    const data = this.#conversation?._comparisonV1;
+    if (!data || !actor?.dispatchComparisonToChatContent) {
+      return;
+    }
+    try {
+      console.log(
+        "[ai-window] dispatching pending comparison data, products=",
+        data.products?.length
+      );
+      actor.dispatchComparisonToChatContent({ kind: "initial", data });
+    } catch (e) {
+      console.warn("Could not dispatch pending comparison data", e);
     }
   }
 
@@ -1691,6 +1735,7 @@ export class AIWindow extends MozLitElement {
 
       if (this.#browser && actor) {
         this.#deliverConversationMessages(actor);
+        this.#dispatchPendingComparisonData(actor);
       }
     } else {
       this.onCreateNewChatClick();

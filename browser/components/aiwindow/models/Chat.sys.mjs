@@ -23,6 +23,9 @@ import {
   RUN_SEARCH,
   GET_USER_MEMORIES,
   GET_NAVIGATION_INFO,
+  COMPARE_PRODUCTS,
+  REFINE_COMPARISON,
+  ADD_PRODUCT_FROM_TAB,
 } from "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs";
 import {
   expandUrlTokensInToolParams,
@@ -162,6 +165,29 @@ Object.assign(Chat, {
     const searchExecuted = conversation._searchExecutedTurn === currentTurn;
     let blockedSearchAttempts = 0;
 
+    // Detect shopping intent on the user's first message. Used by the
+    // post-run_search hook below to auto-trigger compareProducts so the
+    // comparison artifact renders alongside the LLM's text response.
+    // The Mozilla LLM endpoint doesn't reliably honor a tool_choice override
+    // pinned to a specific function, so we invoke compareProducts directly
+    // server-side instead of trying to coax the LLM into calling it.
+    // MESSAGE_ROLE.USER === 0 (numeric enum from ChatConversation.sys.mjs).
+    const firstUserMessage = (() => {
+      for (const m of conversation.messages) {
+        if (m?.role === 0) {
+          const c = m.content;
+          if (typeof c === "string") {
+            return c.toLowerCase();
+          }
+          return String(c?.body ?? c ?? "").toLowerCase();
+        }
+      }
+      return "";
+    })();
+    const COMPARISON_INTENT_RE =
+      /\b(?:compare\s+(?:top|best|the|\d|\w+\s+\w+)|find\s+(?:me\s+)?(?:the\s+)?best|what(?:'?s|\s+is)\s+the\s+best|which\s+\w+\s+should\s+i\s+(?:buy|get|pick)|recommend\s+(?:a|some|me|the\s+best)|top\s+\d+\s+\w+|best\s+\w+\s+(?:under|for|on)\s+|\bvs\b|\bversus\b)/i;
+    const intentIsShopping =
+      !!firstUserMessage && COMPARISON_INTENT_RE.test(firstUserMessage);
     const streamModelResponse = () => {
       const rawMessages = conversation.getMessagesInOpenAiFormat();
       lazy.console.log(
@@ -384,6 +410,18 @@ Object.assign(Chat, {
             case GET_NAVIGATION_INFO:
               result = await toolFns.getNavigationInfo(toolParams);
               break;
+            case COMPARE_PRODUCTS:
+              result = await toolFns.compareProducts(toolParams, conversation);
+              break;
+            case REFINE_COMPARISON:
+              result = await toolFns.refineComparison(toolParams, conversation);
+              break;
+            case ADD_PRODUCT_FROM_TAB:
+              result = await toolFns.addProductFromTab(
+                toolParams,
+                conversation
+              );
+              break;
             default:
               throw new Error(`No such tool: ${toolName}`);
           }
@@ -437,6 +475,32 @@ Object.assign(Chat, {
           }
           if (!searchHandoffTab.selected) {
             win.gBrowser.selectedTab = searchHandoffTab;
+          }
+
+          // Auto-trigger compareProducts for shopping queries so the
+          // comparison artifact renders alongside the LLM's text response.
+          // We do this server-side (not via the LLM) because the Mozilla
+          // endpoint doesn't reliably honor a function-pinned tool_choice.
+          if (intentIsShopping && !conversation._comparisonV1) {
+            lazy.console.log(
+              "[Chat] auto-invoking compareProducts after run_search:",
+              firstUserMessage.slice(0, 80)
+            );
+            try {
+              await toolFns.compareProducts(
+                { query: firstUserMessage },
+                conversation
+              );
+              lazy.console.log(
+                "[Chat] compareProducts completed, products:",
+                conversation._comparisonV1?.products?.length ?? 0
+              );
+            } catch (cpErr) {
+              lazy.console.warn(
+                "[Chat] auto-compareProducts failed:",
+                cpErr
+              );
+            }
           }
 
           lazy.AIWindow.openSidebarAndContinue(win, conversation);

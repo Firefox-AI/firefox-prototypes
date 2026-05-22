@@ -593,6 +593,42 @@ export class ChatConversation extends EventEmitter {
     if (!this.messages.length) {
       const systemPrompt = await engineInstance.loadPrompt(MODEL_FEATURES.CHAT);
       this.addSystemMessage(SYSTEM_PROMPT_TYPE.TEXT, systemPrompt);
+      this.addSystemMessage(
+        SYSTEM_PROMPT_TYPE.TEXT,
+        "PRODUCT COMPARISON (CHAINED FLOW — read carefully)\n" +
+          "When the user's message looks like a shopping/comparison query, follow this " +
+          "EXACT two-tool sequence in a single conversation turn:\n" +
+          "  Step 1: Call run_search with the user's query. The tab will navigate to the " +
+          "    SERP and the chat will move to the sidebar. Do NOT skip this step — the " +
+          "    user wants live web context.\n" +
+          "  Step 2: After run_search returns the SERP content, call compare_products " +
+          "    with the user's same query (and any extracted constraints: priceMax, brands, " +
+          "    mustHave). This renders the interactive comparison artifact in the sidebar " +
+          "    chat alongside your text response.\n" +
+          "  Step 3: Write a short 1-2 sentence message describing your top pick. Do NOT " +
+          "    list specs in prose — the artifact shows them.\n" +
+          "Trigger phrases for shopping/comparison queries: 'compare', 'vs', 'versus', " +
+          "'find me the best', 'find the best', 'find best', 'what's the best', " +
+          "'top [N] [products]', 'recommend [a/some] [products]', 'which [product] should " +
+          "I buy', 'best X under $Y', or anything that asks to evaluate or shop for a " +
+          "category of physical products. Examples that MUST follow the chained flow: " +
+          "'find the best noise canceling headphones under $400', " +
+          "'compare top noise-cancelling earbuds under $300', " +
+          "'find me the best rear child bike seat for my ebike', " +
+          "'top 4 espresso machines', 'best running shoes for marathons'.\n\n" +
+          "REFINEMENTS\n" +
+          "Follow-ups like 'only under $200', 'remove the Hamax', 'swap one out for a Thule' " +
+          "MUST call refine_comparison with the existing convId — do NOT call compare_products again. " +
+          "After the tool returns, briefly narrate the change (e.g. 'Filtered out 2 over $200. " +
+          "New pick: …').\n\n" +
+          "TAB ADD\n" +
+          "When the user says 'add this one' or 'add the page I'm on', call add_product_from_tab " +
+          "with the existing convId. The tool resolves the active tab automatically.\n\n" +
+          "DATA HONESTY\n" +
+          "For ad-hoc queries the product list is an LLM-mock (best-effort estimates). " +
+          "For tab-added products, prices and specs are estimated from the URL — the artifact " +
+          "shows a 'verify on product page' caption."
+      );
     }
 
     // userContext starts empty so the user message can be added and dispatched
