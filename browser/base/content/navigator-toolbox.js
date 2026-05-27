@@ -3,6 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 ChromeUtils.defineESModuleGetters(this, {
+  AIWindow:
+    "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
   AIWindowUI:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowUI.sys.mjs",
 });
@@ -201,6 +203,7 @@ document.addEventListener(
         #identity-permission-box,
         #translations-button,
         #split-view-button,
+        #smartwindow-agent-button,
         #smartwindow-ask-button
         `);
       if (!element) {
@@ -302,6 +305,12 @@ document.addEventListener(
           }
           break;
 
+        case "smartwindow-agent-button":
+          if (isLeftClick) {
+            AIWindow.openMonitorAgentsPage(window);
+          }
+          break;
+
         default:
           throw new Error(`Missing case for #${element.id}`);
       }
@@ -331,6 +340,7 @@ document.addEventListener(
         #unified-extensions-button,
         #library-button,
         #split-view-button,
+        #smartwindow-agent-button,
         #smartwindow-ask-button
       `);
       if (!element) {
@@ -426,6 +436,12 @@ document.addEventListener(
         case "smartwindow-ask-button":
           if (isLikeLeftClick) {
             AIWindowUI.toggleSidebar(window);
+          }
+          break;
+
+        case "smartwindow-agent-button":
+          if (isLikeLeftClick) {
+            AIWindow.openMonitorAgentsPage(window);
           }
           break;
 

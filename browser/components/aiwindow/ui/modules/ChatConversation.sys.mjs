@@ -606,7 +606,13 @@ export class ChatConversation extends EventEmitter {
     // Remove stale ephemeral messages before adding new user message
     this.removeSystemTimeMemoriesMessages();
 
-    if (!this.messages.length) {
+    if (
+      !this.messages.some(
+        message =>
+          message.role === MESSAGE_ROLE.SYSTEM &&
+          message.content?.type === SYSTEM_PROMPT_TYPE.TEXT
+      )
+    ) {
       const _systemPrompt = await engineInstance.loadPrompt(
         MODEL_FEATURES.CHAT
       );

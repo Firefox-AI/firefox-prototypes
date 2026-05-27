@@ -13,6 +13,9 @@ import {
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/ai-chat-table.mjs";
 
+const MONITOR_AGENTS_URL =
+  "chrome://browser/content/aiwindow/monitorAgents.html";
+
 /**
  * A custom element for rendering a single chat message, either a user message or an
  * assistant message. It handles the markdown rendering and any custom link handling.
@@ -228,6 +231,10 @@ export class AIChatMessage extends MozLitElement {
     );
   }
 
+  #isMonitorAgentsURL(parsed) {
+    return parsed?.href === MONITOR_AGENTS_URL;
+  }
+
   /**
    * This functions handles unfurling links that have not been seen by the conversation.
    * Language models can hallucinate URLs and can be forced by untrusted content to
@@ -257,9 +264,15 @@ export class AIChatMessage extends MozLitElement {
       // Disallowed scheme, strip href to prevent navigation.
       if (
         !parsed ||
-        (parsed.protocol !== "http:" && parsed.protocol !== "https:")
+        (parsed.protocol !== "http:" &&
+          parsed.protocol !== "https:" &&
+          !this.#isMonitorAgentsURL(parsed))
       ) {
         anchor.removeAttribute("href");
+        continue;
+      }
+
+      if (this.#isMonitorAgentsURL(parsed)) {
         continue;
       }
 

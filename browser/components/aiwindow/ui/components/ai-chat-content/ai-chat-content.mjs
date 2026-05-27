@@ -14,6 +14,8 @@ import "chrome://browser/content/aiwindow/components/chat-assistant-loader.mjs";
 import "chrome://browser/content/aiwindow/components/website-chip-container.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/ai-website-confirmation.mjs";
+// eslint-disable-next-line import/no-unassigned-import
+import "chrome://browser/content/aiwindow/components/monitor-agent-creation.mjs";
 
 const FOLLOW_UP_QTY = 2;
 
@@ -611,6 +613,7 @@ export class AIChatContent extends MozLitElement {
       showCallout: showMemoriesCallout ?? false,
       isLastChunk: !!isPreviousMessage,
       toolUIData,
+      monitorId: content?.monitorId ?? null,
     };
 
     this.requestUpdate();
@@ -742,6 +745,20 @@ export class AIChatContent extends MozLitElement {
         `;
       case "ai-action-result":
         return html`<div>confirmation placeholder</div>`;
+      case "monitor-agent-creation":
+        return html`
+          <monitor-agent-creation
+            .prompt=${toolUIData.properties?.prompt || ""}
+            .pageUrl=${toolUIData.properties?.pageUrl || ""}
+            .pageTitle=${toolUIData.properties?.pageTitle || ""}
+            @monitor-agent-creation:submit=${event =>
+              this.#handleMonitorCreationSubmit(
+                event,
+                messageId,
+                toolUIData.toolCallId
+              )}
+          ></monitor-agent-creation>
+        `;
       case "cancelled-component":
         return html`<div>cancelled placeholder</div>`;
       default:
@@ -767,6 +784,14 @@ export class AIChatContent extends MozLitElement {
       updateData: event.detail,
     });
   };
+
+  #handleMonitorCreationSubmit(event, messageId, toolCallId) {
+    this.#dispatchAction("create-monitor-agent", {
+      messageId,
+      toolCallId,
+      monitor: event.detail,
+    });
+  }
 
   #dispatchToolUIUpdate(data) {
     this.dispatchEvent(
@@ -809,6 +834,30 @@ export class AIChatContent extends MozLitElement {
               ></assistant-message-footer>
             `
           : nothing}
+        ${msg.role === "assistant" && msg.monitorId
+          ? this.#renderMonitorControls(msg.monitorId, msg.messageId)
+          : nothing}
+      </div>
+    `;
+  }
+
+  #renderMonitorControls(monitorId, messageId) {
+    return html`
+      <div class="monitor-controls">
+        <moz-button
+          data-l10n-id="monitor-chat-update-button"
+          type="default"
+          size="small"
+          @click=${() =>
+            this.#dispatchAction("monitor-update", { monitorId, messageId })}
+        ></moz-button>
+        <moz-button
+          data-l10n-id="monitor-chat-delete-button"
+          type="destructive"
+          size="small"
+          @click=${() =>
+            this.#dispatchAction("monitor-delete", { monitorId, messageId })}
+        ></moz-button>
       </div>
     `;
   }

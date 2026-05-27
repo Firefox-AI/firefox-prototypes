@@ -1650,6 +1650,7 @@ popupnotificationcontent {
   #urlbar-container,
   #nav-bar-customization-target > *:not(#sidebar-button),
   #nav-bar-overflow-button,
+  #smartwindow-agent-button,
   #smartwindow-ask-button {
     visibility: hidden;
   }

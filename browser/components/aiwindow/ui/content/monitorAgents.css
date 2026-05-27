@@ -1,0 +1,175 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+:root {
+  --monitor-agents-page-width: calc(var(--size-layout-xlarge) + var(--size-layout-xlarge) + var(--size-layout-xsmall));
+
+  font: menu;
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  background-color: var(--background-color-canvas);
+  color: var(--text-color);
+}
+
+main {
+  box-sizing: border-box;
+  max-width: var(--monitor-agents-page-width);
+  margin: 0 auto;
+  padding: var(--space-xxlarge);
+}
+
+.page-header {
+  margin-block-end: var(--space-xlarge);
+}
+
+h1 {
+  font-size: var(--font-size-heading-large);
+  margin: 0;
+}
+
+h2 {
+  font-size: var(--font-size-heading-medium);
+  margin-block: 0 var(--space-large);
+}
+
+.monitor-editor,
+.monitor-card {
+  border: var(--border-width) solid var(--card-border-color);
+  border-radius: var(--border-radius-medium);
+  background-color: var(--card-background-color);
+  padding: var(--space-xlarge);
+}
+
+.monitor-card-highlight {
+  outline: 2px solid var(--color-accent-primary, AccentColor);
+  outline-offset: 2px;
+  animation: monitor-card-pulse 1.5s ease-out;
+}
+
+@keyframes monitor-card-pulse {
+  from {
+    outline-color: var(--color-accent-primary, AccentColor);
+  }
+  to {
+    outline-color: transparent;
+  }
+}
+
+.monitor-editor {
+  margin-block-end: var(--space-xxlarge);
+}
+
+form,
+.monitor-fields {
+  display: grid;
+  gap: var(--space-large);
+}
+
+label,
+.field-group {
+  display: grid;
+  gap: var(--space-small);
+}
+
+textarea,
+input,
+select {
+  box-sizing: border-box;
+  inline-size: 100%;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.schedule-fields {
+  display: grid;
+  gap: var(--space-medium);
+  grid-template-columns: repeat(auto-fit, minmax(var(--size-layout-small), 1fr));
+}
+
+.schedule-interval[hidden],
+.schedule-time[hidden],
+.schedule-day[hidden] {
+  display: none;
+}
+
+.monitor-list {
+  display: grid;
+  gap: var(--space-large);
+}
+
+.monitor-card-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--space-large);
+  margin-block-end: var(--space-large);
+}
+
+.monitor-title {
+  font-size: var(--font-size-root);
+  font-weight: var(--font-weight-semibold);
+  margin: 0 0 var(--space-xsmall);
+}
+
+.monitor-url,
+.monitor-meta {
+  color: var(--text-color-deemphasized);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.monitor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-small);
+  margin-block-start: var(--space-large);
+}
+
+.empty-state {
+  color: var(--text-color-deemphasized);
+  border: var(--border-width) dashed var(--card-border-color);
+  border-radius: var(--border-radius-medium);
+  padding: var(--space-xlarge);
+}
+
+details {
+  margin-block-start: var(--space-large);
+}
+
+.history-list {
+  display: grid;
+  gap: var(--space-medium);
+  margin: var(--space-medium) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history-entry {
+  border-inline-start: var(--border-width) solid var(--card-border-color);
+  padding-inline-start: var(--space-medium);
+}
+
+.history-entry[data-status="success"] {
+  border-inline-start-color: var(--border-color-selected);
+}
+
+.history-entry[data-status="error"] {
+  border-inline-start-color: var(--border-color-error);
+}
+
+.history-entry time {
+  color: var(--text-color-deemphasized);
+  display: block;
+  margin-block-end: var(--space-xsmall);
+}
+
+.history-entry p {
+  margin: 0;
+  white-space: pre-wrap;
+}

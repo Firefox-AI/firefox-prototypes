@@ -15,16 +15,18 @@ export default {
 aiwindow-input-cta-submit-label-chat = Ask
 aiwindow-input-cta-submit-label-search = Search
 aiwindow-input-cta-submit-label-navigate = Go
+aiwindow-input-cta-submit-label-monitor = Monitor
 aiwindow-input-cta-menu-label-chat = Ask
 aiwindow-input-cta-menu-label-search = Search with { $searchEngineName }
 aiwindow-input-cta-menu-label-navigate = Go to site
+aiwindow-input-cta-menu-label-monitor = Monitor this page
 aiwindow-input-cta-menu-label-search-with = Search with…
 aiwindow-input-cta-search-submenu-header = Search
     `,
   },
   argTypes: {
     action: {
-      options: ["", "chat", "search", "navigate"],
+      options: ["", "chat", "search", "navigate", "monitor"],
       control: { type: "select" },
     },
   },
@@ -68,6 +70,13 @@ Search.args = {
 export const Navigate = Template.bind({});
 Navigate.args = {
   action: "navigate",
+  searchEngineInfo: SEARCH_ENGINE_INFO,
+  searchEngines: SEARCH_ENGINES,
+};
+
+export const Monitor = Template.bind({});
+Monitor.args = {
+  action: "monitor",
   searchEngineInfo: SEARCH_ENGINE_INFO,
   searchEngines: SEARCH_ENGINES,
 };

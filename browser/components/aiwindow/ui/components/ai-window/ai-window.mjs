@@ -44,6 +44,10 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/models/ConversationSuggestions.sys.mjs",
   MemoriesManager:
     "moz-src:///browser/components/aiwindow/models/memories/MemoriesManager.sys.mjs",
+  MonitorAgent:
+    "moz-src:///browser/components/aiwindow/models/MonitorAgent.sys.mjs",
+  MONITOR_AGENTS_URL:
+    "moz-src:///browser/components/aiwindow/models/MonitorAgent.sys.mjs",
   getCurrentModelName:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowConstants.sys.mjs",
   ToolUI: "moz-src:///browser/components/aiwindow/ui/modules/ToolUI.sys.mjs",
@@ -107,6 +111,7 @@ const MODE = {
 
 const ACTION = {
   CHAT: "chat",
+  MONITOR: "monitor",
   SEARCH: "search",
   NAVIGATE: "navigate",
 };
@@ -1225,6 +1230,8 @@ export class AIWindow extends MozLitElement {
         model: this.modelName,
         submit_type: submitType,
       });
+    } else if (action === ACTION.MONITOR) {
+      this.#handleMonitorRequest({ value, contextMentions, contextPageUrl });
     }
 
     if (
@@ -1282,6 +1289,110 @@ export class AIWindow extends MozLitElement {
       return [];
     }
     return editor.getAllMentions();
+  }
+
+  #handleMonitorRequest({ value, contextMentions, contextPageUrl }) {
+    const text = String(value ?? "").trim();
+    const { mergedMentions, allUrls } =
+      this.#calculateCurrentMentions(contextMentions);
+    const pageContext = this.#getMonitorPageContext(
+      contextPageUrl,
+      mergedMentions
+    );
+    if (allUrls.size) {
+      this.#conversation.addSeenUrls(allUrls);
+    }
+
+    this.#createMonitorAgentMessage({
+      prompt: text,
+      pageUrl: pageContext?.url?.href ?? "",
+      pageTitle: pageContext?.title ?? "",
+      contextMentions: mergedMentions,
+    });
+  }
+
+  #createMonitorAgentMessage({
+    prompt: monitorPrompt,
+    pageUrl,
+    pageTitle,
+    contextMentions,
+  }) {
+    this.#starterPromptsAbortController?.abort();
+    this.showStarters = false;
+    this.showFooter = false;
+    this.showDisclaimer = true;
+    this.#updateTabFavicon();
+    this.#setBrowserContainerActiveState(true);
+
+    const userMessageBody = monitorPrompt || "Create a monitor";
+    const userMessage = this.#conversation.addUserMessage(
+      userMessageBody,
+      this.#parseMonitorPageUrl(pageUrl),
+      this.#createUserRoleOpts(contextMentions)
+    );
+
+    const assistantMessage = this.#conversation.addAssistantMessage(
+      "text",
+      "",
+      {
+        toolUIData: {
+          toolCallId: crypto.randomUUID(),
+          uiType: "monitor-agent-creation",
+          properties: {
+            prompt: monitorPrompt,
+            pageUrl,
+            pageTitle,
+          },
+        },
+      }
+    );
+
+    const userDispatched = this.#dispatchMessageToChatContent(userMessage);
+    const assistantDispatched =
+      this.#dispatchMessageToChatContent(assistantMessage);
+    if (!userDispatched || !assistantDispatched) {
+      this.#pendingMessageDelivery = true;
+    }
+
+    this.#dispatchChromeEvent(
+      "ai-window:smartbar-input",
+      this.#getAIWindowEventOptions(lazy.EMPTY_SMARTBAR_INPUT_STATE, true)
+    );
+    this.#syncHistoryState();
+    this.#updateConversation();
+  }
+
+  #getMonitorPageContext(contextPageUrl, contextMentions = []) {
+    const contextUrl = this.#parseMonitorPageUrl(contextPageUrl);
+    if (contextUrl) {
+      return { url: contextUrl, title: "" };
+    }
+
+    const currentTabMention = contextMentions.find(
+      mention => mention.type === "currentTab"
+    );
+    const mentionUrl = this.#parseMonitorPageUrl(currentTabMention?.url);
+    if (mentionUrl) {
+      return {
+        url: mentionUrl,
+        title: currentTabMention.label ?? "",
+      };
+    }
+
+    const selectedTab =
+      window.browsingContext?.topChromeWindow?.gBrowser?.selectedTab;
+    const selectedUrl = selectedTab?.linkedBrowser?.currentURI?.spec;
+    const url = this.#parseMonitorPageUrl(selectedUrl);
+    return url ? { url, title: selectedTab?.label ?? "" } : null;
+  }
+
+  #parseMonitorPageUrl(value) {
+    const href = value?.href ?? value?.spec ?? value;
+    const url = URL.parse(String(href ?? ""));
+    if (url && (url.protocol === "http:" || url.protocol === "https:")) {
+      return url;
+    }
+    return null;
   }
 
   /**
@@ -2153,6 +2264,18 @@ export class AIWindow extends MozLitElement {
         this.#retryAfterError();
         break;
 
+      case "create-monitor-agent":
+        this.#handleCreateMonitorAgent(data);
+        break;
+
+      case "monitor-update":
+        this.#handleUpdateMonitorAgent(data);
+        break;
+
+      case "monitor-delete":
+        this.#handleDeleteMonitorAgent(data);
+        break;
+
       case "remove-applied-memory":
         this.#removeAppliedMemory(messageId, memory);
         break;
@@ -2175,6 +2298,66 @@ export class AIWindow extends MozLitElement {
         this.#openMemoriesLearnMore();
         break;
     }
+  }
+
+  #handleCreateMonitorAgent(data) {
+    const message = this.#getMessageById(data?.messageId);
+    if (!message || message.toolUIData?.toolCallId !== data?.toolCallId) {
+      return;
+    }
+
+    try {
+      lazy.MonitorAgent.createMonitor(data.monitor);
+      message.content.body = `Created your new monitor! Check it out at [link](${lazy.MONITOR_AGENTS_URL})`;
+      message.toolUIData = null;
+    } catch (error) {
+      console.error("Failed to create monitor agent", error);
+      message.content.body =
+        "I could not create that monitor. Check the prompt, page URL, and schedule, then try again.";
+    }
+
+    this.#dispatchMessageToChatContent(message);
+    this.#dispatchMessageToChatContent({
+      role: "assistant-message-complete",
+      content: {
+        id: message.id,
+      },
+    });
+    this.#updateConversation();
+  }
+
+  #handleUpdateMonitorAgent(data) {
+    const win = this.#topChromeWindow;
+    if (win && data?.monitorId) {
+      lazy.AIWindow.openMonitorAgentsPage(win, { monitorId: data.monitorId });
+    }
+  }
+
+  #handleDeleteMonitorAgent(data) {
+    try {
+      lazy.MonitorAgent.deleteMonitor(data?.monitorId);
+    } catch (error) {
+      console.error("Failed to delete monitor agent", error);
+      return;
+    }
+
+    const message = this.#getMessageById(data?.messageId);
+    if (!message) {
+      return;
+    }
+
+    // Clear the monitor tag so the in-chat controls disappear, and confirm.
+    message.content.body = "Deleted this monitor.";
+    delete message.content.monitorId;
+
+    this.#dispatchMessageToChatContent(message);
+    this.#dispatchMessageToChatContent({
+      role: "assistant-message-complete",
+      content: {
+        id: message.id,
+      },
+    });
+    this.#updateConversation();
   }
 
   handleToolUIUpdate(data) {

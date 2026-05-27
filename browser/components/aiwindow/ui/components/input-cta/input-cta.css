@@ -147,6 +147,10 @@ panel-item {
     background-image: url("chrome://browser/skin/forward.svg");
   }
 
+  &[icon="monitor"]::part(button) {
+    background-image: url("chrome://browser/skin/calendar-24.svg");
+  }
+
   &[icon="search"]::part(button) {
     background-image: var(--search-icon);
   }

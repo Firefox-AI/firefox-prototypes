@@ -10,6 +10,7 @@
 
 /**
  * @import { ChatConversation } from "moz-src:///browser/components/aiwindow/ui/modules/ChatConversation.sys.mjs"
+ * @import { GetTextOptions } from "moz-src:///toolkit/components/pageextractor/PageExtractor.d.ts"
  */
 
 import { searchBrowsingHistory as implSearchBrowsingHistory } from "moz-src:///browser/components/aiwindow/models/SearchBrowsingHistory.sys.mjs";
@@ -727,11 +728,18 @@ export class GetPageContent {
    * @param {object} toolParams
    * @param {string[]} toolParams.url_list
    * @param {ChatConversation} conversation
+   * @param {GetTextOptions} [extractionOptions]
+   *  Overrides merged over the default getText options, e.g.
+   *  `{ removeBoilerplate: false }` to extract the full rendered DOM.
    * @returns {Promise<Array<string>>}
    *  A promise resolving to a string containing the extracted page content
    *  with a descriptive header, or an error message if extraction fails.
    */
-  static async getPageContent({ url_list }, conversation) {
+  static async getPageContent(
+    { url_list },
+    conversation,
+    extractionOptions = {}
+  ) {
     // This is a decision table for allowing and blocking fetches on the configuration of the
     // SecurityProperties and the URLs. Tab URLs don't do any new page loads. Mention urls
     // have been added by the user so they should be allowed. And all other URLs are
@@ -762,7 +770,8 @@ export class GetPageContent {
           const text = await GetPageContent.#getPageContentsForSingleURL(
             url,
             mentionedUrls,
-            conversation
+            conversation,
+            extractionOptions
           );
           ChromeUtils.addProfilerMarker(
             "SmartWindow",
@@ -807,10 +816,16 @@ export class GetPageContent {
    * @param {string} url
    * @param {Set<string>} mentionedUrls
    * @param {ChatConversation} conversation
+   * @param {GetTextOptions} [extractionOptions]
    *
    * @returns {Promise<string>}
    */
-  static async #getPageContentsForSingleURL(url, mentionedUrls, conversation) {
+  static async #getPageContentsForSingleURL(
+    url,
+    mentionedUrls,
+    conversation,
+    extractionOptions = {}
+  ) {
     // First try to get the contents from an existing tab. This is always allowed from
     // a security perspective as it doesn't involve a network request, so there is
     // no risk for data exfiltration.
@@ -832,7 +847,8 @@ export class GetPageContent {
         pageExtractor,
         conversation,
         `${sanitizeUntrustedContent(tab.label)} (${url})`,
-        url
+        url,
+        extractionOptions
       );
     }
 
@@ -852,7 +868,13 @@ export class GetPageContent {
     }
 
     return PageExtractorParent.getHeadlessExtractor(url, pageExtractor =>
-      GetPageContent.#runExtraction(pageExtractor, conversation, url, url)
+      GetPageContent.#runExtraction(
+        pageExtractor,
+        conversation,
+        url,
+        url,
+        extractionOptions
+      )
     );
   }
 
@@ -864,16 +886,25 @@ export class GetPageContent {
    * @param {ChatConversation} conversation
    * @param {string} label
    * @param {string} sourceUrl
+   * @param {GetTextOptions} [extractionOptions]
+   *  Overrides merged over the default getText options.
    * @returns {Promise<string>}
    *  A promise resolving to a formatted string containing the page content
    *  with mode and label information, or an error message if no content is available.
    */
-  static async #runExtraction(pageExtractor, conversation, label, sourceUrl) {
+  static async #runExtraction(
+    pageExtractor,
+    conversation,
+    label,
+    sourceUrl,
+    extractionOptions = {}
+  ) {
     const extraction = await pageExtractor.getText({
       sufficientLength: GetPageContent.MAX_CHARACTERS,
       cleanWhitespace: true,
       removeBoilerplate: true,
       sourceUrl,
+      ...extractionOptions,
     });
 
     if (!extraction) {

@@ -200,6 +200,7 @@ export class UrlbarProviderAiChat extends UrlbarProvider {
       "aiwindow-input-cta:"
     );
     actor.ask({
+      action: controller.input.smartbarAction,
       contextMentions: controller.input.getResolvedContextWebsites?.() ?? [],
       contextPageUrl: controller.input.getContextPageUrl?.() ?? null,
       detectedIntent: this.#lastIntentEvaluation.intent ?? "chat",

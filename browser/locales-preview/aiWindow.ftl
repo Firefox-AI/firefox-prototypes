@@ -68,6 +68,7 @@ ai-window-toggleview-status-label-inactive = Classic Window
 aiwindow-input-cta-submit-label-chat = Ask
 aiwindow-input-cta-submit-label-navigate = Go
 aiwindow-input-cta-submit-label-search = Search
+aiwindow-input-cta-submit-label-monitor = Watch
 aiwindow-input-cta-submit-label-stop = Stop
 
 # Text announced to screen readers when response generation starts.
@@ -77,6 +78,7 @@ aiwindow-input-cta-menu-label-chat = Ask
 aiwindow-input-cta-menu-label-navigate = Go to site
 # $searchEngineName (string) - The name of the default search engine
 aiwindow-input-cta-menu-label-search = Search with { $searchEngineName }
+aiwindow-input-cta-menu-label-monitor = Watch this page
 aiwindow-input-cta-menu-label-search-with = Search with…
 
 aiwindow-input-cta-search-submenu-header = Search
@@ -154,6 +156,64 @@ aiwindow-firstrun-default-checkbox-description = Switch in settings anytime
 
 smartwindow-ask-button =
     .label = Ask
+
+smartwindow-agent-button =
+    .label = Watch agents
+    .tooltiptext = Watch agents
+    .aria-label = Watch agents
+
+## Monitor agents
+
+monitor-agents-page-title = Watch agents
+monitor-agents-new-title = New monitor
+monitor-agents-existing-title = Existing monitors
+monitor-agents-prompt-label = Prompt
+monitor-agents-url-label = Page URL
+monitor-agents-title-label = Page title
+monitor-agents-extractor-label = Content extractor
+monitor-agents-extractor-native = Native browser extractor
+monitor-agents-extractor-tabstack = Tabstack
+monitor-agents-extractor-dom = Full rendered DOM
+monitor-agents-create-button = Create monitor
+monitor-agents-empty-state = No monitor agents yet.
+monitor-agents-untitled-page = Untitled page
+monitor-agents-enabled-label = Enabled
+monitor-agents-interval-label = Interval
+monitor-agents-interval-every-label = Every
+monitor-agents-interval-unit-label = Unit
+monitor-agents-time-label = Time
+monitor-agents-day-label = Day
+monitor-agents-cadence-interval = Custom interval
+monitor-agents-cadence-daily = Daily
+monitor-agents-cadence-weekly = Weekly
+monitor-agents-interval-unit-minutes = Minutes
+monitor-agents-interval-unit-hours = Hours
+monitor-agents-interval-unit-days = Days
+monitor-agents-interval-unit-weeks = Weeks
+monitor-agents-weekday-sunday = Sunday
+monitor-agents-weekday-monday = Monday
+monitor-agents-weekday-tuesday = Tuesday
+monitor-agents-weekday-wednesday = Wednesday
+monitor-agents-weekday-thursday = Thursday
+monitor-agents-weekday-friday = Friday
+monitor-agents-weekday-saturday = Saturday
+# $schedule (String) - A human-readable schedule such as "daily at 9:00 AM".
+# $nextCheck (String) - The localized date and time of the next scheduled check.
+monitor-agents-next-check = { $schedule } · Next check: { $nextCheck }
+# $schedule (String) - A human-readable schedule such as "daily at 9:00 AM".
+monitor-agents-next-check-not-scheduled = { $schedule } · Not scheduled
+# $title (String) - The monitored page's title or URL.
+monitor-notification-label = { $title } — a monitor you set up has an update
+monitor-notification-visit-button = Visit page
+monitor-notification-modify-button = Modify monitor
+monitor-chat-update-button = Update monitor
+monitor-chat-delete-button = Delete monitor
+monitor-agents-save-button = Save
+monitor-agents-run-now-button = Run now
+monitor-agents-delete-button = Delete
+monitor-agents-save-monitor-button = Save monitor
+# $count (Number) - The number of stored checks for this agent.
+monitor-agents-history-summary = History ({ $count })
 
 ## Memories toggle button
 

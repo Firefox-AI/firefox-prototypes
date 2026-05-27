@@ -122,6 +122,12 @@
   }
 }
 
+.monitor-controls {
+  display: flex;
+  gap: var(--space-small);
+  margin-block-start: var(--space-small);
+}
+
 .chat-bubble-user {
   align-self: flex-end;
   border-radius: var(--space-medium);

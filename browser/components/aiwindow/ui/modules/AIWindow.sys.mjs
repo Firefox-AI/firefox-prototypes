@@ -13,6 +13,8 @@ import { AIFeature } from "chrome://global/content/ml/AIFeature.sys.mjs";
 
 export const AIWINDOW_URL = "chrome://browser/content/aiwindow/aiWindow.html";
 const AIWINDOW_URI = Services.io.newURI(AIWINDOW_URL);
+const MONITOR_AGENTS_URL =
+  "chrome://browser/content/aiwindow/monitorAgents.html";
 const FIRSTRUN_URL = "chrome://browser/content/aiwindow/firstrun.html";
 const FIRSTRUN_URI = Services.io.newURI(FIRSTRUN_URL);
 const PREF_SMARTWINDOW_ENABLED = "browser.smartwindow.enabled";
@@ -56,6 +58,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SessionStartup: "resource:///modules/sessionstore/SessionStartup.sys.mjs",
   MemoriesSchedulers:
     "moz-src:///browser/components/aiwindow/models/memories/MemoriesSchedulers.sys.mjs",
+  MonitorAgent:
+    "moz-src:///browser/components/aiwindow/models/MonitorAgent.sys.mjs",
   SmartWindowTelemetry:
     "moz-src:///browser/components/aiwindow/ui/modules/SmartWindowTelemetry.sys.mjs",
 });
@@ -91,6 +95,7 @@ export const AIWindow = {
       this.initializeAITabsToolbar(win);
       this._updateToolbarButtonPositions(win);
       this._initializeAskButtonOnToolbox(win);
+      this._initializeMonitorAgentsButtonOnToolbox(win);
       const windowArgs = win?.arguments?.[1];
       if (
         windowArgs instanceof Ci.nsIPropertyBag2 &&
@@ -135,6 +140,12 @@ export const AIWindow = {
     if (this.isAIWindowActive(win)) {
       lazy.MemoriesSchedulers.maybeRunAndSchedule();
     }
+    if (
+      this.isAIWindowEnabled() &&
+      !lazy.PrivateBrowsingUtils.isWindowPrivate(win)
+    ) {
+      lazy.MonitorAgent.init();
+    }
   },
 
   handlePlacesEvents(events) {
@@ -164,6 +175,7 @@ export const AIWindow = {
     }
     Services.obs.removeObserver(this, lazy.ONLOGOUT_NOTIFICATION);
     Services.obs.removeObserver(this, "tabstrip-orientation-change");
+    lazy.MonitorAgent.uninit();
 
     lazy.PlacesUtils.observers.removeListener(
       ["page-removed", "history-cleared"],
@@ -270,7 +282,10 @@ export const AIWindow = {
       this.isAvailable
     );
     if (!this.isAvailable) {
+      lazy.MonitorAgent.uninit();
       this._onAccountLogout();
+    } else {
+      lazy.MonitorAgent.init();
     }
   },
 
@@ -280,6 +295,7 @@ export const AIWindow = {
     if (modeSwitcherButton) {
       modeSwitcherButton.hidden = !this.isAIWindowEnabled() || isPrivateWindow;
     }
+    this._initializeMonitorAgentsButtonOnToolbox(win);
   },
 
   _onTabstripOrientationChange() {
@@ -319,6 +335,37 @@ export const AIWindow = {
       return;
     }
     askButton.hidden = !this.isAIWindowActive(win);
+  },
+
+  _initializeMonitorAgentsButtonOnToolbox(win) {
+    const monitorButton = win.document.getElementById(
+      "smartwindow-agent-button"
+    );
+    if (!monitorButton) {
+      return;
+    }
+    monitorButton.hidden =
+      !this.isAIWindowEnabled() ||
+      lazy.PrivateBrowsingUtils.isWindowPrivate(win);
+  },
+
+  openMonitorAgentsPage(win, params = {}) {
+    if (!win?.gBrowser) {
+      return;
+    }
+
+    const url = new URL(MONITOR_AGENTS_URL);
+    for (const [key, value] of Object.entries(params)) {
+      if (value) {
+        url.searchParams.set(key, value);
+      }
+    }
+
+    const triggeringPrincipal =
+      Services.scriptSecurityManager.getSystemPrincipal();
+    win.gBrowser.selectedBrowser.loadURI(Services.io.newURI(url.href), {
+      triggeringPrincipal,
+    });
   },
 
   get isDefaultWindow() {
@@ -692,6 +739,7 @@ export const AIWindow = {
       this._reconcileNewTabPages(win, newTabPref, homePagePref);
       this._updateToolbarButtonPositions(win, { isToggling: true });
       this._initializeAskButtonOnToolbox(win);
+      this._initializeMonitorAgentsButtonOnToolbox(win);
       Services.obs.notifyObservers(
         win,
         "ai-window-state-changed",
@@ -713,6 +761,7 @@ export const AIWindow = {
         }
 
         lazy.MemoriesSchedulers.maybeRunAndSchedule();
+        lazy.MonitorAgent.init();
 
         this._markActiveStart(win);
         this.recordOpenWindowTelemetry(trigger, win);

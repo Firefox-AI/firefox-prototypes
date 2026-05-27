@@ -10,6 +10,7 @@
 
 /**
  * @typedef {object} SmartbarCommitDetails
+ * @property {SmartbarAction} [action] - The selected Smartbar action
  * @property {string} value - The query string
  * @property {SapLocation} location - The location of the input
  * @property {ContextWebsite[]} [contextMentions] - Context mentions

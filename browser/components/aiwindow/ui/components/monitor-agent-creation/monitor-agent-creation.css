@@ -1,0 +1,48 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+:host {
+  display: block;
+  max-width: var(--size-layout-xlarge);
+}
+
+.monitor-agent-creation {
+  border: var(--border-width) solid var(--card-border-color);
+  border-radius: var(--border-radius-medium);
+  background-color: var(--card-background-color);
+  box-sizing: border-box;
+  display: grid;
+  gap: var(--space-large);
+  padding: var(--space-large);
+}
+
+label {
+  display: grid;
+  gap: var(--space-small);
+}
+
+label[hidden] {
+  display: none;
+}
+
+textarea,
+input,
+select {
+  box-sizing: border-box;
+  inline-size: 100%;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.schedule-fields {
+  display: grid;
+  gap: var(--space-medium);
+  grid-template-columns: repeat(auto-fit, minmax(var(--size-layout-small), 1fr));
+}
+
+moz-button {
+  justify-self: start;
+}

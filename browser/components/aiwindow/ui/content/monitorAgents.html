@@ -1,0 +1,91 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at https://mozilla.org/MPL/2.0/. -->
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src resource: chrome:; object-src 'none'; img-src chrome: blob: data: page-icon:;"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <title data-l10n-id="monitor-agents-page-title"></title>
+    <link rel="stylesheet" href="chrome://global/skin/in-content/common.css" />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/aiwindow/monitorAgents.css"
+    />
+    <link rel="localization" href="preview/aiWindow.ftl" />
+    <script
+      type="module"
+      src="chrome://browser/content/aiwindow/monitorAgents.mjs"
+    ></script>
+  </head>
+  <body>
+    <main>
+      <header class="page-header">
+        <h1 data-l10n-id="monitor-agents-page-title"></h1>
+      </header>
+
+      <section class="monitor-editor" aria-labelledby="new-monitor-heading">
+        <h2
+          id="new-monitor-heading"
+          data-l10n-id="monitor-agents-new-title"
+        ></h2>
+        <form id="new-monitor-form">
+          <label>
+            <span data-l10n-id="monitor-agents-prompt-label"></span>
+            <textarea id="new-monitor-prompt" rows="3" required></textarea>
+          </label>
+          <label>
+            <span data-l10n-id="monitor-agents-url-label"></span>
+            <input id="new-monitor-url" type="url" required />
+          </label>
+          <label>
+            <span data-l10n-id="monitor-agents-title-label"></span>
+            <input id="new-monitor-title" type="text" />
+          </label>
+          <label>
+            <span data-l10n-id="monitor-agents-extractor-label"></span>
+            <select id="new-monitor-extractor">
+              <option
+                value="native"
+                data-l10n-id="monitor-agents-extractor-native"
+              ></option>
+              <option
+                value="tabstack"
+                data-l10n-id="monitor-agents-extractor-tabstack"
+              ></option>
+              <option
+                value="dom"
+                data-l10n-id="monitor-agents-extractor-dom"
+              ></option>
+            </select>
+          </label>
+          <div
+            class="schedule-fields"
+            id="new-monitor-schedule"
+            data-schedule-fields
+          ></div>
+          <button
+            type="submit"
+            data-l10n-id="monitor-agents-create-button"
+          ></button>
+        </form>
+      </section>
+
+      <section
+        class="monitor-list-section"
+        aria-labelledby="existing-monitors-heading"
+      >
+        <h2
+          id="existing-monitors-heading"
+          data-l10n-id="monitor-agents-existing-title"
+        ></h2>
+        <div id="monitor-list"></div>
+      </section>
+    </main>
+  </body>
+</html>

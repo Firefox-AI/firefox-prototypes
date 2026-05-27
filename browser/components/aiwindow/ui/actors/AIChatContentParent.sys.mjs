@@ -18,6 +18,9 @@ ChromeUtils.defineESModuleGetters(lazy, {
  * JSWindowActor to pass data between AIChatContent singleton and content pages.
  */
 export class AIChatContentParent extends JSWindowActorParent {
+  #monitorAgentsURI = Services.io.newURI(
+    "chrome://browser/content/aiwindow/monitorAgents.html"
+  );
   #settingsURI = Services.io.newURI("about:settings");
   #prefsURI = Services.io.newURI("about:preferences");
 
@@ -33,6 +36,10 @@ export class AIChatContentParent extends JSWindowActorParent {
       uri.equalsExceptRef(this.#settingsURI) ||
       uri.equalsExceptRef(this.#prefsURI)
     );
+  }
+
+  isMonitorAgentsURI(uri) {
+    return uri.equalsExceptRef(this.#monitorAgentsURI);
   }
 
   dispatchMessageToChatContent(message) {
@@ -136,7 +143,8 @@ export class AIChatContentParent extends JSWindowActorParent {
       if (
         uri.scheme !== "http" &&
         uri.scheme !== "https" &&
-        !this.isSettingsURI(uri)
+        !this.isSettingsURI(uri) &&
+        !this.isMonitorAgentsURI(uri)
       ) {
         return;
       }
@@ -144,6 +152,11 @@ export class AIChatContentParent extends JSWindowActorParent {
       const window = this.browsingContext.topChromeWindow;
 
       if (!window) {
+        return;
+      }
+
+      if (this.isMonitorAgentsURI(uri)) {
+        lazy.AIWindow.openMonitorAgentsPage(window);
         return;
       }
 

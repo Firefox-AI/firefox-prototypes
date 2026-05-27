@@ -420,6 +420,10 @@
   }
 }
 
+#smartwindow-agent-button {
+  list-style-image: url("chrome://browser/skin/calendar-24.svg");
+}
+
 #document-pip-return-to-opener-button {
   list-style-image: url("chrome://global/skin/media/picture-in-picture-closed.svg");
 }

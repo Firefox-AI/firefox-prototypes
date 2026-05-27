@@ -16,6 +16,7 @@ export class AISmartBarChild extends JSWindowActorChild {
   receiveMessage(msg) {
     if (msg.name === "AskFromParent") {
       const {
+        action,
         contextMentions,
         contextPageUrl,
         detectedIntent,
@@ -25,7 +26,7 @@ export class AISmartBarChild extends JSWindowActorChild {
       } = msg.data;
       let event = new this.contentWindow.CustomEvent("smartbar-commit", {
         detail: {
-          action: "chat",
+          action: action || "chat",
           contextMentions,
           contextPageUrl,
           detectedIntent,

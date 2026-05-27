@@ -1431,7 +1431,9 @@ ${
       }
     }
 
-    this.handleNavigation({ event });
+    if (!this.#submitMonitorIfSelected(event)) {
+      this.handleNavigation({ event });
+    }
   }
 
   /**
@@ -1502,9 +1504,11 @@ ${
     const isExplicitAction =
       event.type === "aiwindow-input-cta:on-action-change";
 
-    // For non-explicit actions, forward to handleNavigation.
+    // For non-explicit actions, submit monitor directly or forward to handleNavigation.
     if (!isExplicitAction) {
-      this.handleNavigation({ event });
+      if (!this.#submitMonitorIfSelected(event)) {
+        this.handleNavigation({ event });
+      }
       return;
     }
 
@@ -1552,6 +1556,14 @@ ${
         { allowInheritPrincipal: false }
       );
     }
+  }
+
+  #submitMonitorIfSelected(event) {
+    if (this.#isSmartbarMode && this.smartbarAction === "monitor") {
+      this.#dispatchSmartbarCommitEvent(event, this.untrimmedValue);
+      return true;
+    }
+    return false;
   }
 
   /**
