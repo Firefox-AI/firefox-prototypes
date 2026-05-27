@@ -24,7 +24,7 @@ import "chrome://global/content/elements/moz-button.mjs";
  *
  * The component is based on `moz-button` and extended with an action menu.
  *
- * @typedef {"" | "chat" | "search" | "navigate"} SmartbarAction
+ * @typedef {"" | "chat" | "search" | "navigate" | "research"} SmartbarAction
  * @property {SmartbarAction} action - Current action or empty string for initial state.
  * @property {SearchEngineInfo} searchEngineInfo - The current search engine display info.
  * @property {SearchEngineInfo[]} searchEngines - The list of visible search engines.
@@ -41,7 +41,7 @@ export class InputCta extends MozLitElement {
     searchEngines: { type: Array },
   };
 
-  static ACTIONS = ["chat", "navigate", "search", "stop"];
+  static ACTIONS = ["chat", "navigate", "search", "research", "stop"];
 
   constructor() {
     super();

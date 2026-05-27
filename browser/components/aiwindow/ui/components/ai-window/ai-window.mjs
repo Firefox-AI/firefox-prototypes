@@ -47,6 +47,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   getCurrentModelName:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowConstants.sys.mjs",
   ToolUI: "moz-src:///browser/components/aiwindow/ui/modules/ToolUI.sys.mjs",
+  ResearchAgent:
+    "moz-src:///browser/components/aiwindow/models/ResearchAgent.sys.mjs",
 });
 
 ChromeUtils.defineLazyGetter(lazy, "log", function () {
@@ -109,6 +111,7 @@ const ACTION = {
   CHAT: "chat",
   SEARCH: "search",
   NAVIGATE: "navigate",
+  RESEARCH: "research",
 };
 
 const PREF_MEMORIES_CONVERSATION =
@@ -1188,7 +1191,13 @@ export class AIWindow extends MozLitElement {
         ? "button"
         : "enter");
 
-    if (action === ACTION.CHAT) {
+    if (lazy.ResearchAgent.isWaitingForClarifications(this.conversationId)) {
+      this.submitResearchMessage({
+        text: value,
+        contextPageUrl,
+        submitType,
+      });
+    } else if (action === ACTION.CHAT) {
       const { mergedMentions, allUrls, inlineMentions } =
         this.#calculateCurrentMentions(contextMentions);
 
@@ -1224,6 +1233,12 @@ export class AIWindow extends MozLitElement {
         message_seq: this.conversationMessageCount,
         model: this.modelName,
         submit_type: submitType,
+      });
+    } else if (action === ACTION.RESEARCH) {
+      this.submitResearchMessage({
+        text: value,
+        contextPageUrl,
+        submitType,
       });
     }
 
@@ -1326,6 +1341,40 @@ export class AIWindow extends MozLitElement {
       ...this.#createUserRoleOpts(contextMentions),
       pageUrl: contextPageUrl,
     });
+    this.#dispatchChromeEvent(
+      "ai-window:smartbar-input",
+      this.#getAIWindowEventOptions(lazy.EMPTY_SMARTBAR_INPUT_STATE, true)
+    );
+  }
+
+  async submitResearchMessage({ text, contextPageUrl }) {
+    const trimmed = String(text ?? "").trim();
+    if (!trimmed) {
+      return;
+    }
+
+    this.#recordChatInteraction();
+    this.#starterPromptsAbortController?.abort();
+    this.showStarters = false;
+    this.showFooter = false;
+    this.showDisclaimer = true;
+    this.#updateTabFavicon();
+    this.#setBrowserContainerActiveState(true);
+    this.isGenerating = true;
+
+    try {
+      await lazy.ResearchAgent.submit({
+        conversation: this.#conversation,
+        text: trimmed,
+        pageUrl: contextPageUrl,
+        userOpts: this.#createUserRoleOpts([]),
+      });
+    } catch (error) {
+      this.#handleError(error, { latency: 0, duration: 0 });
+    } finally {
+      this.isGenerating = false;
+    }
+
     this.#dispatchChromeEvent(
       "ai-window:smartbar-input",
       this.#getAIWindowEventOptions(lazy.EMPTY_SMARTBAR_INPUT_STATE, true)

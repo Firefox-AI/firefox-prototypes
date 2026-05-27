@@ -116,56 +116,39 @@ add_task(async function test_run_search_whitespace_query_returns_error() {
   );
 });
 
-add_task(async function test_run_search_no_browsingContext_returns_error() {
-  const result = await RunSearch.runSearch({ query: "test query" });
-  Assert.ok(
-    result.includes("Error"),
-    "No browsingContext should return an error string"
-  );
-  Assert.ok(
-    result.includes("no browsingContext provided"),
-    "Error should mention no browsingContext provided"
-  );
-});
-
-function createFakeSearchContext() {
-  const fakeTab = { selected: true };
-  const fakeWin = {
-    closed: false,
-    gBrowser: {
-      getTabForBrowser: () => fakeTab,
-      addProgressListener(listener) {
-        listener.onStateChange(
-          null,
-          null,
-          Ci.nsIWebProgressListener.STATE_STOP |
-            Ci.nsIWebProgressListener.STATE_IS_NETWORK
-        );
-      },
-      removeProgressListener() {},
-    },
-  };
-  return {
-    browsingContext: {
-      topChromeWindow: fakeWin,
-      embedderElement: {
-        currentURI: Services.io.newURI("https://example.com"),
-      },
-    },
+function withFakeExaSearch(searchImpl) {
+  const original = RunSearch._createExaClient;
+  RunSearch._createExaClient = () => ({
+    search: searchImpl,
+  });
+  registerCleanupFunction(() => {
+    RunSearch._createExaClient = original;
+  });
+  return () => {
+    RunSearch._createExaClient = original;
   };
 }
 
 add_task(async function test_runSearch_sets_security_flags() {
-  const fakeContext = createFakeSearchContext();
   const conversation = makeConversation();
+  const restore = withFakeExaSearch(async () => ({
+    results: [
+      {
+        title: "Example result",
+        url: "https://example.com/",
+        highlights: ["Example highlight"],
+      },
+    ],
+  }));
   const result = await RunSearch.runSearch(
     { query: "test query" },
-    fakeContext.browsingContext,
+    null,
     conversation
   );
+  restore();
   conversation.securityProperties.commit();
 
-  Assert.ok(result.includes("Error"), "Expected an error result from the mock");
+  Assert.ok(result.includes("Exa search results"), "Expected Exa results");
   Assert.equal(
     conversation.securityProperties.privateData,
     true,
@@ -179,18 +162,19 @@ add_task(async function test_runSearch_sets_security_flags() {
 });
 
 add_task(async function test_runSearch_allowed_when_flags_set() {
-  const fakeContext = createFakeSearchContext();
   const conversation = makeConversation({
     privateData: true,
     untrustedInput: true,
   });
+  const restore = withFakeExaSearch(async () => ({ results: [] }));
   const result = await RunSearch.runSearch(
     { query: "test query" },
-    fakeContext.browsingContext,
+    null,
     conversation
   );
+  restore();
 
-  Assert.ok(result.includes("Error"), "no security refusal");
+  Assert.ok(result.includes("No Exa search results"), "no security refusal");
 });
 
 add_task(async function test_runSearch_no_security_flags_on_early_exit() {
@@ -204,30 +188,28 @@ add_task(async function test_runSearch_no_security_flags_on_early_exit() {
   );
 });
 
-add_task(async function test_run_search_closed_window_returns_error() {
+add_task(async function test_run_search_uses_exa_without_browsingContext() {
+  let searchParams;
+  const restore = withFakeExaSearch(async params => {
+    searchParams = params;
+    return {
+      results: [
+        {
+          title: "Result",
+          url: "https://example.org/",
+          text: "Result text",
+        },
+      ],
+    };
+  });
   const result = await RunSearch.runSearch(
     { query: "test query" },
-    { browsingContext: { topChromeWindow: { closed: true } } }
+    null,
+    makeConversation()
   );
-  Assert.ok(
-    result.includes("Error"),
-    "Closed window should return an error string"
-  );
-  Assert.ok(
-    result.includes("not available or closed"),
-    "Error should mention window not available or closed"
-  );
-});
+  restore();
 
-add_task(
-  async function test_run_search_uses_context_browsingContext_when_provided() {
-    const result = await RunSearch.runSearch(
-      { query: "test query" },
-      { browsingContext: { topChromeWindow: { closed: true } } }
-    );
-    Assert.ok(
-      result.includes("Error"),
-      "Closed window from browsingContext should return an error string"
-    );
-  }
-);
+  Assert.equal(searchParams.query, "test query");
+  Assert.deepEqual(searchParams.contents, { highlights: true });
+  Assert.ok(result.includes("https://example.org/"));
+});

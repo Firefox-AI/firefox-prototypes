@@ -67,6 +67,7 @@ ai-window-toggleview-status-label-inactive = Classic Window
 
 aiwindow-input-cta-submit-label-chat = Ask
 aiwindow-input-cta-submit-label-navigate = Go
+aiwindow-input-cta-submit-label-research = Research
 aiwindow-input-cta-submit-label-search = Search
 aiwindow-input-cta-submit-label-stop = Stop
 
@@ -75,6 +76,7 @@ aiwindow-generation-started-announcement = Response generation started
 
 aiwindow-input-cta-menu-label-chat = Ask
 aiwindow-input-cta-menu-label-navigate = Go to site
+aiwindow-input-cta-menu-label-research = Research
 # $searchEngineName (string) - The name of the default search engine
 aiwindow-input-cta-menu-label-search = Search with { $searchEngineName }
 aiwindow-input-cta-menu-label-search-with = Search with…
@@ -196,6 +198,11 @@ smartwindow-footer-history =
     .aria-label = History
     .label = History
 
+smartwindow-footer-reports =
+    .tooltiptext = Research reports
+    .aria-label = Research reports
+    .label = Reports
+
 ## Disclaimer
 ## Text displayed to user to warn user about potential mistakes.
 
@@ -227,6 +234,35 @@ firefoxview-chat-date-prev-month = { DATETIME($date, month: "long", year: "numer
 
 firefoxview-chats-empty-header = Get back to your chats
 firefoxview-chats-empty-description = As you use Smart Window, your chats will be saved here.
+
+## FirefoxView Research Reports
+
+firefoxview-reports-nav = Reports
+  .title = Reports
+firefoxview-reports-header = Reports
+firefoxview-reports-list-header = Saved reports
+firefoxview-reports-loading = Loading reports
+
+firefoxview-reports-empty-header = No research reports yet
+firefoxview-reports-empty-description = Research reports from Smart Window will appear here.
+
+firefoxview-report-query-label = Query
+firefoxview-report-description-label = Description
+firefoxview-report-query-missing = No query recorded.
+firefoxview-report-description-missing = No description recorded.
+firefoxview-report-open = Open report
+
+firefoxview-report-export-pdf =
+  .label = Export to PDF
+firefoxview-report-cancel =
+  .label = Cancel
+firefoxview-report-delete =
+  .label = Delete
+
+firefoxview-report-status-in-progress = In progress
+firefoxview-report-status-complete = Complete
+firefoxview-report-status-failed = Failed
+firefoxview-report-status-cancelled = Cancelled
 
 ## Count displayed in fxview chat search results
 

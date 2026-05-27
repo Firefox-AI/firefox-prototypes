@@ -77,12 +77,11 @@ export async function executeToolByName(
         browsingContext,
         conversation
       );
-      const engine = await lazy.SearchService.getDefault();
       Glean.smartWindow.searchHandoff.record({
         location: mode,
         chat_id: conversation.id,
         message_seq: conversation.messageCount,
-        provider: engine.name ?? "unknown",
+        provider: "exa",
         model: engineInstance?.model,
       });
       conversation._searchExecutedTurn = currentTurn;
@@ -169,7 +168,6 @@ const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   AIWindow:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
-  SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
 });
 
 ChromeUtils.defineLazyGetter(lazy, "console", () =>
@@ -286,7 +284,7 @@ Object.assign(Chat, {
     chatToolsConfig = filterFeatureGatedTools(chatToolsConfig);
 
     let fullResponseText = "";
-    const searchExecuted = conversation._searchExecutedTurn === currentTurn;
+    let searchExecuted = conversation._searchExecutedTurn === currentTurn;
     let blockedSearchAttempts = 0;
 
     const streamModelResponse = () => {
@@ -488,10 +486,6 @@ Object.assign(Chat, {
           delete toolParams.query;
         }
 
-        // Capture the embedder element before running tools, as navigation during
-        // a tool call such as search handoff can replace the browsing context.
-        const originalEmbedderElement = browsingContext?.embedderElement;
-
         // Dispatch the required arguments to different tool calls. Wrap this in a
         // try/catch so the conversation can be updated for failed calls.
         let result;
@@ -550,38 +544,8 @@ Object.assign(Chat, {
           return;
         }
 
-        // Perform the search handoff if the RUN_SEARCH tool was run.
         if (toolName === RUN_SEARCH) {
-          // Commit here because we return early below and never reach the
-          // post-loop commit.
-          conversation.securityProperties.commit();
-          lazy.console.log(
-            `Security commit ${conversation.securityProperties.getLogText()}`
-          );
-
-          const win = originalEmbedderElement?.documentGlobal;
-          if (!win || win.closed) {
-            console.error(
-              "run_search: Associated window not available or closed, aborting search handoff"
-            );
-            return;
-          }
-
-          const searchHandoffTab = win.gBrowser.getTabForBrowser(
-            originalEmbedderElement
-          );
-          if (!searchHandoffTab) {
-            console.error(
-              "run_search: Original tab no longer exists, aborting search handoff"
-            );
-            return;
-          }
-          if (!searchHandoffTab.selected) {
-            win.gBrowser.selectedTab = searchHandoffTab;
-          }
-
-          lazy.AIWindow.openSidebarAndContinue(win, conversation);
-          return;
+          searchExecuted = true;
         }
 
         // @todo Bug 2006159 - Implement parallel tool calling

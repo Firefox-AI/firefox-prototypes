@@ -1502,6 +1502,11 @@ ${
     const isExplicitAction =
       event.type === "aiwindow-input-cta:on-action-change";
 
+    if (action === "research") {
+      this.#dispatchSmartbarCommitEvent(event, this.untrimmedValue);
+      return;
+    }
+
     // For non-explicit actions, forward to handleNavigation.
     if (!isExplicitAction) {
       this.handleNavigation({ event });
@@ -1573,6 +1578,11 @@ ${
     // When queries are suppressed, submit directly to chat.
     if (this.#isSmartbarMode && this._permanentlySuppressStartQuery) {
       this.submitChat(event, this.untrimmedValue);
+      return;
+    }
+
+    if (this.#isSmartbarMode && this.smartbarAction === "research") {
+      this.#dispatchSmartbarCommitEvent(event, this.untrimmedValue);
       return;
     }
 

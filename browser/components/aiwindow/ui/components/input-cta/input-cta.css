@@ -151,6 +151,10 @@ panel-item {
     background-image: var(--search-icon);
   }
 
+  &[icon="research"]::part(button) {
+    background-image: url("chrome://global/skin/icons/page-portrait.svg");
+  }
+
   &[icon="search-with"]::part(button) {
     background-image: url("chrome://global/skin/icons/search-glass.svg");
   }
