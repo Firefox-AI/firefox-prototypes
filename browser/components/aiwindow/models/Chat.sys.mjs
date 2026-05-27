@@ -15,6 +15,7 @@ import {
   SEARCH_BROWSING_HISTORY,
   GET_PAGE_CONTENT,
   RUN_SEARCH,
+  UPDATE_RESEARCH_REPORT,
   GET_USER_MEMORIES,
   GET_NAVIGATION_INFO,
   MANAGE_TABS,
@@ -26,6 +27,7 @@ import {
   SEARCH_THE_WEB_FAST_PREF,
   SEARCH_THE_WEB_TOOL_CONFIG_FAST,
   GET_SKILL,
+  UpdateResearchReport,
 } from "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs";
 import { runSearchTheWeb } from "moz-src:///browser/components/aiwindow/models/search/SearchWorkflow.sys.mjs";
 
@@ -83,6 +85,12 @@ export async function executeToolByName(
       });
       break;
     }
+    case UPDATE_RESEARCH_REPORT:
+      result = await UpdateResearchReport.updateReport(
+        toolParams,
+        conversation
+      );
+      break;
     case GET_OPEN_TABS:
       result = await toolFns.getOpenTabs(conversation);
       break;

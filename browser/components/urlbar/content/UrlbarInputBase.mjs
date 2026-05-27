@@ -60,6 +60,8 @@ if (lazy) {
     ExtensionUtils: "resource://gre/modules/ExtensionUtils.sys.mjs",
     QuickSuggest: "moz-src:///browser/components/urlbar/QuickSuggest.sys.mjs",
     ReaderMode: "moz-src:///toolkit/components/reader/ReaderMode.sys.mjs",
+    ResearchAgent:
+      "moz-src:///browser/components/aiwindow/models/ResearchAgent.sys.mjs",
     SharingUtils: "moz-src:///browser/components/sharing/SharingUtils.sys.mjs",
     SearchUIUtils: "moz-src:///browser/components/search/SearchUIUtils.sys.mjs",
     UrlbarTokenizer:
@@ -1124,6 +1126,11 @@ ${
 
     this.setValue(value, { allowTrim: true, valueIsTyped: !valid });
     this.toggleAttribute("usertyping", !valid && value);
+    if (valid) {
+      this.#maybeShowResearchReportUrlbarLabel(
+        this.window.gBrowser?.currentURI
+      );
+    }
 
     if (this.focused && value != previousUntrimmedValue) {
       if (
@@ -3719,6 +3726,47 @@ ${
     this.inputField.dispatchEvent(event);
 
     return val;
+  }
+
+  /**
+   * If the current page is a saved research report, show its title in the
+   * urlbar in place of the file:// URL. Chrome-only: `lazy` is null in a
+   * content realm, where ResearchAgent is unavailable.
+   *
+   * @param {nsIURI} [uri] The URI of the current page.
+   */
+  #maybeShowResearchReportUrlbarLabel(uri) {
+    const uriSpec = uri?.spec || "";
+    if (!lazy || uri?.scheme !== "file") {
+      return;
+    }
+
+    const previousUntrimmedValue = this.untrimmedValue;
+    lazy.ResearchAgent.getReportUrlbarTitle(uriSpec)
+      .then(async title => {
+        if (!title) {
+          return;
+        }
+        const label = await this.document.l10n.formatValue(
+          "urlbar-research-report-label",
+          { title }
+        );
+        if (
+          !label ||
+          this.untrimmedValue !== previousUntrimmedValue ||
+          this.window.gBrowser?.currentURI?.spec !== uriSpec
+        ) {
+          return;
+        }
+        this.setValue(label, {
+          untrimmedValue: uriSpec,
+          valueIsTyped: false,
+        });
+        this.inputField.setAttribute("title", uriSpec);
+      })
+      .catch(error => {
+        logger().debug("Could not show research report URL label.", error);
+      });
   }
 
   /**

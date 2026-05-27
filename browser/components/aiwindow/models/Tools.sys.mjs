@@ -38,6 +38,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   setTimeout: "resource://gre/modules/Timer.sys.mjs",
   MemoriesManager:
     "moz-src:///browser/components/aiwindow/models/memories/MemoriesManager.sys.mjs",
+  ResearchAgent:
+    "moz-src:///browser/components/aiwindow/models/ResearchAgent.sys.mjs",
   SessionStore:
     "moz-src:///browser/components/sessionstore/SessionStore.sys.mjs",
   SmartWindowNavigationInfo:
@@ -101,6 +103,7 @@ export const GET_PAGE_CONTENT = "get_page_content";
 export const GENERATE_AITAB = "generate_aitab";
 export const RUN_SEARCH = "run_search";
 export const SEARCH_THE_WEB = "search_the_web";
+export const UPDATE_RESEARCH_REPORT = "update_research_report";
 export const GET_USER_MEMORIES = "get_user_memories";
 export const GET_NAVIGATION_INFO = "get_navigation_info";
 export const MANAGE_TABS = "manage_tabs";
@@ -125,6 +128,7 @@ export const TOOLS = [
   GET_OPEN_TABS,
   SEARCH_BROWSING_HISTORY,
   GET_PAGE_CONTENT,
+  UPDATE_RESEARCH_REPORT,
   GET_USER_MEMORIES,
   GET_NAVIGATION_INFO,
   MANAGE_TABS,
@@ -289,7 +293,7 @@ export const toolsConfig = [
     function: {
       name: GET_PAGE_CONTENT,
       description:
-        "Retrieve cleaned text content of all the provided browser page URL Tokens in the list.",
+        "Retrieve cleaned text content of all the provided browser page URL tokens or full URLs in the list. Known Smart Window research report file URLs are allowed.",
       parameters: {
         type: "object",
         properties: {
@@ -299,7 +303,7 @@ export const toolsConfig = [
               type: "string",
               description:
                 "A URL token that appeared in the conversation, formatted as §url_token: DOMAIN_TLD_PATH_n§. " +
-                "Do NOT fabricate tokens. Only use tokens from user messages and tool results.",
+                "Do NOT fabricate tokens. Only use tokens or full URLs from user messages and tool results.",
             },
             minItems: 1,
             description: "List of URL tokens to fetch content from.",
@@ -339,6 +343,45 @@ export const toolsConfig = [
     },
   },
   SEARCH_THE_WEB_TOOL_CONFIG,
+  {
+    type: "function",
+    function: {
+      name: UPDATE_RESEARCH_REPORT,
+      description:
+        "Update the final answer section of a saved Smart Window research report. Use only when the user explicitly asks to edit, revise, rewrite, rearrange, or otherwise change a Smart Window research report. This only works for report URLs that appeared in the conversation or current page context.",
+      parameters: {
+        type: "object",
+        properties: {
+          report_url: {
+            type: "string",
+            description:
+              "The report URL token or full file URL for the Smart Window research report to update.",
+          },
+          updated_answer_markdown: {
+            type: "string",
+            description:
+              "The complete replacement final answer body for the report, written in Markdown.",
+          },
+          edit_summary: {
+            type: "string",
+            description:
+              "A brief plain-language summary of what changed in the report.",
+          },
+          title: {
+            type: "string",
+            description:
+              "Optional updated report title. Leave empty to keep the existing title.",
+          },
+          description: {
+            type: "string",
+            description:
+              "Optional updated one-sentence report description. Leave empty to keep the existing description.",
+          },
+        },
+        required: ["report_url", "updated_answer_markdown", "edit_summary"],
+      },
+    },
+  },
   {
     type: "function",
     function: {
@@ -946,6 +989,15 @@ export class GetPageContent {
     const results = await Promise.all(
       url_list.map(async (url, index) => {
         if (!isAllowedURL(url)) {
+          if (await lazy.ResearchAgent.isResearchReportUrl(url)) {
+            conversation.securityProperties.setPrivateData();
+            conversation.securityProperties.setUntrustedInput();
+            return {
+              url,
+              ok: true,
+              content: await lazy.ResearchAgent.getReportContentForUrl(url),
+            };
+          }
           return { url, ok: false, content: "This URL is not allowed: " + url };
         }
         const startTime = ChromeUtils.now();
@@ -1499,3 +1551,45 @@ export const toolFns = {
   addMemory,
   getSkill,
 };
+
+/**
+ * Handles the update_research_report tool call, which rewrites the final
+ * answer of a saved Smart Window research report.
+ */
+export class UpdateResearchReport {
+  /**
+   * @param {object} toolParams
+   * @param {string} toolParams.report_url
+   * @param {string} toolParams.updated_answer_markdown
+   * @param {string} toolParams.edit_summary
+   * @param {string} [toolParams.title]
+   * @param {string} [toolParams.description]
+   * @param {ChatConversation} conversation
+   * @returns {Promise<object>}
+   */
+  static async updateReport(toolParams, conversation) {
+    const {
+      report_url,
+      updated_answer_markdown,
+      edit_summary,
+      title = "",
+      description = "",
+    } = toolParams || {};
+    const updatedReport = await lazy.ResearchAgent.updateReport({
+      reportUrl: report_url,
+      updatedAnswerMarkdown: updated_answer_markdown,
+      editSummary: edit_summary,
+      title,
+      description,
+    });
+    conversation.securityProperties.setPrivateData();
+    conversation.securityProperties.setUntrustedInput();
+    return {
+      ok: true,
+      message: "Research report updated.",
+      reportUrl: updatedReport.fileUri,
+      title: updatedReport.title,
+      description: updatedReport.description,
+    };
+  }
+}

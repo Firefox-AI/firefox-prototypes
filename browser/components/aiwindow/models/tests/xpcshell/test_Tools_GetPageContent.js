@@ -12,6 +12,10 @@ const { PageExtractorParent } = ChromeUtils.importESModule(
   "resource://gre/actors/PageExtractorParent.sys.mjs"
 );
 
+const { ResearchAgent } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/aiwindow/models/ResearchAgent.sys.mjs"
+);
+
 const { sinon } = ChromeUtils.importESModule(
   "resource://testing-common/Sinon.sys.mjs"
 );
@@ -244,6 +248,43 @@ add_task(async function test_getPageContent_no_browsing_context() {
     sb.restore();
   }
 });
+
+add_task(
+  async function test_getPageContent_allows_known_research_report_file_url() {
+    const sb = sinon.createSandbox();
+
+    try {
+      const reportUrl = "file:///tmp/smart-window-report.html";
+      setupBrowserWindowTracker(sb, createFakeWindow([]));
+      sb.stub(ResearchAgent, "isResearchReportUrl").resolves(true);
+      sb.stub(ResearchAgent, "getReportContentForUrl").resolves(
+        "Smart Window research report: Updated Park Week"
+      );
+
+      const conversation = makeConversation();
+      const result_array = await GetPageContent.getPageContent(
+        { url_list: [reportUrl] },
+        conversation
+      );
+      conversation.securityProperties.commit();
+
+      Assert.equal(
+        result_array[0],
+        "Smart Window research report: Updated Park Week"
+      );
+      Assert.ok(
+        conversation.securityProperties.privateData,
+        "Report content should be treated as private data"
+      );
+      Assert.ok(
+        conversation.securityProperties.untrustedInput,
+        "Report content should be treated as untrusted input"
+      );
+    } finally {
+      sb.restore();
+    }
+  }
+);
 
 add_task(async function test_getPageContent_successful_extraction() {
   const sb = sinon.createSandbox();

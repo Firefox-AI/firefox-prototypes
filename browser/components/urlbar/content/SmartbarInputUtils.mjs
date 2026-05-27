@@ -3,6 +3,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { MultilineEditor } from "chrome://browser/content/multilineeditor/multiline-editor.mjs";
+import {
+  Decoration,
+  DecorationSet,
+  Plugin as PmPlugin,
+} from "chrome://browser/content/multilineeditor/prosemirror.bundle.mjs";
 import { createMentionsPlugin } from "chrome://browser/content/multilineeditor/plugins/MentionsPlugin.mjs";
 import { createCommandsPlugin } from "chrome://browser/content/multilineeditor/plugins/CommandsPlugin.mjs";
 import UrlbarPrefs from "chrome://browser/content/urlbar/UrlbarContentPrefs.mjs";
@@ -35,6 +40,7 @@ const logger = () =>
 
 // Debounce delay for the mention suggestions query.
 const MENTION_QUERY_DEBOUNCE_MS = 150;
+const RESEARCH_SLASH_COMMAND_TOKEN = /^\/research(?=\s|$)/i;
 
 const AGENT_COMMAND_ITEMS = [
   {
@@ -500,6 +506,30 @@ function setupMentionsPlugin(editorElement, panelList) {
   return plugin;
 }
 
+function createResearchSlashCommandPlugin() {
+  return {
+    createPlugin: () =>
+      new PmPlugin({
+        props: {
+          decorations(state) {
+            const command = state.doc
+              .textBetween(0, state.doc.content.size, "\n", "\n")
+              .match(RESEARCH_SLASH_COMMAND_TOKEN)?.[0];
+            if (!command) {
+              return null;
+            }
+
+            return DecorationSet.create(state.doc, [
+              Decoration.inline(1, 1 + command.length, {
+                class: "smartbar-slash-command",
+              }),
+            ]);
+          },
+        },
+      }),
+  };
+}
+
 /**
  * Typing "/" at the start of the input opens a dropdown of agent commands.
  * Picking one completes the input to "/<command> " and
@@ -719,6 +749,8 @@ export function createEditor(inputElement) {
   if (smartbarInput.sapName === "smartbar") {
     plugins.push(setupCommandsPlugin(editorElement, panelList));
   }
+  // Decoration-only plugin that highlights a leading "/research" token.
+  plugins.push(createResearchSlashCommandPlugin());
   editorElement.plugins = plugins;
 
   setupContextMentionsButton(smartbarInput, panelList);

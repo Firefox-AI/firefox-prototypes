@@ -89,6 +89,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/ResumeActivityDismissals.sys.mjs",
   dismissResumeActivityMemory:
     "moz-src:///browser/components/aiwindow/ui/modules/ResumeActivityDismissals.sys.mjs",
+  ResearchAgent:
+    "moz-src:///browser/components/aiwindow/models/ResearchAgent.sys.mjs",
 });
 
 ChromeUtils.defineLazyGetter(lazy, "log", function () {
@@ -151,7 +153,9 @@ const ACTION = {
   CHAT: "chat",
   SEARCH: "search",
   NAVIGATE: "navigate",
+  RESEARCH: "research",
 };
+const RESEARCH_SLASH_COMMAND = /^\/research(?:\s+|$)/i;
 
 const PREF_MEMORIES_CONVERSATION =
   "browser.smartwindow.memories.generateFromConversation";
@@ -191,6 +195,15 @@ const MAX_RESUME_PILLS_DISPLAYED = 3;
 // TEMP: English-only workaround. Remove once resume headlines support
 // localization - see Bug 2066263.
 const RESUME_HEADLINE_PREFIX_RE = /^\s*pick\s+up\b[\s:;,.—-]*/iu;
+
+function parseResearchSlashCommand(value) {
+  const text = String(value ?? "");
+  const match = text.match(RESEARCH_SLASH_COMMAND);
+  if (!match) {
+    return null;
+  }
+  return text.slice(match[0].length).trimStart();
+}
 
 // 1-6 are MLPA spec codes; 7 is set locally for Fastly-blocked 406s.
 const ERROR_TELEMETRY_NAME_BY_CODE = {
@@ -1750,7 +1763,7 @@ export class AIWindow extends MozLitElement {
       this.#handleSmartbarCommit.name,
       this.conversationId
     );
-    const {
+    let {
       value,
       action,
       command,
@@ -1762,6 +1775,11 @@ export class AIWindow extends MozLitElement {
       searchProvider,
       submitType: providedSubmitType,
     } = event.detail;
+    const researchCommandQuery = parseResearchSlashCommand(value);
+    if (researchCommandQuery !== null) {
+      value = researchCommandQuery;
+      action = ACTION.RESEARCH;
+    }
 
     const submitType =
       providedSubmitType ??
@@ -1776,7 +1794,15 @@ export class AIWindow extends MozLitElement {
         : null;
     this.#smartbar.clearSmartbarInput();
 
-    if (action === ACTION.CHAT) {
+    // While the research agent is awaiting clarifications, any submit is an
+    // answer to it rather than a new chat/search/navigate action.
+    if (lazy.ResearchAgent.isWaitingForClarifications(this.conversationId)) {
+      this.submitResearchMessage({
+        text: value,
+        contextPageUrl,
+        submitType,
+      });
+    } else if (action === ACTION.CHAT) {
       if (
         lazy.AgentUI.tryHandleCommand({
           command,
@@ -1832,6 +1858,12 @@ export class AIWindow extends MozLitElement {
         message_seq: this.conversationMessageCount,
         model: this.modelName,
         submit_type: submitType,
+      });
+    } else if (action === ACTION.RESEARCH) {
+      this.submitResearchMessage({
+        text: value,
+        contextPageUrl,
+        submitType,
       });
     }
 
@@ -1946,6 +1978,40 @@ export class AIWindow extends MozLitElement {
       ...this.#createUserRoleOpts(contextMentions),
       pageUrl: contextPageUrl,
     });
+    this.#dispatchChromeEvent(
+      "ai-window:smartbar-input",
+      this.#getAIWindowEventOptions(lazy.EMPTY_SMARTBAR_INPUT_STATE, true)
+    );
+  }
+
+  async submitResearchMessage({ text, contextPageUrl }) {
+    const trimmed = String(text ?? "").trim();
+    if (!trimmed) {
+      return;
+    }
+
+    this.#recordChatInteraction();
+    this.#starterPromptsAbortController?.abort();
+    this.showStarters = false;
+    this.showFooter = false;
+    this.showDisclaimer = true;
+    this.#updateTabFavicon();
+    this.#setBrowserContainerActiveState(true);
+    this.isGenerating = true;
+
+    try {
+      await lazy.ResearchAgent.submit({
+        conversation: this.#conversation,
+        text: trimmed,
+        pageUrl: contextPageUrl,
+        userOpts: this.#createUserRoleOpts([]),
+      });
+    } catch (error) {
+      this.#handleError(error, { latency: 0, duration: 0 });
+    } finally {
+      this.isGenerating = false;
+    }
+
     this.#dispatchChromeEvent(
       "ai-window:smartbar-input",
       this.#getAIWindowEventOptions(lazy.EMPTY_SMARTBAR_INPUT_STATE, true)
