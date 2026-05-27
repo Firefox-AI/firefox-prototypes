@@ -69,6 +69,14 @@ add_task(async function test_smartwindow_footer_valid_actions() {
           "openTab called twice after chats"
         );
         Assert.equal(openTabCalls[1], "chats", "openTab called with chats");
+
+        footerJS.handleActionClick("reports");
+        Assert.equal(
+          openTabCalls.length,
+          3,
+          "openTab called three times after reports"
+        );
+        Assert.equal(openTabCalls[2], "reports", "openTab called with reports");
       } finally {
         // Restore exactly what was there before
         if (hadHandler) {
@@ -240,8 +248,8 @@ add_task(async function test_smartwindow_footer_button_clicks() {
 
       await ContentTaskUtils.waitForCondition(() => {
         const buttons = footer.shadowRoot?.querySelectorAll("moz-button");
-        return buttons && buttons.length === 2;
-      }, "Footer should render two moz-button elements");
+        return buttons && buttons.length === 3;
+      }, "Footer should render three moz-button elements");
 
       const topWin = content.browsingContext.topChromeWindow;
 
@@ -262,7 +270,7 @@ add_task(async function test_smartwindow_footer_button_clicks() {
 
       try {
         const buttons = footer.shadowRoot.querySelectorAll("moz-button");
-        Assert.equal(buttons.length, 2, "Should have exactly 2 buttons");
+        Assert.equal(buttons.length, 3, "Should have exactly 3 buttons");
 
         const historyButton = Array.from(buttons).find(
           btn =>
@@ -271,9 +279,14 @@ add_task(async function test_smartwindow_footer_button_clicks() {
         const chatsButton = Array.from(buttons).find(
           btn => btn.getAttribute("data-l10n-id") === "smartwindow-footer-chats"
         );
+        const reportsButton = Array.from(buttons).find(
+          btn =>
+            btn.getAttribute("data-l10n-id") === "smartwindow-footer-reports"
+        );
 
         Assert.ok(historyButton, "Should find history button");
         Assert.ok(chatsButton, "Should find chats button");
+        Assert.ok(reportsButton, "Should find reports button");
 
         historyButton.click();
         await ContentTaskUtils.waitForCondition(
@@ -288,6 +301,13 @@ add_task(async function test_smartwindow_footer_button_clicks() {
           "openTab should be called after clicking chats"
         );
         Assert.equal(openTabCalls[1], "chats", "chats click opens chats");
+
+        reportsButton.click();
+        await ContentTaskUtils.waitForCondition(
+          () => openTabCalls.length === 3,
+          "openTab should be called after clicking reports"
+        );
+        Assert.equal(openTabCalls[2], "reports", "reports click opens reports");
       } finally {
         // Restore FirefoxViewHandler / openTab
         if (hadHandler) {

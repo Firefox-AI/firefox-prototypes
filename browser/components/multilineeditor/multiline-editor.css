@@ -9,6 +9,10 @@
   --multiline-editor-color: var(--text-color);
   --multiline-editor-focus-outline: var(--focus-outline);
   --multiline-editor-selection-color: var(--color-accent-primary);
+  --multiline-editor-command-background-color: color-mix(in srgb, var(--color-accent-primary) 12%, transparent);
+  --multiline-editor-command-border-color: color-mix(in srgb, var(--color-accent-primary) 45%, transparent);
+  --multiline-editor-command-border-radius: var(--border-radius-small);
+  --multiline-editor-command-color: var(--text-color);
   --multiline-editor-mention-placeholder-border-color: var(--color-violet-0);
   --multiline-editor-mention-placeholder-background-color: transparent;
   --multiline-editor-mention-placeholder-border-radius: var(--border-radius-medium);
@@ -61,6 +65,17 @@
 
 .multiline-editor .ProseMirror ::selection {
   background-color: var(--multiline-editor-selection-color);
+}
+
+.multiline-editor .ProseMirror .smartbar-slash-command {
+  background-color: var(--multiline-editor-command-background-color);
+  border: var(--border-width) solid var(--multiline-editor-command-border-color);
+  border-radius: var(--multiline-editor-command-border-radius);
+  box-decoration-break: clone;
+  color: var(--multiline-editor-command-color);
+  font-weight: var(--font-weight-semibold);
+  padding: 0 var(--space-xxsmall);
+  white-space: nowrap;
 }
 
 /* Force empty paragraphs to not collapse */

@@ -13,12 +13,10 @@
  */
 
 import { searchBrowsingHistory as implSearchBrowsingHistory } from "moz-src:///browser/components/aiwindow/models/SearchBrowsingHistory.sys.mjs";
+import { ExaClient } from "moz-src:///browser/components/aiwindow/models/ExaClient.sys.mjs";
 import { WCSMerinoClient } from "moz-src:///browser/components/aiwindow/models/WCSMerinoClient.sys.mjs";
 import { PageExtractorParent } from "resource://gre/actors/PageExtractorParent.sys.mjs";
-import {
-  ChatStore,
-  MESSAGE_ROLE,
-} from "moz-src:///browser/components/aiwindow/ui/modules/ChatStore.sys.mjs";
+import { MESSAGE_ROLE } from "moz-src:///browser/components/aiwindow/ui/modules/ChatStore.sys.mjs";
 import {
   sanitizeUntrustedContent,
   isNewPageUrl,
@@ -29,10 +27,10 @@ ChromeUtils.defineESModuleGetters(lazy, {
   AIWindow:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
-  clearTimeout: "resource://gre/modules/Timer.sys.mjs",
-  setTimeout: "resource://gre/modules/Timer.sys.mjs",
   MemoriesManager:
     "moz-src:///browser/components/aiwindow/models/memories/MemoriesManager.sys.mjs",
+  ResearchAgent:
+    "moz-src:///browser/components/aiwindow/models/ResearchAgent.sys.mjs",
   SmartWindowNavigationInfo:
     "moz-src:///browser/components/aiwindow/models/SmartWindowNavigationInfo.sys.mjs",
   // @todo Bug 2009194
@@ -90,6 +88,7 @@ export const GET_OPEN_TABS = "get_open_tabs";
 export const SEARCH_BROWSING_HISTORY = "search_browsing_history";
 export const GET_PAGE_CONTENT = "get_page_content";
 export const RUN_SEARCH = "run_search";
+export const UPDATE_RESEARCH_REPORT = "update_research_report";
 export const GET_USER_MEMORIES = "get_user_memories";
 export const GET_NAVIGATION_INFO = "get_navigation_info";
 export const WORLD_CUP_MATCHES = "world_cup_matches";
@@ -105,6 +104,7 @@ export const TOOLS = [
   SEARCH_BROWSING_HISTORY,
   GET_PAGE_CONTENT,
   RUN_SEARCH,
+  UPDATE_RESEARCH_REPORT,
   GET_USER_MEMORIES,
   GET_NAVIGATION_INFO,
   WORLD_CUP_MATCHES,
@@ -112,13 +112,11 @@ export const TOOLS = [
 ];
 
 export const RUN_SEARCH_VERBATIM_QUERY_DESCRIPTION =
-  "Perform a web search using the browser's default search engine and return " +
-  "the search results page content. Use this when the user needs current web " +
+  "Perform a web search using Exa and return the search results. Use this when the user needs current web " +
   "information that would benefit from a live search. This tool uses the current user message as the query.";
 
 export const RUN_SEARCH_GENERATED_QUERY_DESCRIPION =
-  "Perform a web search using the browser's default search engine and return " +
-  "the search results page content. Use this when the user needs current web " +
+  "Perform a web search using Exa and return the search results. Use this when the user needs current web " +
   "information that would benefit from a live search.";
 
 const RUN_SEARCH_TOOL_CONFIG_VERBATIM_QUERY = {
@@ -203,7 +201,7 @@ export const toolsConfig = [
     function: {
       name: GET_PAGE_CONTENT,
       description:
-        "Retrieve cleaned text content of all the provided browser page URL Tokens in the list.",
+        "Retrieve cleaned text content of all the provided browser page URL tokens or full URLs in the list. Known Smart Window research report file URLs are allowed.",
       parameters: {
         type: "object",
         properties: {
@@ -213,7 +211,7 @@ export const toolsConfig = [
               type: "string",
               description:
                 "A URL token that appeared in the conversation, formatted as §url_token: DOMAIN_TLD_PATH_n§. " +
-                "Do NOT fabricate tokens. Only use tokens from user messages and tool results.",
+                "Do NOT fabricate tokens. Only use tokens or full URLs from user messages and tool results.",
             },
             minItems: 1,
             description: "List of URL tokens to fetch content from.",
@@ -224,6 +222,45 @@ export const toolsConfig = [
     },
   },
   RUN_SEARCH_TOOL_CONFIG_VERBATIM_QUERY,
+  {
+    type: "function",
+    function: {
+      name: UPDATE_RESEARCH_REPORT,
+      description:
+        "Update the final answer section of a saved Smart Window research report. Use only when the user explicitly asks to edit, revise, rewrite, rearrange, or otherwise change a Smart Window research report. This only works for report URLs that appeared in the conversation or current page context.",
+      parameters: {
+        type: "object",
+        properties: {
+          report_url: {
+            type: "string",
+            description:
+              "The report URL token or full file URL for the Smart Window research report to update.",
+          },
+          updated_answer_markdown: {
+            type: "string",
+            description:
+              "The complete replacement final answer body for the report, written in Markdown.",
+          },
+          edit_summary: {
+            type: "string",
+            description:
+              "A brief plain-language summary of what changed in the report.",
+          },
+          title: {
+            type: "string",
+            description:
+              "Optional updated report title. Leave empty to keep the existing title.",
+          },
+          description: {
+            type: "string",
+            description:
+              "Optional updated one-sentence report description. Leave empty to keep the existing description.",
+          },
+        },
+        required: ["report_url", "updated_answer_markdown", "edit_summary"],
+      },
+    },
+  },
   {
     type: "function",
     function: {
@@ -465,19 +502,12 @@ export function stripSearchBrowsingHistoryFields(result) {
 }
 
 /**
- * Performs a web search using the browser's default search engine,
- * waits for the results page to load, and extracts its content.
+ * Handles Exa search tool calls.
  */
 export class RunSearch {
-  static NAVIGATION_TIMEOUT_MS = 15000;
-  static CONTENT_SETTLE_MS = 2000;
-  static MAX_CHARACTERS = 15000;
-
-  static #ensureTabSelected(tab) {
-    if (!tab.selected) {
-      tab.documentGlobal.gBrowser.selectedTab = tab;
-    }
-  }
+  static MAX_RESULTS = 8;
+  static MAX_RESULT_TEXT = 1200;
+  static _createExaClient = () => new ExaClient();
 
   /**
    * Switches the run_search tool description to the one for verbatim queries
@@ -521,198 +551,82 @@ export class RunSearch {
 
   /**
    * @param {object} [toolParams]
-   * @param {BrowsingContext} browsingContext
+   * @param {BrowsingContext} _browsingContext
    * @param {ChatConversation} conversation
    * @returns {Promise<string>}
    */
-  static async runSearch(toolParams, browsingContext, conversation) {
-    // No security check, always allowed because we assume that the search
-    // provider is trusted.
-
-    // Decide if we'll use the user message verbatim as the search query or generate one
+  static async runSearch(toolParams, _browsingContext, conversation) {
     let query;
-    if (toolParams.query) {
+    if (toolParams?.query) {
       query = toolParams.query;
     } else {
-      const recentUserMessages = await ChatStore.getMostRecentMessages(
-        MESSAGE_ROLE.USER,
-        1
-      );
-      if (!recentUserMessages.length) {
-        return "Error: no user messages stored to user as the search query.";
-      }
-      query = recentUserMessages[0].content.body;
+      const recentUserMessage =
+        conversation?.messages?.findLast(m => m.role === MESSAGE_ROLE.USER) ??
+        null;
+      query = recentUserMessage?.content?.body;
     }
 
     if (!query || typeof query !== "string" || !query.trim()) {
       return "Error: a non-empty search query is required.";
     }
 
-    if (!browsingContext) {
-      return "Error: no browsingContext provided to perform search.";
-    }
-
-    const win = browsingContext.topChromeWindow;
-    if (!win || win.closed) {
-      return "Error: associated browser window not available or closed.";
-    }
-
-    // Get the original tab from the browsing context, not the currently selected tab
-    const originalBrowser = browsingContext.embedderElement;
-    let targetTab =
-      originalBrowser && win.gBrowser?.getTabForBrowser(originalBrowser);
-
-    if (targetTab) {
-      // Switch to the original tab if it's different from currently selected
-      RunSearch.#ensureTabSelected(targetTab);
-    } else {
-      return "Error: Original tab no longer exists, aborting search to avoid interfering with existing conversation.";
-    }
-
-    // If the original tab is the AI Window page, move to sidebar first
-    if (lazy.AIWindow.isAIWindowContentPage(originalBrowser.currentURI)) {
-      await RunSearch.#moveToSidebarIfNeeded(win, targetTab);
-
-      // Ensure we're still on the correct tab after the await
-      RunSearch.#ensureTabSelected(targetTab);
-    }
-
-    RunSearch.#showSearchingIndicator(win, true, query.trim());
-
-    let result;
     try {
-      await RunSearch.#performSearchAndWait(win, originalBrowser, query.trim());
-      result = RunSearch.#extractSerpContent(originalBrowser, conversation);
-    } catch (e) {
-      console.error("[RunSearch] search failed:", e);
-      result = `Error performing search for "${query}": ${e.message}`;
-    } finally {
-      RunSearch.#showSearchingIndicator(win, false, null);
-    }
-
-    conversation.securityProperties.setPrivateData();
-    conversation.securityProperties.setUntrustedInput();
-
-    lazy.console.log("[Tool] runSearch", result);
-    return result;
-  }
-
-  // TODO - this may be dead code. The fetch with history already yields a
-  // searching state, and the sidebar implementation may not need this at all.
-  // Revisit this in the future:
-  // https://bugzilla.mozilla.org/show_bug.cgi?id=2016252 to find a more
-  // concrete way to target what side bar needs to show the indicator, if any
-  // at all. My guess is that this might be here because of the move to sidebar
-  // implementation, and the indicator state does not "transfer over". Possibly
-  // look into tapping into something more concrete like the conversation state
-  // in the AIWindow store to trigger this kind of UI state instead of trying
-  // to directly manipulate the sidebar UI from here.
-  static #showSearchingIndicator(win, isSearching, searchQuery) {
-    try {
-      const sidebar = win.document.getElementById("ai-window-box");
-      if (!sidebar) {
-        return;
-      }
-      const aiBrowser = sidebar.querySelector("#ai-window-browser");
-      if (!aiBrowser?.contentDocument) {
-        return;
-      }
-      const aiWindow = aiBrowser.contentDocument.querySelector("ai-window");
-      if (aiWindow?.showSearchingIndicator) {
-        aiWindow.showSearchingIndicator(isSearching, searchQuery);
-      }
-    } catch {
-      // Sidebar may not be available
-    }
-  }
-
-  static async #moveToSidebarIfNeeded(win, tab) {
-    await lazy.AIWindow.moveConversationToSidebar(win, tab);
-  }
-
-  /**
-   * Navigates to the search results and waits for the page to finish loading.
-   *
-   * @param {Window} win
-   * @param {XULElement} browser
-   * @param {string} query
-   */
-  static async #performSearchAndWait(win, browser, query) {
-    const navigationPromise = new Promise((resolve, reject) => {
-      const timeout = lazy.setTimeout(() => {
-        win.gBrowser.removeProgressListener(listener);
-        reject(new Error("Navigation timed out"));
-      }, RunSearch.NAVIGATION_TIMEOUT_MS);
-
-      const listener = {
-        QueryInterface: ChromeUtils.generateQI([
-          "nsIWebProgressListener",
-          "nsISupportsWeakReference",
-        ]),
-        onStateChange(_webProgress, _request, stateFlags) {
-          const complete =
-            Ci.nsIWebProgressListener.STATE_STOP |
-            Ci.nsIWebProgressListener.STATE_IS_NETWORK;
-          if ((stateFlags & complete) === complete) {
-            lazy.clearTimeout(timeout);
-            win.gBrowser.removeProgressListener(listener);
-            resolve();
-          }
+      const response = await RunSearch._createExaClient().search({
+        query,
+        numResults: RunSearch.MAX_RESULTS,
+        contents: {
+          highlights: true,
         },
-        onLocationChange() {},
-        onProgressChange() {},
-        onStatusChange() {},
-        onSecurityChange() {},
-        onContentBlockingEvent() {},
-      };
-
-      win.gBrowser.addProgressListener(listener);
-    });
-
-    await lazy.AIWindow.performSearch(query, win);
-    await navigationPromise;
-
-    // Allow JS rendering to settle
-    await new Promise(r => lazy.setTimeout(r, RunSearch.CONTENT_SETTLE_MS));
-  }
-
-  /**
-   * Run PageExtractor on the search engine page.
-   *
-   * @param {MozBrowser} browser
-   * @param {ChatConversation} conversation
-   * @returns {string}
-   */
-  static async #extractSerpContent(browser, conversation) {
-    const windowContext = browser.browsingContext?.currentWindowContext;
-    if (!windowContext) {
-      return "Error: could not access search results page content.";
-    }
-
-    /** @type {string} */
-    let text;
-    /** @type {PageExtractorParent} */
-    const pageExtractor = await windowContext.getActor("PageExtractor");
-    try {
-      const result = await pageExtractor.getText({
-        sufficientLength: RunSearch.MAX_CHARACTERS,
-        cleanWhitespace: true,
-        removeBoilerplate: false,
-        sourceUrl: browser.currentURI?.spec,
       });
-      if (!result) {
-        return "No content could be extracted from the search results page.";
+      const results = Array.isArray(response.results) ? response.results : [];
+      conversation.addSeenUrls(
+        results.map(result => result.url).filter(Boolean)
+      );
+      conversation.securityProperties.setPrivateData();
+      conversation.securityProperties.setUntrustedInput();
+
+      if (!results.length) {
+        return `No Exa search results found for "${query.trim()}".`;
       }
-      text = result.text;
-      conversation.addSeenUrls(result.links);
-    } catch {
-      return "Error: failed to extract search results content.";
+
+      const resultText = results
+        .map((result, index) => {
+          const text = truncateSearchResultText(
+            result.text ||
+              result.summary ||
+              result.highlights?.join("\n") ||
+              result.snippet ||
+              ""
+          );
+          return [
+            `${index + 1}. ${sanitizeUntrustedContent(result.title || "Untitled")}`,
+            `URL: ${result.url || ""}`,
+            result.publishedDate ? `Published: ${result.publishedDate}` : "",
+            result.author
+              ? `Author: ${sanitizeUntrustedContent(result.author)}`
+              : "",
+            text ? `Excerpt: ${sanitizeUntrustedContent(text)}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n");
+        })
+        .join("\n\n");
+
+      const formatted = `Exa search results for "${query.trim()}":\n\n${resultText}`;
+      lazy.console.log("[Tool] runSearch", formatted);
+      return formatted;
+    } catch (e) {
+      console.error("[RunSearch] Exa search failed:", e);
+      return `Error performing Exa search for "${query.trim()}": ${e.message}`;
     }
-
-    const url = browser.currentURI?.spec || "unknown";
-
-    return `Search results from ${url}:\n\n${text}`;
   }
+}
+
+function truncateSearchResultText(text) {
+  if (!text || text.length <= RunSearch.MAX_RESULT_TEXT) {
+    return text || "";
+  }
+  return `${text.slice(0, RunSearch.MAX_RESULT_TEXT - 3)}...`;
 }
 
 /**
@@ -755,6 +669,11 @@ export class GetPageContent {
     const results = await Promise.all(
       url_list.map(async (url, index) => {
         if (!isAllowedURL(url)) {
+          if (await lazy.ResearchAgent.isResearchReportUrl(url)) {
+            conversation.securityProperties.setPrivateData();
+            conversation.securityProperties.setUntrustedInput();
+            return lazy.ResearchAgent.getReportContentForUrl(url);
+          }
           return "This URL is not allowed: " + url;
         }
         const startTime = ChromeUtils.now();
@@ -890,6 +809,47 @@ export class GetPageContent {
     conversation.securityProperties.setUntrustedInput();
 
     return `Content from ${label}:\n\n${text}`;
+  }
+}
+
+/**
+ * Handles saved research report update tool calls.
+ */
+export class UpdateResearchReport {
+  /**
+   * @param {object} toolParams
+   * @param {string} toolParams.report_url
+   * @param {string} toolParams.updated_answer_markdown
+   * @param {string} toolParams.edit_summary
+   * @param {string} [toolParams.title]
+   * @param {string} [toolParams.description]
+   * @param {ChatConversation} conversation
+   * @returns {Promise<object>}
+   */
+  static async updateReport(toolParams, conversation) {
+    const {
+      report_url,
+      updated_answer_markdown,
+      edit_summary,
+      title = "",
+      description = "",
+    } = toolParams || {};
+    const updatedReport = await lazy.ResearchAgent.updateReport({
+      reportUrl: report_url,
+      updatedAnswerMarkdown: updated_answer_markdown,
+      editSummary: edit_summary,
+      title,
+      description,
+    });
+    conversation.securityProperties.setPrivateData();
+    conversation.securityProperties.setUntrustedInput();
+    return {
+      ok: true,
+      message: "Research report updated.",
+      reportUrl: updatedReport.fileUri,
+      title: updatedReport.title,
+      description: updatedReport.description,
+    };
   }
 }
 

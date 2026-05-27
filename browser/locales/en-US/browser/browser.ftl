@@ -595,6 +595,10 @@ urlbar-permissions-granted =
 urlbar-switch-to-tab =
   .value = Switch to tab:
 
+# Variables:
+#   $title (String): title of the saved Smart Window research report.
+urlbar-research-report-label = Research: { $title }
+
 # Used to indicate that a selected autocomplete entry is provided by an extension.
 urlbar-extension =
   .value = Extension:

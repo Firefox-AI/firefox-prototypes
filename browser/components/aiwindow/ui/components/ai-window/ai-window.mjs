@@ -47,6 +47,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   getCurrentModelName:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowConstants.sys.mjs",
   ToolUI: "moz-src:///browser/components/aiwindow/ui/modules/ToolUI.sys.mjs",
+  ResearchAgent:
+    "moz-src:///browser/components/aiwindow/models/ResearchAgent.sys.mjs",
 });
 
 ChromeUtils.defineLazyGetter(lazy, "log", function () {
@@ -109,7 +111,9 @@ const ACTION = {
   CHAT: "chat",
   SEARCH: "search",
   NAVIGATE: "navigate",
+  RESEARCH: "research",
 };
+const RESEARCH_SLASH_COMMAND = /^\/research(?:\s+|$)/i;
 
 const PREF_MEMORIES_CONVERSATION =
   "browser.smartwindow.memories.generateFromConversation";
@@ -122,6 +126,15 @@ const TAB_FAVICON_CHAT =
 const PREF_CHAT_INTERACTION_COUNT = "browser.smartwindow.chat.interactionCount";
 const MAX_INTERACTION_COUNT = 1000;
 const MAX_SIDEBAR_STARTER_CACHE_KEYS = 20;
+
+function parseResearchSlashCommand(value) {
+  const text = String(value ?? "");
+  const match = text.match(RESEARCH_SLASH_COMMAND);
+  if (!match) {
+    return null;
+  }
+  return text.slice(match[0].length).trimStart();
+}
 
 // 1-6 are MLPA spec codes; 7 is set locally for Fastly-blocked 406s.
 const ERROR_TELEMETRY_NAME_BY_CODE = {
@@ -1170,7 +1183,7 @@ export class AIWindow extends MozLitElement {
     );
     this.#smartbar.clearSmartbarInput();
 
-    const {
+    let {
       value,
       action,
       contextMentions = [],
@@ -1181,6 +1194,11 @@ export class AIWindow extends MozLitElement {
       searchProvider,
       submitType: providedSubmitType,
     } = event.detail;
+    const researchCommandQuery = parseResearchSlashCommand(value);
+    if (researchCommandQuery !== null) {
+      value = researchCommandQuery;
+      action = ACTION.RESEARCH;
+    }
 
     const submitType =
       providedSubmitType ??
@@ -1188,7 +1206,13 @@ export class AIWindow extends MozLitElement {
         ? "button"
         : "enter");
 
-    if (action === ACTION.CHAT) {
+    if (lazy.ResearchAgent.isWaitingForClarifications(this.conversationId)) {
+      this.submitResearchMessage({
+        text: value,
+        contextPageUrl,
+        submitType,
+      });
+    } else if (action === ACTION.CHAT) {
       const { mergedMentions, allUrls, inlineMentions } =
         this.#calculateCurrentMentions(contextMentions);
 
@@ -1224,6 +1248,12 @@ export class AIWindow extends MozLitElement {
         message_seq: this.conversationMessageCount,
         model: this.modelName,
         submit_type: submitType,
+      });
+    } else if (action === ACTION.RESEARCH) {
+      this.submitResearchMessage({
+        text: value,
+        contextPageUrl,
+        submitType,
       });
     }
 
@@ -1326,6 +1356,40 @@ export class AIWindow extends MozLitElement {
       ...this.#createUserRoleOpts(contextMentions),
       pageUrl: contextPageUrl,
     });
+    this.#dispatchChromeEvent(
+      "ai-window:smartbar-input",
+      this.#getAIWindowEventOptions(lazy.EMPTY_SMARTBAR_INPUT_STATE, true)
+    );
+  }
+
+  async submitResearchMessage({ text, contextPageUrl }) {
+    const trimmed = String(text ?? "").trim();
+    if (!trimmed) {
+      return;
+    }
+
+    this.#recordChatInteraction();
+    this.#starterPromptsAbortController?.abort();
+    this.showStarters = false;
+    this.showFooter = false;
+    this.showDisclaimer = true;
+    this.#updateTabFavicon();
+    this.#setBrowserContainerActiveState(true);
+    this.isGenerating = true;
+
+    try {
+      await lazy.ResearchAgent.submit({
+        conversation: this.#conversation,
+        text: trimmed,
+        pageUrl: contextPageUrl,
+        userOpts: this.#createUserRoleOpts([]),
+      });
+    } catch (error) {
+      this.#handleError(error, { latency: 0, duration: 0 });
+    } finally {
+      this.isGenerating = false;
+    }
+
     this.#dispatchChromeEvent(
       "ai-window:smartbar-input",
       this.#getAIWindowEventOptions(lazy.EMPTY_SMARTBAR_INPUT_STATE, true)

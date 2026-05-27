@@ -93,14 +93,26 @@ const lazy = XPCOMUtils.declareLazy({
   logger: () => lazy.UrlbarUtils.getLogger({ prefix: "SmartbarInput" }),
   getCurrentTabUrl:
     "moz-src:///browser/components/aiwindow/ui/modules/ChatUtils.sys.mjs",
+  ResearchAgent:
+    "moz-src:///browser/components/aiwindow/models/ResearchAgent.sys.mjs",
 });
 
 const UNLIMITED_MAX_RESULTS = 99;
 const MAX_INPUT_LENGTH = 32000;
+const RESEARCH_SLASH_COMMAND = /^\/research(?:\s+|$)/i;
 
 let getBoundsWithoutFlushing = element =>
   element.documentGlobal.windowUtils.getBoundsWithoutFlushing(element);
 let px = number => number.toFixed(2) + "px";
+
+function parseResearchSlashCommand(value) {
+  const text = String(value ?? "");
+  const match = text.match(RESEARCH_SLASH_COMMAND);
+  if (!match) {
+    return null;
+  }
+  return text.slice(match[0].length).trimStart();
+}
 
 /**
  * A website context entry used to render website chips.
@@ -1208,6 +1220,9 @@ ${
 
     this._setValue(value, { allowTrim: true, valueIsTyped: !valid });
     this.toggleAttribute("usertyping", !valid && value);
+    if (valid) {
+      this.#maybeShowResearchReportUrlbarLabel(this.window.gBrowser.currentURI);
+    }
 
     if (this.focused && value != previousUntrimmedValue) {
       if (
@@ -1431,6 +1446,13 @@ ${
       }
     }
 
+    if (
+      this.#isSmartbarMode &&
+      this.#commitResearchSlashCommand(event, this.untrimmedValue)
+    ) {
+      return;
+    }
+
     this.handleNavigation({ event });
   }
 
@@ -1459,6 +1481,17 @@ ${
     );
   }
 
+  #commitResearchSlashCommand(event, value) {
+    const query = parseResearchSlashCommand(value);
+    if (query === null) {
+      return false;
+    }
+
+    this.smartbarAction = "research";
+    this.#dispatchSmartbarCommitEvent(event, query);
+    return true;
+  }
+
   /**
    * Submit a chat event.
    *
@@ -1466,6 +1499,10 @@ ${
    * @param {string} value - The value to commit.
    */
   submitChat(event, value) {
+    if (this.#commitResearchSlashCommand(event, value)) {
+      return;
+    }
+
     this.smartbarAction = "chat";
     this.#dispatchSmartbarCommitEvent(event, value);
   }
@@ -1497,10 +1534,19 @@ ${
       return;
     }
 
+    if (this.#commitResearchSlashCommand(event, this.untrimmedValue)) {
+      return;
+    }
+
     const action = event.detail.action;
     this.smartbarAction = action;
     const isExplicitAction =
       event.type === "aiwindow-input-cta:on-action-change";
+
+    if (action === "research") {
+      this.#dispatchSmartbarCommitEvent(event, this.untrimmedValue);
+      return;
+    }
 
     // For non-explicit actions, forward to handleNavigation.
     if (!isExplicitAction) {
@@ -1554,6 +1600,24 @@ ${
     }
   }
 
+  #handleSmartbarNavigation(event) {
+    if (!this.#isSmartbarMode) {
+      return false;
+    }
+
+    if (this._permanentlySuppressStartQuery) {
+      this.submitChat(event, this.untrimmedValue);
+      return true;
+    }
+
+    if (this.smartbarAction === "research") {
+      this.#dispatchSmartbarCommitEvent(event, this.untrimmedValue);
+      return true;
+    }
+
+    return false;
+  }
+
   /**
    * Handles an event which would cause a URL or text to be opened.
    *
@@ -1570,9 +1634,7 @@ ${
    *   The principal that the action was triggered from.
    */
   handleNavigation({ event, oneOffParams, triggeringPrincipal }) {
-    // When queries are suppressed, submit directly to chat.
-    if (this.#isSmartbarMode && this._permanentlySuppressStartQuery) {
-      this.submitChat(event, this.untrimmedValue);
+    if (this.#handleSmartbarNavigation(event)) {
       return;
     }
 
@@ -3953,6 +4015,40 @@ ${
     return val;
   }
 
+  #maybeShowResearchReportUrlbarLabel(uri) {
+    const uriSpec = uri?.spec || "";
+    if (uri?.scheme !== "file") {
+      return;
+    }
+
+    const previousUntrimmedValue = this.untrimmedValue;
+    lazy.ResearchAgent.getReportUrlbarTitle(uriSpec)
+      .then(async title => {
+        if (!title) {
+          return;
+        }
+        const label = await this.document.l10n.formatValue(
+          "urlbar-research-report-label",
+          { title }
+        );
+        if (
+          !label ||
+          this.untrimmedValue !== previousUntrimmedValue ||
+          this.window.gBrowser.currentURI?.spec !== uriSpec
+        ) {
+          return;
+        }
+        this._setValue(label, {
+          untrimmedValue: uriSpec,
+          valueIsTyped: false,
+        });
+        this.inputField.setAttribute("title", uriSpec);
+      })
+      .catch(error => {
+        lazy.logger.debug("Could not show research report URL label.", error);
+      });
+  }
+
   /**
    * Extracts a input value from a UrlbarResult, used when filling the input
    * field on selecting a result.
@@ -5945,6 +6041,11 @@ ${
     this._resultForCurrentValue = null;
 
     this.userTypedValue = value;
+    if (this.#isSmartbarMode && parseResearchSlashCommand(value) !== null) {
+      this.smartbarAction = "research";
+      this.#detectedIntent = "research";
+    }
+
     // Unset userSelectionBehavior because the user is modifying the search
     // string, thus there's no valid selection. This is also used by the view
     // to set "aria-activedescendant", thus it should never get stale.
@@ -6756,7 +6857,9 @@ ${
   #updateSmartbarCTAButton(firstResult) {
     /** @type {SmartbarAction} */
     let detectedAction;
-    if (!firstResult || !firstResult.heuristic) {
+    if (parseResearchSlashCommand(this.untrimmedValue) !== null) {
+      detectedAction = "research";
+    } else if (!firstResult || !firstResult.heuristic) {
       detectedAction = this.value ? "chat" : "";
     } else {
       switch (firstResult.type) {

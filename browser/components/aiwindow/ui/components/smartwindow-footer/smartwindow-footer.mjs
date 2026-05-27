@@ -5,7 +5,7 @@
 import { html } from "chrome://global/content/vendor/lit.all.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
 
-const ALLOWED_ACTIONS = ["chats", "history"];
+const ALLOWED_ACTIONS = ["chats", "history", "reports"];
 
 /**
  * A Custome element to mangage Smart Window fullpage footer
@@ -46,6 +46,17 @@ export class SmartwindowFooter extends MozLitElement {
           iconsrc="chrome://browser/content/firefoxview/view-chats.svg"
           @click=${() => {
             this.handleActionClick("chats");
+          }}
+        >
+        </moz-button>
+        <moz-button
+          type="ghost"
+          data-l10n-id="smartwindow-footer-reports"
+          data-l10n-attrs="tooltiptext,aria-label"
+          class="footer-action-button"
+          iconsrc="chrome://global/skin/icons/page-portrait.svg"
+          @click=${() => {
+            this.handleActionClick("reports");
           }}
         >
         </moz-button>

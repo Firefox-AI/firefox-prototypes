@@ -13,16 +13,22 @@ export default {
     docs: {
       description: {
         component:
-          "A footer component for the Smart Window fullpage mode that provides navigation buttons for History and Chats.",
+          "A footer component for the Smart Window fullpage mode that provides navigation buttons for History, Chats, and Reports.",
       },
     },
     fluent: `
-aiwindow-history = History
+smartwindow-footer-history =
+    .label = History
     .aria-label = View browsing history
     .tooltiptext = View your browsing history
-aiwindow-chats = Chats
+smartwindow-footer-chats =
+    .label = Chats
     .aria-label = View chat conversations
     .tooltiptext = View your chat conversations
+smartwindow-footer-reports =
+    .label = Reports
+    .aria-label = View research reports
+    .tooltiptext = View your research reports
     `,
   },
 };

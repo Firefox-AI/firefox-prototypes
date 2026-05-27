@@ -1,0 +1,110 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+.research-reports-list {
+  display: grid;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.research-report-item {
+  border-block-start: var(--border-width) solid var(--border-color-deemphasized);
+}
+
+.research-reports-list li:last-child .research-report-item {
+  border-block-end: var(--border-width) solid var(--border-color-deemphasized);
+}
+
+.research-report-item summary {
+  cursor: pointer;
+  padding: var(--space-medium) 0;
+}
+
+.research-report-item summary::marker {
+  color: var(--text-color-deemphasized);
+}
+
+.research-report-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-small) var(--space-large);
+  align-items: baseline;
+  padding-inline-start: var(--space-small);
+}
+
+.research-report-title {
+  overflow-wrap: anywhere;
+  font-weight: var(--font-weight-semibold);
+}
+
+.research-report-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-small);
+  justify-content: end;
+  color: var(--text-color-deemphasized);
+  font-size: var(--font-size-small);
+}
+
+.research-report-status {
+  border-radius: var(--border-radius-small, 4px);
+  background: var(--button-background-color);
+  color: var(--text-color);
+  padding: var(--space-xxsmall) var(--space-small);
+}
+
+.research-report-body {
+  display: grid;
+  gap: var(--space-medium);
+  padding-block: 0 var(--space-large);
+  padding-inline-start: calc(var(--space-large) + var(--space-medium));
+}
+
+.research-report-body dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-small) var(--space-medium);
+  margin: 0;
+}
+
+.research-report-body dt {
+  color: var(--text-color-deemphasized);
+  font-weight: var(--font-weight-semibold);
+}
+
+.research-report-body dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.research-report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-small);
+  align-items: center;
+}
+
+.research-report-link {
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .research-report-summary,
+  .research-report-body dl {
+    display: block;
+  }
+
+  .research-report-meta {
+    display: flex;
+    justify-content: start;
+    margin-block-start: var(--space-xsmall);
+  }
+
+  .research-report-body dt {
+    margin-block-start: var(--space-medium);
+  }
+}

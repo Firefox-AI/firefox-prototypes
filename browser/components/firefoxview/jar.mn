@@ -13,6 +13,8 @@ browser.jar:
     content/browser/firefoxview/history.css
     content/browser/firefoxview/history.mjs
     content/browser/firefoxview/opentabs.mjs
+    content/browser/firefoxview/reports.css
+    content/browser/firefoxview/reports.mjs
     content/browser/firefoxview/view-opentabs.css
     content/browser/firefoxview/syncedtabs.mjs
     content/browser/firefoxview/view-syncedtabs.css

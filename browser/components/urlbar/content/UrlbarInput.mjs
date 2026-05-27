@@ -95,6 +95,8 @@ const lazy = XPCOMUtils.declareLazy({
     pref: "privacy.query_stripping.strip_on_share.enabled",
     default: false,
   },
+  ResearchAgent:
+    "moz-src:///browser/components/aiwindow/models/ResearchAgent.sys.mjs",
   logger: () => lazy.UrlbarUtils.getLogger({ prefix: "Input" }),
 });
 
@@ -959,6 +961,9 @@ ${
 
     this._setValue(value, { allowTrim: true, valueIsTyped: !valid });
     this.toggleAttribute("usertyping", !valid && value);
+    if (valid) {
+      this.#maybeShowResearchReportUrlbarLabel(this.window.gBrowser.currentURI);
+    }
 
     if (this.focused && value != previousUntrimmedValue) {
       if (
@@ -3434,6 +3439,40 @@ ${
     this.inputField.dispatchEvent(event);
 
     return val;
+  }
+
+  #maybeShowResearchReportUrlbarLabel(uri) {
+    const uriSpec = uri?.spec || "";
+    if (uri?.scheme !== "file") {
+      return;
+    }
+
+    const previousUntrimmedValue = this.untrimmedValue;
+    lazy.ResearchAgent.getReportUrlbarTitle(uriSpec)
+      .then(async title => {
+        if (!title) {
+          return;
+        }
+        const label = await this.document.l10n.formatValue(
+          "urlbar-research-report-label",
+          { title }
+        );
+        if (
+          !label ||
+          this.untrimmedValue !== previousUntrimmedValue ||
+          this.window.gBrowser.currentURI?.spec !== uriSpec
+        ) {
+          return;
+        }
+        this._setValue(label, {
+          untrimmedValue: uriSpec,
+          valueIsTyped: false,
+        });
+        this.inputField.setAttribute("title", uriSpec);
+      })
+      .catch(error => {
+        lazy.logger.debug("Could not show research report URL label.", error);
+      });
   }
 
   /**

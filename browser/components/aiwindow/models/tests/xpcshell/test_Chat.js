@@ -720,22 +720,6 @@ add_task(
       sb.stub(openAIEngine, "build").resolves(fakeEngine);
       sb.stub(openAIEngine, "getFxAccountToken").resolves("mock_token");
 
-      const mockBrowser = {
-        documentGlobal: {
-          closed: false,
-          gBrowser: {
-            getTabForBrowser: () => ({ selected: true }),
-            selectedTab: null,
-          },
-        },
-      };
-      const openSidebarStub = sb.stub().callsFake(() => {});
-      const origLazy = ChromeUtils.importESModule(
-        "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs"
-      );
-      const origOpenSidebar = origLazy.AIWindow.openSidebarAndContinue;
-      origLazy.AIWindow.openSidebarAndContinue = openSidebarStub;
-
       const conversation = new ChatConversation({
         title: "search guard test",
         description: "desc",
@@ -750,7 +734,7 @@ add_task(
       conversation.addAssistantMessage("text", "");
 
       const context = {
-        browsingContext: { embedderElement: mockBrowser },
+        browsingContext: null,
         telemetry: { location: "home" },
       };
 
@@ -766,9 +750,9 @@ add_task(
         "run_search should be called exactly once"
       );
 
-      // Simulate openSidebarAndContinue calling fetchWithHistory again
-      // on the same conversation (same turn). The guard should block
-      // execution and the model continues generating text.
+      // Simulate the model requesting another search on the same turn.
+      // The guard should block execution and the model continues generating
+      // text using the Exa result it already has.
       callCount = 1;
       conversation.addAssistantMessage("text", "");
       await Chat.fetchWithHistory({
@@ -810,8 +794,6 @@ add_task(
         runSearchStub.calledTwice,
         "run_search should be called twice total (once per turn)"
       );
-
-      origLazy.AIWindow.openSidebarAndContinue = origOpenSidebar;
     } finally {
       sb.restore();
     }

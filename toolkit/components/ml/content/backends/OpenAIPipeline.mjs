@@ -310,6 +310,7 @@ export class OpenAIPipeline {
     const message = completion.choices[0].message;
     const output = message.content || "";
     const toolCalls = message.tool_calls || null;
+    const usage = completion.usage || null;
 
     this.#sendProgress({
       content: output,
@@ -318,11 +319,13 @@ export class OpenAIPipeline {
       port,
       isDone: true,
       toolCalls,
+      ...(usage ? { usage } : {}),
     });
 
     return {
       finalOutput: output,
       metrics: [],
+      ...(usage ? { usage } : {}),
       ...(toolCalls ? { toolCalls } : {}),
     };
   }

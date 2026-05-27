@@ -3,6 +3,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { MultilineEditor } from "chrome://browser/content/multilineeditor/multiline-editor.mjs";
+import {
+  Decoration,
+  DecorationSet,
+  Plugin as PmPlugin,
+} from "chrome://browser/content/multilineeditor/prosemirror.bundle.mjs";
 import { createMentionsPlugin } from "chrome://browser/content/multilineeditor/plugins/MentionsPlugin.mjs";
 
 /**
@@ -41,6 +46,7 @@ ChromeUtils.defineLazyGetter(lazy, "log", function () {
 
 // Debounce delay for the mention suggestions query.
 const MENTION_QUERY_DEBOUNCE_MS = 150;
+const RESEARCH_SLASH_COMMAND_TOKEN = /^\/research(?=\s|$)/i;
 
 /**
  * @typedef {object} TabMention
@@ -415,6 +421,30 @@ function setupMentionsPlugin(editorElement, panelList) {
   return plugin;
 }
 
+function createResearchSlashCommandPlugin() {
+  return {
+    createPlugin: () =>
+      new PmPlugin({
+        props: {
+          decorations(state) {
+            const command = state.doc
+              .textBetween(0, state.doc.content.size, "\n", "\n")
+              .match(RESEARCH_SLASH_COMMAND_TOKEN)?.[0];
+            if (!command) {
+              return null;
+            }
+
+            return DecorationSet.create(state.doc, [
+              Decoration.inline(1, 1 + command.length, {
+                class: "smartbar-slash-command",
+              }),
+            ]);
+          },
+        },
+      }),
+  };
+}
+
 /**
  * Creates a Smartbar editor element.
  *
@@ -466,7 +496,8 @@ export function createEditor(inputElement) {
     window.browsingContext?.embedderElement?.id === lazy.AIWindowUI.BROWSER_ID;
 
   const mentionsPlugin = setupMentionsPlugin(editorElement, panelList);
-  editorElement.plugins = [mentionsPlugin];
+  const researchSlashCommandPlugin = createResearchSlashCommandPlugin();
+  editorElement.plugins = [mentionsPlugin, researchSlashCommandPlugin];
 
   const smartbarInput = /** @type {SmartbarInput} */ (
     editorElement.closest("moz-smartbar")

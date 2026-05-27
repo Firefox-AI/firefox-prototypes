@@ -116,6 +116,129 @@ add_task(async function test_smartbar_submit_chat() {
   }
 });
 
+add_task(async function test_smartbar_research_slash_command() {
+  const sb = this.sinon.createSandbox();
+
+  try {
+    const fetchWithHistoryStub = sb.stub(this.Chat, "fetchWithHistory");
+    const researchSubmitStub = sb
+      .stub(this.ResearchAgent, "submit")
+      .resolves({});
+    sb.stub(this.openAIEngine, "build").resolves({
+      loadPrompt: () => Promise.resolve("Mock system prompt"),
+    });
+    const win = await openAIWindow();
+    const browser = win.gBrowser.selectedBrowser;
+
+    await typeInSmartbar(browser, "/research Best budget 3D printer");
+    await submitSmartbar(browser);
+    await TestUtils.waitForCondition(
+      () => researchSubmitStub.calledOnce,
+      "Should submit slash command prompt to ResearchAgent"
+    );
+
+    Assert.equal(
+      researchSubmitStub.firstCall.args[0].text,
+      "Best budget 3D printer",
+      "Should strip the /research command from the research query"
+    );
+    Assert.ok(
+      !fetchWithHistoryStub.called,
+      "Should not submit /research command as a normal chat"
+    );
+
+    await BrowserTestUtils.closeWindow(win);
+  } finally {
+    sb.restore();
+  }
+});
+
+add_task(async function test_smartbar_research_slash_command_preview() {
+  const win = await openAIWindow();
+  const browser = win.gBrowser.selectedBrowser;
+
+  await typeInSmartbar(browser, "/research Best budget 3D printer");
+  await waitForSmartbarAction(browser, "research");
+
+  const highlightedCommand = await SpecialPowers.spawn(
+    browser,
+    [],
+    async () => {
+      const aiWindowElement = content.document.querySelector("ai-window");
+      const smartbar = aiWindowElement.shadowRoot.querySelector(
+        "#ai-window-smartbar"
+      );
+      const inputCta = smartbar.querySelector("input-cta");
+
+      await ContentTaskUtils.waitForCondition(
+        () => inputCta.getAttribute("action") === "research",
+        "Wait for the input CTA action to become research"
+      );
+      await ContentTaskUtils.waitForCondition(
+        () =>
+          smartbar.inputField.shadowRoot.querySelector(
+            ".smartbar-slash-command"
+          )?.textContent === "/research",
+        "Wait for the /research command to be highlighted"
+      );
+
+      return smartbar.inputField.shadowRoot.querySelector(
+        ".smartbar-slash-command"
+      ).textContent;
+    }
+  );
+
+  Assert.equal(
+    highlightedCommand,
+    "/research",
+    "Should highlight the /research command token"
+  );
+
+  await BrowserTestUtils.closeWindow(win);
+});
+
+add_task(async function test_smartbar_research_slash_command_only_at_start() {
+  const sb = this.sinon.createSandbox();
+
+  try {
+    const fetchWithHistoryStub = sb.stub(this.Chat, "fetchWithHistory");
+    const researchSubmitStub = sb.stub(this.ResearchAgent, "submit");
+    sb.stub(this.openAIEngine, "build").resolves({
+      loadPrompt: () => Promise.resolve("Mock system prompt"),
+    });
+    const win = await openAIWindow();
+    const browser = win.gBrowser.selectedBrowser;
+
+    await dispatchSmartbarCommit(
+      browser,
+      "Please /research Best budget 3D printer",
+      "chat"
+    );
+    await TestUtils.waitForCondition(
+      () => fetchWithHistoryStub.calledOnce,
+      "Should submit text with non-leading /research as chat"
+    );
+
+    const conversation = fetchWithHistoryStub.firstCall.args[0].conversation;
+    const messages = conversation.getMessagesInOpenAiFormat();
+    const userMessage = messages.findLast(message => message.role === "user");
+
+    Assert.equal(
+      userMessage.content,
+      "Please /research Best budget 3D printer",
+      "Should preserve non-leading /research text in chat"
+    );
+    Assert.ok(
+      !researchSubmitStub.called,
+      "Should not run research when /research is not at the start"
+    );
+
+    await BrowserTestUtils.closeWindow(win);
+  } finally {
+    sb.restore();
+  }
+});
+
 add_task(async function test_smartbar_action_navigate() {
   const sb = this.sinon.createSandbox();
 

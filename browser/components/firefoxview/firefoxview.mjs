@@ -109,8 +109,11 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   if (isAIWindow()) {
     await import("chrome://browser/content/firefoxview/chats.mjs");
+    await import("chrome://browser/content/firefoxview/reports.mjs");
     document.getElementById("firefoxview-chats-nav").hidden = false;
+    document.getElementById("firefoxview-reports-nav").hidden = false;
     document.querySelector("view-chats").hidden = false;
+    document.querySelector("view-reports").hidden = false;
   }
 
   pageNav = document.querySelector("moz-page-nav");
