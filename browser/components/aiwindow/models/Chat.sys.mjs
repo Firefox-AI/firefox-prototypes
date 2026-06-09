@@ -21,6 +21,7 @@ import {
   WORLD_CUP_LIVE,
   WORLD_CUP_TOOLS,
   WORLD_CUP_PREF,
+  SCOUT_COUPONS,
 } from "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs";
 
 // TODO: move this to Tools.sys.mjs when able to define tool UI data there
@@ -98,6 +99,9 @@ export async function executeToolByName(
       break;
     case GET_NAVIGATION_INFO:
       result = await toolFns.getNavigationInfo(toolParams);
+      break;
+    case SCOUT_COUPONS:
+      result = await toolFns.scoutCoupons(toolParams);
       break;
     case CONFIRM_CLOSE_TABS:
       // Add the specific uiType for close tabs confirmation

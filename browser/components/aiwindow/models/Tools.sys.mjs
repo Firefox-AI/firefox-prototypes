@@ -14,6 +14,7 @@
 
 import { searchBrowsingHistory as implSearchBrowsingHistory } from "moz-src:///browser/components/aiwindow/models/SearchBrowsingHistory.sys.mjs";
 import { ExaClient } from "moz-src:///browser/components/aiwindow/models/ExaClient.sys.mjs";
+import { ScoutAgent } from "moz-src:///browser/components/aiwindow/models/ScoutAgent.sys.mjs";
 import { WCSMerinoClient } from "moz-src:///browser/components/aiwindow/models/WCSMerinoClient.sys.mjs";
 import { PageExtractorParent } from "resource://gre/actors/PageExtractorParent.sys.mjs";
 import { MESSAGE_ROLE } from "moz-src:///browser/components/aiwindow/ui/modules/ChatStore.sys.mjs";
@@ -90,6 +91,7 @@ export const GET_USER_MEMORIES = "get_user_memories";
 export const GET_NAVIGATION_INFO = "get_navigation_info";
 export const WORLD_CUP_MATCHES = "world_cup_matches";
 export const WORLD_CUP_LIVE = "world_cup_live";
+export const SCOUT_COUPONS = "scout_coupons";
 
 // Tools gated behind a feature pref. Filtered out of the model's tool list
 // in Chat.sys.mjs when the pref is off.
@@ -105,6 +107,7 @@ export const TOOLS = [
   GET_NAVIGATION_INFO,
   WORLD_CUP_MATCHES,
   WORLD_CUP_LIVE,
+  SCOUT_COUPONS,
 ];
 
 export const RUN_SEARCH_VERBATIM_QUERY_DESCRIPTION =
@@ -305,6 +308,35 @@ export const toolsConfig = [
               "Omit to include all live matches.",
           },
         },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: SCOUT_COUPONS,
+      description:
+        "Find and validate working coupon codes for an online store. Recovers " +
+        "candidate codes from coupon aggregators, then tests each one at a real " +
+        "cart and returns only the codes that currently reduce the price, with " +
+        "their savings. Use this when the user asks for a discount, promo code, " +
+        "or coupon for a specific store. Validation supports Shopify stores.",
+      parameters: {
+        type: "object",
+        properties: {
+          domain: {
+            type: "string",
+            description:
+              "The store's bare domain to scout, e.g. 'glossier.com'. Resolve the " +
+              "store the user named to its domain.",
+          },
+          product: {
+            type: "string",
+            description:
+              "Optional product the user is shopping for, for context only.",
+          },
+        },
+        required: ["domain"],
       },
     },
   },
@@ -897,6 +929,37 @@ export async function worldCupLive(toolParams, conversation) {
   return trimmed;
 }
 
+/**
+ * Find and validate working coupon codes for a store.
+ *
+ * @param {{domain: string, product?: string}} toolParams
+ * @returns {Promise<object>}
+ */
+export async function scoutCoupons(toolParams) {
+  const domain = String(toolParams?.domain || "").trim();
+  if (!domain) {
+    return { error: "No store domain was provided to scout." };
+  }
+  try {
+    const result = await ScoutAgent.scout(domain);
+    return {
+      domain: result.domain,
+      platform: result.platform,
+      recovered_count: result.recoveredCount,
+      validated_count: result.candidateCount,
+      working_codes: result.valid.map(code => ({
+        code: code.code,
+        savings: code.savings,
+        percent_off: code.pct,
+        offer: code.discount,
+      })),
+      summary: result.summary,
+    };
+  } catch (error) {
+    return { error: `Coupon scout failed: ${error?.message || error}` };
+  }
+}
+
 export const toolFns = {
   getOpenTabs,
   searchBrowsingHistory,
@@ -904,4 +967,5 @@ export const toolFns = {
   getNavigationInfo,
   worldCupMatches,
   worldCupLive,
+  scoutCoupons,
 };

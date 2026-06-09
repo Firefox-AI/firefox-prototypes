@@ -31,6 +31,8 @@ firefox-appdir = "browser"
 
 ["test_ResearchAgent.js"]
 
+["test_ScoutAgent.js"]
+
 ["test_SearchBrowsingHistory.js"]
 
 ["test_SearchBrowsingHistoryDomainBoost.js"]
