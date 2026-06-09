@@ -117,24 +117,34 @@ export class CouponFollowClient {
       )
       .slice(0, limit);
 
+    // Reveal popups are independent stateless POSTs, so resolve them in
+    // parallel. Results are merged in card order with case-insensitive dedupe.
+    const resolved = await Promise.all(
+      cards.map(card =>
+        this.#popup(card.cid, normalized, signal)
+          .then(data => ({ card, data }))
+          .catch(() => null)
+      )
+    );
+
     const seen = new Set();
     const codes = [];
-    for (const card of cards) {
-      let data;
-      try {
-        data = await this.#popup(card.cid, normalized, signal);
-      } catch {
+    for (const entry of resolved) {
+      if (!entry) {
         continue;
       }
-      const code = String(data?.code || data?.Code || "").trim();
+      const code = String(entry.data?.code || entry.data?.Code || "").trim();
       if (!code || seen.has(code.toUpperCase())) {
         continue;
       }
       seen.add(code.toUpperCase());
       codes.push({
         code,
-        discount: String(data?.title || data?.desc || "").slice(0, 80),
-        source: `couponfollow:${card.cid}`,
+        discount: String(entry.data?.title || entry.data?.desc || "").slice(
+          0,
+          80
+        ),
+        source: `couponfollow:${entry.card.cid}`,
       });
     }
     return codes;

@@ -24,8 +24,8 @@ const PHASE = Object.freeze({
   FAILED: "failed",
 });
 
-const MAX_RECOVERED_CODES = 16;
-const MAX_VALIDATED_CODES = 16;
+const MAX_RECOVERED_CODES = 8;
+const MAX_VALIDATED_CODES = 8;
 const DOMAIN_RE = /\b((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,})\b/i;
 
 function parseScoutJson(text) {

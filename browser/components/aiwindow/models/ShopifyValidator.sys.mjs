@@ -119,7 +119,7 @@ export class ShopifyValidator {
    * @returns {Promise<object>} { domain, platform, product, baselineTotal,
    *   nValid, results: [{ code, outcome, savings, pct, codedTotal, detail }] }
    */
-  async validateStore(domain, codes, { maxCodes = 16, spacing = 800 } = {}) {
+  async validateStore(domain, codes, { maxCodes = 8, spacing = 250 } = {}) {
     const host = normalizeDomain(domain);
     const platform = await this.detectPlatform(host);
     if (platform !== "shopify") {
