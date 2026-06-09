@@ -31,6 +31,7 @@ browser.jar:
   content/browser/aiwindow/assets/model-choice-2.svg                (assets/model-choice-2.svg)
   content/browser/aiwindow/assets/model-choice-3.svg                (assets/model-choice-3.svg)
   content/browser/aiwindow/assets/set-default-onboarding.svg        (assets/set-default-onboarding.svg)
+  content/browser/aiwindow/assets/prototype-newtab-bg.png           (assets/prototype-newtab-bg.png)
   content/browser/aiwindow/firstrun.html                            (content/firstrun.html)
   content/browser/aiwindow/firstrun.css                             (content/firstrun.css)
   content/browser/aiwindow/firstrun.js                              (content/firstrun.js)
@@ -67,3 +68,5 @@ browser.jar:
   content/browser/aiwindow/components/smartwindow-heading.css       (components/smartwindow-heading/smartwindow-heading.css)
   content/browser/aiwindow/components/ai-action-result.mjs          (components/ai-action-result/ai-action-result.mjs)
   content/browser/aiwindow/components/ai-action-result.css          (components/ai-action-result/ai-action-result.css)
+  content/browser/aiwindow/components/smart-window-prototype.mjs    (components/smart-window-prototype/smart-window-prototype.mjs)
+  content/browser/aiwindow/components/smart-window-prototype.css    (components/smart-window-prototype/smart-window-prototype.css)

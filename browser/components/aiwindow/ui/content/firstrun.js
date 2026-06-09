@@ -25,6 +25,19 @@ const { getAllModelsData } = ChromeUtils.importESModule(
 
 const autoAdvanceMS = Services.prefs.getIntPref(AUTO_ADVANCE_PREF);
 
+function shouldRenderSmartWindowPrototype() {
+  const params = new URLSearchParams(window.location.search);
+  return params.has("prototype") || window.location.hash === "#prototype";
+}
+
+async function renderSmartWindowPrototype() {
+  await import("chrome://browser/content/aiwindow/components/smart-window-prototype.mjs");
+  const root = document.getElementById("multi-stage-message-root");
+  root.className = "smart-window-prototype-root";
+  root.removeAttribute("role");
+  root.replaceChildren(document.createElement("smart-window-prototype"));
+}
+
 function createAIWindowConfig(modelData) {
   return {
     id: "AI_WINDOW_WELCOME",
@@ -568,12 +581,16 @@ async function renderFirstRun() {
   document.body.appendChild(script);
 }
 
+const render = shouldRenderSmartWindowPrototype()
+  ? renderSmartWindowPrototype
+  : renderFirstRun;
+
 if (document.readyState === "loading") {
   document.addEventListener(
     "DOMContentLoaded",
-    () => renderFirstRun().catch(console.error),
+    () => render().catch(console.error),
     { once: true }
   );
 } else {
-  renderFirstRun().catch(console.error);
+  render().catch(console.error);
 }
