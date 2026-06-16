@@ -26,6 +26,8 @@ const PHASE = Object.freeze({
 
 const MAX_RECOVERED_CODES = 8;
 const MAX_VALIDATED_CODES = 8;
+const CACHE_TTL_MS = 60 * 60 * 1000;
+const PREWARM_DOMAINS_PREF = "browser.smartwindow.scout.prewarmDomains";
 const DOMAIN_RE = /\b((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,})\b/i;
 
 function parseScoutJson(text) {
@@ -64,6 +66,7 @@ class ScoutAgentSingleton {
   #sessions = new Map();
   #couponFollow = new CouponFollowClient();
   #validator = new ShopifyValidator();
+  #cache = new Map();
 
   isRunning(conversationId) {
     return this.#sessions.get(conversationId)?.phase === PHASE.RUNNING;
@@ -76,12 +79,13 @@ class ScoutAgentSingleton {
    * @param {string} domain Bare store domain, e.g. "glossier.com".
    * @param {object} [options]
    * @param {(stage: object) => void} [options.onProgress]
+   * @param {boolean} [options.forceRefresh] Bypass the per-domain result cache.
    * @returns {Promise<object>} {
    *   domain, platform, recoveredCount, candidateCount, baselineTotal, product,
    *   valid: [{ code, savings, pct, discount }], summary
    * }
    */
-  async scout(domain, { onProgress } = {}) {
+  async scout(domain, { onProgress, forceRefresh = false } = {}) {
     const host = normalizeDomain(domain);
     if (!host) {
       return {
@@ -92,6 +96,12 @@ class ScoutAgentSingleton {
         valid: [],
         summary: "No store domain was provided.",
       };
+    }
+
+    const cached = this.#cache.get(host);
+    if (!forceRefresh && cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+      onProgress?.({ stage: "done", ...cached.result });
+      return cached.result;
     }
 
     onProgress?.({ stage: "recovering", domain: host });
@@ -138,8 +148,21 @@ class ScoutAgentSingleton {
         valid
       ),
     };
+    this.#cache.set(host, { ts: Date.now(), result });
     onProgress?.({ stage: "done", ...result });
     return result;
+  }
+
+  /**
+   * Warm the result cache for a list of domains (best effort, in background).
+   * Used to pre-seed demo stores so the first query is instant.
+   *
+   * @param {string[]} domains
+   */
+  prewarm(domains) {
+    for (const domain of domains) {
+      this.scout(domain).catch(() => {});
+    }
   }
 
   async submit({ conversation, text, pageUrl = null, userOpts = undefined }) {
@@ -334,3 +357,16 @@ class ScoutAgentSingleton {
 }
 
 export const ScoutAgent = new ScoutAgentSingleton();
+
+// Optionally pre-seed the cache for a comma-separated list of demo stores so the
+// first scout in a demo returns instantly. Off unless the pref is set.
+try {
+  const domains = Services.prefs
+    .getCharPref(PREWARM_DOMAINS_PREF, "")
+    .split(",")
+    .map(domain => domain.trim())
+    .filter(Boolean);
+  if (domains.length) {
+    ScoutAgent.prewarm(domains);
+  }
+} catch {}
