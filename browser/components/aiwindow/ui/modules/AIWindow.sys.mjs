@@ -28,6 +28,8 @@ const PREF_SEMANTIC_HISTORY_SMARTWINDOW_FEATURE_GATE =
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  AutoTabGrouping:
+    "moz-src:///browser/components/aiwindow/ui/modules/AutoTabGrouping.sys.mjs",
   getAllModelsData:
     "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
   AIWindowTabStatesManager:
@@ -113,6 +115,7 @@ export const AIWindow = {
         new lazy.AIWindowTabStatesManager(win)
       );
       this._markActiveStart(win);
+      lazy.AutoTabGrouping.maybeAutoGroup(win, "open");
     }
 
     if (this._initialized) {
@@ -777,6 +780,7 @@ export const AIWindow = {
 
         this._markActiveStart(win);
         this.recordOpenWindowTelemetry(trigger, win);
+        lazy.AutoTabGrouping.maybeAutoGroup(win, "switch");
       } else {
         const duration_ms = this._consumeActiveDuration(win);
         const opened_tabs = win.gBrowser.tabs.length;
