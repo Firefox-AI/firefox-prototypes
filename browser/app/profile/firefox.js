@@ -2302,6 +2302,7 @@ pref("browser.smartwindow.autoTabGrouping.minCandidateTabs", 4);
 pref("browser.smartwindow.autoTabGrouping.triggerOnOpen", true);
 // Whether to run when an existing window is switched to Smart mode.
 pref("browser.smartwindow.autoTabGrouping.triggerOnSwitch", true);
+pref("browser.smartwindow.autoTabGrouping.reviewBeforeGrouping", false);
 pref("browser.smartwindow.autoTabGrouping.loglevel", "Warn");
 
 // Smart Window: Merino World Cup Soccer tool call (bug 2038266)

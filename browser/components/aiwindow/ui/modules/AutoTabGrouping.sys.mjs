@@ -60,19 +60,15 @@ XPCOMUtils.defineLazyPreferenceGetter(
   "browser.smartwindow.autoTabGrouping.triggerOnSwitch",
   true
 );
+XPCOMUtils.defineLazyPreferenceGetter(
+  lazy,
+  "reviewBeforeGrouping",
+  "browser.smartwindow.autoTabGrouping.reviewBeforeGrouping",
+  false
+);
 
 const NOTIFICATION_VALUE = "smartwindow-auto-tab-grouping";
 
-/**
- * Orchestrates proactive tab grouping for Smart Windows.
- *
- * On a trigger (window open or switch to Smart mode) it clusters the window's
- * ungrouped tabs with the on-device SmartTabGrouping models, labels the
- * clusters, caps them to a small number, and then either suggests the groups
- * to the user (suggest mode) or creates them immediately with a one-click undo
- * (create mode). Every action is reversible: undo ungroups the created groups
- * while keeping all tabs open.
- */
 export const AutoTabGrouping = {
   /**
    * Windows we've already offered grouping for in their current lifetime, so a
@@ -81,12 +77,6 @@ export const AutoTabGrouping = {
    * @type {WeakSet<ChromeWindow>}
    */
   _offeredWindows: new WeakSet(),
-
-  /**
-   * Lazily-created shared grouping manager.
-   *
-   * @type {import("moz-src:///browser/components/tabbrowser/SmartTabGrouping.sys.mjs").SmartTabGroupingManager}
-   */
   _manager: null,
 
   get manager() {
@@ -158,6 +148,8 @@ export const AutoTabGrouping = {
 
     if (lazy.mode == "create") {
       this._createGroups(win, groups);
+    } else if (lazy.reviewBeforeGrouping) {
+      this._showReviewPanel(win, groups);
     } else {
       this._showSuggestionBar(win, groups);
     }
@@ -194,8 +186,6 @@ export const AutoTabGrouping = {
       return [];
     }
 
-    // Keep clusters that are large enough to be worth a group, biggest first,
-    // capped to maxGroups so we never overwhelm the user.
     let clusters = result.clusterRepresentations
       .filter(c => c.tabs && c.tabs.length >= lazy.minTabsPerGroup)
       .sort((a, b) => b.tabs.length - a.tabs.length);
@@ -206,7 +196,6 @@ export const AutoTabGrouping = {
       return [];
     }
 
-    // Label generation contrasts each cluster against the remaining tabs.
     const groupedTabs = new Set(clusters.flatMap(c => c.tabs));
     const otherTabs = candidates.filter(t => !groupedTabs.has(t));
 
@@ -299,6 +288,120 @@ export const AutoTabGrouping = {
         },
       ]
     );
+  },
+
+  /**
+   * Suggest mode + review pref: show an interactive panel where the user can
+   * rename each proposed group and uncheck individual member tabs before
+   * creating. Confirm routes through _createGroups (which re-validates tabs and
+   * shows the undo bar, keeping "Group more" working). Cancel creates nothing.
+   *
+   * @param {ChromeWindow} win
+   * @param {Array<{label: string, tabs: MozTabbrowserTab[]}>} proposals
+   */
+  _showReviewPanel(win, proposals) {
+    const doc = win.document;
+    const popupSet = doc.getElementById("mainPopupSet");
+    const anchor =
+      doc.getElementById("alltabs-button") ||
+      doc.getElementById("tabbrowser-tabs");
+    if (!popupSet || !anchor) {
+      // Fall back to the simple bar if the chrome we anchor to is missing.
+      this._showSuggestionBar(win, proposals);
+      return;
+    }
+
+    const HTML_NS = "http://www.w3.org/1999/xhtml";
+
+    const panel = doc.createXULElement("panel");
+    panel.setAttribute("type", "arrow");
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("orient", "vertical");
+    panel.setAttribute("class", "panel-no-padding");
+    panel.id = "smartwindow-auto-tab-grouping-review-panel";
+
+    const body = doc.createElementNS(HTML_NS, "div");
+    body.className = "panel-subview-body";
+
+    const title = doc.createElementNS(HTML_NS, "h1");
+    title.className = "panel-header";
+    doc.l10n.setAttributes(title, "tab-group-editor-title-suggest");
+    body.appendChild(title);
+
+    // Per-proposal mutable state: the name field plus the still-selected tabs.
+    const groupState = [];
+
+    for (const proposal of proposals) {
+      const state = { labelInput: null, selected: new Set(proposal.tabs) };
+
+      const nameWrap = doc.createElementNS(HTML_NS, "div");
+      nameWrap.className = "tab-group-editor-name";
+      const nameLabel = doc.createElementNS(HTML_NS, "label");
+      doc.l10n.setAttributes(nameLabel, "tab-group-editor-name-label");
+      const nameInput = doc.createElementNS(HTML_NS, "input");
+      nameInput.type = "text";
+      nameInput.value = proposal.label || "";
+      doc.l10n.setAttributes(nameInput, "tab-group-editor-name-field");
+      state.labelInput = nameInput;
+      nameWrap.append(nameLabel, nameInput);
+      body.appendChild(nameWrap);
+
+      // One checkbox per member tab (favicon + title), checked by default.
+      // Mirrors tabgroup-menu.js #createRow.
+      for (const tab of proposal.tabs) {
+        const checkbox = doc.createElement("moz-checkbox");
+        checkbox.label = tab.label;
+        checkbox.iconSrc = tab.image;
+        checkbox.checked = true;
+        checkbox.classList.add(
+          "tab-group-suggestion-checkbox",
+          "text-truncated-ellipsis"
+        );
+        checkbox.addEventListener("change", e => {
+          if (e.target.checked) {
+            state.selected.add(tab);
+          } else {
+            state.selected.delete(tab);
+          }
+        });
+        body.appendChild(checkbox);
+      }
+
+      groupState.push(state);
+    }
+
+    const footer = doc.createElement("moz-button-group");
+    footer.className = "panel-footer";
+    const cancelBtn = doc.createElement("moz-button");
+    doc.l10n.setAttributes(cancelBtn, "tab-group-editor-cancel");
+    const confirmBtn = doc.createElement("moz-button");
+    confirmBtn.setAttribute("type", "primary");
+    doc.l10n.setAttributes(confirmBtn, "tab-group-editor-done");
+    footer.append(cancelBtn, confirmBtn);
+    body.appendChild(footer);
+
+    panel.appendChild(body);
+    popupSet.appendChild(panel);
+
+    cancelBtn.addEventListener("command", () => panel.hidePopup());
+    confirmBtn.addEventListener("command", () => {
+      const confirmed = [];
+      for (const state of groupState) {
+        const tabs = [...state.selected];
+        if (tabs.length < lazy.minTabsPerGroup) {
+          continue;
+        }
+        confirmed.push({ label: state.labelInput.value.trim(), tabs });
+      }
+      panel.hidePopup();
+      if (confirmed.length) {
+        this._createGroups(win, confirmed);
+      }
+    });
+
+    panel.addEventListener("popuphidden", () => panel.remove(), { once: true });
+
+    panel.openPopup(anchor, { position: "bottomright topright" });
   },
 
   /**
