@@ -1001,6 +1001,19 @@ export class nsContextMenu {
     // this.setItemAttr( "context-copy", "disabled", !this.isTextSelected() );
     this.window.goUpdateGlobalEditMenuItems();
 
+    // Smart Form Fill (spike): only on a text input in the top-level document
+    // of an HTTPS page, never on passwords, and only when Smart Window is on
+    // and we are not in a private window.
+    this.showItem(
+      "context-smartformfill",
+      this.onTextInput &&
+        !this.onPassword &&
+        !this.inFrame &&
+        !!this.browser?.currentURI?.schemeIs("https") &&
+        lazy.AIWindow.isAIWindowEnabled() &&
+        !lazy.PrivateBrowsingUtils.isWindowPrivate(this.window)
+    );
+
     this.showItem("context-undo", this.onTextInput);
     this.showItem("context-redo", this.onTextInput);
     this.showItem("context-cut", this.onTextInput);
@@ -1405,6 +1418,13 @@ export class nsContextMenu {
 
   useGeneratedPassword() {
     lazy.LoginManagerContextMenu.useGeneratedPassword(this.targetIdentifier);
+  }
+
+  smartFormFill() {
+    console.log("[SmartFormFill] context menu item clicked");
+    let actor =
+      this.browser.browsingContext.currentWindowGlobal.getActor("SmartFormFill");
+    actor.smartFill(this.targetIdentifier).catch(console.error);
   }
 
   isLoginForm() {

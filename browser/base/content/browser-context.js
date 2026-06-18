@@ -183,6 +183,9 @@ document.addEventListener(
         case "context-reveal-password":
           gContextMenu.toggleRevealPassword();
           break;
+        case "context-smartformfill":
+          gContextMenu.smartFormFill();
+          break;
         case "context-print-selection":
           gContextMenu.printSelection();
           break;

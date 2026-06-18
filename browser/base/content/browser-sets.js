@@ -362,6 +362,24 @@ document.addEventListener(
           SidebarController.toggle("viewHistorySidebar");
           break;
 
+        case "smartFormFillKb": {
+          // Same gates as the context-menu entry: Smart Window on, HTTPS, not
+          // private. Top-document only is implicit (we use the selected tab's
+          // top browsing context, so a focused subframe input is ignored).
+          const browser = gBrowser.selectedBrowser;
+          if (
+            AIWindow.isAIWindowEnabled() &&
+            !PrivateBrowsingUtils.isWindowPrivate(window) &&
+            browser.currentURI?.schemeIs("https")
+          ) {
+            browser.browsingContext.currentWindowGlobal
+              .getActor("SmartFormFill")
+              .smartFillFocused()
+              .catch(console.error);
+          }
+          break;
+        }
+
         case "key_selectTab1":
         case "key_selectTab2":
         case "key_selectTab3":
