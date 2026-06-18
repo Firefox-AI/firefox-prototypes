@@ -266,6 +266,18 @@ let JSWINDOWACTORS = {
     enablePreference: "browser.smartwindow.enabled",
   },
 
+  SmartFormFill: {
+    parent: {
+      esModuleURI:
+        "moz-src:///browser/components/aiwindow/ui/actors/SmartFormFillParent.sys.mjs",
+    },
+    child: {
+      esModuleURI:
+        "moz-src:///browser/components/aiwindow/ui/actors/SmartFormFillChild.sys.mjs",
+    },
+    enablePreference: "browser.smartwindow.enabled",
+  },
+
   BackupUI: {
     parent: {
       esModuleURI: "resource:///actors/BackupUIParent.sys.mjs",
