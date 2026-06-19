@@ -35,6 +35,9 @@ ChromeUtils.defineLazyGetter(lazy, "console", () =>
 // values more; lower it to let the model win more often.
 const CONFIDENCE_THRESHOLD = 0.7;
 
+/**
+ *
+ */
 export class SmartFormFillParent extends JSWindowActorParent {
   /**
    * Entry point invoked from the context menu handler.
@@ -91,10 +94,7 @@ export class SmartFormFillParent extends JSWindowActorParent {
       }
 
       lazy.console.info("Contextual field; asking the model");
-      // Stored value (e.g. a past search) is read on the client and never sent
-      // to the model.
       const storedValue = await this.#readStoredValue(clicked.name);
-      // Show the busy indicator on the field while the model works.
       this.sendAsyncMessage("SmartFormFill:Preview", { targetIdentifier });
 
       const suggestion = await lazy.generateSuggestion({
@@ -103,39 +103,52 @@ export class SmartFormFillParent extends JSWindowActorParent {
         siblingFields: data.siblingFields,
       });
 
-      // Arbiter: prefer a confident LLM value, otherwise fall back to the stored
-      // value, otherwise fill nothing.
       const confidence = suggestion?.confidence ?? 0;
       lazy.console.info(
         `arbiter: llm=${JSON.stringify(suggestion?.value)} confidence=${confidence} threshold=${CONFIDENCE_THRESHOLD} stored=${JSON.stringify(storedValue)}`
       );
 
-      let chosen = null;
-      if (suggestion?.value && confidence >= CONFIDENCE_THRESHOLD) {
-        chosen = { value: suggestion.value, source: "llm" };
+      const llmValue = suggestion?.value || null;
+      const llmAlts = suggestion?.alternatives || [];
+      let topValue = null;
+      let topSource = null;
+      let alts = [];
+      if (llmValue) {
+        topValue = llmValue;
+        topSource = "llm";
+        alts = llmAlts.filter(a => a && a !== llmValue).slice(0, 2);
+        if (
+          storedValue &&
+          storedValue !== llmValue &&
+          alts.length < 2 &&
+          !alts.includes(storedValue)
+        ) {
+          alts.push(storedValue);
+        }
       } else if (storedValue) {
-        chosen = { value: storedValue, source: "stored" };
+        topValue = storedValue;
+        topSource = "stored";
       }
+      alts = alts.filter(Boolean).slice(0, 2);
 
-      if (!chosen) {
-        lazy.console.warn("arbiter: no value chosen");
+      if (!topValue) {
         this.sendAsyncMessage("SmartFormFill:ClearPreview", {
           targetIdentifier,
         });
         return { status: "no-value", suggestion };
       }
 
-      lazy.console.info(`arbiter: chose ${chosen.source} -> "${chosen.value}"`);
       const filled = await this.sendQuery("SmartFormFill:Fill", {
         targetIdentifier,
-        value: chosen.value,
+        value: topValue,
       });
-
-      lazy.console.info(`Fill ${filled ? "succeeded" : "failed"}`);
       return {
         status: filled ? "filled" : "fill-failed",
-        source: chosen.source,
+        value: topValue,
+        source: topSource,
         suggestion,
+        targetIdentifier,
+        alternatives: alts,
       };
     } catch (e) {
       lazy.console.error("smartFill failed", e);
@@ -168,5 +181,22 @@ export class SmartFormFillParent extends JSWindowActorParent {
       lazy.console.warn("readStoredValue failed", e);
       return null;
     }
+  }
+
+  async applyFill(targetIdentifier, value) {
+    try {
+      const filled = await this.sendQuery("SmartFormFill:Fill", {
+        targetIdentifier,
+        value,
+      });
+      return { status: filled ? "filled" : "fill-failed", value };
+    } catch (e) {
+      this.sendAsyncMessage("SmartFormFill:ClearPreview", { targetIdentifier });
+      return { status: "error" };
+    }
+  }
+
+  clearPreview(targetIdentifier) {
+    this.sendAsyncMessage("SmartFormFill:ClearPreview", { targetIdentifier });
   }
 }

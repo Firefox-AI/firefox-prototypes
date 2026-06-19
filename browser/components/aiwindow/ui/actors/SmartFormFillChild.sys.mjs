@@ -32,8 +32,8 @@ ChromeUtils.defineLazyGetter(lazy, "console", () =>
   })
 );
 
-// Ghost text shown via the autofill preview state while the model is working.
-const BUSY_PREVIEW_TEXT = "Smart filling…";
+// Ghost text shown via the autofill preview state while waiting for the model.
+const BUSY_PREVIEW_TEXT = "Asking AI…";
 
 // Only these text input types are eligible. Identity-by-type inputs (email,
 // tel), passwords, textareas, and non-text controls (checkbox, date, file, etc.)
@@ -47,6 +47,9 @@ function isFillable(element) {
   );
 }
 
+/**
+ *
+ */
 export class SmartFormFillChild extends JSWindowActorChild {
   async receiveMessage(message) {
     switch (message.name) {
@@ -90,7 +93,7 @@ export class SmartFormFillChild extends JSWindowActorChild {
     return {
       fieldName,
       category: fieldName
-        ? lazy.FormAutofillUtils.getCategoryFromFieldName(fieldName) ?? null
+        ? (lazy.FormAutofillUtils.getCategoryFromFieldName(fieldName) ?? null)
         : null,
       inputType: element?.type ?? "",
       name: element?.name || element?.id || "",
@@ -126,7 +129,10 @@ export class SmartFormFillChild extends JSWindowActorChild {
     }
 
     const formLike = lazy.AutofillFormFactory.createFromField(element);
-    const fieldDetails = lazy.FormAutofillHeuristics.getFormInfo(formLike, true);
+    const fieldDetails = lazy.FormAutofillHeuristics.getFormInfo(
+      formLike,
+      true
+    );
     lazy.console.info(
       `classify: ${fieldDetails.length} fields in form; clicked type=${element.type} name=${element.name || element.id}`
     );

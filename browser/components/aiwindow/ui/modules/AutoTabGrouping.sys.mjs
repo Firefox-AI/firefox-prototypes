@@ -325,8 +325,12 @@ export const AutoTabGrouping = {
 
     const title = doc.createElementNS(HTML_NS, "h1");
     title.className = "panel-header";
-    doc.l10n.setAttributes(title, "tab-group-editor-title-suggest");
+    title.textContent = "Review AI-suggested groups";
     body.appendChild(title);
+
+    const hint = doc.createElementNS(HTML_NS, "div");
+    hint.textContent = "Rename groups or uncheck tabs before creating";
+    body.appendChild(hint);
 
     // Per-proposal mutable state: the name field plus the still-selected tabs.
     const groupState = [];

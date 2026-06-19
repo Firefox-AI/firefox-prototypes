@@ -60,21 +60,24 @@ type, and max length), the other fields on the form for context, a list of the
 user's currently open browser tabs, and a list of saved memories about the user.
 
 First classify the page as one of: "travel", "registration", "product_search",
-or "other". Then propose the single best value for the target field, inferred
-from the open tabs, the memories, and the page itself.
+or "other". Propose the single best value for the target field. Also list up to 2
+alternatives from options you considered (including lower-confidence or tentative
+ones for variety).
+
+Alternatives should add diversity (different items/phrasings from the tabs or
+memories) even if lower confidence than the main value.
 
 Rules:
-- NEVER invent personal identity data (real names, emails, addresses, phone
-  numbers, payment details). If the field needs that, return an empty value.
-- Prefer values grounded in the open tabs or saved memories (a destination being
-  researched, a product being shopped for, a likely search query).
-- Respect the field's max length when provided.
-- If you are not reasonably confident, return an empty value with low confidence.
-- In "reasoning", list every open tab you were given (by title) and say in a few
-  words why you used or ignored each one. This must reflect ALL tabs provided.
+- NEVER invent personal identity data. Empty main value if needed for identity
+  (alternatives can be empty).
+- Ground values in the provided open tabs and memories.
+- Respect max length.
+- Main value: low confidence -> empty value. Alternatives: include considered
+  varied options.
+- Reasoning must cover every tab.
 
 Respond with ONLY a JSON object, no prose, no code fences:
-{"pageType": "...", "value": "...", "confidence": 0.0, "reasoning": "..."}`;
+{"pageType": "...", "value": "...", "confidence": 0.0, "alternatives": ["...", "..."], "reasoning": "..."}`;
 
 /**
  * Collect open tabs as lightweight, sanitized context.
@@ -141,10 +144,17 @@ function parseSuggestion(raw) {
     if (typeof parsed.value !== "string") {
       return null;
     }
+    const alts = Array.isArray(parsed.alternatives)
+      ? parsed.alternatives
+          .map(v => String(v).slice(0, MAX_VALUE_LENGTH))
+          .filter(Boolean)
+          .slice(0, 2)
+      : [];
     return {
       pageType: String(parsed.pageType ?? "other"),
       value: parsed.value.slice(0, MAX_VALUE_LENGTH),
       confidence: Number(parsed.confidence) || 0,
+      alternatives: alts,
       reasoning: String(parsed.reasoning ?? ""),
     };
   } catch (e) {

@@ -357,18 +357,67 @@ document.addEventListener(
           break;
 
         case "smartFormFillKb": {
-          // Same gates as the context-menu entry: Smart Window on, HTTPS, not
-          // private. Top-document only is implicit (we use the selected tab's
-          // top browsing context, so a focused subframe input is ignored).
           const browser = gBrowser.selectedBrowser;
           if (
             AIWindow.isAIWindowEnabled() &&
             !PrivateBrowsingUtils.isWindowPrivate(window) &&
             browser.currentURI?.schemeIs("https")
           ) {
-            browser.browsingContext.currentWindowGlobal
-              .getActor("SmartFormFill")
+            const actor =
+              browser.browsingContext.currentWindowGlobal.getActor(
+                "SmartFormFill"
+              );
+            actor
               .smartFillFocused()
+              .then(r => {
+                const box = window.gNotificationBox || gNotificationBox;
+                if (!box) {
+                  return;
+                }
+                const existing =
+                  box.getNotificationWithValue("smartformfill-demo");
+                if (existing) {
+                  existing.close();
+                }
+                let label = "Smart Form Fill";
+                const buttons = [];
+                if (r?.status === "filled") {
+                  label = `Filled with “${r.value || ""}”`;
+                  const alts = r.alternatives || [];
+                  for (const alt of alts) {
+                    buttons.push({
+                      label: `Use “${alt}”`,
+                      callback: () => {
+                        const n =
+                          box.getNotificationWithValue("smartformfill-demo");
+                        if (n) {
+                          n.close();
+                        }
+                        actor
+                          .applyFill(r.targetIdentifier, alt)
+                          .catch(() => {});
+                        return false;
+                      },
+                    });
+                  }
+                } else if (r?.status === "no-value") {
+                  label = "No good value from AI or history";
+                } else if (r?.status === "deferred-identity") {
+                  label = "Letting normal autofill handle this";
+                }
+                const notif = box.appendNotification(
+                  "smartformfill-demo",
+                  { label, priority: box.PRIORITY_INFO_MEDIUM },
+                  buttons
+                );
+                if (!buttons.length) {
+                  setTimeout(() => {
+                    try {
+                      notif.close();
+                    } catch {}
+                  }, 4500);
+                }
+              })
               .catch(console.error);
           }
           break;

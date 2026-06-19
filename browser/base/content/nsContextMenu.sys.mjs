@@ -1401,9 +1401,66 @@ export class nsContextMenu {
 
   smartFormFill() {
     console.log("[SmartFormFill] context menu item clicked");
-    let actor =
-      this.browser.browsingContext.currentWindowGlobal.getActor("SmartFormFill");
-    actor.smartFill(this.targetIdentifier).catch(console.error);
+    const actor =
+      this.browser.browsingContext.currentWindowGlobal.getActor(
+        "SmartFormFill"
+      );
+    actor
+      .smartFill(this.targetIdentifier)
+      .then(r => this.#showSmartFormFillResult(r, actor))
+      .catch(console.error);
+  }
+
+  #showSmartFormFillResult(result, actor) {
+    const box =
+      this.window.gNotificationBox ||
+      this.window.gBrowser?.ownerGlobal?.gNotificationBox;
+    if (!box) {
+      return;
+    }
+    const existing = box.getNotificationWithValue("smartformfill-demo");
+    if (existing) {
+      existing.close();
+    }
+    let label = "Smart Form Fill";
+    const buttons = [];
+    if (result?.status === "filled") {
+      label = `Filled with “${result.value || ""}”`;
+      const alts = result.alternatives || [];
+      for (const alt of alts) {
+        buttons.push({
+          label: `Use “${alt}”`,
+          callback: () => {
+            const n = box.getNotificationWithValue("smartformfill-demo");
+            if (n) {
+              n.close();
+            }
+            if (actor && result.targetIdentifier) {
+              actor.applyFill(result.targetIdentifier, alt).catch(() => {});
+            }
+            return false;
+          },
+        });
+      }
+    } else if (result?.status === "no-value") {
+      label = "No good value from AI or history";
+    } else if (result?.status === "deferred-identity") {
+      label = "Letting normal autofill handle this";
+    } else if (result?.status === "skipped-creditcard") {
+      label = "Smart Form Fill skipped for card field";
+    }
+    const notif = box.appendNotification(
+      "smartformfill-demo",
+      { label, priority: box.PRIORITY_INFO_MEDIUM },
+      buttons
+    );
+    if (!buttons.length) {
+      setTimeout(() => {
+        try {
+          notif.close();
+        } catch {}
+      }, 4500);
+    }
   }
 
   isLoginForm() {
