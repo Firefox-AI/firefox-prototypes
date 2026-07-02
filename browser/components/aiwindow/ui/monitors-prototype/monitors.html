@@ -1,0 +1,919 @@
+<!doctype html>
+<html lang="en" class="ai-window">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>Monitors — Smart Window prototype</title>
+<style>
+/* ============================================================
+   MONITORS — Smart Window prototype
+   Tokens are the real Nova values from
+   toolkit/themes/shared/design-system/dist/tokens-shared.css
+   (the browser.nova.enabled layer), plus the Smart Window brand
+   tokens from ai-window-shared.css / ai-window-content.css.
+   Nothing here is derived from the Den / agent-surface concepts.
+   ============================================================ */
+:root {
+  color-scheme: light dark;
+
+  /* ---- Acorn primitives (Nova values, verbatim) ---- */
+  --color-white: #ffffff;
+  --color-gray-0: #fcfbff; --color-gray-05: #f7f6fb; --color-gray-10: #efedf2;
+  --color-gray-15: #e3e2e7; --color-gray-20: #d6d5da; --color-gray-30: #b7b6ba;
+  --color-gray-50: #67666a; --color-gray-55: #515054; --color-gray-60: #3f3e42;
+  --color-gray-70: #252428; --color-gray-80: #171519; --color-gray-85: #131215;
+  --color-violet-0: #f5ecff; --color-violet-10: #eaddff; --color-violet-20: #d4c1ff;
+  --color-violet-30: #b89cff; --color-violet-40: #9871ff; --color-violet-50: #764edd;
+  --color-violet-60: #5939a8; --color-violet-70: #3e2976; --color-violet-90: #161423;
+  --color-violet-desaturated-0: #f2f0f8; --color-violet-desaturated-10: #e7e1f8;
+  --color-violet-desaturated-50: #75669f; --color-violet-desaturated-90: #180e30;
+  --color-green-10: #c4f1e0; --color-green-20: #90e3c6; --color-green-40: #11ae84;
+  --color-green-50: #008865; --color-green-70: #004933;
+  --color-red-10: #ffd9df; --color-red-20: #ffb6bf; --color-red-50: #c52d4f; --color-red-70: #69172d;
+  --color-yellow-10: #fde8b5; --color-yellow-20: #fbcc77; --color-yellow-50: #b26100; --color-yellow-70: #5f3100;
+
+  /* ---- Semantic tokens (Nova) ---- */
+  --background-color-canvas: light-dark(var(--color-gray-05), var(--color-gray-85));
+  --background-color-box: light-dark(var(--color-white), var(--color-gray-70));
+  --background-color-box-info: light-dark(var(--color-gray-15), var(--color-gray-60));
+  --background-color-success: light-dark(var(--color-green-10), var(--color-green-70));
+  --background-color-warning: light-dark(var(--color-yellow-10), var(--color-yellow-70));
+  --background-color-critical: light-dark(var(--color-red-10), var(--color-red-70));
+  --border-color: light-dark(var(--color-gray-30), var(--color-gray-50));
+  --border-color-deemphasized: light-dark(var(--color-gray-20), var(--color-gray-60));
+  --text-color: light-dark(var(--color-violet-desaturated-90), var(--color-violet-desaturated-0));
+  --text-color-deemphasized: light-dark(rgba(20, 9, 43, .7), rgba(242, 240, 248, .7));
+  --text-color-error: light-dark(var(--color-red-50), var(--color-red-20));
+  --text-color-success: light-dark(var(--color-green-50), var(--color-green-20));
+  --text-color-warning: light-dark(var(--color-yellow-50), var(--color-yellow-20));
+  --color-accent-primary: light-dark(var(--color-violet-50), var(--color-violet-20));
+  --color-accent-primary-hover: light-dark(var(--color-violet-60), var(--color-violet-30));
+  --icon-color-warning: light-dark(var(--color-yellow-50), var(--color-yellow-20));
+  --icon-color-success: light-dark(var(--color-green-50), var(--color-green-20));
+
+  /* box-shadow (Nova lighter layers) */
+  --box-shadow-color-lighter-layer-1: light-dark(rgba(0,0,0,.02), rgba(0,0,0,.06));
+  --box-shadow-color-lighter-layer-2: light-dark(rgba(0,0,0,.04), rgba(0,0,0,.12));
+  --box-shadow-level-2: 0 .25px .75px var(--box-shadow-color-lighter-layer-1), 0 2px 6px var(--box-shadow-color-lighter-layer-2);
+  --box-shadow-level-4: 0 8px 28px light-dark(rgba(0,0,0,.18), rgba(0,0,0,.5));
+  --card-box-shadow: var(--box-shadow-level-2);
+
+  /* radius / space / size / type */
+  --border-radius-small: 4px; --border-radius-medium: 8px; --border-radius-large: 12px;
+  --border-radius-xlarge: 16px; --border-radius-xxlarge: 24px; --border-radius-circle: 9999px;
+  --space-xxsmall: 2px; --space-xsmall: 4px; --space-small: 8px; --space-medium: 12px;
+  --space-large: 16px; --space-xlarge: 24px; --space-xxlarge: 32px;
+  --size-item-small: 16px; --size-item-medium: 24px; --size-item-large: 32px; --size-item-xlarge: 48px;
+  --font-size-small: 13px; --font-size-root: 15px; --font-size-large: 17px; --font-size-xlarge: 22px;
+  --font-size-heading-medium: var(--font-size-large); --font-size-heading-large: var(--font-size-xlarge);
+  --font-weight-semibold: 600; --font-weight-bold: 700;
+  --page-main-content-width: 664px;
+
+  --focus-outline-color: var(--color-accent-primary);
+  --focus-outline: 2px solid var(--focus-outline-color);
+
+  /* ---- Smart Window brand (ai-window-shared / ai-window-content) ---- */
+  --smartwindow-text-color-accent-primary: light-dark(var(--color-violet-60), var(--color-violet-30));
+  --smartwindow-icon-color-accent: light-dark(var(--color-violet-50), var(--color-violet-20));
+  --smartwindow-border-color-gradient: linear-gradient(117deg, #321bfd -17.87%, #cf30e2 52.93%, #f90 89.02%, #f5c451 109.44%);
+  --aiwindow-gradient-button: light-dark(linear-gradient(97deg, #8341ca -31.39%, #656fff 90.52%), linear-gradient(64deg, #4e2e9d -5.71%, #c1a9ff 122.83%));
+
+  /* Motion (reduced-motion respected below) */
+  --motion-dur-near: 200ms; --motion-dur-soft: 360ms;
+  --motion-ease-edge: cubic-bezier(.2, 0, 0, 1);
+  --motion-ease-reach: cubic-bezier(.16, 1, .3, 1);
+}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font: var(--font-size-root)/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--text-color);
+  background: light-dark(#e6e4ee, #0d0c10);
+  display: grid; place-items: center; min-height: 100vh; padding: 24px 24px 92px;
+}
+:where(button) { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+:where(button, a, input, [tabindex]):focus-visible { outline: var(--focus-outline); outline-offset: 2px; border-radius: var(--border-radius-small); }
+h1,h2,h3,h4,p { margin: 0; }
+.heading-large { font-size: var(--font-size-heading-large); font-weight: var(--font-weight-bold); }
+.heading-medium { font-size: var(--font-size-heading-medium); font-weight: var(--font-weight-semibold); }
+.deemphasized { color: var(--text-color-deemphasized); }
+.small { font-size: var(--font-size-small); }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ============ Firefox chrome shell ============ */
+.browser {
+  width: 1280px; height: 820px; max-width: 100%;
+  background: var(--background-color-canvas);
+  border-radius: var(--border-radius-large);
+  box-shadow: var(--box-shadow-level-4);
+  display: flex; flex-direction: column; overflow: hidden;
+  border: 1px solid var(--border-color-deemphasized);
+  position: relative;
+}
+.tabstrip { display: flex; align-items: center; gap: var(--space-xsmall); padding: var(--space-small) var(--space-medium) 0; background: light-dark(var(--color-gray-10), #0d0c10); }
+.traffic { display: flex; gap: 6px; margin-right: var(--space-medium); }
+.traffic span { width: 11px; height: 11px; border-radius: 50%; background: light-dark(var(--color-gray-30), var(--color-gray-55)); }
+.tab {
+  display: flex; align-items: center; gap: var(--space-small);
+  padding: 7px var(--space-medium); max-width: 240px; min-width: 130px;
+  border-radius: var(--border-radius-medium) var(--border-radius-medium) 0 0;
+  font-size: var(--font-size-small); color: var(--text-color-deemphasized); position: relative;
+}
+.tab.active { background: var(--background-color-canvas); color: var(--text-color); }
+.tab .favicon { width: 15px; height: 15px; border-radius: 3px; flex: none; display: grid; place-items: center; font-size: 9px; color: #fff; }
+.tab .favicon.sw { background: none; }
+.tab-badge { position: absolute; top: 4px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--smartwindow-text-color-accent-primary); }
+
+/* Tab group — one accent, reads as one thing */
+.tabgroup { display: flex; align-items: center; gap: 2px; padding: 0 6px 0 4px; margin-right: 2px; border-radius: var(--border-radius-medium) var(--border-radius-medium) 0 0; background: light-dark(rgba(117,66,229,.12), rgba(196,162,255,.14)); }
+.tabgroup .tg-dot { width: 9px; height: 9px; border-radius: 3px; background: var(--smartwindow-text-color-accent-primary); flex: none; margin-left: 4px; }
+.tabgroup .tg-label { align-self: center; font-size: 11px; font-weight: var(--font-weight-semibold); color: var(--smartwindow-text-color-accent-primary); padding: 0 6px 0 4px; white-space: nowrap; }
+
+.toolbar { display: flex; align-items: center; gap: var(--space-small); padding: var(--space-small) var(--space-medium); background: var(--background-color-canvas); border-bottom: 1px solid var(--border-color-deemphasized); }
+.nav-btn { width: 32px; height: 32px; border-radius: var(--border-radius-medium); display: grid; place-items: center; color: var(--text-color-deemphasized); flex: none; }
+.nav-btn:hover { background: var(--background-color-box-info); }
+.nav-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.urlbar { flex: 1; display: flex; align-items: center; gap: var(--space-small); height: 36px; padding: 0 var(--space-small) 0 var(--space-medium); background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-circle); font-size: var(--font-size-small); }
+.urlbar .lock { color: var(--text-color-deemphasized); flex: none; display: grid; }
+.urlbar .address { flex: 1; color: var(--text-color); }
+.urlbar .address .domain { font-weight: var(--font-weight-semibold); }
+.urlbar .address .internal { color: var(--smartwindow-text-color-accent-primary); font-weight: var(--font-weight-semibold); }
+.page-action { width: 28px; height: 28px; border-radius: var(--border-radius-medium); display: grid; place-items: center; color: var(--text-color-deemphasized); flex: none; position: relative; }
+.page-action:hover { background: var(--background-color-box-info); }
+.page-action svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.page-action.attn { color: var(--smartwindow-icon-color-accent); }
+.page-action .dot { position: absolute; top: 2px; right: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--icon-color-success); border: 1.5px solid var(--background-color-box); }
+.sw-toggle { color: var(--smartwindow-icon-color-accent); }
+.content-row { flex: 1; display: flex; min-height: 0; position: relative; }
+.stage { flex: 1; min-width: 0; overflow: auto; position: relative; background: var(--background-color-canvas); }
+
+/* ============ Mock product page ============ */
+.site { min-height: 100%; background: light-dark(#ffffff, #1b1a1e); }
+.site-header { display: flex; align-items: center; gap: var(--space-large); padding: var(--space-large) var(--space-xxlarge); border-bottom: 1px solid var(--border-color-deemphasized); }
+.site-logo { font-weight: var(--font-weight-bold); font-size: 18px; }
+.product { display: flex; gap: var(--space-xxlarge); padding: var(--space-xxlarge); align-items: flex-start; }
+.product-img { width: 300px; height: 300px; flex: none; border-radius: var(--border-radius-large); background: radial-gradient(120% 120% at 30% 20%, light-dark(#efe9ff,#2c2740), transparent 60%), light-dark(var(--color-gray-10), var(--color-gray-70)); display: grid; place-items: center; color: var(--text-color-deemphasized); border: 1px solid var(--border-color-deemphasized); }
+.product-img svg { width: 120px; height: 120px; opacity: .5; }
+.product-info { max-width: 420px; }
+.product-brand { color: var(--text-color-deemphasized); font-size: var(--font-size-small); text-transform: uppercase; letter-spacing: .04em; }
+.product-title { font-size: 26px; font-weight: var(--font-weight-bold); margin: 4px 0 var(--space-medium); }
+.product-price { font-size: 34px; font-weight: var(--font-weight-bold); }
+.product-was { color: var(--text-color-deemphasized); text-decoration: line-through; margin-left: var(--space-small); font-size: 18px; font-weight: 400; }
+.product-stock { display: inline-flex; align-items: center; gap: 6px; color: var(--text-color-success); font-size: var(--font-size-small); margin-top: var(--space-small); }
+.product-buy { margin-top: var(--space-large); display: flex; gap: var(--space-medium); }
+.product-meta { margin-top: var(--space-xlarge); color: var(--text-color-deemphasized); font-size: var(--font-size-small); line-height: 1.7; }
+
+/* Buttons (moz-button-like) */
+.btn-primary { background: var(--color-accent-primary); color: light-dark(var(--color-white), var(--color-gray-70)); padding: 8px var(--space-large); border-radius: var(--border-radius-circle); font-weight: var(--font-weight-semibold); font-size: var(--font-size-small); }
+.btn-primary.lg { padding: 11px 22px; font-size: var(--font-size-root); }
+.btn-primary:hover { background: var(--color-accent-primary-hover); }
+.btn-ghost { padding: 8px var(--space-large); border-radius: var(--border-radius-circle); font-weight: var(--font-weight-semibold); font-size: var(--font-size-small); color: var(--text-color); border: 1px solid var(--border-color); }
+.btn-ghost:hover { background: var(--background-color-box-info); }
+
+/* ============ about:monitors — its own in-content surface ============ */
+.aboutpage { min-height: 100%; background: var(--background-color-canvas); padding: 56px 24px 72px; }
+.aboutpage-inner { max-width: var(--page-main-content-width); margin: 0 auto; }
+.about-head { display: flex; align-items: center; gap: var(--space-medium); margin-bottom: var(--space-large); }
+.about-head .brandmark { width: 30px; height: 30px; border-radius: var(--border-radius-medium); background: var(--smartwindow-border-color-gradient); display: grid; place-items: center; flex: none; }
+.about-head .title { font-size: 28px; font-weight: var(--font-weight-bold); }
+.about-head .spacer { flex: 1; }
+
+.banner { display: flex; align-items: center; gap: var(--space-small); padding: var(--space-small) var(--space-medium); margin-bottom: var(--space-xlarge); border-radius: var(--border-radius-medium); background: var(--background-color-box-info); color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
+.banner svg { width: 15px; height: 15px; flex: none; }
+.banner .accent-link { margin-left: auto; }
+.accent-link { color: var(--color-accent-primary); font-weight: var(--font-weight-semibold); font-size: var(--font-size-small); }
+
+.group-label { font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--text-color-deemphasized); text-transform: uppercase; letter-spacing: .04em; margin: var(--space-large) 0 var(--space-small); }
+
+/* Glance row */
+.grow { display: flex; align-items: center; gap: var(--space-medium); padding: var(--space-medium) var(--space-large); background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); margin-bottom: var(--space-small); width: 100%; text-align: left; transition: border-color var(--motion-dur-near) var(--motion-ease-edge), box-shadow var(--motion-dur-near) var(--motion-ease-edge); }
+.grow:hover { border-color: var(--border-color); box-shadow: var(--box-shadow-level-2); }
+.grow .gmain { min-width: 0; flex: 1; }
+.grow .gname { font-weight: var(--font-weight-semibold); }
+.grow .gmeta { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
+.grow .gvalue { text-align: right; flex: none; }
+.grow .gvalue .now { font-weight: var(--font-weight-bold); font-size: var(--font-size-heading-medium); }
+.grow .gvalue .sub { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
+.grow.paused { opacity: .72; }
+.dot-status { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.dot-status.active { background: var(--icon-color-success); }
+.dot-status.paused { background: var(--border-color); }
+.favicon-sq { width: 26px; height: 26px; border-radius: var(--border-radius-small); flex: none; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 12px; }
+
+.flag-attn { display: inline-flex; align-items: center; gap: 6px; color: var(--text-color-warning); background: var(--background-color-warning); padding: 3px 10px; border-radius: var(--border-radius-circle); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); }
+.flag-attn svg { width: 13px; height: 13px; fill: none; stroke: var(--icon-color-warning); stroke-width: 2; }
+.grow.attn { border-color: var(--icon-color-warning); }
+.trend { font-weight: var(--font-weight-semibold); }
+.trend.down { color: var(--text-color-success); }
+.trend.up { color: var(--text-color-error); }
+
+/* Starter / templates grid (always under the running + paused monitors) */
+.empty-lead { text-align: center; margin-bottom: var(--space-xlarge); }
+.empty-lead h3 { font-size: var(--font-size-heading-large); font-weight: var(--font-weight-bold); margin-bottom: 4px; }
+.empty-lead p { color: var(--text-color-deemphasized); }
+.starter-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-medium); }
+.starter { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; padding: var(--space-large); background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); text-align: left; transition: border-color var(--motion-dur-near) var(--motion-ease-edge); }
+.starter:hover { border-color: var(--color-accent-primary); }
+.starter .ic { width: 30px; height: 30px; border-radius: var(--border-radius-medium); background: var(--background-color-box-info); display: grid; place-items: center; color: var(--smartwindow-icon-color-accent); }
+.starter .ic svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.starter .st-name { font-weight: var(--font-weight-semibold); font-size: var(--font-size-small); }
+.starter .st-desc { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
+
+/* Loading skeleton */
+.skel { background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); padding: var(--space-medium) var(--space-large); margin-bottom: var(--space-small); display: flex; align-items: center; gap: var(--space-medium); }
+.sk { background: light-dark(var(--color-gray-10), var(--color-gray-60)); border-radius: var(--border-radius-small); animation: shimmer 1.4s ease-in-out infinite; }
+.sk.circle { width: 26px; height: 26px; flex: none; }
+.sk.line { height: 11px; }
+@keyframes shimmer { 50% { opacity: .45; } }
+
+/* ============ The monitor card — one component, three homes ============ */
+.mcard { background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); padding: var(--space-large); display: flex; flex-direction: column; gap: var(--space-medium); }
+.mcard.pinned { box-shadow: var(--card-box-shadow); }
+.mcard-head { display: flex; align-items: center; gap: var(--space-small); }
+.mcard-name { font-weight: var(--font-weight-semibold); }
+.mcard-url { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
+.mcard-head .spacer { flex: 1; }
+.mvalue { display: flex; align-items: baseline; gap: var(--space-small); flex-wrap: wrap; }
+.mvalue .now { font-size: 30px; font-weight: var(--font-weight-bold); line-height: 1; }
+.mvalue .from { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
+.value-good { background: var(--background-color-success); border-radius: var(--border-radius-medium); padding: var(--space-medium) var(--space-large); display: inline-flex; align-items: baseline; gap: var(--space-small); flex-wrap: wrap; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-label { font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--text-color-deemphasized); }
+.field-input { border: 1px solid var(--border-color); border-radius: var(--border-radius-medium); padding: 9px var(--space-medium); background: var(--background-color-box); font-size: var(--font-size-small); color: var(--text-color); width: 100%; }
+.field-input:focus-visible { outline: var(--focus-outline); outline-offset: 1px; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px var(--space-medium); border: 1px solid var(--border-color); border-radius: var(--border-radius-circle); font-size: var(--font-size-small); color: var(--text-color); background: var(--background-color-box); }
+.chip:hover { border-color: var(--color-accent-primary); color: var(--color-accent-primary); }
+.chip.selected { border-color: var(--color-accent-primary); background: light-dark(var(--color-violet-0), rgba(118,78,221,.28)); color: var(--color-accent-primary); }
+.page-pill { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 5px var(--space-small) 5px 6px; border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-circle); background: var(--background-color-box-info); font-size: var(--font-size-small); }
+.page-pill .fav { width: 15px; height: 15px; border-radius: 3px; flex: none; display: grid; place-items: center; color: #fff; font-size: 8px; font-weight: 700; }
+.page-pill .x { color: var(--text-color-deemphasized); }
+.segmented { display: inline-flex; border: 1px solid var(--border-color); border-radius: var(--border-radius-medium); overflow: hidden; }
+.segmented button { padding: 6px var(--space-medium); font-size: var(--font-size-small); color: var(--text-color-deemphasized); }
+.segmented button[aria-pressed="true"] { background: var(--background-color-box-info); color: var(--text-color); font-weight: var(--font-weight-semibold); }
+.segmented button + button { border-left: 1px solid var(--border-color); }
+.mrow { display: flex; align-items: center; gap: var(--space-small); font-size: var(--font-size-small); }
+.mrow .lbl { color: var(--text-color-deemphasized); min-width: 92px; }
+.mrow .val { color: var(--text-color); }
+.mrow .spacer { flex: 1; }
+.switch { position: relative; width: 38px; height: 22px; flex: none; }
+.switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.switch .track { position: absolute; inset: 0; background: var(--border-color); border-radius: var(--border-radius-circle); transition: background var(--motion-dur-near) var(--motion-ease-edge); }
+.switch .thumb { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform var(--motion-dur-near) var(--motion-ease-edge); box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.switch input:checked + .track { background: var(--color-accent-primary); }
+.switch input:checked + .track + .thumb { transform: translateX(16px); }
+.switch input:focus-visible + .track { outline: var(--focus-outline); outline-offset: 2px; }
+.mcard-actions { display: flex; align-items: center; gap: var(--space-small); }
+.mcard-actions .spacer { flex: 1; }
+.mono-dim { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
+
+/* Destructive button (guarded delete) */
+.btn-danger { color: var(--text-color-error); border: 1px solid var(--border-color); padding: 8px var(--space-large); border-radius: var(--border-radius-circle); font-weight: var(--font-weight-semibold); font-size: var(--font-size-small); display: inline-flex; align-items: center; gap: 6px; }
+.btn-danger svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.btn-danger:hover { background: var(--background-color-critical); border-color: var(--text-color-error); }
+
+/* Overflow menu — Edit / Pause / Delete (the reversible actions, §2) */
+.ovf { position: relative; flex: none; }
+.ovf-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.menu-pop { position: absolute; inset-inline-end: 0; top: calc(100% + 4px); z-index: 40; min-width: 188px; background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-medium); box-shadow: var(--box-shadow-level-4); padding: var(--space-xsmall); display: flex; flex-direction: column; }
+.menu-pop[hidden] { display: none; }
+.menu-pop button { display: flex; align-items: center; gap: var(--space-small); padding: 8px var(--space-small); border-radius: var(--border-radius-small); font-size: var(--font-size-small); text-align: left; color: var(--text-color); }
+.menu-pop button:hover { background: var(--background-color-box-info); }
+.menu-pop button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.menu-pop .destructive { color: var(--text-color-error); }
+.menu-pop hr { border: 0; border-top: 1px solid var(--border-color-deemphasized); margin: var(--space-xsmall) var(--space-xsmall); width: auto; }
+
+/* Undo toast — delete is reversible (§2 guarded exception + undo) */
+.undo-toast { position: absolute; bottom: 76px; left: 50%; transform: translateX(-50%); z-index: 80; display: flex; align-items: center; gap: var(--space-medium); background: light-dark(#180e30, #f2f0f8); color: light-dark(#f2f0f8, #180e30); padding: 10px 12px 10px 16px; border-radius: var(--border-radius-circle); box-shadow: var(--box-shadow-level-4); font-size: var(--font-size-small); animation: toast-in var(--motion-dur-soft) var(--motion-ease-reach) both; }
+.undo-toast[hidden] { display: none; }
+.undo-toast .undo { color: inherit; font-weight: var(--font-weight-semibold); text-decoration: underline; }
+.undo-toast .x { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; color: inherit; opacity: .7; }
+.undo-toast .x:hover { opacity: 1; background: light-dark(rgba(242,240,248,.15), rgba(24,14,48,.1)); }
+.undo-toast .x svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; }
+hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); margin: var(--space-xsmall) 0; width: 100%; }
+
+/* Change history */
+.section-toggle { display: flex; align-items: center; gap: 6px; color: var(--text-color-deemphasized); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); }
+.section-toggle svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; }
+.history { display: flex; flex-direction: column; }
+.hist-item { display: flex; align-items: baseline; gap: var(--space-small); padding: var(--space-small) 0; border-top: 1px solid var(--border-color-deemphasized); font-size: var(--font-size-small); }
+.hist-item .when { color: var(--text-color-deemphasized); min-width: 74px; flex: none; }
+.hist-item .oldv { color: var(--text-color-deemphasized); text-decoration: line-through; }
+.hist-item .newv { font-weight: var(--font-weight-semibold); }
+.hist-item .arrow { color: var(--text-color-deemphasized); }
+.hist-item.low { color: var(--text-color-deemphasized); }
+.hist-badge-low { font-size: 11px; color: var(--text-color-warning); border: 1px solid var(--icon-color-warning); border-radius: var(--border-radius-small); padding: 0 5px; }
+
+/* ============ Smart Window sidebar (real ai-window structure) ============ */
+.sidebar { width: 416px; flex: none; display: flex; flex-direction: column; background: var(--background-color-canvas); border-left: 1px solid var(--border-color-deemphasized); }
+.sw-header { display: flex; align-items: center; gap: var(--space-small); padding: var(--space-medium) var(--space-large); }
+.sw-brand { width: 20px; height: 20px; border-radius: var(--border-radius-small); background: var(--smartwindow-border-color-gradient); flex: none; }
+.sw-title { font-weight: var(--font-weight-semibold); font-size: var(--font-size-small); }
+.sw-header .spacer { flex: 1; }
+.sw-chat { flex: 1; overflow: auto; padding: var(--space-large); display: flex; flex-direction: column; gap: var(--space-medium); }
+
+/* Real chat message classes */
+.message-user { align-self: flex-end; max-width: 85%; background: var(--background-color-box-info); padding: var(--space-small) var(--space-medium); border-radius: var(--border-radius-large); }
+.message-user p { margin: 0; }
+.message-user .cmd-tok { color: var(--smartwindow-text-color-accent-primary); font-weight: var(--font-weight-semibold); }
+.message-assistant { max-width: 100%; color: var(--text-color); }
+.message-assistant a { color: var(--smartwindow-text-color-accent-primary); }
+
+.status-chip { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-size-small); color: var(--text-color-success); background: var(--background-color-success); padding: 3px 10px; border-radius: var(--border-radius-circle); }
+.status-chip .pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pulse 1.8s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+.catchup { display: inline-flex; align-items: center; gap: var(--space-small); padding: var(--space-small) var(--space-medium); background: var(--background-color-box-info); border-radius: var(--border-radius-medium); font-size: var(--font-size-small); color: var(--text-color-deemphasized); align-self: flex-start; }
+.catchup svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+
+/* In-chat monitor card: click to expand, updates live */
+.chatcard { cursor: pointer; }
+.chatcard .chev { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--text-color-deemphasized); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: transform var(--motion-dur-near) var(--motion-ease-edge); }
+.chatcard[aria-expanded="true"] .chev { transform: rotate(180deg); }
+.watch-expand { display: flex; flex-direction: column; gap: var(--space-medium); }
+.watch-expand[hidden] { display: none; }
+@keyframes flashbg { from { background: var(--background-color-success); } to { background: transparent; } }
+.flash { animation: flashbg 1.4s var(--motion-ease-edge); border-radius: var(--border-radius-small); }
+
+/* Slash agent picker (type "/" → Monitor / Scout / Research) */
+.slash-menu { margin: 0 var(--space-large) var(--space-small); background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); box-shadow: var(--box-shadow-level-4); padding: var(--space-xsmall); }
+.slash-head { font-size: 11px; font-weight: var(--font-weight-semibold); color: var(--text-color-deemphasized); text-transform: uppercase; letter-spacing: .04em; padding: 6px var(--space-small) 4px; }
+.agent-item { display: flex; align-items: center; gap: var(--space-medium); width: 100%; padding: var(--space-small); border-radius: var(--border-radius-medium); text-align: left; }
+.agent-item:hover, .agent-item.sel { background: var(--background-color-box-info); }
+.agent-item .ai { width: 30px; height: 30px; border-radius: var(--border-radius-medium); display: grid; place-items: center; flex: none; }
+.agent-item .ai svg { width: 17px; height: 17px; fill: none; stroke: #fff; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.agent-item .an { font-weight: var(--font-weight-semibold); font-size: var(--font-size-small); }
+.agent-item .ad { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
+.agent-item .cmd { margin-left: auto; color: var(--text-color-deemphasized); font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* Smartbar composer — real gradient border + gradient split send (input-cta) */
+.smartbar-wrap { padding: 0 var(--space-large) var(--space-small); }
+.smartbar { border: 1px solid transparent; border-radius: var(--border-radius-xlarge); background: linear-gradient(var(--background-color-box), var(--background-color-box)) padding-box, var(--smartwindow-border-color-gradient) border-box; padding: var(--space-small) var(--space-small) var(--space-small) var(--space-large); display: flex; align-items: center; gap: var(--space-small); box-shadow: var(--box-shadow-level-2); }
+.smartbar .ph { flex: 1; color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
+.smartbar .typed { flex: 1; color: var(--text-color); font-size: var(--font-size-small); }
+.smartbar .typed .caret { display: inline-block; width: 1.5px; height: 1em; background: var(--color-accent-primary); vertical-align: -2px; animation: caret 1s steps(1) infinite; }
+@keyframes caret { 50% { opacity: 0; } }
+.smartbar .mention { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--text-color-deemphasized); flex: none; }
+.smartbar .mention:hover { background: var(--background-color-box-info); }
+.smartbar .mention svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.smartbar .send { width: 34px; height: 30px; border-radius: var(--border-radius-circle); background: var(--aiwindow-gradient-button); color: #fff; display: grid; place-items: center; flex: none; }
+.disclaimer { padding: 0 var(--space-large) var(--space-medium); color: var(--text-color-deemphasized); font-size: 11px; text-align: center; }
+.disclaimer a { color: var(--smartwindow-text-color-accent-primary); }
+
+/* ============ OS notification toast ============ */
+.os-toast { position: absolute; top: 16px; right: 16px; width: 360px; z-index: 60; background: light-dark(rgba(250,250,252,.94), rgba(37,36,40,.96)); backdrop-filter: blur(14px); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-xlarge); box-shadow: var(--box-shadow-level-4); padding: var(--space-medium) var(--space-large); display: flex; gap: var(--space-medium); align-items: flex-start; cursor: pointer; text-align: left; animation: toast-in var(--motion-dur-soft) var(--motion-ease-reach) both; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-16px); } }
+.os-toast .app-icon { width: 34px; height: 34px; border-radius: var(--border-radius-medium); flex: none; background: var(--smartwindow-border-color-gradient); display: grid; place-items: center; color: #fff; }
+
+/* ============ Scenario stepper dock ============ */
+.dock { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; align-items: center; gap: var(--space-medium); background: light-dark(rgba(24,14,48,.94), rgba(242,240,248,.96)); color: light-dark(#f2f0f8, #180e30); padding: var(--space-small) var(--space-medium); border-radius: var(--border-radius-circle); box-shadow: var(--box-shadow-level-4); font-size: var(--font-size-small); }
+.dock button { color: inherit; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; }
+.dock button:hover { background: light-dark(rgba(242,240,248,.15), rgba(24,14,48,.08)); }
+.dock .step-label { min-width: 360px; text-align: center; }
+.dock .step-label .step-num { opacity: .55; margin-right: 8px; }
+.dock .dots { display: flex; gap: 5px; }
+.dock .dots span { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .3; }
+.dock .dots span.on { opacity: 1; }
+.dock .divider { width: 1px; height: 18px; background: currentColor; opacity: .2; }
+.dock .theme-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+
+/* Step visibility — only hide inactive steps; visible keep authored display */
+[data-show]:not(.step-visible) { display: none !important; }
+
+.annot { position: absolute; z-index: 50; background: light-dark(#180e30, #f2f0f8); color: light-dark(#f2f0f8, #180e30); padding: 6px 12px; border-radius: var(--border-radius-medium); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); box-shadow: var(--box-shadow-level-4); max-width: 250px; }
+.annot::before { content: ""; position: absolute; width: 10px; height: 10px; background: inherit; transform: rotate(45deg); }
+.annot.point-right::before { right: -5px; top: 14px; }
+.annot.point-down::before { bottom: -5px; left: 24px; }
+
+.anim-land { animation: land var(--motion-dur-near) var(--motion-ease-edge) both; }
+.anim-reach { animation: reach var(--motion-dur-soft) var(--motion-ease-reach) both; }
+@keyframes land { from { opacity: 0; transform: translateY(8px); } }
+@keyframes reach { from { opacity: 0; transform: translateY(16px); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+</style>
+</head>
+<body>
+
+<div class="browser" id="browser">
+
+  <!-- ===================== Tab strip ===================== -->
+  <div class="tabstrip">
+    <div class="traffic"><span></span><span></span><span></span></div>
+
+    <!-- Product tab -->
+    <div class="tab active" data-show="1 2 3 4 8" style="min-width:190px">
+      <span class="favicon" style="background:#e8663a">S</span>
+      <span class="truncate">Sony WH-1000XM5 — SoundNest</span>
+      <span class="tab-badge" data-show="8"></span>
+    </div>
+
+    <!-- about:monitors tab -->
+    <div class="tab active" data-show="5 6 7" style="min-width:150px">
+      <span class="favicon sw"><svg viewBox="0 0 24 24" width="15" height="15"><rect width="24" height="24" rx="4" fill="url(#g)"/><path d="M5 12h3l2-5 4 10 2-5h3" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="g" x1="0" y1="0" x2="24" y2="24"><stop offset="0" stop-color="#321bfd"/><stop offset=".5" stop-color="#cf30e2"/><stop offset="1" stop-color="#ff9900"/></linearGradient></defs></svg></span>
+      <span class="truncate">about:monitors</span>
+    </div>
+
+    <!-- Tab GROUP — Open page handoff -->
+    <div class="tabgroup" data-show="9">
+      <span class="tg-dot"></span>
+      <span class="tg-label">Sony price watch</span>
+      <div class="tab active" style="min-width:150px"><span class="favicon" style="background:#e8663a">S</span><span class="truncate">Sony WH-1000XM5</span></div>
+      <div class="tab" style="min-width:120px"><span class="favicon" style="background:#3a7ae8">A</span><span class="truncate">AudioDirect</span></div>
+    </div>
+
+    <div class="tab" style="min-width:110px" data-show="1 2 3 4 8 9"><span class="favicon" style="background:#67666a">+</span><span>New Tab</span></div>
+  </div>
+
+  <!-- ===================== Toolbar ===================== -->
+  <div class="toolbar">
+    <div class="nav-btn"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></div>
+    <div class="nav-btn"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+    <div class="nav-btn"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v3h3"/></svg></div>
+
+    <div class="urlbar" data-show="1 2 3 4 8 9">
+      <span class="lock"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+      <span class="address"><span class="domain">soundnest.com</span>/audio/sony-wh-1000xm5</span>
+      <button class="page-action attn" id="pa-monitor" title="Monitor this page" aria-label="Monitor this page">
+        <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        <span class="dot" data-show="4 8 9"></span>
+      </button>
+    </div>
+
+    <div class="urlbar" data-show="5 6 7">
+      <span class="lock"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg></span>
+      <span class="address"><span class="internal">about:monitors</span></span>
+    </div>
+
+    <button class="page-action sw-toggle" title="Smart Window" aria-label="Toggle Smart Window"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>
+  </div>
+
+  <!-- ===================== Content row ===================== -->
+  <div class="content-row">
+    <main class="stage" id="stage">
+
+      <!-- ---------- Product page (create context + notification) ---------- -->
+      <div class="site" data-show="1 2 3 4 8">
+        <div class="site-header"><span class="site-logo">SoundNest</span><span class="deemphasized small">Headphones</span><span class="deemphasized small">Speakers</span><span class="deemphasized small">Deals</span></div>
+        <div class="product">
+          <div class="product-img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="14" width="4" height="7" rx="1.5"/><rect x="17" y="14" width="4" height="7" rx="1.5"/></svg></div>
+          <div class="product-info">
+            <div class="product-brand">Sony</div>
+            <div class="product-title">WH-1000XM5 Wireless Headphones</div>
+            <div class="product-price">$299</div>
+            <div class="product-stock"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> In stock</div>
+            <div class="product-buy"><button class="btn-primary lg">Add to cart</button><button class="btn-ghost">Save for later</button></div>
+            <div class="product-meta">Free returns within 30 days · Ships in 2–3 business days<br/>Price last changed 14 days ago</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- about:monitors ---------- -->
+      <div class="aboutpage" data-show="5 6 7">
+        <div class="aboutpage-inner">
+          <div class="about-head">
+            <span class="brandmark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h4l2-6 4 12 2-6h4"/></svg></span>
+            <span class="title">Monitors</span>
+            <span class="spacer"></span>
+            <button class="btn-primary" id="new-monitor">+ New monitor</button>
+          </div>
+
+          <!-- Empty-state lead (only when there are no monitors) -->
+          <div class="empty-lead" data-show="7"><h3>Watch a page for changes</h3><p>Start from one of these, or open any page and type <b>/monitor</b> in Smart Window.</p></div>
+
+          <!-- Populated: running + paused monitors -->
+          <div data-show="5 6">
+            <div class="banner">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--smartwindow-icon-color-accent)" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+              Checking on-device while Firefox is open. 1 monitor keeps watching in the background.
+              <a class="accent-link" href="#" onclick="return false">Manage background</a>
+            </div>
+
+            <div class="group-label">Active · 3</div>
+
+            <div>
+              <div class="grow" id="row-sony" data-show="5" role="button" tabindex="0" aria-expanded="false">
+                <span class="dot-status active"></span>
+                <span class="favicon-sq" style="background:#e8663a">S</span>
+                <span class="gmain"><span class="gname">Sony WH-1000XM5 price</span><br/><span class="gmeta truncate">soundnest.com · checked 3m ago</span></span>
+                <span class="gvalue"><span class="now">$299</span><br/><span class="sub">watching for a drop</span></span>
+                <span class="ovf">
+                  <button class="page-action ovf-btn" aria-haspopup="menu" aria-expanded="false" title="More" aria-label="Monitor actions"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg></button>
+                  <div class="menu-pop" role="menu" hidden>
+                    <button role="menuitem" data-act="edit-row"><svg viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 5l4 4"/></svg> Edit</button>
+                    <button role="menuitem" data-act="pause"><svg viewBox="0 0 24 24"><rect x="7" y="6" width="3.2" height="12" rx="1"/><rect x="13.8" y="6" width="3.2" height="12" rx="1"/></svg> Pause</button>
+                    <hr/>
+                    <button role="menuitem" class="destructive" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete monitor</button>
+                  </div>
+                </span>
+              </div>
+
+              <div id="card-sony" class="mcard anim-land" data-show="6">
+                <div class="mcard-head">
+                  <span class="favicon-sq" style="background:#e8663a">S</span>
+                  <span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url">soundnest.com/audio/sony-wh-1000xm5</span></span>
+                  <span class="spacer"></span>
+                  <span class="ovf">
+                    <button class="page-action ovf-btn" aria-haspopup="menu" aria-expanded="false" title="More"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg></button>
+                    <div class="menu-pop" role="menu" hidden>
+                      <button role="menuitem" data-act="edit"><svg viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 5l4 4"/></svg> Edit condition</button>
+                      <button role="menuitem" data-act="pause"><svg viewBox="0 0 24 24"><rect x="7" y="6" width="3.2" height="12" rx="1"/><rect x="13.8" y="6" width="3.2" height="12" rx="1"/></svg> Pause</button>
+                      <hr/>
+                      <button role="menuitem" class="destructive" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete monitor</button>
+                    </div>
+                  </span>
+                  <button class="page-action" title="Collapse" id="collapse-sony"><svg viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg></button>
+                </div>
+                <div class="mvalue"><span class="now">$299</span><span class="from">watching for a drop · checked 3m ago</span></div>
+                <div class="field">
+                  <span class="field-label">Alert me when</span>
+                  <input class="field-input" value="the price drops below $270" aria-label="Alert condition" />
+                  <div class="chip-row"><button class="chip">Any drop</button><button class="chip selected">Below $270</button><button class="chip">Below $250</button><button class="chip">Back in stock</button></div>
+                </div>
+                <div class="field">
+                  <span class="field-label">Pages</span>
+                  <div class="chip-row"><span class="page-pill"><span class="fav" style="background:#e8663a">S</span> soundnest.com/…/xm5 <span class="x">×</span></span><button class="chip">+ Add page</button></div>
+                </div>
+                <hr class="rule" />
+                <div class="mrow"><span class="lbl">Check</span><span class="segmented" role="group" aria-label="Check frequency"><button aria-pressed="true">Auto</button><button aria-pressed="false">Hourly</button><button aria-pressed="false">Daily</button></span></div>
+                <div class="mrow"><span class="lbl">Notify</span><span class="val">Desktop notification</span></div>
+                <div class="mrow"><span class="lbl">Background</span><span class="val">Check while Firefox is closed</span><span class="spacer"></span><label class="switch"><input type="checkbox" aria-label="Check in background" /><span class="track"></span><span class="thumb"></span></label></div>
+                <div class="mcard-actions"><button class="btn-danger" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete</button><button class="btn-ghost">Pause</button><span class="spacer"></span><span class="mono-dim">Saved automatically</span></div>
+              </div>
+            </div>
+
+            <div class="grow attn" role="button" tabindex="0">
+              <span class="dot-status active"></span>
+              <span class="favicon-sq" style="background:#2f855a">R</span>
+              <span class="gmain"><span class="gname">REI Danner hiking boots</span><br/><span class="gmeta truncate">rei.com · the page layout changed</span></span>
+              <span class="gvalue"><span class="flag-attn"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg> Needs a look</span></span>
+              <span class="ovf">
+                <button class="page-action ovf-btn" aria-haspopup="menu" aria-expanded="false" title="More" aria-label="Monitor actions"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg></button>
+                <div class="menu-pop" role="menu" hidden>
+                  <button role="menuitem" data-act="edit-row"><svg viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 5l4 4"/></svg> Edit</button>
+                  <button role="menuitem" data-act="pause"><svg viewBox="0 0 24 24"><rect x="7" y="6" width="3.2" height="12" rx="1"/><rect x="13.8" y="6" width="3.2" height="12" rx="1"/></svg> Pause</button>
+                  <hr/>
+                  <button role="menuitem" class="destructive" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete monitor</button>
+                </div>
+              </span>
+            </div>
+
+            <div class="grow" role="button" tabindex="0">
+              <span class="dot-status active"></span>
+              <span class="favicon-sq" style="background:#3a7ae8">C</span>
+              <span class="gmain"><span class="gname">Apartment listings · Mission</span><br/><span class="gmeta truncate">craigslist.org · checked 12m ago · <span style="color:var(--smartwindow-text-color-accent-primary)">background on</span></span></span>
+              <span class="gvalue"><span class="now">3 new</span><br/><span class="sub">since yesterday</span></span>
+              <span class="ovf">
+                <button class="page-action ovf-btn" aria-haspopup="menu" aria-expanded="false" title="More" aria-label="Monitor actions"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg></button>
+                <div class="menu-pop" role="menu" hidden>
+                  <button role="menuitem" data-act="edit-row"><svg viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 5l4 4"/></svg> Edit</button>
+                  <button role="menuitem" data-act="pause"><svg viewBox="0 0 24 24"><rect x="7" y="6" width="3.2" height="12" rx="1"/><rect x="13.8" y="6" width="3.2" height="12" rx="1"/></svg> Pause</button>
+                  <hr/>
+                  <button role="menuitem" class="destructive" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete monitor</button>
+                </div>
+              </span>
+            </div>
+
+            <div class="group-label">Paused · 1</div>
+            <div class="grow paused" role="button" tabindex="0">
+              <span class="dot-status paused"></span>
+              <span class="favicon-sq" style="background:#b8860b">N</span>
+              <span class="gmain"><span class="gname">Nikon Z6 III price</span><br/><span class="gmeta truncate">bhphotovideo.com · paused · last $1,999</span></span>
+              <span class="gvalue"><a class="accent-link" href="#" onclick="return false">Resume</a></span>
+              <span class="ovf">
+                <button class="page-action ovf-btn" aria-haspopup="menu" aria-expanded="false" title="More" aria-label="Monitor actions"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg></button>
+                <div class="menu-pop" role="menu" hidden>
+                  <button role="menuitem" data-act="edit-row"><svg viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 5l4 4"/></svg> Edit</button>
+                  <button role="menuitem" data-act="resume"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> Resume</button>
+                  <hr/>
+                  <button role="menuitem" class="destructive" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete monitor</button>
+                </div>
+              </span>
+            </div>
+          </div>
+
+          <!-- Starter templates — ALWAYS available, under the running + paused monitors -->
+          <div class="group-label" data-show="5 6">Start a new monitor</div>
+          <div class="starter-grid" data-show="5 6 7">
+            <button class="starter"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/><path d="M17 15l4 4-4-2-4 2z" fill="currentColor" stroke="none"/></svg></span><span class="st-name">Price drop</span><span class="st-desc">Tell me when it gets cheaper</span></button>
+            <button class="starter"><span class="ic"><svg viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/></svg></span><span class="st-name">Back in stock</span><span class="st-desc">Ping me when it returns</span></button>
+            <button class="starter"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><span class="st-name">Profile update</span><span class="st-desc">Watch a person or page</span></button>
+            <button class="starter"><span class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h16M9 4v16"/></svg></span><span class="st-name">Page change</span><span class="st-desc">Any edit to this page</span></button>
+            <button class="starter"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="M8 10h8M8 14h5"/></svg></span><span class="st-name">News / topic</span><span class="st-desc">New coverage of a subject</span></button>
+            <button class="starter"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg></span><span class="st-name">Dates / slots</span><span class="st-desc">Appointment or reservation</span></button>
+          </div>
+
+          <!-- Loading skeleton (state demo) -->
+          <div data-show="7">
+            <div class="group-label">Loading</div>
+            <div class="skel"><div class="sk circle"></div><div style="flex:1"><div class="sk line" style="width:44%;margin-bottom:7px"></div><div class="sk line" style="width:66%"></div></div><div class="sk line" style="width:54px;height:20px"></div></div>
+            <div class="skel"><div class="sk circle"></div><div style="flex:1"><div class="sk line" style="width:38%;margin-bottom:7px"></div><div class="sk line" style="width:58%"></div></div><div class="sk line" style="width:54px;height:20px"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- Product page after the drop (open page) ---------- -->
+      <div class="site" data-show="9">
+        <div class="site-header"><span class="site-logo">SoundNest</span><span class="deemphasized small">Headphones</span><span class="deemphasized small">Speakers</span><span class="deemphasized small">Deals</span></div>
+        <div class="product">
+          <div class="product-img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="14" width="4" height="7" rx="1.5"/><rect x="17" y="14" width="4" height="7" rx="1.5"/></svg></div>
+          <div class="product-info">
+            <div class="product-brand">Sony</div>
+            <div class="product-title">WH-1000XM5 Wireless Headphones</div>
+            <div class="product-price">$278<span class="product-was">$299</span></div>
+            <div class="product-stock"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> In stock</div>
+            <div class="product-buy"><button class="btn-primary lg">Add to cart</button><button class="btn-ghost">Save for later</button></div>
+            <div class="product-meta">Price dropped today · you set a monitor for this</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- OS notification toast ---------- -->
+      <button class="os-toast" id="toast" data-show="8">
+        <span class="app-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
+        <span>
+          <div style="font-weight:var(--font-weight-semibold)">Firefox · Monitors</div>
+          <div>Sony WH-1000XM5 dropped to <b>$278</b> <span class="trend down">▼ −7%</span> from $299.</div>
+          <div class="mono-dim" style="margin-top:2px">Click to open the page →</div>
+        </span>
+      </button>
+
+      <div class="annot point-right" style="top:70px; right:150px" data-show="1">Firefox already renders this page — so the check happens here, on your device.</div>
+      <div class="annot point-right" style="bottom:150px; right:24px" data-show="2">Type <b>/</b> in the smartbar to run an agent — Monitor, Scout, or Research.</div>
+      <div class="annot point-down" style="bottom:120px; left:410px" data-show="7">Templates seed the first monitor; loading matches the row so nothing shifts.</div>
+    </main>
+
+    <!-- ===================== Smart Window sidebar ===================== -->
+    <aside class="sidebar" id="sidebar" data-show="2 3 4 9" aria-label="Smart Window">
+      <div class="sw-header">
+        <span class="sw-brand"></span>
+        <span class="sw-title">Smart Window</span>
+        <span class="spacer"></span>
+        <button class="page-action" title="New chat" aria-label="New chat"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button class="page-action" title="Close" aria-label="Close Smart Window"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg></button>
+      </div>
+
+      <div class="sw-chat">
+        <!-- The command the user sent (via the / agent picker) -->
+        <div class="message-user" data-show="3 4"><p><span class="cmd-tok">/monitor</span> watch this price</p></div>
+
+        <!-- Step 3: Monitor agent → create card -->
+        <div data-show="3" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
+          <div class="message-assistant">This looks like a product page, so I set a price rule and pulled the current price. Tweak anything, then start it.</div>
+
+          <div class="mcard" id="create-card">
+            <div class="mcard-head"><span class="favicon-sq" style="background:#e8663a">S</span><span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url">soundnest.com/audio/sony-wh-1000xm5</span></span></div>
+            <div class="mvalue"><span class="now">$299</span><span class="from">detected on the page now</span></div>
+            <div class="field">
+              <span class="field-label">Alert me when</span>
+              <input class="field-input" id="create-cond" value="the price drops below $270" aria-label="Alert condition" />
+              <div class="chip-row" id="create-chips"><button class="chip">Any drop</button><button class="chip selected">Below $270</button><button class="chip">Below $250</button><button class="chip">Back in stock</button></div>
+            </div>
+            <div class="field">
+              <span class="field-label">Pages</span>
+              <div class="chip-row"><span class="page-pill"><span class="fav" style="background:#e8663a">S</span> soundnest.com/…/xm5 <span class="x">×</span></span><button class="chip">+ Add page</button></div>
+            </div>
+            <hr class="rule" />
+            <div class="mrow"><span class="lbl">Check</span><span class="segmented" role="group" aria-label="Check frequency"><button aria-pressed="true">Auto</button><button aria-pressed="false">Hourly</button><button aria-pressed="false">Daily</button></span></div>
+            <div class="mrow"><span class="lbl">Notify</span><span class="val">Desktop notification</span></div>
+            <div class="mrow"><span class="lbl">Background</span><a class="accent-link" href="#" onclick="return false">Also check when Firefox is closed</a><span class="spacer"></span><label class="switch"><input type="checkbox" aria-label="Check in background" /><span class="track"></span><span class="thumb"></span></label></div>
+            <div class="mcard-actions"><span class="mono-dim">Runs on-device</span><span class="spacer"></span><button class="btn-ghost">Cancel</button><button class="btn-primary" id="start-monitoring">Start monitoring</button></div>
+          </div>
+        </div>
+
+        <!-- Step 4: Watching — the card sits in the chat, click to expand, updates live -->
+        <div data-show="4" class="anim-land" style="display:flex;flex-direction:column;gap:var(--space-medium)">
+          <div class="message-assistant">Monitoring <b>Sony WH-1000XM5 price</b>. I'll send a desktop notification if it drops below $270 — find it any time at <a href="#" onclick="return false">about:monitors</a>.</div>
+
+          <div class="mcard chatcard" id="watch-card" role="button" tabindex="0" aria-expanded="false">
+            <div class="mcard-head">
+              <span class="favicon-sq" style="background:#e8663a">S</span>
+              <span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url" id="watch-sub">Below $270 · Auto · on-device</span></span>
+              <span class="spacer"></span>
+              <span class="status-chip"><span class="pulse-dot"></span> Watching</span>
+              <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div class="watch-expand" id="watch-expand" hidden>
+              <div class="mvalue" id="watch-val-row"><span class="now" id="watch-val">$299</span><span class="from" id="watch-meta">watching for a drop · checked just now</span></div>
+              <div class="mrow"><span class="lbl">Alert me when</span><span class="val">the price drops below $270</span></div>
+              <div class="mrow"><span class="lbl">Check</span><span class="val">Auto · on-device</span></div>
+              <div class="mcard-actions"><button class="btn-ghost" id="check-now">Check now</button><span class="spacer"></span><span class="mono-dim">updates on-device</span></div>
+              <hr class="rule" />
+              <div class="section-toggle">Change history</div>
+              <div class="history" id="watch-hist">
+                <div class="hist-item"><span class="when">Now</span><span class="newv">$299</span><span class="deemphasized">first checked</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="mono-dim" style="align-self:flex-start">Click the card to expand — it refreshes on-device as new data comes in.</div>
+        </div>
+
+        <!-- Step 9: Open page — the card is pinned to THIS CHAT, plus change history -->
+        <div data-show="9" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
+          <div class="catchup"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg> Pinned to chat</div>
+          <div class="mcard pinned">
+            <div class="mcard-head"><span class="favicon-sq" style="background:#e8663a">S</span><span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url">soundnest.com/audio/sony-wh-1000xm5</span></span><span class="spacer"></span>
+              <button class="page-action" title="Edit" aria-label="Edit monitor"><svg viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 5l4 4"/></svg></button>
+              <span class="ovf">
+                <button class="page-action ovf-btn" aria-haspopup="menu" aria-expanded="false" title="More"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg></button>
+                <div class="menu-pop" role="menu" hidden>
+                  <button role="menuitem" data-act="edit"><svg viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 5l4 4"/></svg> Edit condition</button>
+                  <button role="menuitem" data-act="pause"><svg viewBox="0 0 24 24"><rect x="7" y="6" width="3.2" height="12" rx="1"/><rect x="13.8" y="6" width="3.2" height="12" rx="1"/></svg> Pause</button>
+                  <hr/>
+                  <button role="menuitem" class="destructive" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete monitor</button>
+                </div>
+              </span>
+            </div>
+            <div class="value-good"><span class="now" style="font-size:26px;font-weight:var(--font-weight-bold)">$278</span><span class="trend down">▼ −7%</span><span class="from">from $299 · below your $270? not yet</span></div>
+            <div class="mrow"><span class="lbl">Alert me when</span><span class="val">the price drops below $270</span></div>
+            <div class="mrow"><span class="lbl">Check</span><span class="val">Auto · on-device</span></div>
+            <div class="mcard-actions"><button class="btn-ghost">Snooze</button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary">Open page</button></div>
+          </div>
+          <button class="section-toggle">Change history <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+          <div class="history">
+            <div class="hist-item"><span class="when">Today 2:14p</span><span class="oldv">$299</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$278</span><span class="deemphasized">−7%</span></div>
+            <div class="hist-item low"><span class="when">Jun 24</span><span>possible change</span><span class="hist-badge-low">low confidence</span><span class="deemphasized">held here — no notification</span></div>
+            <div class="hist-item"><span class="when">Jun 17</span><span class="oldv">$319</span><span class="arrow">→</span><span class="newv">$299</span><span class="deemphasized">first checked</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Slash agent picker — appears when you type "/" in the smartbar -->
+      <div class="slash-menu" data-show="2">
+        <div class="slash-head">Agents</div>
+        <button class="agent-item sel" id="agent-monitor">
+          <span class="ai" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
+          <span><span class="an">Monitor</span><br/><span class="ad">Watch a page for changes</span></span>
+          <span class="cmd">/monitor</span>
+        </button>
+        <button class="agent-item">
+          <span class="ai" style="background:linear-gradient(135deg,#db54bf,#f4682c)"><svg viewBox="0 0 24 24"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg></span>
+          <span><span class="an">Scout</span><br/><span class="ad">Find deals and coupons</span></span>
+          <span class="cmd">/scout</span>
+        </button>
+        <button class="agent-item">
+          <span class="ai" style="background:linear-gradient(135deg,#455fe7,#10a4ca)"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg></span>
+          <span><span class="an">Research</span><br/><span class="ad">Research a topic, write a report</span></span>
+          <span class="cmd">/research</span>
+        </button>
+      </div>
+
+      <!-- Smartbar composer — the real omni-smartbar (Ask, search, or type a URL) -->
+      <div class="smartbar-wrap">
+        <div class="smartbar">
+          <span class="typed" data-show="2">/<span class="caret"></span></span>
+          <span class="ph" data-show="3 4 9">Ask, search, or type a URL</span>
+          <button class="mention" title="Tag a tab or site" aria-label="Tag a tab or site"><svg viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/><path d="M16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-4 7.5"/></svg></button>
+          <button class="send" aria-label="Send"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+        </div>
+      </div>
+      <div class="disclaimer">AI can make mistakes. <a href="#" onclick="return false">Report any issues</a>.</div>
+    </aside>
+  </div>
+
+  <!-- Undo toast — delete is reversible (§2) -->
+  <div class="undo-toast" id="undo-toast" hidden>
+    <span>Monitor deleted.</span>
+    <button class="undo" id="undo-btn">Undo</button>
+    <button class="x" id="undo-x" aria-label="Dismiss"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg></button>
+  </div>
+</div>
+
+<!-- ===================== Scenario stepper dock ===================== -->
+<div class="dock" role="group" aria-label="Prototype walkthrough">
+  <button id="prev" aria-label="Previous step"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+  <span class="dots" id="dots"></span>
+  <span class="step-label"><span class="step-num" id="step-num">1 / 9</span><span id="step-text">On the page you're watching</span></span>
+  <button id="next" aria-label="Next step"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+  <span class="divider"></span>
+  <button class="theme-btn" id="theme" aria-label="Toggle theme"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6L19 19M19 5l-1.4 1.4M6.4 17.6L5 19"/></svg></button>
+</div>
+
+<script>
+const STEPS = [
+  "On the page you're watching",
+  "Type / to run an agent",
+  "Monitor — the create card",
+  "Watching in chat — click to expand, updates live",
+  "about:monitors — its own surface",
+  "Edit inline — the row becomes the card",
+  "Empty & loading + starter templates",
+  "A confident change fires a notification",
+  "Open page — pinned to the chat + history",
+];
+let step = 1;
+const N = STEPS.length;
+const dots = document.getElementById("dots");
+STEPS.forEach((_, i) => { const s = document.createElement("span"); if (i === 0) s.className = "on"; dots.appendChild(s); });
+
+function render() {
+  document.querySelectorAll("[data-show]").forEach(el => {
+    el.classList.toggle("step-visible", el.getAttribute("data-show").split(/\s+/).includes(String(step)));
+  });
+  document.getElementById("step-num").textContent = step + " / " + N;
+  document.getElementById("step-text").textContent = STEPS[step - 1];
+  [...dots.children].forEach((d, i) => d.classList.toggle("on", i < step));
+  document.getElementById("sidebar").style.width = step === 9 ? "452px" : "416px";
+}
+function go(n) { step = Math.max(1, Math.min(N, n)); render(); }
+document.getElementById("next").onclick = () => go(step + 1);
+document.getElementById("prev").onclick = () => go(step - 1);
+document.addEventListener("keydown", e => { if (e.key === "ArrowRight") go(step + 1); if (e.key === "ArrowLeft") go(step - 1); });
+
+// Story shortcuts
+document.getElementById("pa-monitor").onclick = () => { if (step === 1) go(2); };
+document.getElementById("agent-monitor").onclick = (e) => { e.stopPropagation(); go(3); };
+document.getElementById("new-monitor").onclick = () => go(7);
+document.getElementById("start-monitoring").onclick = () => go(4);
+document.getElementById("toast").onclick = () => go(9);
+document.getElementById("collapse-sony").onclick = () => go(5);
+
+// Dashboard rows: click / Enter / Space expands the Sony row into the editable card
+const rowSony = document.getElementById("row-sony");
+function expandSony(e) { if (e.target.closest(".ovf")) return; go(6); }
+rowSony.addEventListener("click", expandSony);
+rowSony.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(6); } });
+
+// In-chat monitor card: click to expand, "Check now" simulates new data arriving
+const watchCard = document.getElementById("watch-card");
+const watchExpand = document.getElementById("watch-expand");
+function toggleWatch() { const open = watchCard.getAttribute("aria-expanded") === "true"; watchCard.setAttribute("aria-expanded", String(!open)); watchExpand.hidden = open; }
+watchCard.addEventListener("click", e => { if (e.target.closest("button, a")) return; toggleWatch(); });
+watchCard.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleWatch(); } });
+
+const prices = [299, 291, 284, 276];
+let pi = 0;
+document.getElementById("check-now").addEventListener("click", e => {
+  e.stopPropagation();
+  if (pi >= prices.length - 1) return;
+  const prev = prices[pi]; pi++; const now = prices[pi];
+  const pct = Math.round((now - 299) / 299 * 100);
+  document.getElementById("watch-val").textContent = "$" + now;
+  document.getElementById("watch-meta").textContent = "checked just now · ▼ " + pct + "%";
+  document.getElementById("watch-sub").textContent = "$" + now + " · Below $270 · Auto";
+  const hist = document.getElementById("watch-hist");
+  const row = document.createElement("div"); row.className = "hist-item";
+  row.innerHTML = '<span class="when">Just now</span><span class="oldv">$' + prev + '</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$' + now + '</span><span class="deemphasized">' + pct + '%</span>';
+  hist.prepend(row);
+  const vr = document.getElementById("watch-val-row"); vr.classList.remove("flash"); void vr.offsetWidth; vr.classList.add("flash");
+});
+
+// Overflow menus (Edit / Pause / Delete)
+function closeMenus(except) {
+  document.querySelectorAll(".menu-pop").forEach(m => { if (m !== except) { m.hidden = true; m.previousElementSibling?.setAttribute("aria-expanded", "false"); } });
+}
+document.querySelectorAll(".ovf-btn").forEach(btn => {
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    const pop = btn.nextElementSibling;
+    const willOpen = pop.hidden;
+    closeMenus(willOpen ? pop : null);
+    pop.hidden = !willOpen;
+    btn.setAttribute("aria-expanded", String(willOpen));
+  });
+});
+document.addEventListener("click", () => closeMenus(null));
+
+// Undo toast (guarded, reversible delete)
+const undoToast = document.getElementById("undo-toast");
+let undoTimer = null;
+function showUndo() { undoToast.hidden = false; clearTimeout(undoTimer); undoTimer = setTimeout(() => { undoToast.hidden = true; }, 6000); }
+document.getElementById("undo-btn").onclick = () => { clearTimeout(undoTimer); undoToast.hidden = true; };
+document.getElementById("undo-x").onclick = () => { clearTimeout(undoTimer); undoToast.hidden = true; };
+
+document.querySelectorAll('[data-act]').forEach(el => {
+  el.addEventListener("click", e => {
+    e.stopPropagation();
+    const act = el.getAttribute("data-act");
+    closeMenus(null);
+    if (act === "delete") showUndo();
+    else if (act === "edit-row" && el.closest("#row-sony")) go(6);
+    // edit / pause / resume are illustrative no-ops in this prototype
+  });
+});
+
+function wireChips(container, input, map) {
+  if (!container) return;
+  container.querySelectorAll(".chip").forEach(chip => {
+    chip.onclick = () => {
+      container.querySelectorAll(".chip").forEach(c => c.classList.remove("selected"));
+      chip.classList.add("selected");
+      if (input && map[chip.textContent]) input.value = map[chip.textContent];
+    };
+  });
+}
+wireChips(document.getElementById("create-chips"), document.getElementById("create-cond"), {
+  "Any drop": "the price drops at all", "Below $270": "the price drops below $270",
+  "Below $250": "the price drops below $250", "Back in stock": "it's back in stock",
+});
+document.querySelectorAll(".segmented").forEach(seg => {
+  seg.querySelectorAll("button").forEach(b => { b.onclick = () => { seg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", "false")); b.setAttribute("aria-pressed", "true"); }; });
+});
+const root = document.documentElement;
+document.getElementById("theme").onclick = () => { root.setAttribute("data-theme", root.getAttribute("data-theme") === "dark" ? "light" : "dark"); };
+render();
+</script>
+</body>
+</html>
