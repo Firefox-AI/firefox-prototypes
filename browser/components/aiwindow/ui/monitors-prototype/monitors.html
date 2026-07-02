@@ -228,7 +228,6 @@ h1,h2,h3,h4,p { margin: 0; }
 
 /* Create-monitor modal — dashboard container for the same create card (§4) */
 .modal-scrim { position: absolute; inset: 0; z-index: 70; background: light-dark(rgba(21,20,26,.42), rgba(0,0,0,.55)); display: grid; place-items: center; padding: var(--space-xlarge); }
-.modal-scrim[hidden] { display: none; }
 .modal-card { width: min(480px, 100%); box-shadow: var(--box-shadow-level-4); }
 
 /* Loading skeleton */
@@ -250,7 +249,6 @@ h1,h2,h3,h4,p { margin: 0; }
 .mvalue { display: flex; align-items: baseline; gap: var(--space-small); flex-wrap: wrap; }
 .mvalue .now { font-size: 30px; font-weight: var(--font-weight-bold); line-height: 1; }
 .mvalue .from { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
-.value-good { background: var(--background-color-success); border-radius: var(--border-radius-medium); padding: var(--space-medium) var(--space-large); display: inline-flex; align-items: baseline; gap: var(--space-small); flex-wrap: wrap; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-label { font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--text-color-deemphasized); }
 .field-input { border: 1px solid var(--border-color); border-radius: var(--border-radius-medium); padding: 9px var(--space-medium); background: var(--background-color-box); font-size: var(--font-size-small); color: var(--text-color); width: 100%; }
@@ -281,10 +279,8 @@ h1,h2,h3,h4,p { margin: 0; }
 .mcard-actions .spacer { flex: 1; }
 .mono-dim { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
 
-/* Destructive button (guarded delete) */
-.btn-danger { color: var(--text-color-error); border: 1px solid var(--border-color); padding: 8px var(--space-large); border-radius: var(--border-radius-circle); font-weight: var(--font-weight-semibold); font-size: var(--font-size-small); display: inline-flex; align-items: center; gap: 6px; }
-.btn-danger svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.btn-danger:hover { background: var(--background-color-critical); border-color: var(--text-color-error); }
+.btn-ghost:disabled { opacity: .55; cursor: default; }
+.btn-ghost:disabled:hover { background: none; }
 
 /* Inline save confirmation — edits save as you make them */
 .save-note { display: inline-flex; align-items: center; gap: 5px; font-size: var(--font-size-small); color: var(--text-color-deemphasized); }
@@ -293,7 +289,6 @@ h1,h2,h3,h4,p { margin: 0; }
 
 /* Undo toast — delete is reversible (§2 guarded exception + undo) */
 .undo-toast { position: absolute; bottom: 76px; left: 50%; transform: translateX(-50%); z-index: 80; display: flex; align-items: center; gap: var(--space-medium); background: light-dark(#180e30, #f2f0f8); color: light-dark(#f2f0f8, #180e30); padding: 10px 12px 10px 16px; border-radius: var(--border-radius-circle); box-shadow: var(--box-shadow-level-4); font-size: var(--font-size-small); animation: toast-in var(--motion-dur-soft) var(--motion-ease-reach) both; }
-.undo-toast[hidden] { display: none; }
 .undo-toast .undo { color: inherit; font-weight: var(--font-weight-semibold); text-decoration: underline; }
 .undo-toast .x { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; color: inherit; opacity: .7; }
 .undo-toast .x:hover { opacity: 1; background: light-dark(rgba(242,240,248,.15), rgba(24,14,48,.1)); }
@@ -305,7 +300,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 .section-toggle svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; }
 .history { display: flex; flex-direction: column; }
 .hist-item { display: flex; align-items: baseline; gap: var(--space-small); padding: var(--space-small) 0; border-top: 1px solid var(--border-color-deemphasized); font-size: var(--font-size-small); }
-.hist-item .when { color: var(--text-color-deemphasized); min-width: 74px; flex: none; }
+.hist-item .when { color: var(--text-color-deemphasized); min-width: 84px; flex: none; }
 .hist-item .oldv { color: var(--text-color-deemphasized); text-decoration: line-through; }
 .hist-item .newv { font-weight: var(--font-weight-semibold); }
 .hist-item .arrow { color: var(--text-color-deemphasized); }
@@ -339,7 +334,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 .chatcard .chev { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--text-color-deemphasized); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: transform var(--motion-dur-near) var(--motion-ease-edge); }
 .chatcard[aria-expanded="true"] .chev { transform: rotate(180deg); }
 .watch-expand { display: flex; flex-direction: column; gap: var(--space-medium); }
-.watch-expand[hidden] { display: none; }
 @keyframes flashbg { from { background: var(--background-color-success); } to { background: transparent; } }
 .flash { animation: flashbg 1.4s var(--motion-ease-edge); border-radius: var(--border-radius-small); }
 
@@ -482,11 +476,11 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <span class="brandmark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h4l2-6 4 12 2-6h4"/></svg></span>
             <span class="title">Monitors</span>
             <span class="spacer"></span>
-            <button class="btn-primary" id="new-monitor">+ New monitor</button>
+            <button class="btn-primary" id="new-monitor">New monitor</button>
           </div>
 
           <!-- Empty-state lead (only when there are no monitors) -->
-          <div class="empty-lead" data-show="7"><h3>Watch a page for changes</h3><p>Start from a monitor prompt, or open any page and type <b>/monitor</b> in Smart Window.</p></div>
+          <div class="empty-lead" data-show="7"><h3>Watch any page for changes</h3><p>Start from a monitor prompt, or open any page and type <b>/monitor</b> in Smart Window.</p></div>
 
           <!-- Populated: running + paused monitors -->
           <div data-show="5 6">
@@ -527,7 +521,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <div class="mrow"><span class="lbl">Check</span><span class="segmented" role="group" aria-label="Check frequency"><button aria-pressed="true">Auto</button><button aria-pressed="false">Hourly</button><button aria-pressed="false">Daily</button></span></div>
                 <div class="mrow"><span class="lbl">Notify</span><span class="val">Desktop notification</span></div>
                 <div class="mrow"><span class="lbl">Background</span><span class="val">Check while Firefox is closed</span><span class="spacer"></span><label class="switch"><input type="checkbox" aria-label="Check in background" /><span class="track"></span><span class="thumb"></span></label></div>
-                <div class="mcard-actions"><button class="btn-danger" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete</button><button class="btn-ghost">Pause</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite">Saved automatically</span></div>
+                <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite">Saved automatically</span></div>
               </div>
             </div>
 
@@ -585,7 +579,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <div class="product-price">$278<span class="product-was">$299</span></div>
             <div class="product-stock"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> In stock</div>
             <div class="product-buy"><button class="btn-primary lg">Add to cart</button><button class="btn-ghost">Save for later</button></div>
-            <div class="product-meta">Price dropped today · you set a monitor for this</div>
+            <div class="product-meta">Price dropped today · Free returns within 30 days</div>
           </div>
         </div>
       </div>
@@ -595,14 +589,13 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         <span class="app-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
         <span>
           <div style="font-weight:var(--font-weight-semibold)">Firefox · Monitors</div>
-          <div>Sony WH-1000XM5 dropped to <b>$278</b> <span class="trend down">▼ −7%</span> from $299.</div>
-          <div class="mono-dim" style="margin-top:2px">Click to open the page →</div>
+          <div>Sony WH-1000XM5 dropped to <b>$278</b> — down 7% from $299.</div>
         </span>
       </button>
 
-      <div class="annot point-right" style="top:70px; right:150px" data-show="1">Firefox already renders this page — so the check happens here, on your device.</div>
-      <div class="annot point-right" style="bottom:150px; right:24px" data-show="2">Type <b>/</b> in the smartbar to run an agent — Monitor, Scout, or Research.</div>
-      <div class="annot point-down" style="bottom:120px; left:410px" data-show="7">Monitor prompts open the create card pre-filled; loading matches the row so nothing shifts.</div>
+      <div class="annot point-right" style="top:70px; right:150px" data-show="1">Firefox is already looking at this page. A monitor just keeps looking — on your device.</div>
+      <div class="annot point-right" style="bottom:150px; right:24px" data-show="2">Type <b>/</b> to call an agent.</div>
+      <div class="annot point-down" style="bottom:120px; left:410px" data-show="7">The skeleton matches the row exactly — nothing shifts when monitors arrive.</div>
     </main>
 
     <!-- ===================== Smart Window sidebar ===================== -->
@@ -621,11 +614,11 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
         <!-- Step 3: Monitor agent → create card -->
         <div data-show="3" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
-          <div class="message-assistant">This looks like a product page, so I set a price rule and pulled the current price. Tweak anything, then start it.</div>
+          <div class="message-assistant">Looks like a product page — I've set this up to watch the price. Tweak anything, then start it.</div>
 
           <div class="mcard" id="create-card">
             <div class="mcard-head"><span class="favicon-sq" style="background:#e8663a">S</span><span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url">soundnest.com/audio/sony-wh-1000xm5</span></span></div>
-            <div class="mvalue"><span class="now">$299</span><span class="from">detected on the page now</span></div>
+            <div class="mvalue"><span class="now">$299</span><span class="from">found on this page just now</span></div>
             <div class="field">
               <span class="field-label">Alert me when</span>
               <input class="field-input" id="create-cond" value="the price drops below $270" aria-label="Alert condition" />
@@ -645,7 +638,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
         <!-- Step 4: Watching — the card sits in the chat, click to expand, updates live -->
         <div data-show="4" class="anim-land" style="display:flex;flex-direction:column;gap:var(--space-medium)">
-          <div class="message-assistant">Monitoring <b>Sony WH-1000XM5 price</b>. I'll send a desktop notification if it drops below $270 — find it any time at <a href="#" onclick="return false">about:monitors</a>.</div>
+          <div class="message-assistant">Watching <b>Sony WH-1000XM5 price</b>. You'll hear from me if it drops below $270 — it lives at <a href="#" onclick="return false">about:monitors</a>.</div>
 
           <div class="mcard chatcard live" id="watch-card" role="button" tabindex="0" aria-expanded="false">
             <div class="mcard-head">
@@ -666,7 +659,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <span class="save-note" id="save-note-watch" role="status" aria-live="polite"></span>
               </div>
               <div class="mrow"><span class="lbl">Check</span><span class="val">Auto · on-device</span></div>
-              <div class="mcard-actions"><button class="btn-danger" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete</button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-ghost" id="check-now">Check now</button></div>
+              <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-ghost" id="check-now">Check now</button></div>
               <hr class="rule" />
               <div class="section-toggle">Change history</div>
               <div class="history" id="watch-hist">
@@ -674,7 +667,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               </div>
             </div>
           </div>
-          <div class="mono-dim" style="align-self:flex-start">Click to expand; the pencil edits in place. It refreshes on-device as new data comes in.</div>
         </div>
 
         <!-- Step 9: Open page — the card is pinned to THIS CHAT, plus change history -->
@@ -703,7 +695,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <hr class="rule" />
             <div class="section-toggle">Change history</div>
             <div class="history">
-              <div class="hist-item"><span class="when">Today 2:14p</span><span class="oldv">$299</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$278</span><span class="deemphasized">−7%</span></div>
+              <div class="hist-item"><span class="when">Today 2:14 PM</span><span class="oldv">$299</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$278</span><span class="deemphasized">−7%</span></div>
               <div class="hist-item low"><span class="when">Jun 24</span><span class="hist-flag">possible change</span><span class="deemphasized">low confidence · held here, no notification</span></div>
               <div class="hist-item"><span class="when">Jun 17</span><span class="oldv">$319</span><span class="arrow">→</span><span class="newv">$299</span><span class="deemphasized">first checked</span></div>
             </div>
@@ -727,7 +719,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         </button>
         <button class="agent-item">
           <span class="ai" style="background:linear-gradient(135deg,#455fe7,#10a4ca)"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg></span>
-          <span><span class="an">Research</span><br/><span class="ad">Research a topic, write a report</span></span>
+          <span><span class="an">Research</span><br/><span class="ad">Dig into a topic and report back</span></span>
           <span class="cmd">/research</span>
         </button>
       </div>
@@ -804,7 +796,7 @@ const STEPS = [
   "Watching in chat — click to expand, updates live",
   "about:monitors — its own surface",
   "Edit inline — the row becomes the card",
-  "Empty & loading + starter templates",
+  "Empty & loading + monitor prompts",
   "A confident change fires a notification",
   "Open page — pinned to the chat + history",
 ];
@@ -928,6 +920,7 @@ document.getElementById("check-now").addEventListener("click", e => {
   e.stopPropagation();
   if (pi >= prices.length - 1) return;
   const prev = prices[pi]; pi++; const now = prices[pi];
+  if (pi >= prices.length - 1) { const b = e.currentTarget; b.disabled = true; b.textContent = "Up to date"; }
   const pct = Math.abs(Math.round((now - 299) / 299 * 100));
   document.getElementById("watch-val").textContent = "$" + now;
   document.getElementById("watch-meta").textContent = "checked just now · was $299";
