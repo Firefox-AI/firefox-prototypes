@@ -88,6 +88,7 @@
 :root[data-theme="dark"] { color-scheme: dark; }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; }
 body {
   font: var(--font-size-root)/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -652,11 +653,13 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url" id="watch-sub">Below $270 · Auto · on-device</span></span>
               <span class="spacer"></span>
               <span class="status-chip" id="watch-chip"><span class="pulse-dot"></span> Watching</span>
+              <button class="page-action" id="watch-edit" title="Edit monitor" aria-label="Edit monitor" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 5l4 4"/></svg></button>
               <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
             </div>
             <div class="watch-expand" id="watch-expand" hidden>
               <div class="mvalue" id="watch-val-row"><span class="now" id="watch-val">$299</span><span class="from" id="watch-meta">watching for a drop · checked just now</span></div>
-              <div class="field">
+              <div class="mrow" id="watch-cond-read"><span class="lbl">Alert me when</span><span class="val" id="watch-cond-text">the price drops below $270</span></div>
+              <div class="field" id="watch-cond-editor" hidden>
                 <span class="field-label">Alert me when</span>
                 <input class="field-input" id="watch-cond" value="the price drops below $270" aria-label="Alert condition" />
                 <div class="chip-row" id="watch-chips"><button class="chip">Any drop</button><button class="chip selected">Below $270</button><button class="chip">Below $250</button><button class="chip">Back in stock</button></div>
@@ -671,21 +674,25 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               </div>
             </div>
           </div>
-          <div class="mono-dim" style="align-self:flex-start">Click the card to expand — it refreshes on-device as new data comes in.</div>
+          <div class="mono-dim" style="align-self:flex-start">Click to expand; the pencil edits in place. It refreshes on-device as new data comes in.</div>
         </div>
 
         <!-- Step 9: Open page — the card is pinned to THIS CHAT, plus change history -->
         <div data-show="9" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
           <div class="pin-eyebrow"><svg viewBox="0 0 24 24"><path d="M12 17v5M8 3h8l-1 6 4 3H5l4-3z"/></svg> Pinned to chat</div>
-          <div class="mcard pinned live">
+          <div class="mcard chatcard pinned live" id="pin-card" role="button" tabindex="0" aria-expanded="true">
             <div class="mcard-head">
               <span class="favicon-sq" style="background:#e8663a">S</span>
               <span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url">soundnest.com/audio/sony-wh-1000xm5</span></span>
               <span class="spacer"></span>
               <span class="status-chip">$278 ▼ −7%</span>
+              <button class="page-action" id="pin-edit" title="Edit monitor" aria-label="Edit monitor" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 5l4 4"/></svg></button>
+              <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
             </div>
+            <div class="watch-expand" id="pin-expand">
             <div class="mvalue"><span class="now">$278</span><span class="from">checked 2:14 PM · was $299</span></div>
-            <div class="field">
+            <div class="mrow" id="pin-cond-read"><span class="lbl">Alert me when</span><span class="val" id="pin-cond-text">the price drops below $270</span></div>
+            <div class="field" id="pin-cond-editor" hidden>
               <span class="field-label">Alert me when</span>
               <input class="field-input" id="pin-cond" value="the price drops below $270" aria-label="Alert condition" />
               <div class="chip-row" id="pin-chips"><button class="chip">Any drop</button><button class="chip selected">Below $270</button><button class="chip">Below $250</button><button class="chip">Back in stock</button></div>
@@ -699,6 +706,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <div class="hist-item"><span class="when">Today 2:14p</span><span class="oldv">$299</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$278</span><span class="deemphasized">−7%</span></div>
               <div class="hist-item low"><span class="when">Jun 24</span><span class="hist-flag">possible change</span><span class="deemphasized">low confidence · held here, no notification</span></div>
               <div class="hist-item"><span class="when">Jun 17</span><span class="oldv">$319</span><span class="arrow">→</span><span class="newv">$299</span><span class="deemphasized">first checked</span></div>
+            </div>
             </div>
           </div>
         </div>
@@ -881,12 +889,38 @@ function expandSony() { go(6); }
 rowSony.addEventListener("click", expandSony);
 rowSony.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(6); } });
 
-// In-chat monitor card: click to expand, "Check now" simulates new data arriving
-const watchCard = document.getElementById("watch-card");
-const watchExpand = document.getElementById("watch-expand");
-function toggleWatch() { const open = watchCard.getAttribute("aria-expanded") === "true"; watchCard.setAttribute("aria-expanded", String(!open)); watchExpand.hidden = open; }
-watchCard.addEventListener("click", e => { if (e.target.closest("button, a, input, label")) return; toggleWatch(); });
-watchCard.addEventListener("keydown", e => { if (e.target !== watchCard) return; if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleWatch(); } });
+// Monitor cards in chat: click to expand; the pencil expands into inline edit
+function wireMonitorCard(ids) {
+  const card = document.getElementById(ids.card);
+  const expand = document.getElementById(ids.expand);
+  const editBtn = document.getElementById(ids.edit);
+  const readRow = document.getElementById(ids.read);
+  const editor = document.getElementById(ids.editor);
+  const input = document.getElementById(ids.input);
+  const readText = document.getElementById(ids.readText);
+  function setMode(editing) {
+    editBtn.setAttribute("aria-pressed", String(editing));
+    editor.hidden = !editing;
+    readRow.hidden = editing;
+    if (editing) input.focus();
+  }
+  function setOpen(open) {
+    card.setAttribute("aria-expanded", String(open));
+    expand.hidden = !open;
+    if (!open) setMode(false);
+  }
+  card.addEventListener("click", e => { if (e.target.closest("button, a, input, label")) return; setOpen(card.getAttribute("aria-expanded") !== "true"); });
+  card.addEventListener("keydown", e => { if (e.target !== card) return; if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(card.getAttribute("aria-expanded") !== "true"); } });
+  editBtn.addEventListener("click", e => {
+    e.stopPropagation();
+    if (card.getAttribute("aria-expanded") !== "true") { setOpen(true); setMode(true); return; }
+    setMode(editBtn.getAttribute("aria-pressed") !== "true");
+  });
+  input.addEventListener("input", () => { readText.textContent = input.value; });
+  return { syncRead: () => { readText.textContent = input.value; } };
+}
+const watchCardApi = wireMonitorCard({ card: "watch-card", expand: "watch-expand", edit: "watch-edit", read: "watch-cond-read", editor: "watch-cond-editor", input: "watch-cond", readText: "watch-cond-text" });
+const pinCardApi = wireMonitorCard({ card: "pin-card", expand: "pin-expand", edit: "pin-edit", read: "pin-cond-read", editor: "pin-cond-editor", input: "pin-cond", readText: "pin-cond-text" });
 
 const prices = [299, 291, 284, 276];
 let pi = 0;
@@ -962,8 +996,8 @@ const COND_MAP = {
 };
 wireChips(document.getElementById("create-chips"), document.getElementById("create-cond"), COND_MAP);
 wireChips(document.getElementById("sony-chips"), document.getElementById("sony-cond"), COND_MAP);
-wireChips(document.getElementById("watch-chips"), document.getElementById("watch-cond"), COND_MAP, () => noteSaved(watchNote, ""));
-wireChips(document.getElementById("pin-chips"), document.getElementById("pin-cond"), COND_MAP, () => noteSaved(pinNote, ""));
+wireChips(document.getElementById("watch-chips"), document.getElementById("watch-cond"), COND_MAP, () => { noteSaved(watchNote, ""); watchCardApi.syncRead(); });
+wireChips(document.getElementById("pin-chips"), document.getElementById("pin-cond"), COND_MAP, () => { noteSaved(pinNote, ""); pinCardApi.syncRead(); });
 document.querySelectorAll(".segmented").forEach(seg => {
   seg.querySelectorAll("button").forEach(b => { b.onclick = () => { seg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", "false")); b.setAttribute("aria-pressed", "true"); }; });
 });
