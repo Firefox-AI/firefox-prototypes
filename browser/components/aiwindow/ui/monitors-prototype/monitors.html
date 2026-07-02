@@ -276,16 +276,10 @@ h1,h2,h3,h4,p { margin: 0; }
 .btn-danger svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .btn-danger:hover { background: var(--background-color-critical); border-color: var(--text-color-error); }
 
-/* Overflow menu — Edit / Pause / Delete (the reversible actions, §2) */
-.ovf { position: relative; flex: none; }
-.ovf-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.menu-pop { position: absolute; inset-inline-end: 0; top: calc(100% + 4px); z-index: 40; min-width: 188px; background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-medium); box-shadow: var(--box-shadow-level-4); padding: var(--space-xsmall); display: flex; flex-direction: column; }
-.menu-pop[hidden] { display: none; }
-.menu-pop button { display: flex; align-items: center; gap: var(--space-small); padding: 8px var(--space-small); border-radius: var(--border-radius-small); font-size: var(--font-size-small); text-align: left; color: var(--text-color); }
-.menu-pop button:hover { background: var(--background-color-box-info); }
-.menu-pop button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.menu-pop .destructive { color: var(--text-color-error); }
-.menu-pop hr { border: 0; border-top: 1px solid var(--border-color-deemphasized); margin: var(--space-xsmall) var(--space-xsmall); width: auto; }
+/* Inline save confirmation — edits save as you make them */
+.save-note { display: inline-flex; align-items: center; gap: 5px; font-size: var(--font-size-small); color: var(--text-color-deemphasized); }
+.save-note svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.save-note.saved { color: var(--text-color-success); animation: land var(--motion-dur-near) var(--motion-ease-edge); }
 
 /* Undo toast — delete is reversible (§2 guarded exception + undo) */
 .undo-toast { position: absolute; bottom: 76px; left: 50%; transform: translateX(-50%); z-index: 80; display: flex; align-items: center; gap: var(--space-medium); background: light-dark(#180e30, #f2f0f8); color: light-dark(#f2f0f8, #180e30); padding: 10px 12px 10px 16px; border-radius: var(--border-radius-circle); box-shadow: var(--box-shadow-level-4); font-size: var(--font-size-small); animation: toast-in var(--motion-dur-soft) var(--motion-ease-reach) both; }
@@ -499,15 +493,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <span class="favicon-sq" style="background:#e8663a">S</span>
                 <span class="gmain"><span class="gname">Sony WH-1000XM5 price</span><br/><span class="gmeta truncate">soundnest.com · checked 3m ago</span></span>
                 <span class="gvalue"><span class="now">$299</span><br/><span class="sub">watching for a drop</span></span>
-                <span class="ovf">
-                  <button class="page-action ovf-btn" aria-haspopup="menu" aria-expanded="false" title="More" aria-label="Monitor actions"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg></button>
-                  <div class="menu-pop" role="menu" hidden>
-                    <button role="menuitem" data-act="edit-row"><svg viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 5l4 4"/></svg> Edit</button>
-                    <button role="menuitem" data-act="pause"><svg viewBox="0 0 24 24"><rect x="7" y="6" width="3.2" height="12" rx="1"/><rect x="13.8" y="6" width="3.2" height="12" rx="1"/></svg> Pause</button>
-                    <hr/>
-                    <button role="menuitem" class="destructive" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete monitor</button>
-                  </div>
-                </span>
               </div>
 
               <div id="card-sony" class="mcard anim-land" data-show="6">
@@ -515,22 +500,13 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                   <span class="favicon-sq" style="background:#e8663a">S</span>
                   <span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url">soundnest.com/audio/sony-wh-1000xm5</span></span>
                   <span class="spacer"></span>
-                  <span class="ovf">
-                    <button class="page-action ovf-btn" aria-haspopup="menu" aria-expanded="false" title="More"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg></button>
-                    <div class="menu-pop" role="menu" hidden>
-                      <button role="menuitem" data-act="edit"><svg viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 5l4 4"/></svg> Edit condition</button>
-                      <button role="menuitem" data-act="pause"><svg viewBox="0 0 24 24"><rect x="7" y="6" width="3.2" height="12" rx="1"/><rect x="13.8" y="6" width="3.2" height="12" rx="1"/></svg> Pause</button>
-                      <hr/>
-                      <button role="menuitem" class="destructive" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete monitor</button>
-                    </div>
-                  </span>
                   <button class="page-action" title="Collapse" id="collapse-sony"><svg viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg></button>
                 </div>
                 <div class="mvalue"><span class="now">$299</span><span class="from">watching for a drop · checked 3m ago</span></div>
                 <div class="field">
                   <span class="field-label">Alert me when</span>
-                  <input class="field-input" value="the price drops below $270" aria-label="Alert condition" />
-                  <div class="chip-row"><button class="chip">Any drop</button><button class="chip selected">Below $270</button><button class="chip">Below $250</button><button class="chip">Back in stock</button></div>
+                  <input class="field-input" id="sony-cond" value="the price drops below $270" aria-label="Alert condition" />
+                  <div class="chip-row" id="sony-chips"><button class="chip">Any drop</button><button class="chip selected">Below $270</button><button class="chip">Below $250</button><button class="chip">Back in stock</button></div>
                 </div>
                 <div class="field">
                   <span class="field-label">Pages</span>
@@ -540,7 +516,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <div class="mrow"><span class="lbl">Check</span><span class="segmented" role="group" aria-label="Check frequency"><button aria-pressed="true">Auto</button><button aria-pressed="false">Hourly</button><button aria-pressed="false">Daily</button></span></div>
                 <div class="mrow"><span class="lbl">Notify</span><span class="val">Desktop notification</span></div>
                 <div class="mrow"><span class="lbl">Background</span><span class="val">Check while Firefox is closed</span><span class="spacer"></span><label class="switch"><input type="checkbox" aria-label="Check in background" /><span class="track"></span><span class="thumb"></span></label></div>
-                <div class="mcard-actions"><button class="btn-danger" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete</button><button class="btn-ghost">Pause</button><span class="spacer"></span><span class="mono-dim">Saved automatically</span></div>
+                <div class="mcard-actions"><button class="btn-danger" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete</button><button class="btn-ghost">Pause</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite">Saved automatically</span></div>
               </div>
             </div>
 
@@ -549,15 +525,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <span class="favicon-sq" style="background:#2f855a">R</span>
               <span class="gmain"><span class="gname">REI Danner hiking boots</span><br/><span class="gmeta truncate">rei.com · the page layout changed</span></span>
               <span class="gvalue"><span class="flag-attn"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg> Needs a look</span></span>
-              <span class="ovf">
-                <button class="page-action ovf-btn" aria-haspopup="menu" aria-expanded="false" title="More" aria-label="Monitor actions"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg></button>
-                <div class="menu-pop" role="menu" hidden>
-                  <button role="menuitem" data-act="edit-row"><svg viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 5l4 4"/></svg> Edit</button>
-                  <button role="menuitem" data-act="pause"><svg viewBox="0 0 24 24"><rect x="7" y="6" width="3.2" height="12" rx="1"/><rect x="13.8" y="6" width="3.2" height="12" rx="1"/></svg> Pause</button>
-                  <hr/>
-                  <button role="menuitem" class="destructive" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete monitor</button>
-                </div>
-              </span>
             </div>
 
             <div class="grow" role="button" tabindex="0">
@@ -565,15 +532,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <span class="favicon-sq" style="background:#3a7ae8">C</span>
               <span class="gmain"><span class="gname">Apartment listings · Mission</span><br/><span class="gmeta truncate">craigslist.org · checked 12m ago · <span style="color:var(--smartwindow-text-color-accent-primary)">background on</span></span></span>
               <span class="gvalue"><span class="now">3 new</span><br/><span class="sub">since yesterday</span></span>
-              <span class="ovf">
-                <button class="page-action ovf-btn" aria-haspopup="menu" aria-expanded="false" title="More" aria-label="Monitor actions"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg></button>
-                <div class="menu-pop" role="menu" hidden>
-                  <button role="menuitem" data-act="edit-row"><svg viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 5l4 4"/></svg> Edit</button>
-                  <button role="menuitem" data-act="pause"><svg viewBox="0 0 24 24"><rect x="7" y="6" width="3.2" height="12" rx="1"/><rect x="13.8" y="6" width="3.2" height="12" rx="1"/></svg> Pause</button>
-                  <hr/>
-                  <button role="menuitem" class="destructive" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete monitor</button>
-                </div>
-              </span>
             </div>
 
             <div class="group-label">Paused · 1</div>
@@ -582,15 +540,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <span class="favicon-sq" style="background:#b8860b">N</span>
               <span class="gmain"><span class="gname">Nikon Z6 III price</span><br/><span class="gmeta truncate">bhphotovideo.com · paused · last $1,999</span></span>
               <span class="gvalue"><a class="accent-link" href="#" onclick="return false">Resume</a></span>
-              <span class="ovf">
-                <button class="page-action ovf-btn" aria-haspopup="menu" aria-expanded="false" title="More" aria-label="Monitor actions"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg></button>
-                <div class="menu-pop" role="menu" hidden>
-                  <button role="menuitem" data-act="edit-row"><svg viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 5l4 4"/></svg> Edit</button>
-                  <button role="menuitem" data-act="resume"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> Resume</button>
-                  <hr/>
-                  <button role="menuitem" class="destructive" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete monitor</button>
-                </div>
-              </span>
             </div>
           </div>
 
@@ -699,7 +648,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <div class="mvalue" id="watch-val-row"><span class="now" id="watch-val">$299</span><span class="from" id="watch-meta">watching for a drop · checked just now</span></div>
               <div class="mrow"><span class="lbl">Alert me when</span><span class="val">the price drops below $270</span></div>
               <div class="mrow"><span class="lbl">Check</span><span class="val">Auto · on-device</span></div>
-              <div class="mcard-actions"><button class="btn-ghost" id="check-now">Check now</button><span class="spacer"></span><span class="mono-dim">updates on-device</span></div>
+              <div class="mcard-actions"><button class="btn-danger" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete</button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-ghost" id="check-now">Check now</button></div>
               <hr class="rule" />
               <div class="section-toggle">Change history</div>
               <div class="history" id="watch-hist">
@@ -714,22 +663,11 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         <div data-show="9" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
           <div class="catchup"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg> Pinned to chat</div>
           <div class="mcard pinned">
-            <div class="mcard-head"><span class="favicon-sq" style="background:#e8663a">S</span><span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url">soundnest.com/audio/sony-wh-1000xm5</span></span><span class="spacer"></span>
-              <button class="page-action" title="Edit" aria-label="Edit monitor"><svg viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 5l4 4"/></svg></button>
-              <span class="ovf">
-                <button class="page-action ovf-btn" aria-haspopup="menu" aria-expanded="false" title="More"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg></button>
-                <div class="menu-pop" role="menu" hidden>
-                  <button role="menuitem" data-act="edit"><svg viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 5l4 4"/></svg> Edit condition</button>
-                  <button role="menuitem" data-act="pause"><svg viewBox="0 0 24 24"><rect x="7" y="6" width="3.2" height="12" rx="1"/><rect x="13.8" y="6" width="3.2" height="12" rx="1"/></svg> Pause</button>
-                  <hr/>
-                  <button role="menuitem" class="destructive" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete monitor</button>
-                </div>
-              </span>
-            </div>
+            <div class="mcard-head"><span class="favicon-sq" style="background:#e8663a">S</span><span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url">soundnest.com/audio/sony-wh-1000xm5</span></span></div>
             <div class="value-good"><span class="now" style="font-size:26px;font-weight:var(--font-weight-bold)">$278</span><span class="trend down">▼ −7%</span><span class="from">from $299 · below your $270? not yet</span></div>
             <div class="mrow"><span class="lbl">Alert me when</span><span class="val">the price drops below $270</span></div>
             <div class="mrow"><span class="lbl">Check</span><span class="val">Auto · on-device</span></div>
-            <div class="mcard-actions"><button class="btn-ghost">Snooze</button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary">Open page</button></div>
+            <div class="mcard-actions"><button class="btn-danger" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete</button><button class="btn-ghost">Snooze</button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary">Open page</button></div>
           </div>
           <button class="section-toggle">Change history <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
           <div class="history">
@@ -832,7 +770,7 @@ document.getElementById("collapse-sony").onclick = () => go(5);
 
 // Dashboard rows: click / Enter / Space expands the Sony row into the editable card
 const rowSony = document.getElementById("row-sony");
-function expandSony(e) { if (e.target.closest(".ovf")) return; go(6); }
+function expandSony() { go(6); }
 rowSony.addEventListener("click", expandSony);
 rowSony.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(6); } });
 
@@ -860,21 +798,25 @@ document.getElementById("check-now").addEventListener("click", e => {
   const vr = document.getElementById("watch-val-row"); vr.classList.remove("flash"); void vr.offsetWidth; vr.classList.add("flash");
 });
 
-// Overflow menus (Edit / Pause / Delete)
-function closeMenus(except) {
-  document.querySelectorAll(".menu-pop").forEach(m => { if (m !== except) { m.hidden = true; m.previousElementSibling?.setAttribute("aria-expanded", "false"); } });
+// Inline save confirmation — the expanded card saves as you edit
+const saveNote = document.getElementById("save-note-sony");
+const SAVE_CHECK = '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>';
+let saveTimer = null;
+function noteSaved() {
+  if (!saveNote) return;
+  saveNote.classList.remove("saved");
+  void saveNote.offsetWidth;
+  saveNote.innerHTML = SAVE_CHECK + " Saved";
+  saveNote.classList.add("saved");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { saveNote.classList.remove("saved"); saveNote.textContent = "Saved automatically"; }, 4000);
 }
-document.querySelectorAll(".ovf-btn").forEach(btn => {
-  btn.addEventListener("click", e => {
-    e.stopPropagation();
-    const pop = btn.nextElementSibling;
-    const willOpen = pop.hidden;
-    closeMenus(willOpen ? pop : null);
-    pop.hidden = !willOpen;
-    btn.setAttribute("aria-expanded", String(willOpen));
-  });
+const cardSony = document.getElementById("card-sony");
+document.getElementById("sony-cond").addEventListener("input", noteSaved);
+cardSony.querySelector(".switch input").addEventListener("change", noteSaved);
+cardSony.addEventListener("click", e => {
+  if (e.target.closest(".chip, .segmented button, .page-pill .x")) noteSaved();
 });
-document.addEventListener("click", () => closeMenus(null));
 
 // Undo toast (guarded, reversible delete)
 const undoToast = document.getElementById("undo-toast");
@@ -886,11 +828,7 @@ document.getElementById("undo-x").onclick = () => { clearTimeout(undoTimer); und
 document.querySelectorAll('[data-act]').forEach(el => {
   el.addEventListener("click", e => {
     e.stopPropagation();
-    const act = el.getAttribute("data-act");
-    closeMenus(null);
-    if (act === "delete") showUndo();
-    else if (act === "edit-row" && el.closest("#row-sony")) go(6);
-    // edit / pause / resume are illustrative no-ops in this prototype
+    if (el.getAttribute("data-act") === "delete") showUndo();
   });
 });
 
@@ -904,10 +842,12 @@ function wireChips(container, input, map) {
     };
   });
 }
-wireChips(document.getElementById("create-chips"), document.getElementById("create-cond"), {
+const COND_MAP = {
   "Any drop": "the price drops at all", "Below $270": "the price drops below $270",
   "Below $250": "the price drops below $250", "Back in stock": "it's back in stock",
-});
+};
+wireChips(document.getElementById("create-chips"), document.getElementById("create-cond"), COND_MAP);
+wireChips(document.getElementById("sony-chips"), document.getElementById("sony-cond"), COND_MAP);
 document.querySelectorAll(".segmented").forEach(seg => {
   seg.querySelectorAll("button").forEach(b => { b.onclick = () => { seg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", "false")); b.setAttribute("aria-pressed", "true"); }; });
 });
