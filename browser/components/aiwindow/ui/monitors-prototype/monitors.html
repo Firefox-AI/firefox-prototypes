@@ -240,6 +240,8 @@ h1,h2,h3,h4,p { margin: 0; }
 /* ============ The monitor card — one component, three homes ============ */
 .mcard { background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); padding: var(--space-large); display: flex; flex-direction: column; gap: var(--space-medium); }
 .mcard.pinned { box-shadow: var(--card-box-shadow); }
+/* Live monitor card in chat — the violet ring marks it as pinned and updating */
+.mcard.live { border: 2px solid var(--color-accent-primary); }
 .mcard-head { display: flex; align-items: center; gap: var(--space-small); }
 .mcard-name { font-weight: var(--font-weight-semibold); }
 .mcard-url { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
@@ -644,7 +646,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         <div data-show="4" class="anim-land" style="display:flex;flex-direction:column;gap:var(--space-medium)">
           <div class="message-assistant">Monitoring <b>Sony WH-1000XM5 price</b>. I'll send a desktop notification if it drops below $270 — find it any time at <a href="#" onclick="return false">about:monitors</a>.</div>
 
-          <div class="mcard chatcard" id="watch-card" role="button" tabindex="0" aria-expanded="false">
+          <div class="mcard chatcard live" id="watch-card" role="button" tabindex="0" aria-expanded="false">
             <div class="mcard-head">
               <span class="favicon-sq" style="background:#e8663a">S</span>
               <span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url" id="watch-sub">Below $270 · Auto · on-device</span></span>
@@ -654,7 +656,12 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             </div>
             <div class="watch-expand" id="watch-expand" hidden>
               <div class="mvalue" id="watch-val-row"><span class="now" id="watch-val">$299</span><span class="from" id="watch-meta">watching for a drop · checked just now</span></div>
-              <div class="mrow"><span class="lbl">Alert me when</span><span class="val">the price drops below $270</span></div>
+              <div class="field">
+                <span class="field-label">Alert me when</span>
+                <input class="field-input" id="watch-cond" value="the price drops below $270" aria-label="Alert condition" />
+                <div class="chip-row" id="watch-chips"><button class="chip">Any drop</button><button class="chip selected">Below $270</button><button class="chip">Below $250</button><button class="chip">Back in stock</button></div>
+                <span class="save-note" id="save-note-watch" role="status" aria-live="polite"></span>
+              </div>
               <div class="mrow"><span class="lbl">Check</span><span class="val">Auto · on-device</span></div>
               <div class="mcard-actions"><button class="btn-danger" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete</button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-ghost" id="check-now">Check now</button></div>
               <hr class="rule" />
@@ -670,18 +677,29 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         <!-- Step 9: Open page — the card is pinned to THIS CHAT, plus change history -->
         <div data-show="9" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
           <div class="pin-eyebrow"><svg viewBox="0 0 24 24"><path d="M12 17v5M8 3h8l-1 6 4 3H5l4-3z"/></svg> Pinned to chat</div>
-          <div class="mcard pinned">
-            <div class="mcard-head"><span class="favicon-sq" style="background:#e8663a">S</span><span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url">soundnest.com/audio/sony-wh-1000xm5</span></span></div>
-            <div class="value-good"><span class="now" style="font-size:26px;font-weight:var(--font-weight-bold)">$278</span><span class="trend down">▼ −7%</span><span class="from">was $299 · checked 2:14 PM</span></div>
-            <div class="mrow"><span class="lbl">Alert me when</span><span class="val">the price drops below $270</span></div>
+          <div class="mcard pinned live">
+            <div class="mcard-head">
+              <span class="favicon-sq" style="background:#e8663a">S</span>
+              <span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url">soundnest.com/audio/sony-wh-1000xm5</span></span>
+              <span class="spacer"></span>
+              <span class="status-chip">$278 ▼ −7%</span>
+            </div>
+            <div class="mvalue"><span class="now">$278</span><span class="from">checked 2:14 PM · was $299</span></div>
+            <div class="field">
+              <span class="field-label">Alert me when</span>
+              <input class="field-input" id="pin-cond" value="the price drops below $270" aria-label="Alert condition" />
+              <div class="chip-row" id="pin-chips"><button class="chip">Any drop</button><button class="chip selected">Below $270</button><button class="chip">Below $250</button><button class="chip">Back in stock</button></div>
+              <span class="save-note" id="save-note-pin" role="status" aria-live="polite"></span>
+            </div>
             <div class="mrow"><span class="lbl">Check</span><span class="val">Auto · on-device</span></div>
             <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Snooze</button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary">Open page</button></div>
-          </div>
-          <button class="section-toggle">Change history <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
-          <div class="history">
-            <div class="hist-item"><span class="when">Today 2:14p</span><span class="oldv">$299</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$278</span><span class="deemphasized">−7%</span></div>
-            <div class="hist-item low"><span class="when">Jun 24</span><span class="hist-flag">possible change</span><span class="deemphasized">low confidence · held here, no notification</span></div>
-            <div class="hist-item"><span class="when">Jun 17</span><span class="oldv">$319</span><span class="arrow">→</span><span class="newv">$299</span><span class="deemphasized">first checked</span></div>
+            <hr class="rule" />
+            <div class="section-toggle">Change history</div>
+            <div class="history">
+              <div class="hist-item"><span class="when">Today 2:14p</span><span class="oldv">$299</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$278</span><span class="deemphasized">−7%</span></div>
+              <div class="hist-item low"><span class="when">Jun 24</span><span class="hist-flag">possible change</span><span class="deemphasized">low confidence · held here, no notification</span></div>
+              <div class="hist-item"><span class="when">Jun 17</span><span class="oldv">$319</span><span class="arrow">→</span><span class="newv">$299</span><span class="deemphasized">first checked</span></div>
+            </div>
           </div>
         </div>
       </div>
@@ -867,8 +885,8 @@ rowSony.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " 
 const watchCard = document.getElementById("watch-card");
 const watchExpand = document.getElementById("watch-expand");
 function toggleWatch() { const open = watchCard.getAttribute("aria-expanded") === "true"; watchCard.setAttribute("aria-expanded", String(!open)); watchExpand.hidden = open; }
-watchCard.addEventListener("click", e => { if (e.target.closest("button, a")) return; toggleWatch(); });
-watchCard.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleWatch(); } });
+watchCard.addEventListener("click", e => { if (e.target.closest("button, a, input, label")) return; toggleWatch(); });
+watchCard.addEventListener("keydown", e => { if (e.target !== watchCard) return; if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleWatch(); } });
 
 const prices = [299, 291, 284, 276];
 let pi = 0;
@@ -890,23 +908,28 @@ document.getElementById("check-now").addEventListener("click", e => {
 
 // Inline save confirmation — the expanded card saves as you edit
 const saveNote = document.getElementById("save-note-sony");
+const watchNote = document.getElementById("save-note-watch");
+const pinNote = document.getElementById("save-note-pin");
 const SAVE_CHECK = '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>';
-let saveTimer = null;
-function noteSaved() {
-  if (!saveNote) return;
-  saveNote.classList.remove("saved");
-  void saveNote.offsetWidth;
-  saveNote.innerHTML = SAVE_CHECK + " Saved";
-  saveNote.classList.add("saved");
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => { saveNote.classList.remove("saved"); saveNote.textContent = "Saved automatically"; }, 4000);
+function noteSaved(el, revert) {
+  el = el || saveNote;
+  revert = revert === undefined ? "Saved automatically" : revert;
+  if (!el) return;
+  el.classList.remove("saved");
+  void el.offsetWidth;
+  el.innerHTML = SAVE_CHECK + " Saved";
+  el.classList.add("saved");
+  clearTimeout(el._saveTimer);
+  el._saveTimer = setTimeout(() => { el.classList.remove("saved"); el.textContent = revert; }, 4000);
 }
 const cardSony = document.getElementById("card-sony");
-document.getElementById("sony-cond").addEventListener("input", noteSaved);
-cardSony.querySelector(".switch input").addEventListener("change", noteSaved);
+document.getElementById("sony-cond").addEventListener("input", () => noteSaved());
+cardSony.querySelector(".switch input").addEventListener("change", () => noteSaved());
 cardSony.addEventListener("click", e => {
   if (e.target.closest(".chip, .segmented button, .page-pill .x")) noteSaved();
 });
+document.getElementById("watch-cond").addEventListener("input", () => noteSaved(watchNote, ""));
+document.getElementById("pin-cond").addEventListener("input", () => noteSaved(pinNote, ""));
 
 // Undo toast (guarded, reversible delete)
 const undoToast = document.getElementById("undo-toast");
@@ -922,13 +945,14 @@ document.querySelectorAll('[data-act]').forEach(el => {
   });
 });
 
-function wireChips(container, input, map) {
+function wireChips(container, input, map, onPick) {
   if (!container) return;
   container.querySelectorAll(".chip").forEach(chip => {
     chip.onclick = () => {
       container.querySelectorAll(".chip").forEach(c => c.classList.remove("selected"));
       chip.classList.add("selected");
       if (input && map[chip.textContent]) input.value = map[chip.textContent];
+      if (onPick) onPick();
     };
   });
 }
@@ -938,6 +962,8 @@ const COND_MAP = {
 };
 wireChips(document.getElementById("create-chips"), document.getElementById("create-cond"), COND_MAP);
 wireChips(document.getElementById("sony-chips"), document.getElementById("sony-cond"), COND_MAP);
+wireChips(document.getElementById("watch-chips"), document.getElementById("watch-cond"), COND_MAP, () => noteSaved(watchNote, ""));
+wireChips(document.getElementById("pin-chips"), document.getElementById("pin-cond"), COND_MAP, () => noteSaved(pinNote, ""));
 document.querySelectorAll(".segmented").forEach(seg => {
   seg.querySelectorAll("button").forEach(b => { b.onclick = () => { seg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", "false")); b.setAttribute("aria-pressed", "true"); }; });
 });
