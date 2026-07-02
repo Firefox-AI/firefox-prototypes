@@ -146,6 +146,8 @@ h1,h2,h3,h4,p { margin: 0; }
 .page-action:hover { background: var(--background-color-box-info); }
 .page-action svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .page-action.attn { color: var(--smartwindow-icon-color-accent); }
+.page-action.danger { color: var(--text-color-error); }
+.page-action.danger:hover { background: var(--background-color-critical); }
 .page-action .dot { position: absolute; top: 2px; right: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--icon-color-success); border: 1.5px solid var(--background-color-box); }
 .sw-toggle { color: var(--smartwindow-icon-color-accent); }
 .content-row { flex: 1; display: flex; min-height: 0; position: relative; }
@@ -222,6 +224,11 @@ h1,h2,h3,h4,p { margin: 0; }
 .starter .ic svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .starter .st-name { font-weight: var(--font-weight-semibold); font-size: var(--font-size-small); }
 .starter .st-desc { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
+
+/* Create-monitor modal — dashboard container for the same create card (§4) */
+.modal-scrim { position: absolute; inset: 0; z-index: 70; background: light-dark(rgba(21,20,26,.42), rgba(0,0,0,.55)); display: grid; place-items: center; padding: var(--space-xlarge); }
+.modal-scrim[hidden] { display: none; }
+.modal-card { width: min(480px, 100%); box-shadow: var(--box-shadow-level-4); }
 
 /* Loading skeleton */
 .skel { background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); padding: var(--space-medium) var(--space-large); margin-bottom: var(--space-small); display: flex; align-items: center; gap: var(--space-medium); }
@@ -300,7 +307,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 .hist-item .newv { font-weight: var(--font-weight-semibold); }
 .hist-item .arrow { color: var(--text-color-deemphasized); }
 .hist-item.low { color: var(--text-color-deemphasized); }
-.hist-badge-low { font-size: 11px; color: var(--text-color-warning); border: 1px solid var(--icon-color-warning); border-radius: var(--border-radius-small); padding: 0 5px; }
+.hist-flag { color: var(--text-color-warning); font-weight: var(--font-weight-semibold); }
 
 /* ============ Smart Window sidebar (real ai-window structure) ============ */
 .sidebar { width: 416px; flex: none; display: flex; flex-direction: column; background: var(--background-color-canvas); border-left: 1px solid var(--border-color-deemphasized); }
@@ -317,11 +324,12 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 .message-assistant { max-width: 100%; color: var(--text-color); }
 .message-assistant a { color: var(--smartwindow-text-color-accent-primary); }
 
-.status-chip { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-size-small); color: var(--text-color-success); background: var(--background-color-success); padding: 3px 10px; border-radius: var(--border-radius-circle); }
+.status-chip { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--text-color-success); background: var(--background-color-success); padding: 3px 10px; border-radius: var(--border-radius-circle); white-space: nowrap; flex: none; }
 .status-chip .pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pulse 1.8s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .35; } }
-.catchup { display: inline-flex; align-items: center; gap: var(--space-small); padding: var(--space-small) var(--space-medium); background: var(--background-color-box-info); border-radius: var(--border-radius-medium); font-size: var(--font-size-small); color: var(--text-color-deemphasized); align-self: flex-start; }
-.catchup svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+/* Eyebrow — a label, not a control */
+.pin-eyebrow { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: var(--font-weight-semibold); letter-spacing: .05em; text-transform: uppercase; color: var(--text-color-deemphasized); }
+.pin-eyebrow svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 /* In-chat monitor card: click to expand, updates live */
 .chatcard { cursor: pointer; }
@@ -475,7 +483,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </div>
 
           <!-- Empty-state lead (only when there are no monitors) -->
-          <div class="empty-lead" data-show="7"><h3>Watch a page for changes</h3><p>Start from one of these, or open any page and type <b>/monitor</b> in Smart Window.</p></div>
+          <div class="empty-lead" data-show="7"><h3>Watch a page for changes</h3><p>Start from a monitor prompt, or open any page and type <b>/monitor</b> in Smart Window.</p></div>
 
           <!-- Populated: running + paused monitors -->
           <div data-show="5 6">
@@ -543,8 +551,8 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             </div>
           </div>
 
-          <!-- Starter templates — ALWAYS available, under the running + paused monitors -->
-          <div class="group-label" data-show="5 6">Start a new monitor</div>
+          <!-- Monitor prompts — always under the running + paused monitors; each opens the create modal pre-filled -->
+          <div class="group-label" data-show="5 6">Monitor prompts</div>
           <div class="starter-grid" data-show="5 6 7">
             <button class="starter"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/><path d="M17 15l4 4-4-2-4 2z" fill="currentColor" stroke="none"/></svg></span><span class="st-name">Price drop</span><span class="st-desc">Tell me when it gets cheaper</span></button>
             <button class="starter"><span class="ic"><svg viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/></svg></span><span class="st-name">Back in stock</span><span class="st-desc">Ping me when it returns</span></button>
@@ -591,7 +599,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
       <div class="annot point-right" style="top:70px; right:150px" data-show="1">Firefox already renders this page — so the check happens here, on your device.</div>
       <div class="annot point-right" style="bottom:150px; right:24px" data-show="2">Type <b>/</b> in the smartbar to run an agent — Monitor, Scout, or Research.</div>
-      <div class="annot point-down" style="bottom:120px; left:410px" data-show="7">Templates seed the first monitor; loading matches the row so nothing shifts.</div>
+      <div class="annot point-down" style="bottom:120px; left:410px" data-show="7">Monitor prompts open the create card pre-filled; loading matches the row so nothing shifts.</div>
     </main>
 
     <!-- ===================== Smart Window sidebar ===================== -->
@@ -641,7 +649,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <span class="favicon-sq" style="background:#e8663a">S</span>
               <span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url" id="watch-sub">Below $270 · Auto · on-device</span></span>
               <span class="spacer"></span>
-              <span class="status-chip"><span class="pulse-dot"></span> Watching</span>
+              <span class="status-chip" id="watch-chip"><span class="pulse-dot"></span> Watching</span>
               <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
             </div>
             <div class="watch-expand" id="watch-expand" hidden>
@@ -661,18 +669,18 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
         <!-- Step 9: Open page — the card is pinned to THIS CHAT, plus change history -->
         <div data-show="9" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
-          <div class="catchup"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg> Pinned to chat</div>
+          <div class="pin-eyebrow"><svg viewBox="0 0 24 24"><path d="M12 17v5M8 3h8l-1 6 4 3H5l4-3z"/></svg> Pinned to chat</div>
           <div class="mcard pinned">
             <div class="mcard-head"><span class="favicon-sq" style="background:#e8663a">S</span><span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url">soundnest.com/audio/sony-wh-1000xm5</span></span></div>
-            <div class="value-good"><span class="now" style="font-size:26px;font-weight:var(--font-weight-bold)">$278</span><span class="trend down">▼ −7%</span><span class="from">from $299 · below your $270? not yet</span></div>
+            <div class="value-good"><span class="now" style="font-size:26px;font-weight:var(--font-weight-bold)">$278</span><span class="trend down">▼ −7%</span><span class="from">was $299 · checked 2:14 PM</span></div>
             <div class="mrow"><span class="lbl">Alert me when</span><span class="val">the price drops below $270</span></div>
             <div class="mrow"><span class="lbl">Check</span><span class="val">Auto · on-device</span></div>
-            <div class="mcard-actions"><button class="btn-danger" data-act="delete"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Delete</button><button class="btn-ghost">Snooze</button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary">Open page</button></div>
+            <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Snooze</button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary">Open page</button></div>
           </div>
           <button class="section-toggle">Change history <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
           <div class="history">
             <div class="hist-item"><span class="when">Today 2:14p</span><span class="oldv">$299</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$278</span><span class="deemphasized">−7%</span></div>
-            <div class="hist-item low"><span class="when">Jun 24</span><span>possible change</span><span class="hist-badge-low">low confidence</span><span class="deemphasized">held here — no notification</span></div>
+            <div class="hist-item low"><span class="when">Jun 24</span><span class="hist-flag">possible change</span><span class="deemphasized">low confidence · held here, no notification</span></div>
             <div class="hist-item"><span class="when">Jun 17</span><span class="oldv">$319</span><span class="arrow">→</span><span class="newv">$299</span><span class="deemphasized">first checked</span></div>
           </div>
         </div>
@@ -709,6 +717,33 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       </div>
       <div class="disclaimer">AI can make mistakes. <a href="#" onclick="return false">Report any issues</a>.</div>
     </aside>
+
+    <!-- Create modal — the same create card, in the dashboard's container (§4). No page to read, so you paste a URL. -->
+    <div class="modal-scrim" id="modal-scrim" hidden>
+      <div class="mcard modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="mcard-head">
+          <span class="favicon-sq" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
+          <span><span class="mcard-name" id="modal-title">New monitor</span><br/><span class="mcard-url">Watches on-device while Firefox is open</span></span>
+          <span class="spacer"></span>
+          <button class="page-action" id="modal-close" title="Close" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg></button>
+        </div>
+        <div class="field">
+          <span class="field-label">Alert me when</span>
+          <input class="field-input" id="modal-cond" placeholder="Describe what to watch" aria-label="Alert condition" />
+          <div class="chip-row" id="modal-chips"></div>
+        </div>
+        <div class="field">
+          <span class="field-label">Pages</span>
+          <input class="field-input" id="modal-url" placeholder="Paste a URL to watch" aria-label="Page URL" />
+          <span class="mono-dim">No page open here — paste one and I'll read its current value.</span>
+        </div>
+        <hr class="rule" />
+        <div class="mrow"><span class="lbl">Check</span><span class="segmented" role="group" aria-label="Check frequency"><button aria-pressed="true">Auto</button><button aria-pressed="false">Hourly</button><button aria-pressed="false">Daily</button></span></div>
+        <div class="mrow"><span class="lbl">Notify</span><span class="val">Desktop notification</span></div>
+        <div class="mrow"><span class="lbl">Background</span><a class="accent-link" href="#" onclick="return false">Also check when Firefox is closed</a><span class="spacer"></span><label class="switch"><input type="checkbox" aria-label="Check in background" /><span class="track"></span><span class="thumb"></span></label></div>
+        <div class="mcard-actions"><span class="mono-dim">Runs on-device</span><span class="spacer"></span><button class="btn-ghost" id="modal-cancel">Cancel</button><button class="btn-primary" id="modal-start">Start monitoring</button></div>
+      </div>
+    </div>
   </div>
 
   <!-- Undo toast — delete is reversible (§2) -->
@@ -716,6 +751,12 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
     <span>Monitor deleted.</span>
     <button class="undo" id="undo-btn">Undo</button>
     <button class="x" id="undo-x" aria-label="Dismiss"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg></button>
+  </div>
+
+  <!-- Started toast -->
+  <div class="undo-toast" id="start-toast" hidden>
+    <span>Watching. You'll find it under Active.</span>
+    <button class="x" id="start-x" aria-label="Dismiss"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg></button>
   </div>
 </div>
 
@@ -758,12 +799,60 @@ function render() {
 function go(n) { step = Math.max(1, Math.min(N, n)); render(); }
 document.getElementById("next").onclick = () => go(step + 1);
 document.getElementById("prev").onclick = () => go(step - 1);
-document.addEventListener("keydown", e => { if (e.key === "ArrowRight") go(step + 1); if (e.key === "ArrowLeft") go(step - 1); });
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && !scrim.hidden) { closeModal(); return; }
+  if (!scrim.hidden) return;
+  if (e.key === "ArrowRight") go(step + 1);
+  if (e.key === "ArrowLeft") go(step - 1);
+});
 
 // Story shortcuts
 document.getElementById("pa-monitor").onclick = () => { if (step === 1) go(2); };
 document.getElementById("agent-monitor").onclick = (e) => { e.stopPropagation(); go(3); };
-document.getElementById("new-monitor").onclick = () => go(7);
+
+// Monitor prompts + New monitor open the create card as a modal (no page to read here — you paste a URL)
+const PROMPTS = {
+  "Price drop": { cond: "the price drops", chips: [["Any drop", "the price drops at all"], ["Below a target", "the price drops below $—"], ["10% off or more", "the price drops 10% or more"]] },
+  "Back in stock": { cond: "it's back in stock", chips: [["Any restock", "it's back in stock"], ["My size", "my size is back in stock"]] },
+  "Profile update": { cond: "this profile posts or changes", chips: [["New post", "they post something new"], ["Bio changes", "the bio or details change"]] },
+  "Page change": { cond: "anything on the page changes", chips: [["Any change", "anything on the page changes"], ["A section I pick", "the section I select changes"]] },
+  "News / topic": { cond: "there's new coverage of this topic", chips: [["As it happens", "there's new coverage, as it happens"], ["Daily digest", "new coverage, once a day"]] },
+  "Dates / slots": { cond: "a date or slot opens up", chips: [["Any opening", "any date or slot opens"], ["Weekends", "a weekend slot opens"]] },
+};
+const scrim = document.getElementById("modal-scrim");
+const modalCond = document.getElementById("modal-cond");
+const modalChips = document.getElementById("modal-chips");
+function openModal(name) {
+  const p = name ? PROMPTS[name] : null;
+  document.getElementById("modal-title").textContent = name || "New monitor";
+  modalCond.value = p ? p.cond : "";
+  document.getElementById("modal-url").value = "";
+  modalChips.innerHTML = "";
+  (p ? p.chips : []).forEach(([label, cond]) => {
+    const c = document.createElement("button");
+    c.className = "chip"; c.textContent = label;
+    c.onclick = () => { modalChips.querySelectorAll(".chip").forEach(x => x.classList.remove("selected")); c.classList.add("selected"); modalCond.value = cond; };
+    modalChips.appendChild(c);
+  });
+  modalChips.hidden = !p;
+  scrim.hidden = false;
+  modalCond.focus();
+}
+function closeModal() { scrim.hidden = true; }
+document.querySelectorAll(".starter").forEach(s => s.addEventListener("click", () => openModal(s.querySelector(".st-name").textContent)));
+document.getElementById("new-monitor").onclick = () => openModal(null);
+scrim.addEventListener("click", e => { if (e.target === scrim) closeModal(); });
+document.getElementById("modal-close").onclick = closeModal;
+document.getElementById("modal-cancel").onclick = closeModal;
+const startToast = document.getElementById("start-toast");
+let startTimer = null;
+document.getElementById("modal-start").onclick = () => {
+  closeModal();
+  startToast.hidden = false;
+  clearTimeout(startTimer);
+  startTimer = setTimeout(() => { startToast.hidden = true; }, 4000);
+};
+document.getElementById("start-x").onclick = () => { clearTimeout(startTimer); startToast.hidden = true; };
 document.getElementById("start-monitoring").onclick = () => go(4);
 document.getElementById("toast").onclick = () => go(9);
 document.getElementById("collapse-sony").onclick = () => go(5);
@@ -787,13 +876,14 @@ document.getElementById("check-now").addEventListener("click", e => {
   e.stopPropagation();
   if (pi >= prices.length - 1) return;
   const prev = prices[pi]; pi++; const now = prices[pi];
-  const pct = Math.round((now - 299) / 299 * 100);
+  const pct = Math.abs(Math.round((now - 299) / 299 * 100));
   document.getElementById("watch-val").textContent = "$" + now;
-  document.getElementById("watch-meta").textContent = "checked just now · ▼ " + pct + "%";
-  document.getElementById("watch-sub").textContent = "$" + now + " · Below $270 · Auto";
+  document.getElementById("watch-meta").textContent = "checked just now · was $299";
+  document.getElementById("watch-sub").textContent = "Below $270 · Auto · on-device";
+  document.getElementById("watch-chip").innerHTML = "$" + now + " ▼ −" + pct + "%";
   const hist = document.getElementById("watch-hist");
   const row = document.createElement("div"); row.className = "hist-item";
-  row.innerHTML = '<span class="when">Just now</span><span class="oldv">$' + prev + '</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$' + now + '</span><span class="deemphasized">' + pct + '%</span>';
+  row.innerHTML = '<span class="when">Just now</span><span class="oldv">$' + prev + '</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$' + now + '</span><span class="deemphasized">−' + pct + '%</span>';
   hist.prepend(row);
   const vr = document.getElementById("watch-val-row"); vr.classList.remove("flash"); void vr.offsetWidth; vr.classList.add("flash");
 });
