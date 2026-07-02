@@ -185,9 +185,6 @@ h1,h2,h3,h4,p { margin: 0; }
 .about-head .title { font-size: 28px; font-weight: var(--font-weight-bold); }
 .about-head .spacer { flex: 1; }
 
-.banner { display: flex; align-items: center; gap: var(--space-small); padding: var(--space-small) var(--space-medium); margin-bottom: var(--space-xlarge); border-radius: var(--border-radius-medium); background: var(--background-color-box-info); color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
-.banner svg { width: 15px; height: 15px; flex: none; }
-.banner .accent-link { margin-left: auto; }
 .accent-link { color: var(--color-accent-primary); font-weight: var(--font-weight-semibold); font-size: var(--font-size-small); }
 
 .group-label { font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--text-color-deemphasized); text-transform: uppercase; letter-spacing: .04em; margin: var(--space-large) 0 var(--space-small); }
@@ -268,13 +265,6 @@ h1,h2,h3,h4,p { margin: 0; }
 .mrow .lbl { color: var(--text-color-deemphasized); min-width: 92px; }
 .mrow .val { color: var(--text-color); }
 .mrow .spacer { flex: 1; }
-.switch { position: relative; width: 38px; height: 22px; flex: none; }
-.switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
-.switch .track { position: absolute; inset: 0; background: var(--border-color); border-radius: var(--border-radius-circle); transition: background var(--motion-dur-near) var(--motion-ease-edge); }
-.switch .thumb { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform var(--motion-dur-near) var(--motion-ease-edge); box-shadow: 0 1px 2px rgba(0,0,0,.2); }
-.switch input:checked + .track { background: var(--color-accent-primary); }
-.switch input:checked + .track + .thumb { transform: translateX(16px); }
-.switch input:focus-visible + .track { outline: var(--focus-outline); outline-offset: 2px; }
 .mcard-actions { display: flex; align-items: center; gap: var(--space-small); }
 .mcard-actions .spacer { flex: 1; }
 .mono-dim { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
@@ -484,12 +474,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
           <!-- Populated: running + paused monitors -->
           <div data-show="5 6">
-            <div class="banner">
-              <svg viewBox="0 0 24 24" fill="none" stroke="var(--smartwindow-icon-color-accent)" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
-              Checking on-device while Firefox is open. 1 monitor keeps watching in the background.
-              <a class="accent-link" href="#" onclick="return false">Manage background</a>
-            </div>
-
             <div class="group-label">Active · 3</div>
 
             <div>
@@ -520,7 +504,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <hr class="rule" />
                 <div class="mrow"><span class="lbl">Check</span><span class="segmented" role="group" aria-label="Check frequency"><button aria-pressed="true">Auto</button><button aria-pressed="false">Hourly</button><button aria-pressed="false">Daily</button></span></div>
                 <div class="mrow"><span class="lbl">Notify</span><span class="val">Desktop notification</span></div>
-                <div class="mrow"><span class="lbl">Background</span><span class="val">Check while Firefox is closed</span><span class="spacer"></span><label class="switch"><input type="checkbox" aria-label="Check in background" /><span class="track"></span><span class="thumb"></span></label></div>
                 <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite">Saved automatically</span></div>
               </div>
             </div>
@@ -535,7 +518,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <div class="grow" role="button" tabindex="0">
               <span class="dot-status active"></span>
               <span class="favicon-sq" style="background:#3a7ae8">C</span>
-              <span class="gmain"><span class="gname">Apartment listings · Mission</span><br/><span class="gmeta truncate">craigslist.org · checked 12m ago · <span style="color:var(--smartwindow-text-color-accent-primary)">background on</span></span></span>
+              <span class="gmain"><span class="gname">Apartment listings · Mission</span><br/><span class="gmeta truncate">craigslist.org · checked 12m ago</span></span>
               <span class="gvalue"><span class="now">3 new</span><br/><span class="sub">since yesterday</span></span>
             </div>
 
@@ -631,8 +614,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <hr class="rule" />
             <div class="mrow"><span class="lbl">Check</span><span class="segmented" role="group" aria-label="Check frequency"><button aria-pressed="true">Auto</button><button aria-pressed="false">Hourly</button><button aria-pressed="false">Daily</button></span></div>
             <div class="mrow"><span class="lbl">Notify</span><span class="val">Desktop notification</span></div>
-            <div class="mrow"><span class="lbl">Background</span><a class="accent-link" href="#" onclick="return false">Also check when Firefox is closed</a><span class="spacer"></span><label class="switch"><input type="checkbox" aria-label="Check in background" /><span class="track"></span><span class="thumb"></span></label></div>
-            <div class="mcard-actions"><span class="mono-dim">Runs on-device</span><span class="spacer"></span><button class="btn-ghost">Cancel</button><button class="btn-primary" id="start-monitoring">Start monitoring</button></div>
+                        <div class="mcard-actions"><span class="mono-dim">Runs on-device</span><span class="spacer"></span><button class="btn-ghost">Cancel</button><button class="btn-primary" id="start-monitoring">Start monitoring</button></div>
           </div>
         </div>
 
@@ -741,7 +723,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       <div class="mcard modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div class="mcard-head">
           <span class="favicon-sq" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
-          <span><span class="mcard-name" id="modal-title">New monitor</span><br/><span class="mcard-url">Watches on-device while Firefox is open</span></span>
+          <span><span class="mcard-name" id="modal-title">New monitor</span><br/><span class="mcard-url">Watches the page on-device</span></span>
           <span class="spacer"></span>
           <button class="page-action" id="modal-close" title="Close" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg></button>
         </div>
@@ -758,8 +740,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         <hr class="rule" />
         <div class="mrow"><span class="lbl">Check</span><span class="segmented" role="group" aria-label="Check frequency"><button aria-pressed="true">Auto</button><button aria-pressed="false">Hourly</button><button aria-pressed="false">Daily</button></span></div>
         <div class="mrow"><span class="lbl">Notify</span><span class="val">Desktop notification</span></div>
-        <div class="mrow"><span class="lbl">Background</span><a class="accent-link" href="#" onclick="return false">Also check when Firefox is closed</a><span class="spacer"></span><label class="switch"><input type="checkbox" aria-label="Check in background" /><span class="track"></span><span class="thumb"></span></label></div>
-        <div class="mcard-actions"><span class="mono-dim">Runs on-device</span><span class="spacer"></span><button class="btn-ghost" id="modal-cancel">Cancel</button><button class="btn-primary" id="modal-start">Start monitoring</button></div>
+                <div class="mcard-actions"><span class="mono-dim">Runs on-device</span><span class="spacer"></span><button class="btn-ghost" id="modal-cancel">Cancel</button><button class="btn-primary" id="modal-start">Start monitoring</button></div>
       </div>
     </div>
   </div>
@@ -951,7 +932,6 @@ function noteSaved(el, revert) {
 }
 const cardSony = document.getElementById("card-sony");
 document.getElementById("sony-cond").addEventListener("input", () => noteSaved());
-cardSony.querySelector(".switch input").addEventListener("change", () => noteSaved());
 cardSony.addEventListener("click", e => {
   if (e.target.closest(".chip, .segmented button, .page-pill .x")) noteSaved();
 });
