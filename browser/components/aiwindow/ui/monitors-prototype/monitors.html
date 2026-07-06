@@ -198,6 +198,7 @@ h1,h2,h3,h4,p { margin: 0; }
 .accent-link { color: var(--color-accent-primary); font-weight: var(--font-weight-semibold); font-size: var(--font-size-small); }
 
 .group-label { font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--text-color-deemphasized); text-transform: uppercase; letter-spacing: .04em; margin: var(--space-large) 0 var(--space-small); }
+.scope-tag { font-size: 11px; font-weight: 400; color: var(--text-color-deemphasized); text-transform: none; letter-spacing: 0; margin-left: var(--space-xsmall); opacity: .8; }
 
 /* Glance row */
 .grow { display: flex; align-items: center; gap: var(--space-medium); padding: var(--space-medium) var(--space-large); background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); margin-bottom: var(--space-small); width: 100%; text-align: left; transition: border-color var(--motion-dur-near) var(--motion-ease-edge), box-shadow var(--motion-dur-near) var(--motion-ease-edge); }
@@ -710,7 +711,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </div>
 
           <!-- Monitor prompts — always under the running + paused monitors; each opens the create modal pre-filled -->
-          <div class="group-label" data-show="5 6">Monitor prompts</div>
+          <div class="group-label" data-show="5 6">Monitor prompts <span class="scope-tag">after v0</span></div>
           <div class="starter-grid" data-show="5 6 11">
             <button class="starter"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/><path d="M17 15l4 4-4-2-4 2z" fill="currentColor" stroke="none"/></svg></span><span class="st-name">Price drop</span><span class="st-desc">Tell me when it gets cheaper</span></button>
             <button class="starter"><span class="ic"><svg viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/></svg></span><span class="st-name">Back in stock</span><span class="st-desc">Ping me when it returns</span></button>
