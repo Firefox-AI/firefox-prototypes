@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light dark" />
-<title>Monitors — Smart Window prototype</title>
+<title>Monitors — after-v0 explorations (includes Monitor prompts)</title>
 <style>
 /* ============================================================
    MONITORS — Smart Window prototype
@@ -151,7 +151,6 @@ h1,h2,h3,h4,p { margin: 0; }
 .page-action.attn { color: var(--smartwindow-icon-color-accent); }
 .page-action.danger { color: var(--text-color-error); }
 .page-action.danger:hover { background: var(--background-color-critical); }
-[data-act="delete"].armed { width: auto; padding: 0 12px; background: var(--background-color-critical); color: var(--text-color-error); font-size: 12px; font-weight: var(--font-weight-semibold); border: 1px solid var(--text-color-error); border-radius: var(--border-radius-circle); }
 .mcard-actions .page-action.danger { width: 36px; height: 36px; border: 1px solid var(--border-color); border-radius: var(--border-radius-circle); }
 .mcard-actions { margin-top: var(--space-xsmall); }
 .page-action .dot { position: absolute; top: 2px; right: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--icon-color-success); border: 1.5px solid var(--background-color-box); }
@@ -539,7 +538,9 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       <button class="rail-btn" title="Bookmarks" aria-label="Bookmarks"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8L3.5 9.7l5.9-.9z"/></svg></button>
       <button class="rail-btn" title="Passwords" aria-label="Passwords"><svg viewBox="0 0 24 24"><circle cx="8" cy="14" r="3.5"/><path d="M10.5 11.5 19 3M15 7l2.5 2.5"/></svg></button>
       <div class="rail-sep" role="separator"></div>
-      <button class="rail-btn" id="rail-monitors" title="Tools" aria-label="Tools"><svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h9M17 17h3"/><circle cx="15" cy="7" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="17" r="1.6"/></svg><span class="dot"></span></button>
+      <button class="rail-btn" id="rail-monitors" title="Monitors" aria-label="Monitors"><svg viewBox="0 0 24 24"><path d="M4 12h4l2-6 4 12 2-6h4"/></svg><span class="dot"></span></button>
+      <button class="rail-btn" title="Scout" aria-label="Scout"><svg viewBox="0 0 24 24"><path d="M3 11l8-8h7v7l-8 8z"/><circle cx="14.5" cy="7.5" r="1.2"/></svg></button>
+      <button class="rail-btn" title="Research" aria-label="Research"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></button>
       <span class="rail-spacer"></span>
       <button class="rail-btn" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2.1 2.1M16.9 16.9L19 19M19 5l-2.1 2.1M7.1 16.9L5 19"/></svg></button>
     </nav>
@@ -547,8 +548,8 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
     <!-- Monitors tool panel (step 11) -->
     <aside class="rail-panel" data-show="10" aria-label="Monitors panel">
       <div class="rail-panel-head">
-        <span class="rail-panel-title">Tools</span>
-        <span class="deemphasized small">Monitors · 3 active</span>
+        <span class="rail-panel-title">Monitors</span>
+        <span class="deemphasized small">3 active</span>
         <span style="flex:1"></span>
         <button class="btn-ghost" id="panel-new" style="padding:5px 12px">+ New</button>
       </div>
@@ -631,7 +632,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </div>
 
           <!-- Empty-state lead (only when there are no monitors) -->
-          <div class="empty-lead" data-show="11"><h3>Watch any page for changes</h3><p>Open any page and type <b>/monitor</b> in Smart Window, or start with New monitor.</p></div>
+          <div class="empty-lead" data-show="11"><h3>Watch any page for changes</h3><p>Start from a monitor prompt, or open any page and type <b>/monitor</b> in Smart Window.</p></div>
 
           <!-- Populated: running + paused monitors -->
           <div data-show="5 6">
@@ -731,6 +732,17 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               </div>
               </div></div>
             </div>
+          </div>
+
+          <!-- Monitor prompts — always under the running + paused monitors; each opens the create modal pre-filled -->
+          <div class="group-label" data-show="5 6">Monitor prompts <span class="scope-tag">after v0</span></div>
+          <div class="starter-grid" data-show="5 6 11">
+            <button class="starter"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/><path d="M17 15l4 4-4-2-4 2z" fill="currentColor" stroke="none"/></svg></span><span class="st-name">Price drop</span><span class="st-desc">Tell me when it gets cheaper</span></button>
+            <button class="starter"><span class="ic"><svg viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/></svg></span><span class="st-name">Back in stock</span><span class="st-desc">Ping me when it returns</span></button>
+            <button class="starter"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><span class="st-name">Profile update</span><span class="st-desc">Watch a person or page</span></button>
+            <button class="starter"><span class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h16M9 4v16"/></svg></span><span class="st-name">Page change</span><span class="st-desc">Any edit to this page</span></button>
+            <button class="starter"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="M8 10h8M8 14h5"/></svg></span><span class="st-name">News / topic</span><span class="st-desc">New coverage of a subject</span></button>
+            <button class="starter"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg></span><span class="st-name">Dates / slots</span><span class="st-desc">Appointment or reservation</span></button>
           </div>
 
           <!-- Loading skeleton (state demo) -->
@@ -1055,7 +1067,7 @@ const STEPS = [
   "Open page — pinned to the chat + history",
   "Pinned to New Tab — hover the stack",
   "Tools in the sidebar — Monitors at hand",
-  "Day zero — the empty state",
+  "Day zero — empty state & monitor prompts",
 ];
 let step = Math.min(Math.max(parseInt(location.hash.slice(1), 10) || 1, 1), STEPS.length);
 const N = STEPS.length;
@@ -1157,7 +1169,7 @@ railList.querySelectorAll(".mitem-head").forEach(btn => {
   });
 });
 
-// New monitor opens the create card as a modal (no page to read here — you paste a URL). PROMPTS parked for after v0 — see monitors-after-v0.html
+// Monitor prompts + New monitor open the create card as a modal (no page to read here — you paste a URL)
 const PROMPTS = {
   "Price drop": { cond: "the price drops", chips: [["Any drop", "the price drops at all"], ["Below a target", "the price drops below $—"], ["10% off or more", "the price drops 10% or more"]] },
   "Back in stock": { cond: "it's back in stock", chips: [["Any restock", "it's back in stock"], ["My size", "my size is back in stock"]] },
@@ -1301,17 +1313,10 @@ function showUndo() { undoToast.hidden = false; clearTimeout(undoTimer); undoTim
 document.getElementById("undo-btn").onclick = () => { clearTimeout(undoTimer); undoToast.hidden = true; };
 document.getElementById("undo-x").onclick = () => { clearTimeout(undoTimer); undoToast.hidden = true; };
 
-document.querySelectorAll('[data-act="delete"]').forEach(el => {
-  const original = el.innerHTML;
-  let disarmTimer = null;
-  const disarm = () => { clearTimeout(disarmTimer); el.classList.remove("armed"); el.innerHTML = original; };
+document.querySelectorAll('[data-act]').forEach(el => {
   el.addEventListener("click", e => {
     e.stopPropagation();
-    if (el.classList.contains("armed")) { disarm(); showUndo(); return; }
-    el.classList.add("armed");
-    el.textContent = "Sure?";
-    clearTimeout(disarmTimer);
-    disarmTimer = setTimeout(disarm, 3000);
+    if (el.getAttribute("data-act") === "delete") showUndo();
   });
 });
 
