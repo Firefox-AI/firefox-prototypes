@@ -149,6 +149,9 @@ h1,h2,h3,h4,p { margin: 0; }
 .page-action.attn { color: var(--smartwindow-icon-color-accent); }
 .page-action.danger { color: var(--text-color-error); }
 .page-action.danger:hover { background: var(--background-color-critical); }
+.mcard-actions .page-action.danger { width: 36px; height: 36px; border: 1px solid var(--border-color); border-radius: var(--border-radius-circle); }
+.mcard-actions { margin-top: var(--space-xsmall); }
+#card-sony { margin-bottom: var(--space-small); }
 .page-action .dot { position: absolute; top: 2px; right: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--icon-color-success); border: 1.5px solid var(--background-color-box); }
 .sw-toggle { color: var(--smartwindow-icon-color-accent); }
 .content-row { flex: 1; display: flex; min-height: 0; position: relative; }
@@ -283,7 +286,7 @@ h1,h2,h3,h4,p { margin: 0; }
 .undo-toast .x { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; color: inherit; opacity: .7; }
 .undo-toast .x:hover { opacity: 1; background: light-dark(rgba(242,240,248,.15), rgba(24,14,48,.1)); }
 .undo-toast .x svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; }
-hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); margin: var(--space-xsmall) 0; width: 100%; }
+hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); margin: var(--space-small) 0 var(--space-xsmall); width: 100%; }
 
 /* Change history */
 .section-toggle { display: flex; align-items: center; gap: 6px; color: var(--text-color-deemphasized); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); }
@@ -447,28 +450,28 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
     <div class="traffic"><span></span><span></span><span></span></div>
 
     <!-- Product tab -->
-    <div class="tab active" data-show="1 2 3 4 8" style="min-width:190px">
+    <div class="tab active" data-show="1 2 3 4 7" style="min-width:190px">
       <span class="favicon" style="background:#e8663a">S</span>
       <span class="truncate">Sony WH-1000XM5 — SoundNest</span>
-      <span class="tab-badge" data-show="8"></span>
+      <span class="tab-badge" data-show="7"></span>
     </div>
 
     <!-- about:monitors tab -->
-    <div class="tab active" data-show="5 6 7" style="min-width:150px">
+    <div class="tab active" data-show="5 6 11" style="min-width:150px">
       <span class="favicon sw"><svg viewBox="0 0 24 24" width="15" height="15"><rect width="24" height="24" rx="4" fill="url(#g)"/><path d="M5 12h3l2-5 4 10 2-5h3" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="g" x1="0" y1="0" x2="24" y2="24"><stop offset="0" stop-color="#321bfd"/><stop offset=".5" stop-color="#cf30e2"/><stop offset="1" stop-color="#ff9900"/></linearGradient></defs></svg></span>
       <span class="truncate">about:monitors</span>
     </div>
 
     <!-- Tab GROUP — Open page handoff -->
-    <div class="tabgroup" data-show="9">
+    <div class="tabgroup" data-show="8">
       <span class="tg-dot"></span>
       <span class="tg-label">Sony price watch</span>
       <div class="tab active" style="min-width:150px"><span class="favicon" style="background:#e8663a">S</span><span class="truncate">Sony WH-1000XM5</span></div>
       <div class="tab" style="min-width:120px"><span class="favicon" style="background:#3a7ae8">A</span><span class="truncate">AudioDirect</span></div>
     </div>
 
-    <div class="tab" style="min-width:110px" data-show="1 2 3 4 8 9"><span class="favicon" style="background:#67666a">+</span><span>New Tab</span></div>
-    <div class="tab active" style="min-width:130px" data-show="10 11"><span class="favicon" style="background:#67666a">+</span><span>New Tab</span></div>
+    <div class="tab" style="min-width:110px" data-show="1 2 3 4 7 8"><span class="favicon" style="background:#67666a">+</span><span>New Tab</span></div>
+    <div class="tab active" style="min-width:130px" data-show="9 10"><span class="favicon" style="background:#67666a">+</span><span>New Tab</span></div>
   </div>
 
   <!-- ===================== Toolbar ===================== -->
@@ -477,21 +480,21 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
     <div class="nav-btn"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
     <div class="nav-btn"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v3h3"/></svg></div>
 
-    <div class="urlbar" data-show="1 2 3 4 8 9">
+    <div class="urlbar" data-show="1 2 3 4 7 8">
       <span class="lock"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
       <span class="address"><span class="domain">soundnest.com</span>/audio/sony-wh-1000xm5</span>
       <button class="page-action attn" id="pa-monitor" title="Monitor this page" aria-label="Monitor this page">
         <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
-        <span class="dot" data-show="4 8 9"></span>
+        <span class="dot" data-show="4 7 8"></span>
       </button>
     </div>
 
-    <div class="urlbar" data-show="5 6 7">
+    <div class="urlbar" data-show="5 6 11">
       <span class="lock"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg></span>
       <span class="address"><span class="internal">about:monitors</span></span>
     </div>
 
-    <div class="urlbar" data-show="10 11">
+    <div class="urlbar" data-show="9 10">
       <span class="lock"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></span>
       <span class="address" style="color:var(--text-color-deemphasized)">Search with Firefox or enter address</span>
     </div>
@@ -517,7 +520,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
     </nav>
 
     <!-- Monitors tool panel (step 11) -->
-    <aside class="rail-panel" data-show="11" aria-label="Monitors panel">
+    <aside class="rail-panel" data-show="10" aria-label="Monitors panel">
       <div class="rail-panel-head">
         <span class="rail-panel-title">Monitors</span>
         <span class="deemphasized small">3 active</span>
@@ -567,7 +570,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
     <main class="stage" id="stage">
 
       <!-- ---------- Product page (create context + notification) ---------- -->
-      <div class="site" data-show="1 2 3 4 8">
+      <div class="site" data-show="1 2 3 4 7">
         <div class="site-header"><span class="site-logo">SoundNest</span><span class="deemphasized small">Headphones</span><span class="deemphasized small">Speakers</span><span class="deemphasized small">Deals</span></div>
         <div class="product">
           <div class="product-img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="14" width="4" height="7" rx="1.5"/><rect x="17" y="14" width="4" height="7" rx="1.5"/></svg></div>
@@ -583,7 +586,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       </div>
 
       <!-- ---------- about:monitors ---------- -->
-      <div class="aboutpage" data-show="5 6 7">
+      <div class="aboutpage" data-show="5 6 11">
         <div class="aboutpage-inner">
           <div class="about-head">
             <span class="brandmark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h4l2-6 4 12 2-6h4"/></svg></span>
@@ -593,7 +596,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </div>
 
           <!-- Empty-state lead (only when there are no monitors) -->
-          <div class="empty-lead" data-show="7"><h3>Watch any page for changes</h3><p>Start from a monitor prompt, or open any page and type <b>/monitor</b> in Smart Window.</p></div>
+          <div class="empty-lead" data-show="11"><h3>Watch any page for changes</h3><p>Start from a monitor prompt, or open any page and type <b>/monitor</b> in Smart Window.</p></div>
 
           <!-- Populated: running + paused monitors -->
           <div data-show="5 6">
@@ -655,7 +658,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
           <!-- Monitor prompts — always under the running + paused monitors; each opens the create modal pre-filled -->
           <div class="group-label" data-show="5 6">Monitor prompts</div>
-          <div class="starter-grid" data-show="5 6 7">
+          <div class="starter-grid" data-show="5 6 11">
             <button class="starter"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/><path d="M17 15l4 4-4-2-4 2z" fill="currentColor" stroke="none"/></svg></span><span class="st-name">Price drop</span><span class="st-desc">Tell me when it gets cheaper</span></button>
             <button class="starter"><span class="ic"><svg viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/></svg></span><span class="st-name">Back in stock</span><span class="st-desc">Ping me when it returns</span></button>
             <button class="starter"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><span class="st-name">Profile update</span><span class="st-desc">Watch a person or page</span></button>
@@ -665,7 +668,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </div>
 
           <!-- Loading skeleton (state demo) -->
-          <div data-show="7">
+          <div data-show="11">
             <div class="group-label">Loading</div>
             <div class="skel"><div class="sk circle"></div><div style="flex:1"><div class="sk line" style="width:44%;margin-bottom:7px"></div><div class="sk line" style="width:66%"></div></div><div class="sk line" style="width:54px;height:20px"></div></div>
             <div class="skel"><div class="sk circle"></div><div style="flex:1"><div class="sk line" style="width:38%;margin-bottom:7px"></div><div class="sk line" style="width:58%"></div></div><div class="sk line" style="width:54px;height:20px"></div></div>
@@ -674,7 +677,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       </div>
 
       <!-- ---------- Product page after the drop (open page) ---------- -->
-      <div class="site" data-show="9">
+      <div class="site" data-show="8">
         <div class="site-header"><span class="site-logo">SoundNest</span><span class="deemphasized small">Headphones</span><span class="deemphasized small">Speakers</span><span class="deemphasized small">Deals</span></div>
         <div class="product">
           <div class="product-img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="14" width="4" height="7" rx="1.5"/><rect x="17" y="14" width="4" height="7" rx="1.5"/></svg></div>
@@ -690,7 +693,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       </div>
 
       <!-- ---------- New Tab with the corner monitor stack ---------- -->
-      <div class="newtab" data-show="10 11">
+      <div class="newtab" data-show="9 10">
         <div class="newtab-inner">
           <div class="newtab-logo"><span class="fx"></span> Firefox</div>
           <div class="newtab-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg> Search with Firefox or enter address</div>
@@ -704,7 +707,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </div>
         </div>
 
-        <div class="mstack" id="mstack" data-show="10 11">
+        <div class="mstack" id="mstack" data-show="9 10">
           <div class="mstack-list">
             <div class="mstack-item">
               <button class="mrow-mini" aria-expanded="false">
@@ -750,11 +753,11 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </div>
         </div>
 
-        <div class="annot point-right" style="top:26px; right:332px" data-show="10">Monitors ride along on New Tab — hover the stack.</div>
+        <div class="annot point-right" style="top:26px; right:332px" data-show="9">Monitors ride along on New Tab — hover the stack.</div>
       </div>
 
       <!-- ---------- OS notification toast ---------- -->
-      <button class="os-toast" id="toast" data-show="8">
+      <button class="os-toast" id="toast" data-show="7">
         <span class="app-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
         <span>
           <div style="font-weight:var(--font-weight-semibold)">Firefox · Monitors</div>
@@ -762,11 +765,10 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         </span>
       </button>
       <div class="annot point-right" style="bottom:150px; right:24px" data-show="2">Type <b>/</b> to call a tool.</div>
-      <div class="annot point-down" style="bottom:120px; left:410px" data-show="7">The skeleton matches the row exactly — nothing shifts when monitors arrive.</div>
     </main>
 
     <!-- ===================== Smart Window sidebar ===================== -->
-    <aside class="sidebar" id="sidebar" data-show="2 3 4 9" aria-label="Smart Window">
+    <aside class="sidebar" id="sidebar" data-show="2 3 4 8" aria-label="Smart Window">
       <div class="sw-header">
         <span class="sw-brand"></span>
         <span class="sw-title">Smart Window</span>
@@ -835,7 +837,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         </div>
 
         <!-- Step 9: Open page — the card is pinned to THIS CHAT, plus change history -->
-        <div data-show="9" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
+        <div data-show="8" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
           <div class="pin-eyebrow"><svg viewBox="0 0 24 24"><path d="M12 17v5M8 3h8l-1 6 4 3H5l4-3z"/></svg> Pinned to chat</div>
           <div class="mcard chatcard pinned live" id="pin-card" role="button" tabindex="0" aria-expanded="true">
             <div class="mcard-head">
@@ -893,7 +895,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       <div class="smartbar-wrap">
         <div class="smartbar">
           <span class="typed" data-show="2">/<span class="caret"></span></span>
-          <span class="ph" data-show="3 4 9">Ask, search, or type a URL</span>
+          <span class="ph" data-show="3 4 8">Ask, search, or type a URL</span>
           <button class="mention" title="Tag a tab or site" aria-label="Tag a tab or site"><svg viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/><path d="M16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-4 7.5"/></svg></button>
           <button class="send" aria-label="Send"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
         </div>
@@ -959,11 +961,11 @@ const STEPS = [
   "Watching in chat — click to expand, updates live",
   "about:monitors — its own surface",
   "Edit inline — the row becomes the card",
-  "Empty & loading + monitor prompts",
   "A confident change fires a notification",
   "Open page — pinned to the chat + history",
   "Pinned to New Tab — hover the stack",
   "Tools in the sidebar — Monitors at hand",
+  "Day zero — empty state & monitor prompts",
 ];
 let step = Math.min(Math.max(parseInt(location.hash.slice(1), 10) || 1, 1), STEPS.length);
 const N = STEPS.length;
@@ -977,9 +979,9 @@ function render() {
   document.getElementById("step-num").textContent = step + " / " + N;
   document.getElementById("step-text").textContent = STEPS[step - 1];
   [...dots.children].forEach((d, i) => d.classList.toggle("on", i < step));
-  document.getElementById("sidebar").style.width = step === 9 ? "452px" : "416px";
-  if (step !== 10 && step !== 11) stackSet(false);
-  document.getElementById("rail-monitors").classList.toggle("active", step === 11);
+  document.getElementById("sidebar").style.width = step === 8 ? "452px" : "416px";
+  if (step !== 9 && step !== 10) stackSet(false);
+  document.getElementById("rail-monitors").classList.toggle("active", step === 10);
 }
 function go(n) { step = Math.max(1, Math.min(N, n)); history.replaceState(null, "", "#" + step); render(); }
 document.getElementById("next").onclick = () => go(step + 1);
@@ -1042,10 +1044,10 @@ mstack.querySelectorAll(".mrow-mini").forEach(btn => {
     btn.setAttribute("aria-expanded", String(!wasOpen));
   });
 });
-document.querySelectorAll("[data-open-page]").forEach(b => { b.addEventListener("click", () => go(9)); });
+document.querySelectorAll("[data-open-page]").forEach(b => { b.addEventListener("click", () => go(8)); });
 
 // Tools rail: Monitors lives in the chrome
-document.getElementById("rail-monitors").onclick = () => go(11);
+document.getElementById("rail-monitors").onclick = () => go(10);
 document.getElementById("panel-new").onclick = () => openModal(null);
 document.getElementById("panel-open-about").onclick = (e) => { e.preventDefault(); go(5); };
 const railList = document.getElementById("rail-list");
@@ -1104,7 +1106,7 @@ document.getElementById("modal-start").onclick = () => {
 };
 document.getElementById("start-x").onclick = () => { clearTimeout(startTimer); startToast.hidden = true; };
 document.getElementById("start-monitoring").onclick = () => go(4);
-document.getElementById("toast").onclick = () => go(9);
+document.getElementById("toast").onclick = () => go(8);
 document.getElementById("collapse-sony").onclick = () => go(5);
 
 // Dashboard rows: click / Enter / Space expands the Sony row into the editable card
