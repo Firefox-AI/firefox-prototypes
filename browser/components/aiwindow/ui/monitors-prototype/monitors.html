@@ -151,7 +151,6 @@ h1,h2,h3,h4,p { margin: 0; }
 .page-action.danger:hover { background: var(--background-color-critical); }
 .mcard-actions .page-action.danger { width: 36px; height: 36px; border: 1px solid var(--border-color); border-radius: var(--border-radius-circle); }
 .mcard-actions { margin-top: var(--space-xsmall); }
-#card-sony { margin-bottom: var(--space-small); }
 .page-action .dot { position: absolute; top: 2px; right: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--icon-color-success); border: 1.5px solid var(--background-color-box); }
 .sw-toggle { color: var(--smartwindow-icon-color-accent); }
 .content-row { flex: 1; display: flex; min-height: 0; position: relative; }
@@ -195,6 +194,9 @@ h1,h2,h3,h4,p { margin: 0; }
 /* Glance row */
 .grow { display: flex; align-items: center; gap: var(--space-medium); padding: var(--space-medium) var(--space-large); background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); margin-bottom: var(--space-small); width: 100%; text-align: left; transition: border-color var(--motion-dur-near) var(--motion-ease-edge), box-shadow var(--motion-dur-near) var(--motion-ease-edge); }
 .grow:hover { border-color: var(--border-color); box-shadow: var(--box-shadow-level-2); }
+.grow { cursor: pointer; }
+.dash-item { margin-bottom: var(--space-small); }
+.dash-item .grow { margin-bottom: 0; }
 .grow .gmain { min-width: 0; flex: 1; }
 .grow .gname { font-weight: var(--font-weight-semibold); }
 .grow .gmeta { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
@@ -602,22 +604,15 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           <div data-show="5 6">
             <div class="group-label">Active · 3</div>
 
-            <div>
-              <div class="grow" id="row-sony" data-show="5" role="button" tabindex="0" aria-expanded="false">
+            <div class="dash-item">
+              <div class="grow" id="row-sony" role="button" tabindex="0" aria-expanded="false">
                 <span class="dot-status active"></span>
                 <span class="favicon-sq" style="background:#e8663a">S</span>
                 <span class="gmain"><span class="gname">Sony WH-1000XM5 price</span><br/><span class="gmeta truncate">soundnest.com · checked 3m ago</span></span>
                 <span class="gvalue"><span class="now">$299</span><br/><span class="sub">watching for a drop</span></span>
               </div>
-
-              <div id="card-sony" class="mcard anim-land" data-show="6">
-                <div class="mcard-head">
-                  <span class="favicon-sq" style="background:#e8663a">S</span>
-                  <span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url">soundnest.com/audio/sony-wh-1000xm5</span></span>
-                  <span class="spacer"></span>
-                  <button class="page-action" title="Collapse" id="collapse-sony"><svg viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg></button>
-                </div>
-                <div class="mvalue"><span class="now">$299</span><span class="from">watching for a drop · checked 3m ago</span></div>
+              <div class="mstack-expand"><div class="mstack-expand-inner">
+              <div id="card-sony" class="mcard">
                 <div class="field">
                   <span class="field-label">Alert me when</span>
                   <input class="field-input" id="sony-cond" value="the price drops below $270" aria-label="Alert condition" />
@@ -629,30 +624,59 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 </div>
                 <hr class="rule" />
                 <div class="mrow"><span class="lbl">Check</span><span class="segmented" role="group" aria-label="Check frequency"><button aria-pressed="true">Auto</button><button aria-pressed="false">Hourly</button><button aria-pressed="false">Daily</button></span></div>
-                                <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite">Saved automatically</span></div>
+                <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite">Saved automatically</span></div>
               </div>
+              </div></div>
+            </div>
             </div>
 
-            <div class="grow attn" role="button" tabindex="0">
-              <span class="dot-status active"></span>
-              <span class="favicon-sq" style="background:#2f855a">R</span>
-              <span class="gmain"><span class="gname">REI Danner hiking boots</span><br/><span class="gmeta truncate">rei.com · the page layout changed</span></span>
-              <span class="gvalue"><span class="flag-attn"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg> Needs a look</span></span>
+            <div class="dash-item">
+              <div class="grow attn" role="button" tabindex="0" aria-expanded="false">
+                <span class="dot-status active"></span>
+                <span class="favicon-sq" style="background:#2f855a">R</span>
+                <span class="gmain"><span class="gname">REI Danner hiking boots</span><br/><span class="gmeta truncate">rei.com · the page layout changed</span></span>
+                <span class="gvalue"><span class="flag-attn"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg> Needs a look</span></span>
+              </div>
+              <div class="mstack-expand"><div class="mstack-expand-inner">
+              <div class="mcard">
+                <p class="small" style="margin:0">The page layout changed — open it to point the monitor at the right spot again. Until then it can't read a value.</p>
+                <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
+              </div>
+              </div></div>
             </div>
 
-            <div class="grow" role="button" tabindex="0">
-              <span class="dot-status active"></span>
-              <span class="favicon-sq" style="background:#3a7ae8">C</span>
-              <span class="gmain"><span class="gname">Apartment listings · Mission</span><br/><span class="gmeta truncate">craigslist.org · checked 12m ago</span></span>
-              <span class="gvalue"><span class="now">3 new</span><br/><span class="sub">since yesterday</span></span>
+            <div class="dash-item">
+              <div class="grow" role="button" tabindex="0" aria-expanded="false">
+                <span class="dot-status active"></span>
+                <span class="favicon-sq" style="background:#3a7ae8">C</span>
+                <span class="gmain"><span class="gname">Apartment listings · Mission</span><br/><span class="gmeta truncate">craigslist.org · checked 12m ago</span></span>
+                <span class="gvalue"><span class="now">3 new</span><br/><span class="sub">since yesterday</span></span>
+              </div>
+              <div class="mstack-expand"><div class="mstack-expand-inner">
+              <div class="mcard">
+                <div class="mvalue"><span class="now" style="font-size:24px">3 new</span><span class="from">since yesterday · checked 12m ago</span></div>
+                <div class="mrow"><span class="lbl">Alert me when</span><span class="val">a new listing matches my search</span></div>
+                <div class="mrow"><span class="lbl">Check</span><span class="val">Auto · on-device</span></div>
+                <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
+              </div>
+              </div></div>
             </div>
 
             <div class="group-label">Paused · 1</div>
-            <div class="grow paused" role="button" tabindex="0">
-              <span class="dot-status paused"></span>
-              <span class="favicon-sq" style="background:#b8860b">N</span>
-              <span class="gmain"><span class="gname">Nikon Z6 III price</span><br/><span class="gmeta truncate">bhphotovideo.com · paused · last $1,999</span></span>
-              <span class="gvalue"><a class="accent-link" href="#" onclick="return false">Resume</a></span>
+            <div class="dash-item">
+              <div class="grow paused" role="button" tabindex="0" aria-expanded="false">
+                <span class="dot-status paused"></span>
+                <span class="favicon-sq" style="background:#b8860b">N</span>
+                <span class="gmain"><span class="gname">Nikon Z6 III price</span><br/><span class="gmeta truncate">bhphotovideo.com · paused · last $1,999</span></span>
+                <span class="gvalue"><a class="accent-link" href="#" onclick="return false">Resume</a></span>
+              </div>
+              <div class="mstack-expand"><div class="mstack-expand-inner">
+              <div class="mcard">
+                <div class="mvalue"><span class="now" style="font-size:24px">$1,999</span><span class="from">last checked before pausing</span></div>
+                <div class="mrow"><span class="lbl">Alert me when</span><span class="val">the price drops below $1,800</span></div>
+                <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Resume</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
+              </div>
+              </div></div>
             </div>
           </div>
 
@@ -982,6 +1006,13 @@ function render() {
   document.getElementById("sidebar").style.width = step === 8 ? "452px" : "416px";
   if (step !== 9 && step !== 10) stackSet(false);
   document.getElementById("rail-monitors").classList.toggle("active", step === 10);
+  if (step === 5 || step === 6) {
+    document.querySelectorAll(".dash-item").forEach(item => {
+      const open = step === 6 && item.querySelector("#row-sony");
+      setExpand(item.querySelector(".mstack-expand"), !!open);
+      item.querySelector(".grow").setAttribute("aria-expanded", String(!!open));
+    });
+  }
 }
 function go(n) { step = Math.max(1, Math.min(N, n)); history.replaceState(null, "", "#" + step); render(); }
 document.getElementById("next").onclick = () => go(step + 1);
@@ -1107,13 +1138,18 @@ document.getElementById("modal-start").onclick = () => {
 document.getElementById("start-x").onclick = () => { clearTimeout(startTimer); startToast.hidden = true; };
 document.getElementById("start-monitoring").onclick = () => go(4);
 document.getElementById("toast").onclick = () => go(8);
-document.getElementById("collapse-sony").onclick = () => go(5);
-
-// Dashboard rows: click / Enter / Space expands the Sony row into the editable card
-const rowSony = document.getElementById("row-sony");
-function expandSony() { go(6); }
-rowSony.addEventListener("click", expandSony);
-rowSony.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(6); } });
+// Dashboard rows: every row opens and closes in place, independently
+document.querySelectorAll(".dash-item").forEach(item => {
+  const row = item.querySelector(".grow");
+  const body = item.querySelector(".mstack-expand");
+  const toggle = () => {
+    const open = body.classList.contains("exp-open");
+    setExpand(body, !open);
+    row.setAttribute("aria-expanded", String(!open));
+  };
+  row.addEventListener("click", e => { if (e.target.closest("a, button, input, label")) return; toggle(); });
+  row.addEventListener("keydown", e => { if (e.target !== row) return; if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+});
 
 // Monitor cards in chat: click to expand; the pencil expands into inline edit
 function wireMonitorCard(ids) {
