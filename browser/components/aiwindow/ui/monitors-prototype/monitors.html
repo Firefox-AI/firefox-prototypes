@@ -79,10 +79,12 @@
   --smartwindow-border-color-gradient: linear-gradient(117deg, #321bfd -17.87%, #cf30e2 52.93%, #f90 89.02%, #f5c451 109.44%);
   --aiwindow-gradient-button: light-dark(linear-gradient(97deg, #8341ca -31.39%, #656fff 90.52%), linear-gradient(64deg, #4e2e9d -5.71%, #c1a9ff 122.83%));
 
-  /* Motion (reduced-motion respected below) */
-  --motion-dur-near: 200ms; --motion-dur-soft: 360ms;
-  --motion-ease-edge: cubic-bezier(.2, 0, 0, 1);
-  --motion-ease-reach: cubic-bezier(.16, 1, .3, 1);
+  /* Motion — v5.2 CSS subset: linear() character curves, tiered durations */
+  --motion-dur-away: 160ms; --motion-dur-near: 200ms; --motion-dur-soft: 360ms;
+  --motion-ease-edge: linear(0, 0.013 6%, 0.06 13%, 0.16 21%, 0.3 30%, 0.47 40%, 0.64 50%, 0.78 60%, 0.88 70%, 0.945 80%, 0.985 90%, 1);
+  --motion-ease-reach: linear(0, 0.005 8%, 0.03 17%, 0.09 27%, 0.2 37%, 0.35 48%, 0.53 58%, 0.69 68%, 0.82 77%, 0.91 85%, 0.97 92%, 1);
+  --motion-ease-leave: linear(0, 0.02 15%, 0.08 30%, 0.2 45%, 0.39 60%, 0.63 75%, 0.86 88%, 1);
+  --motion-ease-return: linear(0, 0.18 22%, 0.52 45%, 0.83 65%, 1.012 82%, 1.016 90%, 1);
 }
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }
@@ -388,21 +390,22 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 /* Corner stack, bottom-left: collapsed deck; hover fans it upward; click a card to expand in place */
 .mstack { position: absolute; bottom: 16px; left: 16px; width: 324px; z-index: 30; pointer-events: none; }
 .mstack-list { display: flex; flex-direction: column-reverse; gap: var(--space-small); }
-.mstack-list > * { pointer-events: auto; position: relative; will-change: transform; transition: transform var(--motion-dur-soft) var(--motion-ease-reach); }
-/* Fan open = Reach: deals upward from the front card */
-.mstack.open .mstack-list > :nth-child(2) { transition-delay: 70ms; }
-.mstack.open .mstack-list > :nth-child(3) { transition-delay: 140ms; }
-/* Tuck: settles back down, top card first */
-.mstack:not(.open) .mstack-list > * { transition-duration: var(--motion-dur-near); transition-timing-function: var(--motion-ease-edge); }
+.mstack-list > * { pointer-events: auto; position: relative; will-change: transform; transform-origin: 50% 100%; transition: transform var(--motion-dur-soft) var(--motion-ease-reach), border-color var(--motion-dur-away) var(--motion-ease-edge); }
+/* Fan open = Reach: leisurely, dealt with variance — never sprung */
+.mstack.open .mstack-list > :nth-child(2) { transition-delay: 90ms; }
+.mstack.open .mstack-list > :nth-child(3) { transition-delay: 205ms; }
+/* Tuck = Return: comes home faster than it left, with a confident settle */
+.mstack:not(.open) .mstack-list > * { transition-duration: var(--motion-dur-near); transition-timing-function: var(--motion-ease-return); }
 .mstack:not(.open) .mstack-list > :nth-child(1) { z-index: 3; }
-.mstack:not(.open) .mstack-list > :nth-child(2) { transform: translateY(57px) scale(.955); z-index: 2; transition-delay: 40ms; }
+.mstack:not(.open) .mstack-list > :nth-child(2) { transform: translateY(57px) scale(.955); z-index: 2; transition-delay: 45ms; }
 .mstack:not(.open) .mstack-list > :nth-child(3) { transform: translateY(114px) scale(.91); z-index: 1; transition-delay: 0ms; }
 /* The wake: the front card stirs; shadow is a pre-rendered layer faded in */
 .mitem::after { content: ""; position: absolute; inset: -1px; border-radius: var(--border-radius-large); box-shadow: var(--box-shadow-level-4); opacity: 0; transition: opacity var(--motion-dur-near) var(--motion-ease-edge); pointer-events: none; }
 .mstack.intent .mstack-list > :nth-child(1) { transform: translateY(-2px); transition: transform var(--motion-dur-near) var(--motion-ease-edge) 0ms; }
 .mstack.intent .mstack-list > :nth-child(1).mitem::after { opacity: 1; }
 /* Inline expand: measured height transition, no snap */
-.mstack-expand { height: 0; overflow: hidden; transition: height var(--motion-dur-near) var(--motion-ease-edge); }
+.mstack-expand { height: 0; overflow: hidden; transition: height var(--motion-dur-away) var(--motion-ease-leave); }
+.mstack-expand.exp-open { transition: height var(--motion-dur-near) var(--motion-ease-edge); }
 .mstack-expand-inner { padding-top: var(--space-small); }
 /* One card — header and expandable body share the surface, like the chat card */
 .mitem { position: relative; padding: var(--space-small) var(--space-medium); gap: 0; }
@@ -415,6 +418,8 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 .mitem-head .chev { width: 15px; height: 15px; fill: none; stroke: var(--text-color-deemphasized); stroke-width: 2; flex: none; transition: rotate var(--motion-dur-near) var(--motion-ease-edge); }
 .mitem-head[aria-expanded="true"] .chev { rotate: 180deg; }
 .mitem-body { display: flex; flex-direction: column; gap: var(--space-medium); padding-top: var(--space-xsmall); }
+.rail-panel .mitem { transition: border-color var(--motion-dur-away) var(--motion-ease-edge); }
+.mstack.open .mitem:hover, .rail-panel .mitem:hover { border-color: var(--border-color); }
 
 /* ============ OS notification toast ============ */
 .os-toast { position: absolute; top: 16px; right: 16px; width: 360px; z-index: 60; background: light-dark(rgba(250,250,252,.94), rgba(37,36,40,.96)); backdrop-filter: blur(14px); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-xlarge); box-shadow: var(--box-shadow-level-4); padding: var(--space-medium) var(--space-large); display: flex; gap: var(--space-medium); align-items: flex-start; cursor: pointer; text-align: left; animation: toast-in var(--motion-dur-soft) var(--motion-ease-reach) both; }
