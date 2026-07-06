@@ -327,7 +327,24 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 @keyframes flashbg { from { background: var(--background-color-success); } to { background: transparent; } }
 .flash { animation: flashbg 1.4s var(--motion-ease-edge); border-radius: var(--border-radius-small); }
 
-/* Slash agent picker (type "/" → Monitor / Scout / Research) */
+/* ============ Left rail — tools live in the chrome ============ */
+.rail { width: 48px; flex: none; display: flex; flex-direction: column; align-items: center; gap: var(--space-xsmall); padding: var(--space-medium) 0; background-color: light-dark(#f0ebfb, #241743); background-image: linear-gradient(180deg, rgba(118,78,221,.14), transparent 42%); border-right: 1px solid var(--border-color-deemphasized); }
+.rail-btn { width: 34px; height: 34px; border-radius: var(--border-radius-medium); display: grid; place-items: center; color: light-dark(var(--color-violet-desaturated-50), var(--color-violet-desaturated-10)); position: relative; flex: none; }
+.rail-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.rail-btn:hover { background: light-dark(rgba(118,78,221,.12), rgba(212,193,255,.14)); }
+.rail-btn.active { background: light-dark(rgba(118,78,221,.18), rgba(212,193,255,.2)); color: light-dark(var(--color-violet-60), var(--color-violet-20)); }
+.rail-btn .dot { position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--icon-color-success); border: 1.5px solid light-dark(#f0ebfb, #241743); }
+.rail-sep { width: 22px; height: 1px; background: light-dark(rgba(24,14,48,.14), rgba(242,240,248,.16)); margin: var(--space-small) 0; flex: none; }
+.rail-spacer { flex: 1; }
+
+/* Monitors tool panel, docked to the rail */
+.rail-panel { width: 320px; flex: none; display: flex; flex-direction: column; background: var(--background-color-canvas); border-right: 1px solid var(--border-color-deemphasized); }
+.rail-panel-head { display: flex; align-items: center; gap: var(--space-small); padding: var(--space-medium) var(--space-large); }
+.rail-panel-title { font-weight: var(--font-weight-semibold); }
+.rail-panel-body { flex: 1; overflow: auto; padding: 0 var(--space-medium) var(--space-medium); display: flex; flex-direction: column; gap: var(--space-small); }
+.rail-panel-foot { padding: var(--space-medium) var(--space-large); border-top: 1px solid var(--border-color-deemphasized); }
+
+/* Slash tool picker (type "/" → Monitor / Scout / Research) */
 .slash-menu { margin: 0 var(--space-large) var(--space-small); background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); box-shadow: var(--box-shadow-level-4); padding: var(--space-xsmall); }
 .slash-head { font-size: 11px; font-weight: var(--font-weight-semibold); color: var(--text-color-deemphasized); text-transform: uppercase; letter-spacing: .04em; padding: 6px var(--space-small) 4px; }
 .agent-item { display: flex; align-items: center; gap: var(--space-medium); width: 100%; padding: var(--space-small); border-radius: var(--border-radius-medium); text-align: left; }
@@ -451,7 +468,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
     </div>
 
     <div class="tab" style="min-width:110px" data-show="1 2 3 4 8 9"><span class="favicon" style="background:#67666a">+</span><span>New Tab</span></div>
-    <div class="tab active" style="min-width:130px" data-show="10"><span class="favicon" style="background:#67666a">+</span><span>New Tab</span></div>
+    <div class="tab active" style="min-width:130px" data-show="10 11"><span class="favicon" style="background:#67666a">+</span><span>New Tab</span></div>
   </div>
 
   <!-- ===================== Toolbar ===================== -->
@@ -474,7 +491,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       <span class="address"><span class="internal">about:monitors</span></span>
     </div>
 
-    <div class="urlbar" data-show="10">
+    <div class="urlbar" data-show="10 11">
       <span class="lock"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></span>
       <span class="address" style="color:var(--text-color-deemphasized)">Search with Firefox or enter address</span>
     </div>
@@ -484,6 +501,69 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
   <!-- ===================== Content row ===================== -->
   <div class="content-row">
+
+    <!-- Left rail: browser staples up top, tools below the divider -->
+    <nav class="rail" aria-label="Sidebar rail">
+      <button class="rail-btn" title="Synced tabs" aria-label="Synced tabs"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="13" height="9" rx="1.5"/><path d="M7 19h6M10 14v5"/><rect x="17" y="9" width="4" height="10" rx="1.2"/></svg></button>
+      <button class="rail-btn" title="History" aria-label="History"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></button>
+      <button class="rail-btn" title="Bookmarks" aria-label="Bookmarks"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8L3.5 9.7l5.9-.9z"/></svg></button>
+      <button class="rail-btn" title="Passwords" aria-label="Passwords"><svg viewBox="0 0 24 24"><circle cx="8" cy="14" r="3.5"/><path d="M10.5 11.5 19 3M15 7l2.5 2.5"/></svg></button>
+      <div class="rail-sep" role="separator"></div>
+      <button class="rail-btn" id="rail-monitors" title="Monitors" aria-label="Monitors"><svg viewBox="0 0 24 24"><path d="M4 12h4l2-6 4 12 2-6h4"/></svg><span class="dot"></span></button>
+      <button class="rail-btn" title="Scout" aria-label="Scout"><svg viewBox="0 0 24 24"><path d="M3 11l8-8h7v7l-8 8z"/><circle cx="14.5" cy="7.5" r="1.2"/></svg></button>
+      <button class="rail-btn" title="Research" aria-label="Research"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></button>
+      <span class="rail-spacer"></span>
+      <button class="rail-btn" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2.1 2.1M16.9 16.9L19 19M19 5l-2.1 2.1M7.1 16.9L5 19"/></svg></button>
+    </nav>
+
+    <!-- Monitors tool panel (step 11) -->
+    <aside class="rail-panel" data-show="11" aria-label="Monitors panel">
+      <div class="rail-panel-head">
+        <span class="rail-panel-title">Monitors</span>
+        <span class="deemphasized small">3 active</span>
+        <span style="flex:1"></span>
+        <button class="btn-ghost" id="panel-new" style="padding:5px 12px">+ New</button>
+      </div>
+      <div class="rail-panel-body" id="rail-list">
+        <div class="mstack-item">
+          <button class="mrow-mini" aria-expanded="false">
+            <span class="favicon-sq" style="background:#e8663a">S</span>
+            <span class="nm">Sony WH-1000XM5 price</span>
+            <span class="status-chip">$278 ▼ −7%</span>
+          </button>
+          <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mcard">
+            <div class="mvalue"><span class="now" style="font-size:24px">$278</span><span class="from">checked 2:14 PM · was $299</span></div>
+            <div class="mrow"><span class="lbl">Alert me when</span><span class="val">the price drops below $270</span></div>
+            <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
+          </div></div></div>
+        </div>
+        <div class="mstack-item">
+          <button class="mrow-mini" aria-expanded="false">
+            <span class="favicon-sq" style="background:#2f855a">R</span>
+            <span class="nm">REI Danner hiking boots</span>
+            <span class="flag-attn"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg> Needs a look</span>
+          </button>
+          <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mcard">
+            <p class="small" style="margin:0">The page layout changed — open it to point the monitor at the right spot again.</p>
+            <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
+          </div></div></div>
+        </div>
+        <div class="mstack-item">
+          <button class="mrow-mini" aria-expanded="false">
+            <span class="favicon-sq" style="background:#3a7ae8">C</span>
+            <span class="nm">Apartment listings · Mission</span>
+            <span class="status-chip">3 new</span>
+          </button>
+          <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mcard">
+            <div class="mvalue"><span class="now" style="font-size:24px">3 new</span><span class="from">since yesterday · craigslist.org</span></div>
+            <div class="mrow"><span class="lbl">Alert me when</span><span class="val">a new listing matches my search</span></div>
+            <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
+          </div></div></div>
+        </div>
+      </div>
+      <div class="rail-panel-foot"><a class="accent-link" href="#5" id="panel-open-about">Open about:monitors</a></div>
+    </aside>
+
     <main class="stage" id="stage">
 
       <!-- ---------- Product page (create context + notification) ---------- -->
@@ -610,7 +690,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       </div>
 
       <!-- ---------- New Tab with the corner monitor stack ---------- -->
-      <div class="newtab" data-show="10">
+      <div class="newtab" data-show="10 11">
         <div class="newtab-inner">
           <div class="newtab-logo"><span class="fx"></span> Firefox</div>
           <div class="newtab-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg> Search with Firefox or enter address</div>
@@ -624,7 +704,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </div>
         </div>
 
-        <div class="mstack" id="mstack">
+        <div class="mstack" id="mstack" data-show="10">
           <div class="mstack-list">
             <div class="mstack-item">
               <button class="mrow-mini" aria-expanded="false">
@@ -670,7 +750,8 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </div>
         </div>
 
-        <div class="annot point-right" style="top:26px; right:332px">Monitors ride along on New Tab — hover the stack.</div>
+        <div class="annot point-right" style="top:26px; right:332px" data-show="10">Monitors ride along on New Tab — hover the stack.</div>
+        <div class="annot point-left" style="top:120px; left:24px" data-show="11">Monitors, Scout, Research — tools live in the rail. One click, no mode.</div>
       </div>
 
       <!-- ---------- OS notification toast ---------- -->
@@ -683,7 +764,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       </button>
 
       <div class="annot point-right" style="top:70px; right:150px" data-show="1">Firefox is already looking at this page. A monitor just keeps looking — on your device.</div>
-      <div class="annot point-right" style="bottom:150px; right:24px" data-show="2">Type <b>/</b> to call an agent.</div>
+      <div class="annot point-right" style="bottom:150px; right:24px" data-show="2">Type <b>/</b> to call a tool.</div>
       <div class="annot point-down" style="bottom:120px; left:410px" data-show="7">The skeleton matches the row exactly — nothing shifts when monitors arrive.</div>
     </main>
 
@@ -698,10 +779,10 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       </div>
 
       <div class="sw-chat">
-        <!-- The command the user sent (via the / agent picker) -->
+        <!-- The command the user sent (via the / tool picker) -->
         <div class="message-user" data-show="3 4"><p><span class="cmd-tok">/monitor</span> watch this price</p></div>
 
-        <!-- Step 3: Monitor agent → create card -->
+        <!-- Step 3: Monitor tool → create card -->
         <div data-show="3" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
           <div class="message-assistant">Looks like a product page — I've set this up to watch the price. Tweak anything, then start it.</div>
 
@@ -791,9 +872,9 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         </div>
       </div>
 
-      <!-- Slash agent picker — appears when you type "/" in the smartbar -->
+      <!-- Slash tool picker — appears when you type "/" in the smartbar -->
       <div class="slash-menu" data-show="2">
-        <div class="slash-head">Agents</div>
+        <div class="slash-head">Tools</div>
         <button class="agent-item sel" id="agent-monitor">
           <span class="ai" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
           <span><span class="an">Monitor</span><br/><span class="ad">Watch a page for changes</span></span>
@@ -876,7 +957,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 <script>
 const STEPS = [
   "On the page you're watching",
-  "Type / to run an agent",
+  "Type / to run a tool",
   "Monitor — the create card",
   "Watching in chat — click to expand, updates live",
   "about:monitors — its own surface",
@@ -885,6 +966,7 @@ const STEPS = [
   "A confident change fires a notification",
   "Open page — pinned to the chat + history",
   "Pinned to New Tab — hover the stack",
+  "Tools in the sidebar — Monitors at hand",
 ];
 let step = Math.min(Math.max(parseInt(location.hash.slice(1), 10) || 1, 1), STEPS.length);
 const N = STEPS.length;
@@ -900,6 +982,7 @@ function render() {
   [...dots.children].forEach((d, i) => d.classList.toggle("on", i < step));
   document.getElementById("sidebar").style.width = step === 9 ? "452px" : "416px";
   if (step !== 10) stackSet(false);
+  document.getElementById("rail-monitors").classList.toggle("active", step === 11);
 }
 function go(n) { step = Math.max(1, Math.min(N, n)); history.replaceState(null, "", "#" + step); render(); }
 document.getElementById("next").onclick = () => go(step + 1);
@@ -962,7 +1045,23 @@ mstack.querySelectorAll(".mrow-mini").forEach(btn => {
     btn.setAttribute("aria-expanded", String(!wasOpen));
   });
 });
-mstack.querySelectorAll("[data-open-page]").forEach(b => { b.addEventListener("click", () => go(9)); });
+document.querySelectorAll("[data-open-page]").forEach(b => { b.addEventListener("click", () => go(9)); });
+
+// Tools rail: Monitors lives in the chrome
+document.getElementById("rail-monitors").onclick = () => go(11);
+document.getElementById("panel-new").onclick = () => openModal(null);
+document.getElementById("panel-open-about").onclick = (e) => { e.preventDefault(); go(5); };
+const railList = document.getElementById("rail-list");
+railList.querySelectorAll(".mrow-mini").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const body = btn.parentElement.querySelector(".mstack-expand");
+    const wasOpen = body.classList.contains("exp-open");
+    railList.querySelectorAll(".mstack-expand").forEach(b => setExpand(b, false));
+    railList.querySelectorAll(".mrow-mini").forEach(b => b.setAttribute("aria-expanded", "false"));
+    setExpand(body, !wasOpen);
+    btn.setAttribute("aria-expanded", String(!wasOpen));
+  });
+});
 
 // Monitor prompts + New monitor open the create card as a modal (no page to read here — you paste a URL)
 const PROMPTS = {
