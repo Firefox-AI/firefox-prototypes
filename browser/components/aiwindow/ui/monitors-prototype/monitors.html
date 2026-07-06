@@ -203,8 +203,12 @@ h1,h2,h3,h4,p { margin: 0; }
 .grow { display: flex; align-items: center; gap: var(--space-medium); padding: var(--space-medium) var(--space-large); background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); margin-bottom: var(--space-small); width: 100%; text-align: left; transition: border-color var(--motion-dur-near) var(--motion-ease-edge), box-shadow var(--motion-dur-near) var(--motion-ease-edge); }
 .grow:hover { border-color: var(--border-color); box-shadow: var(--box-shadow-level-2); }
 .grow { cursor: pointer; }
-.dash-item { margin-bottom: var(--space-small); }
-.dash-item .grow { margin-bottom: 0; }
+.dash-item { background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); margin-bottom: var(--space-small); transition: border-color var(--motion-dur-away) var(--motion-ease-edge); }
+.dash-item:hover { border-color: var(--border-color); }
+.dash-item.attn { border-color: var(--icon-color-warning); }
+.dash-item .grow, .dash-item .grow:hover { background: none; border: 0; box-shadow: none; margin-bottom: 0; }
+.dash-item .mstack-expand-inner { padding-top: 0; }
+.dash-item .mstack-expand .mcard { border: 0; background: none; box-shadow: none; border-radius: 0; padding: 0 var(--space-large) var(--space-large); }
 .grow .gmain { min-width: 0; flex: 1; }
 .grow .gname { font-weight: var(--font-weight-semibold); }
 .grow .gmeta { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
@@ -549,7 +553,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         <div class="mcard mitem">
           <button class="mitem-head" aria-expanded="false">
             <span class="favicon-sq" style="background:#e8663a">S</span>
-            <span class="mit"><span class="mcard-name">Sony WH-1000XM5 price</span><span class="mcard-url">Below $270 · Auto</span></span>
+            <span class="mit"><span class="mcard-name">Sony WH-1000XM5 price</span><span class="mcard-url">Below $270 · Daily</span></span>
             <span class="status-chip">$278 ▼ −7%</span>
             <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
           </button>
@@ -649,13 +653,13 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                   <div class="chip-row"><span class="page-pill"><span class="fav" style="background:#e8663a">S</span> soundnest.com/…/xm5 <span class="x">×</span></span><button class="chip">+ Add page</button></div>
                 </div>
                 <hr class="rule" />
-                <div class="mrow"><span class="lbl">Check</span><span class="segmented" role="group" aria-label="Check frequency"><button aria-pressed="true">Auto</button><button aria-pressed="false">Hourly</button><button aria-pressed="false">Daily</button></span></div>
+                <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span></div>
                 <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite">Saved automatically</span></div>
               </div>
               </div></div>
             </div>
 
-            <div class="dash-item">
+            <div class="dash-item attn">
               <div class="grow attn" role="button" tabindex="0" aria-expanded="false">
                 <span class="dot-status active"></span>
                 <span class="favicon-sq" style="background:#2f855a">R</span>
@@ -681,7 +685,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <div class="mcard">
                 <div class="mvalue"><span class="now" style="font-size:24px">3 new</span><span class="from">since yesterday · checked 12m ago</span></div>
                 <div class="mrow"><span class="lbl">Alert me when</span><span class="val">a new listing matches my search</span></div>
-                <div class="mrow"><span class="lbl">Check</span><span class="val">Auto · on-device</span></div>
+                <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span></div>
                 <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
               </div>
               </div></div>
@@ -789,7 +793,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <div class="mcard mitem">
               <button class="mitem-head" aria-expanded="false">
                 <span class="favicon-sq" style="background:#e8663a">S</span>
-                <span class="mit"><span class="mcard-name">Sony WH-1000XM5 price</span><span class="mcard-url">Below $270 · Auto</span></span>
+                <span class="mit"><span class="mcard-name">Sony WH-1000XM5 price</span><span class="mcard-url">Below $270 · Daily</span></span>
                 <span class="status-chip">$278 ▼ −7%</span>
                 <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
               </button>
@@ -870,7 +874,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <div class="chip-row"><span class="page-pill"><span class="fav" style="background:#e8663a">S</span> soundnest.com/…/xm5 <span class="x">×</span></span><button class="chip">+ Add page</button></div>
             </div>
             <hr class="rule" />
-            <div class="mrow"><span class="lbl">Check</span><span class="segmented" role="group" aria-label="Check frequency"><button aria-pressed="true">Auto</button><button aria-pressed="false">Hourly</button><button aria-pressed="false">Daily</button></span></div>
+            <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span></div>
                                     <div class="mcard-actions"><span class="mono-dim">Runs on-device</span><span class="spacer"></span><button class="btn-ghost">Cancel</button><button class="btn-primary" id="start-monitoring">Start monitoring</button></div>
           </div>
         </div>
@@ -882,7 +886,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           <div class="mcard chatcard live" id="watch-card" role="button" tabindex="0" aria-expanded="false">
             <div class="mcard-head">
               <span class="favicon-sq" style="background:#e8663a">S</span>
-              <span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url" id="watch-sub">Below $270 · Auto · on-device</span></span>
+              <span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url" id="watch-sub">Below $270 · Daily · on-device</span></span>
               <span class="spacer"></span>
               <span class="status-chip" id="watch-chip"><span class="pulse-dot"></span> Watching</span>
               <button class="page-action" id="watch-edit" title="Edit monitor" aria-label="Edit monitor" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 5l4 4"/></svg></button>
@@ -897,7 +901,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <div class="chip-row" id="watch-chips"><button class="chip">Any drop</button><button class="chip selected">Below $270</button><button class="chip">Below $250</button><button class="chip">Back in stock</button></div>
                 <span class="save-note" id="save-note-watch" role="status" aria-live="polite"></span>
               </div>
-              <div class="mrow"><span class="lbl">Check</span><span class="val">Auto · on-device</span></div>
+              <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span></div>
               <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-ghost" id="check-now">Check now</button></div>
               <hr class="rule" />
               <div class="section-toggle">Change history</div>
@@ -929,7 +933,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <div class="chip-row" id="pin-chips"><button class="chip">Any drop</button><button class="chip selected">Below $270</button><button class="chip">Below $250</button><button class="chip">Back in stock</button></div>
               <span class="save-note" id="save-note-pin" role="status" aria-live="polite"></span>
             </div>
-            <div class="mrow"><span class="lbl">Check</span><span class="val">Auto · on-device</span></div>
+            <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span></div>
             <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Snooze</button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary">Open page</button></div>
             <hr class="rule" />
             <div class="section-toggle">Change history</div>
@@ -995,7 +999,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           <span class="mono-dim">No page open here — paste one and I'll read its current value.</span>
         </div>
         <hr class="rule" />
-        <div class="mrow"><span class="lbl">Check</span><span class="segmented" role="group" aria-label="Check frequency"><button aria-pressed="true">Auto</button><button aria-pressed="false">Hourly</button><button aria-pressed="false">Daily</button></span></div>
+        <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span></div>
                         <div class="mcard-actions"><span class="mono-dim">Runs on-device</span><span class="spacer"></span><button class="btn-ghost" id="modal-cancel">Cancel</button><button class="btn-primary" id="modal-start">Start monitoring</button></div>
       </div>
     </div>
@@ -1240,7 +1244,7 @@ document.getElementById("check-now").addEventListener("click", e => {
   const pct = Math.abs(Math.round((now - 299) / 299 * 100));
   document.getElementById("watch-val").textContent = "$" + now;
   document.getElementById("watch-meta").textContent = "checked just now · was $299";
-  document.getElementById("watch-sub").textContent = "Below $270 · Auto · on-device";
+  document.getElementById("watch-sub").textContent = "Below $270 · Daily · on-device";
   document.getElementById("watch-chip").innerHTML = "$" + now + " ▼ −" + pct + "%";
   const hist = document.getElementById("watch-hist");
   const row = document.createElement("div"); row.className = "hist-item";
