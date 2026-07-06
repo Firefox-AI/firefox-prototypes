@@ -352,6 +352,32 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 .disclaimer { padding: 0 var(--space-large) var(--space-medium); color: var(--text-color-deemphasized); font-size: 11px; text-align: center; }
 .disclaimer a { color: var(--smartwindow-text-color-accent-primary); }
 
+/* ============ New Tab + corner monitor stack ============ */
+.newtab { min-height: 100%; display: grid; place-items: center; position: relative; }
+.newtab-inner { display: flex; flex-direction: column; align-items: center; gap: var(--space-xlarge); margin-top: -48px; }
+.newtab-logo { display: flex; align-items: center; gap: var(--space-medium); font-size: 30px; font-weight: var(--font-weight-bold); }
+.newtab-logo .fx { width: 38px; height: 38px; border-radius: 50%; background: var(--smartwindow-border-color-gradient); }
+.newtab-search { width: 560px; max-width: 82%; height: 48px; border-radius: var(--border-radius-circle); background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); box-shadow: var(--box-shadow-level-2); display: flex; align-items: center; gap: var(--space-medium); padding: 0 var(--space-large); color: var(--text-color-deemphasized); }
+.newtab-search svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; flex: none; }
+.shortcut-row { display: flex; gap: var(--space-large); }
+.shortcut { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--text-color-deemphasized); font-size: 11px; }
+.shortcut .tile { width: 48px; height: 48px; border-radius: var(--border-radius-large); background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); display: grid; place-items: center; font-weight: var(--font-weight-semibold); font-size: 15px; color: var(--text-color); }
+
+/* Corner stack: collapsed deck; hover or focus fans it into a column; click a row to expand inline */
+.mstack { position: absolute; top: 16px; right: 16px; width: 324px; z-index: 30; pointer-events: none; }
+.mstack-list { display: flex; flex-direction: column; gap: var(--space-small); }
+.mstack-item { pointer-events: auto; position: relative; transition: transform var(--motion-dur-soft) var(--motion-ease-reach); }
+.mstack:not(.open) .mstack-item:nth-child(1) { z-index: 3; }
+.mstack:not(.open) .mstack-item:nth-child(2) { transform: translateY(-49px) scale(.955); z-index: 2; }
+.mstack:not(.open) .mstack-item:nth-child(3) { transform: translateY(-98px) scale(.91); z-index: 1; }
+.mrow-mini { display: flex; align-items: center; gap: var(--space-small); width: 100%; height: 48px; text-align: left; background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); padding: 0 var(--space-medium); box-shadow: var(--box-shadow-level-2); }
+.mrow-mini .favicon-sq { width: 22px; height: 22px; font-size: 10px; }
+.mrow-mini .nm { flex: 1; min-width: 0; font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mrow-mini .status-chip { padding: 2px 8px; font-size: 12px; }
+.mrow-mini .flag-attn { padding: 2px 8px; font-size: 12px; }
+.mstack-expand { margin-top: var(--space-small); }
+.mstack-expand .mcard { box-shadow: var(--box-shadow-level-4); }
+
 /* ============ OS notification toast ============ */
 .os-toast { position: absolute; top: 16px; right: 16px; width: 360px; z-index: 60; background: light-dark(rgba(250,250,252,.94), rgba(37,36,40,.96)); backdrop-filter: blur(14px); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-xlarge); box-shadow: var(--box-shadow-level-4); padding: var(--space-medium) var(--space-large); display: flex; gap: var(--space-medium); align-items: flex-start; cursor: pointer; text-align: left; animation: toast-in var(--motion-dur-soft) var(--motion-ease-reach) both; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(-16px); } }
@@ -414,6 +440,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
     </div>
 
     <div class="tab" style="min-width:110px" data-show="1 2 3 4 8 9"><span class="favicon" style="background:#67666a">+</span><span>New Tab</span></div>
+    <div class="tab active" style="min-width:130px" data-show="10"><span class="favicon" style="background:#67666a">+</span><span>New Tab</span></div>
   </div>
 
   <!-- ===================== Toolbar ===================== -->
@@ -434,6 +461,11 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
     <div class="urlbar" data-show="5 6 7">
       <span class="lock"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg></span>
       <span class="address"><span class="internal">about:monitors</span></span>
+    </div>
+
+    <div class="urlbar" data-show="10">
+      <span class="lock"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></span>
+      <span class="address" style="color:var(--text-color-deemphasized)">Search with Firefox or enter address</span>
     </div>
 
     <button class="page-action sw-toggle" title="Smart Window" aria-label="Toggle Smart Window"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>
@@ -564,6 +596,70 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <div class="product-meta">Price dropped today · Free returns within 30 days</div>
           </div>
         </div>
+      </div>
+
+      <!-- ---------- New Tab with the corner monitor stack ---------- -->
+      <div class="newtab" data-show="10">
+        <div class="newtab-inner">
+          <div class="newtab-logo"><span class="fx"></span> Firefox</div>
+          <div class="newtab-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg> Search with Firefox or enter address</div>
+          <div class="shortcut-row">
+            <span class="shortcut"><span class="tile" style="color:#e8663a">S</span>soundnest</span>
+            <span class="shortcut"><span class="tile" style="color:#2f855a">R</span>rei</span>
+            <span class="shortcut"><span class="tile" style="color:#3a7ae8">C</span>craigslist</span>
+            <span class="shortcut"><span class="tile" style="color:#b8860b">N</span>bhphoto</span>
+            <span class="shortcut"><span class="tile">M</span>mozilla</span>
+            <span class="shortcut"><span class="tile">W</span>wikipedia</span>
+          </div>
+        </div>
+
+        <div class="mstack" id="mstack">
+          <div class="mstack-list">
+            <div class="mstack-item">
+              <button class="mrow-mini" aria-expanded="false">
+                <span class="favicon-sq" style="background:#e8663a">S</span>
+                <span class="nm">Sony WH-1000XM5 price</span>
+                <span class="status-chip">$278 ▼ −7%</span>
+              </button>
+              <div class="mstack-expand" hidden>
+                <div class="mcard">
+                  <div class="mvalue"><span class="now" style="font-size:24px">$278</span><span class="from">checked 2:14 PM · was $299</span></div>
+                  <div class="mrow"><span class="lbl">Alert me when</span><span class="val">the price drops below $270</span></div>
+                  <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
+                </div>
+              </div>
+            </div>
+            <div class="mstack-item">
+              <button class="mrow-mini" aria-expanded="false">
+                <span class="favicon-sq" style="background:#2f855a">R</span>
+                <span class="nm">REI Danner hiking boots</span>
+                <span class="flag-attn"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg> Needs a look</span>
+              </button>
+              <div class="mstack-expand" hidden>
+                <div class="mcard">
+                  <p class="small" style="margin:0">The page layout changed — open it to point the monitor at the right spot again.</p>
+                  <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
+                </div>
+              </div>
+            </div>
+            <div class="mstack-item">
+              <button class="mrow-mini" aria-expanded="false">
+                <span class="favicon-sq" style="background:#3a7ae8">C</span>
+                <span class="nm">Apartment listings · Mission</span>
+                <span class="status-chip">3 new</span>
+              </button>
+              <div class="mstack-expand" hidden>
+                <div class="mcard">
+                  <div class="mvalue"><span class="now" style="font-size:24px">3 new</span><span class="from">since yesterday · craigslist.org</span></div>
+                  <div class="mrow"><span class="lbl">Alert me when</span><span class="val">a new listing matches my search</span></div>
+                  <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="annot point-right" style="top:26px; right:332px">Monitors ride along on New Tab — hover the stack.</div>
       </div>
 
       <!-- ---------- OS notification toast ---------- -->
@@ -777,6 +873,7 @@ const STEPS = [
   "Empty & loading + monitor prompts",
   "A confident change fires a notification",
   "Open page — pinned to the chat + history",
+  "Pinned to New Tab — hover the stack",
 ];
 let step = 1;
 const N = STEPS.length;
@@ -805,6 +902,31 @@ document.addEventListener("keydown", e => {
 // Story shortcuts
 document.getElementById("pa-monitor").onclick = () => { if (step === 1) go(2); };
 document.getElementById("agent-monitor").onclick = (e) => { e.stopPropagation(); go(3); };
+
+// New Tab corner stack: hover fans it out, click a row expands it inline, Open page hands off to the page + chat
+const mstack = document.getElementById("mstack");
+function stackOpen(v) {
+  mstack.classList.toggle("open", v);
+  if (!v) {
+    mstack.querySelectorAll(".mstack-expand").forEach(b => { b.hidden = true; });
+    mstack.querySelectorAll(".mrow-mini").forEach(b => b.setAttribute("aria-expanded", "false"));
+  }
+}
+mstack.addEventListener("mouseenter", () => stackOpen(true));
+mstack.addEventListener("mouseleave", () => stackOpen(false));
+mstack.addEventListener("focusin", () => stackOpen(true));
+mstack.querySelectorAll(".mrow-mini").forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (!mstack.classList.contains("open")) { stackOpen(true); return; }
+    const body = btn.parentElement.querySelector(".mstack-expand");
+    const wasOpen = !body.hidden;
+    mstack.querySelectorAll(".mstack-expand").forEach(b => { b.hidden = true; });
+    mstack.querySelectorAll(".mrow-mini").forEach(b => b.setAttribute("aria-expanded", "false"));
+    body.hidden = wasOpen;
+    btn.setAttribute("aria-expanded", String(!wasOpen));
+  });
+});
+mstack.querySelectorAll("[data-open-page]").forEach(b => { b.addEventListener("click", () => go(9)); });
 
 // Monitor prompts + New monitor open the create card as a modal (no page to read here — you paste a URL)
 const PROMPTS = {
