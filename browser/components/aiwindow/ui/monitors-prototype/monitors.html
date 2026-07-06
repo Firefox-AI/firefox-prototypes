@@ -644,6 +644,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               </div>
               <div class="mstack-expand"><div class="mstack-expand-inner">
               <div id="card-sony" class="mcard">
+                <div class="mvalue"><span class="now" style="font-size:24px">$299</span><span class="from">watching for a drop · checked 3m ago</span></div>
                 <div class="field">
                   <span class="field-label">Alert me when</span>
                   <input class="field-input" id="sony-cond" value="the price drops below $270" aria-label="Alert condition" />
@@ -654,8 +655,14 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                   <div class="chip-row"><span class="page-pill"><span class="fav" style="background:#e8663a">S</span> soundnest.com/…/xm5 <span class="x">×</span></span><button class="chip">+ Add page</button></div>
                 </div>
                 <hr class="rule" />
-                <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span></div>
+                <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span><span class="scope-tag">choices after v0</span></div>
                 <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite">Saved automatically</span></div>
+                <hr class="rule" />
+                <div class="section-toggle">Change history</div>
+                <div class="history">
+                  <div class="hist-item low"><span class="when">Jun 24</span><span class="hist-flag">possible change</span><span class="deemphasized">low confidence · held, no notification</span></div>
+                  <div class="hist-item"><span class="when">Jun 17</span><span class="oldv">$319</span><span class="arrow">→</span><span class="newv">$299</span><span class="deemphasized">first checked</span></div>
+                </div>
               </div>
               </div></div>
             </div>
@@ -670,6 +677,10 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <div class="mstack-expand"><div class="mstack-expand-inner">
               <div class="mcard">
                 <p class="small" style="margin:0">The page changed and the monitor can't find the price. Open the page and it will find it again.</p>
+                <div class="history" style="margin-top: var(--space-xsmall)">
+                  <div class="hist-item"><span class="when">Jun 30</span><span class="hist-flag">value lost</span><span class="deemphasized">the page changed</span></div>
+                  <div class="hist-item"><span class="when">Jun 12</span><span class="newv">$189</span><span class="deemphasized">first checked</span></div>
+                </div>
                 <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
               </div>
               </div></div>
@@ -686,7 +697,12 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <div class="mcard">
                 <div class="mvalue"><span class="now" style="font-size:24px">3 new</span><span class="from">since yesterday · checked 12m ago</span></div>
                 <div class="mrow"><span class="lbl">Alert me when</span><span class="val">a new listing matches my search</span></div>
-                <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span></div>
+                <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span><span class="scope-tag">choices after v0</span></div>
+                <div class="history" style="margin-top: var(--space-xsmall)">
+                  <div class="hist-item"><span class="when">Today</span><span class="newv" style="color:var(--text-color-success)">3 new listings</span></div>
+                  <div class="hist-item"><span class="when">Yesterday</span><span class="newv">2 new listings</span></div>
+                  <div class="hist-item"><span class="when">Jun 28</span><span class="deemphasized">first checked · 41 listings</span></div>
+                </div>
                 <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
               </div>
               </div></div>
@@ -704,6 +720,11 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <div class="mcard">
                 <div class="mvalue"><span class="now" style="font-size:24px">$1,999</span><span class="from">last checked before pausing</span></div>
                 <div class="mrow"><span class="lbl">Alert me when</span><span class="val">the price drops below $1,800</span></div>
+                <div class="history" style="margin-top: var(--space-xsmall)">
+                  <div class="hist-item"><span class="when">Jun 25</span><span class="deemphasized">paused</span></div>
+                  <div class="hist-item"><span class="when">Jun 20</span><span class="oldv">$2,099</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$1,999</span><span class="deemphasized">−5%</span></div>
+                  <div class="hist-item"><span class="when">Jun 8</span><span class="deemphasized">first checked · $2,099</span></div>
+                </div>
                 <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Resume</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
               </div>
               </div></div>
@@ -875,7 +896,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <div class="chip-row"><span class="page-pill"><span class="fav" style="background:#e8663a">S</span> soundnest.com/…/xm5 <span class="x">×</span></span><button class="chip">+ Add page</button></div>
             </div>
             <hr class="rule" />
-            <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span></div>
+            <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span><span class="scope-tag">choices after v0</span></div>
                                     <div class="mcard-actions"><span class="mono-dim">Runs on-device</span><span class="spacer"></span><button class="btn-ghost">Cancel</button><button class="btn-primary" id="start-monitoring">Start monitoring</button></div>
           </div>
         </div>
@@ -902,7 +923,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <div class="chip-row" id="watch-chips"><button class="chip">Any drop</button><button class="chip selected">Below $270</button><button class="chip">Below $250</button><button class="chip">Back in stock</button></div>
                 <span class="save-note" id="save-note-watch" role="status" aria-live="polite"></span>
               </div>
-              <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span></div>
+              <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span><span class="scope-tag">choices after v0</span></div>
               <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-ghost" id="check-now">Check now</button></div>
               <hr class="rule" />
               <div class="section-toggle">Change history</div>
@@ -934,7 +955,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <div class="chip-row" id="pin-chips"><button class="chip">Any drop</button><button class="chip selected">Below $270</button><button class="chip">Below $250</button><button class="chip">Back in stock</button></div>
               <span class="save-note" id="save-note-pin" role="status" aria-live="polite"></span>
             </div>
-            <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span></div>
+            <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span><span class="scope-tag">choices after v0</span></div>
             <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Snooze</button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary">Open page</button></div>
             <hr class="rule" />
             <div class="section-toggle">Change history</div>
@@ -1000,7 +1021,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           <span class="mono-dim">No page open here — paste one and I'll read its current value.</span>
         </div>
         <hr class="rule" />
-        <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span></div>
+        <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span><span class="scope-tag">choices after v0</span></div>
                         <div class="mcard-actions"><span class="mono-dim">Runs on-device</span><span class="spacer"></span><button class="btn-ghost" id="modal-cancel">Cancel</button><button class="btn-primary" id="modal-start">Start monitoring</button></div>
       </div>
     </div>
