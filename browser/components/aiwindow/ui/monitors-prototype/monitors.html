@@ -274,7 +274,10 @@ h1,h2,h3,h4,p { margin: 0; }
 .chip.selected { border-color: var(--color-accent-primary); background: light-dark(var(--color-violet-0), rgba(118,78,221,.28)); color: var(--color-accent-primary); }
 .page-pill { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 5px var(--space-small) 5px 6px; border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-circle); background: var(--background-color-box-info); font-size: var(--font-size-small); }
 .page-pill .fav { width: 15px; height: 15px; border-radius: 3px; flex: none; display: grid; place-items: center; color: #fff; font-size: 8px; font-weight: 700; }
-.page-pill .x { color: var(--text-color-deemphasized); }
+.page-pill .x { color: var(--text-color-deemphasized); cursor: pointer; padding: 0 2px; }
+.page-pill .x:hover { color: var(--text-color-error); }
+.page-add-input { max-width: 230px; padding: 6px 10px; font-size: var(--font-size-small); }
+#modal-pages:empty { display: none; }
 .segmented { display: inline-flex; border: 1px solid var(--border-color); border-radius: var(--border-radius-medium); overflow: hidden; }
 .segmented button { padding: 6px var(--space-medium); font-size: var(--font-size-small); color: var(--text-color-deemphasized); }
 .segmented button[aria-pressed="true"] { background: var(--background-color-box-info); color: var(--text-color); font-weight: var(--font-weight-semibold); }
@@ -652,7 +655,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 </div>
                 <div class="field">
                   <span class="field-label">Pages</span>
-                  <div class="chip-row"><span class="page-pill"><span class="fav" style="background:#e8663a">S</span> soundnest.com/…/xm5 <span class="x">×</span></span><button class="chip">+ Add page</button></div>
+                  <div class="chip-row pages-row"><span class="page-pill"><span class="fav" style="background:#e8663a">S</span> soundnest.com/…/xm5 <button class="x" aria-label="Remove page">×</button></span><input class="field-input page-add-input" placeholder="Paste a URL" hidden aria-label="Add page URL" /><button class="chip page-add">+ Add page</button></div>
                 </div>
                 <hr class="rule" />
                 <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span><span class="scope-tag">choices after v0</span></div>
@@ -893,7 +896,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             </div>
             <div class="field">
               <span class="field-label">Pages</span>
-              <div class="chip-row"><span class="page-pill"><span class="fav" style="background:#e8663a">S</span> soundnest.com/…/xm5 <span class="x">×</span></span><button class="chip">+ Add page</button></div>
+              <div class="chip-row pages-row"><span class="page-pill"><span class="fav" style="background:#e8663a">S</span> soundnest.com/…/xm5 <button class="x" aria-label="Remove page">×</button></span><input class="field-input page-add-input" placeholder="Paste a URL" hidden aria-label="Add page URL" /><button class="chip page-add">+ Add page</button></div>
             </div>
             <hr class="rule" />
             <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span><span class="scope-tag">choices after v0</span></div>
@@ -1017,8 +1020,9 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         </div>
         <div class="field">
           <span class="field-label">Pages</span>
+          <div class="chip-row" id="modal-pages"></div>
           <input class="field-input" id="modal-url" placeholder="Paste a URL to watch" aria-label="Page URL" />
-          <span class="mono-dim">No page open here — paste one and I'll read its current value.</span>
+          <span class="mono-dim">No page open here — paste one, press Enter, and I'll read its value. Up to 6 pages.</span>
         </div>
         <hr class="rule" />
         <div class="mrow"><span class="lbl">Check</span><span class="val">Daily · on-device</span><span class="scope-tag">choices after v0</span></div>
@@ -1182,6 +1186,9 @@ function openModal(name) {
   document.getElementById("modal-title").textContent = name || "New monitor";
   modalCond.value = p ? p.cond : "";
   document.getElementById("modal-url").value = "";
+  document.getElementById("modal-url").disabled = false;
+  document.getElementById("modal-url").placeholder = "Paste a URL to watch";
+  document.getElementById("modal-pages").innerHTML = "";
   modalChips.innerHTML = "";
   (p ? p.chips : []).forEach(([label, cond]) => {
     const c = document.createElement("button");
@@ -1294,7 +1301,7 @@ function noteSaved(el, revert) {
 const cardSony = document.getElementById("card-sony");
 document.getElementById("sony-cond").addEventListener("input", () => noteSaved());
 cardSony.addEventListener("click", e => {
-  if (e.target.closest(".chip, .segmented button, .page-pill .x")) noteSaved();
+  if (e.target.closest(".chip:not(.page-add), .segmented button, .page-pill .x")) noteSaved();
 });
 document.getElementById("watch-cond").addEventListener("input", () => noteSaved(watchNote, ""));
 document.getElementById("pin-cond").addEventListener("input", () => noteSaved(pinNote, ""));
@@ -1332,6 +1339,64 @@ wireChips(document.getElementById("create-chips"), document.getElementById("crea
 wireChips(document.getElementById("sony-chips"), document.getElementById("sony-cond"), COND_MAP);
 wireChips(document.getElementById("watch-chips"), document.getElementById("watch-cond"), COND_MAP, () => { noteSaved(watchNote, ""); watchCardApi.syncRead(); });
 wireChips(document.getElementById("pin-chips"), document.getElementById("pin-cond"), COND_MAP, () => { noteSaved(pinNote, ""); pinCardApi.syncRead(); });
+// Pages: + Add page reveals an inline URL input; Enter adds a removable pill (up to 6)
+const MAX_PAGES = 6;
+function pageShort(u) { u = u.replace(/^https?:\/\//, "").replace(/\/$/, ""); return u.length > 28 ? u.slice(0, 18) + "…" + u.slice(-8) : u; }
+function makePill(u) {
+  const pill = document.createElement("span");
+  pill.className = "page-pill";
+  const fav = document.createElement("span"); fav.className = "fav"; fav.style.background = "#67666a"; fav.textContent = u.replace(/^https?:\/\//, "")[0].toUpperCase();
+  const x = document.createElement("button"); x.className = "x"; x.setAttribute("aria-label", "Remove page"); x.textContent = "×";
+  pill.append(fav, " " + pageShort(u) + " ", x);
+  return pill;
+}
+document.querySelectorAll(".pages-row").forEach(row => {
+  const btn = row.querySelector(".page-add");
+  const input = row.querySelector(".page-add-input");
+  const count = () => row.querySelectorAll(".page-pill").length;
+  const inSony = !!row.closest("#card-sony");
+  btn.addEventListener("click", e => { e.stopPropagation(); btn.hidden = true; input.hidden = false; input.focus(); });
+  function commit() {
+    const v = input.value.trim();
+    if (v) { row.insertBefore(makePill(v), input); if (inSony) noteSaved(); }
+    input.value = ""; input.hidden = true;
+    btn.hidden = count() >= MAX_PAGES;
+  }
+  input.addEventListener("keydown", ev => {
+    if (ev.key === "Enter") { ev.preventDefault(); commit(); }
+    if (ev.key === "Escape") { ev.stopPropagation(); input.value = ""; input.hidden = true; btn.hidden = count() >= MAX_PAGES; }
+  });
+  input.addEventListener("blur", () => { if (!input.hidden) commit(); });
+  row.addEventListener("click", ev => {
+    const x = ev.target.closest(".page-pill .x"); if (!x) return;
+    ev.stopPropagation();
+    x.closest(".page-pill").remove();
+    btn.hidden = count() >= MAX_PAGES;
+    if (inSony) noteSaved();
+  });
+});
+
+// Modal pages: Enter collects pills above the input
+const modalPages = document.getElementById("modal-pages");
+const modalUrl = document.getElementById("modal-url");
+modalUrl.addEventListener("keydown", ev => {
+  if (ev.key !== "Enter") return;
+  ev.preventDefault();
+  const v = modalUrl.value.trim(); if (!v) return;
+  if (modalPages.querySelectorAll(".page-pill").length >= MAX_PAGES) return;
+  modalPages.appendChild(makePill(v));
+  modalUrl.value = "";
+  const full = modalPages.querySelectorAll(".page-pill").length >= MAX_PAGES;
+  modalUrl.disabled = full;
+  modalUrl.placeholder = full ? "6 pages max" : "Add another URL, or start monitoring";
+});
+modalPages.addEventListener("click", ev => {
+  const x = ev.target.closest(".page-pill .x"); if (!x) return;
+  x.closest(".page-pill").remove();
+  modalUrl.disabled = false;
+  if (!modalPages.querySelector(".page-pill")) modalUrl.placeholder = "Paste a URL to watch";
+});
+
 document.querySelectorAll(".segmented").forEach(seg => {
   seg.querySelectorAll("button").forEach(b => { b.onclick = () => { seg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", "false")); b.setAttribute("aria-pressed", "true"); }; });
 });
