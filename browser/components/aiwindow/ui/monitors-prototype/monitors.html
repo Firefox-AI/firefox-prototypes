@@ -704,7 +704,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </div>
         </div>
 
-        <div class="mstack" id="mstack" data-show="10">
+        <div class="mstack" id="mstack" data-show="10 11">
           <div class="mstack-list">
             <div class="mstack-item">
               <button class="mrow-mini" aria-expanded="false">
@@ -980,7 +980,7 @@ function render() {
   document.getElementById("step-text").textContent = STEPS[step - 1];
   [...dots.children].forEach((d, i) => d.classList.toggle("on", i < step));
   document.getElementById("sidebar").style.width = step === 9 ? "452px" : "416px";
-  if (step !== 10) stackSet(false);
+  if (step !== 10 && step !== 11) stackSet(false);
   document.getElementById("rail-monitors").classList.toggle("active", step === 11);
 }
 function go(n) { step = Math.max(1, Math.min(N, n)); history.replaceState(null, "", "#" + step); render(); }
