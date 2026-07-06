@@ -1400,10 +1400,14 @@ export class nsContextMenu {
   }
 
   smartFormFill() {
-    console.log("[SmartFormFill] context menu item clicked");
-    let actor =
-      this.browser.browsingContext.currentWindowGlobal.getActor("SmartFormFill");
-    actor.smartFill(this.targetIdentifier).catch(console.error);
+    const wgp = this.browser.browsingContext.currentWindowGlobal;
+    // On the pdf.js viewer, route to the PDF actor (real annotation inputs, but
+    // classified/filled by the PDF pipeline, not the web one).
+    if (this.browser.contentPrincipal?.spec === "resource://pdf.js/web/viewer.html") {
+      wgp.getActor("PdfFormFill").fillTarget(this.targetIdentifier);
+      return;
+    }
+    wgp.getActor("SmartFormFill").smartFill(this.targetIdentifier).catch(console.error);
   }
 
   isLoginForm() {

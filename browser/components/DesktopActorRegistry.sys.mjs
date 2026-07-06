@@ -278,6 +278,25 @@ let JSWINDOWACTORS = {
     enablePreference: "browser.smartwindow.enabled",
   },
 
+  // Spike: classify (and fill) pdf.js form fields. Instantiates on every
+  // DOMContentLoaded and bails in the child unless the document principal is the
+  // pdf.js viewer (its document URI is the PDF's own URL, so `matches` cannot
+  // target it). Reads the viewer runtime API without editing vendored pdf.js.
+  PdfFormFill: {
+    parent: {
+      esModuleURI:
+        "moz-src:///browser/components/aiwindow/ui/actors/PdfFormFillParent.sys.mjs",
+    },
+    child: {
+      esModuleURI:
+        "moz-src:///browser/components/aiwindow/ui/actors/PdfFormFillChild.sys.mjs",
+      events: {
+        DOMContentLoaded: {},
+      },
+    },
+    allFrames: true,
+  },
+
   BackupUI: {
     parent: {
       esModuleURI: "resource:///actors/BackupUIParent.sys.mjs",

@@ -361,15 +361,21 @@ document.addEventListener(
           // private. Top-document only is implicit (we use the selected tab's
           // top browsing context, so a focused subframe input is ignored).
           const browser = gBrowser.selectedBrowser;
+          const wgp = browser.browsingContext.currentWindowGlobal;
+          // On the pdf.js viewer, route to the PDF actor.
+          if (
+            browser.contentPrincipal?.spec ===
+            "resource://pdf.js/web/viewer.html"
+          ) {
+            wgp.getActor("PdfFormFill").fillFocused();
+            break;
+          }
           if (
             AIWindow.isAIWindowEnabled() &&
             !PrivateBrowsingUtils.isWindowPrivate(window) &&
             browser.currentURI?.schemeIs("https")
           ) {
-            browser.browsingContext.currentWindowGlobal
-              .getActor("SmartFormFill")
-              .smartFillFocused()
-              .catch(console.error);
+            wgp.getActor("SmartFormFill").smartFillFocused().catch(console.error);
           }
           break;
         }
