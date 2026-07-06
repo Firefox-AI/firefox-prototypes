@@ -367,9 +367,20 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 .mstack { position: absolute; top: 16px; right: 16px; width: 324px; z-index: 30; pointer-events: none; }
 .mstack-list { display: flex; flex-direction: column; gap: var(--space-small); }
 .mstack-item { pointer-events: auto; position: relative; transition: transform var(--motion-dur-soft) var(--motion-ease-reach); }
-.mstack:not(.open) .mstack-item:nth-child(1) { z-index: 3; }
-.mstack:not(.open) .mstack-item:nth-child(2) { transform: translateY(-49px) scale(.955); z-index: 2; }
-.mstack:not(.open) .mstack-item:nth-child(3) { transform: translateY(-98px) scale(.91); z-index: 1; }
+/* Fan open = Reach: leisurely fan stagger, no spring — optional shouldn't feel committed */
+.mstack.open .mstack-item:nth-child(1) { transition-delay: 0ms; }
+.mstack.open .mstack-item:nth-child(2) { transition-delay: 95ms; }
+.mstack.open .mstack-item:nth-child(3) { transition-delay: 210ms; }
+/* Tuck = Leave: faster than the fan, gathers bottom-first */
+.mstack:not(.open) .mstack-item { transition-duration: var(--motion-dur-away); transition-timing-function: var(--motion-ease-leave); }
+.mstack:not(.open) .mstack-item:nth-child(1) { z-index: 3; transition-delay: 80ms; }
+.mstack:not(.open) .mstack-item:nth-child(2) { transform: translateY(-49px) scale(.955); z-index: 2; transition-delay: 40ms; }
+.mstack:not(.open) .mstack-item:nth-child(3) { transform: translateY(-98px) scale(.91); z-index: 1; transition-delay: 0ms; }
+/* The wake: the deck notices the pointer before it opens */
+.mstack.intent .mstack-item:nth-child(1) { transform: translateY(-2px); transition: transform var(--motion-dur-near) var(--motion-ease-edge) 0ms; }
+.mstack.intent .mstack-item:nth-child(2) { transform: translateY(-46px) scale(.965); transition: transform var(--motion-dur-near) var(--motion-ease-edge) 0ms; }
+.mstack.intent .mstack-item:nth-child(3) { transform: translateY(-93px) scale(.925); transition: transform var(--motion-dur-near) var(--motion-ease-edge) 0ms; }
+.mstack.intent .mstack-item:nth-child(1) .mrow-mini { box-shadow: var(--box-shadow-level-4); }
 .mrow-mini { display: flex; align-items: center; gap: var(--space-small); width: 100%; height: 48px; text-align: left; background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); padding: 0 var(--space-medium); box-shadow: var(--box-shadow-level-2); }
 .mrow-mini .favicon-sq { width: 22px; height: 22px; font-size: 10px; }
 .mrow-mini .nm { flex: 1; min-width: 0; font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -622,7 +633,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <span class="status-chip">$278 ▼ −7%</span>
               </button>
               <div class="mstack-expand" hidden>
-                <div class="mcard">
+                <div class="mcard anim-land">
                   <div class="mvalue"><span class="now" style="font-size:24px">$278</span><span class="from">checked 2:14 PM · was $299</span></div>
                   <div class="mrow"><span class="lbl">Alert me when</span><span class="val">the price drops below $270</span></div>
                   <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
@@ -636,7 +647,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <span class="flag-attn"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg> Needs a look</span>
               </button>
               <div class="mstack-expand" hidden>
-                <div class="mcard">
+                <div class="mcard anim-land">
                   <p class="small" style="margin:0">The page layout changed — open it to point the monitor at the right spot again.</p>
                   <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
                 </div>
@@ -649,7 +660,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <span class="status-chip">3 new</span>
               </button>
               <div class="mstack-expand" hidden>
-                <div class="mcard">
+                <div class="mcard anim-land">
                   <div class="mvalue"><span class="now" style="font-size:24px">3 new</span><span class="from">since yesterday · craigslist.org</span></div>
                   <div class="mrow"><span class="lbl">Alert me when</span><span class="val">a new listing matches my search</span></div>
                   <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
@@ -888,6 +899,7 @@ function render() {
   document.getElementById("step-text").textContent = STEPS[step - 1];
   [...dots.children].forEach((d, i) => d.classList.toggle("on", i < step));
   document.getElementById("sidebar").style.width = step === 9 ? "452px" : "416px";
+  if (step !== 10) stackSet(false);
 }
 function go(n) { step = Math.max(1, Math.min(N, n)); render(); }
 document.getElementById("next").onclick = () => go(step + 1);
@@ -895,6 +907,7 @@ document.getElementById("prev").onclick = () => go(step - 1);
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && !scrim.hidden) { closeModal(); return; }
   if (!scrim.hidden) return;
+  if (e.key === "Escape" && mstack.classList.contains("open")) { stackSet(false); return; }
   if (e.key === "ArrowRight") go(step + 1);
   if (e.key === "ArrowLeft") go(step - 1);
 });
@@ -903,21 +916,40 @@ document.addEventListener("keydown", e => {
 document.getElementById("pa-monitor").onclick = () => { if (step === 1) go(2); };
 document.getElementById("agent-monitor").onclick = (e) => { e.stopPropagation(); go(3); };
 
-// New Tab corner stack: hover fans it out, click a row expands it inline, Open page hands off to the page + chat
+// New Tab corner stack. Hover wakes the deck, then it fans (Reach). Leaving starts a
+// grace period before it tucks (Leave) — and it never tucks while a card is expanded;
+// that state dismisses only on Esc or a click elsewhere.
 const mstack = document.getElementById("mstack");
-function stackOpen(v) {
-  mstack.classList.toggle("open", v);
-  if (!v) {
+let stackTimer = null;
+const stackPinned = () => !!mstack.querySelector(".mstack-expand:not([hidden])");
+function stackSet(open) {
+  clearTimeout(stackTimer);
+  mstack.classList.remove("intent");
+  mstack.classList.toggle("open", open);
+  if (!open) {
     mstack.querySelectorAll(".mstack-expand").forEach(b => { b.hidden = true; });
     mstack.querySelectorAll(".mrow-mini").forEach(b => b.setAttribute("aria-expanded", "false"));
   }
 }
-mstack.addEventListener("mouseenter", () => stackOpen(true));
-mstack.addEventListener("mouseleave", () => stackOpen(false));
-mstack.addEventListener("focusin", () => stackOpen(true));
+mstack.addEventListener("mouseenter", () => {
+  clearTimeout(stackTimer);
+  if (mstack.classList.contains("open")) return;
+  mstack.classList.add("intent");
+  stackTimer = setTimeout(() => stackSet(true), 140);
+});
+mstack.addEventListener("mouseleave", () => {
+  clearTimeout(stackTimer);
+  mstack.classList.remove("intent");
+  if (!mstack.classList.contains("open") || stackPinned()) return;
+  stackTimer = setTimeout(() => stackSet(false), 700);
+});
+mstack.addEventListener("focusin", () => { clearTimeout(stackTimer); if (!mstack.classList.contains("open")) stackSet(true); });
+document.addEventListener("click", e => {
+  if (mstack.classList.contains("open") && !e.target.closest("#mstack")) stackSet(false);
+});
 mstack.querySelectorAll(".mrow-mini").forEach(btn => {
   btn.addEventListener("click", () => {
-    if (!mstack.classList.contains("open")) { stackOpen(true); return; }
+    if (!mstack.classList.contains("open")) { stackSet(true); return; }
     const body = btn.parentElement.querySelector(".mstack-expand");
     const wasOpen = !body.hidden;
     mstack.querySelectorAll(".mstack-expand").forEach(b => { b.hidden = true; });
