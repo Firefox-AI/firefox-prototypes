@@ -20,18 +20,6 @@ ChromeUtils.defineLazyGetter(lazy, "console", () =>
 
 XPCOMUtils.defineLazyPreferenceGetter(
   lazy,
-  "enabled",
-  "browser.smartwindow.autoTabGrouping.enabled",
-  false
-);
-XPCOMUtils.defineLazyPreferenceGetter(
-  lazy,
-  "mode",
-  "browser.smartwindow.autoTabGrouping.mode",
-  "suggest"
-);
-XPCOMUtils.defineLazyPreferenceGetter(
-  lazy,
   "maxGroups",
   "browser.smartwindow.autoTabGrouping.maxGroups",
   3
@@ -48,36 +36,110 @@ XPCOMUtils.defineLazyPreferenceGetter(
   "browser.smartwindow.autoTabGrouping.minCandidateTabs",
   4
 );
-XPCOMUtils.defineLazyPreferenceGetter(
-  lazy,
-  "triggerOnOpen",
-  "browser.smartwindow.autoTabGrouping.triggerOnOpen",
-  true
-);
-XPCOMUtils.defineLazyPreferenceGetter(
-  lazy,
-  "triggerOnSwitch",
-  "browser.smartwindow.autoTabGrouping.triggerOnSwitch",
-  true
-);
-XPCOMUtils.defineLazyPreferenceGetter(
-  lazy,
-  "reviewBeforeGrouping",
-  "browser.smartwindow.autoTabGrouping.reviewBeforeGrouping",
-  false
-);
 
-const NOTIFICATION_VALUE = "smartwindow-auto-tab-grouping";
+const PANEL_ID = "smartwindow-group-tabs-panel";
+const HTML_NS = "http://www.w3.org/1999/xhtml";
+
+const PANEL_STYLE = `
+  #${PANEL_ID} {
+    --panel-padding: 0;
+    --panel-background: transparent;
+    --panel-border-color: transparent;
+    --panel-shadow-margin: 0;
+  }
+  #${PANEL_ID} .swgt-container {
+    display: flex;
+    flex-direction: column;
+    min-width: 340px;
+    max-width: 420px;
+    padding: 8px;
+    background: #16151c;
+    color: #fbfbfe;
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  }
+  #${PANEL_ID} .swgt-header {
+    margin: 0;
+    padding: 12px 16px;
+    font-size: 1.1em;
+    font-weight: 700;
+    text-align: center;
+  }
+  #${PANEL_ID} .swgt-body {
+    display: flex;
+    flex-direction: column;
+  }
+  #${PANEL_ID} .swgt-row {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: inherit;
+    text-align: start;
+    padding: 12px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  #${PANEL_ID} .swgt-row:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+  #${PANEL_ID} .swgt-row-title {
+    font-size: 1.05em;
+  }
+  #${PANEL_ID} .swgt-row-primary .swgt-row-title {
+    font-weight: 600;
+  }
+  #${PANEL_ID} .swgt-row-subtitle {
+    font-size: 0.85em;
+    opacity: 0.6;
+  }
+  #${PANEL_ID} .swgt-message {
+    padding: 20px 16px;
+    opacity: 0.7;
+    text-align: center;
+  }
+  #${PANEL_ID} .swgt-footer {
+    padding-top: 8px;
+  }
+  #${PANEL_ID} .swgt-undo {
+    appearance: none;
+    width: 100%;
+    border: none;
+    background: rgba(255, 255, 255, 0.06);
+    color: inherit;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  #${PANEL_ID} .swgt-undo:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.12);
+  }
+  #${PANEL_ID} .swgt-undo:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+`;
 
 export const AutoTabGrouping = {
-  /**
-   * Windows we've already offered grouping for in their current lifetime, so a
-   * trigger doesn't repeatedly nag the user.
-   *
-   * @type {WeakSet<ChromeWindow>}
-   */
-  _offeredWindows: new WeakSet(),
   _manager: null,
+
+  /**
+   * Groups created via the panel, per window, so "Undo all recent groups" can
+   * reverse exactly what this feature created (and nothing the user made by
+   * hand).
+   *
+   * @type {WeakMap<ChromeWindow, object[]>}
+   */
+  _createdGroups: new WeakMap(),
+
+  /**
+   * The panel currently in the DOM for a window, if any.
+   *
+   * @type {WeakMap<ChromeWindow, XULElement>}
+   */
+  _panels: new WeakMap(),
 
   get manager() {
     if (!this._manager) {
@@ -87,72 +149,227 @@ export const AutoTabGrouping = {
   },
 
   /**
-   * Entry point called from the AI Window lifecycle.
+   * Toggle the "Group my tabs" panel from the toolbar button.
    *
    * @param {ChromeWindow} win - The Smart Window.
-   * @param {"open"|"switch"} trigger - What caused this call.
    */
-  async maybeAutoGroup(win, trigger) {
-    try {
-      if (!lazy.enabled) {
-        return;
-      }
-      if (trigger == "open" && !lazy.triggerOnOpen) {
-        return;
-      }
-      if (trigger == "switch" && !lazy.triggerOnSwitch) {
-        return;
-      }
-      if (!win?.gBrowser || win.closed) {
-        return;
-      }
-      if (this._offeredWindows.has(win)) {
-        lazy.console.debug(
-          "Already offered grouping for this window; skipping"
-        );
-        return;
-      }
-      this._offeredWindows.add(win);
+  toggleGroupTabsPanel(win) {
+    const existing = this._panels.get(win);
+    if (existing) {
+      existing.hidePopup();
+      return;
+    }
+    this.showGroupTabsPanel(win).catch(e =>
+      lazy.console.warn("showGroupTabsPanel failed", e)
+    );
+  },
 
-      await this._run(win, trigger);
-    } catch (e) {
-      lazy.console.warn("maybeAutoGroup failed", e);
+  /**
+   * Build the panel, show it, then populate it with suggested groups once the
+   * clustering models have run.
+   *
+   * @param {ChromeWindow} win
+   */
+  async showGroupTabsPanel(win) {
+    if (!win?.gBrowser || win.closed) {
+      return;
+    }
+    const doc = win.document;
+    const anchor = doc.getElementById("smartwindow-group-tabs-button");
+    const popupSet = doc.getElementById("mainPopupSet");
+    if (!anchor || !popupSet) {
+      return;
+    }
+
+    const panel = this._buildPanelSkeleton(win);
+    popupSet.appendChild(panel);
+    this._panels.set(win, panel);
+    panel.addEventListener(
+      "popuphidden",
+      () => {
+        if (this._panels.get(win) === panel) {
+          this._panels.delete(win);
+        }
+        panel.remove();
+      },
+      { once: true }
+    );
+
+    panel.openPopup(anchor, "after_end", 0, 4, false, false);
+
+    this._setMessage(win, panel._body, "Finding groups…");
+
+    const candidates = this._getCandidateTabs(win);
+    let proposals = [];
+    if (candidates.length >= lazy.minCandidateTabs) {
+      try {
+        proposals = await this._buildGroupProposals(win, candidates);
+      } catch (e) {
+        lazy.console.warn("Building group proposals failed", e);
+      }
+    }
+
+    // The panel may have been closed (or replaced) while the models ran.
+    if (this._panels.get(win) !== panel) {
+      return;
+    }
+
+    panel._candidateCount = candidates.length;
+    panel._remaining = proposals;
+    this._renderBody(win, panel);
+  },
+
+  /**
+   * @param {ChromeWindow} win
+   * @returns {XULElement} A detached panel with its body/undo refs attached.
+   */
+  _buildPanelSkeleton(win) {
+    const doc = win.document;
+
+    const panel = doc.createXULElement("panel");
+    panel.id = PANEL_ID;
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("noautofocus", "true");
+    panel.setAttribute("class", "panel-no-padding");
+
+    const style = doc.createElementNS(HTML_NS, "style");
+    style.textContent = PANEL_STYLE;
+    panel.appendChild(style);
+
+    const container = doc.createElementNS(HTML_NS, "div");
+    container.className = "swgt-container";
+
+    const header = doc.createElementNS(HTML_NS, "h1");
+    header.className = "swgt-header";
+    header.textContent = "Group my tabs";
+    container.appendChild(header);
+
+    const body = doc.createElementNS(HTML_NS, "div");
+    body.className = "swgt-body";
+    container.appendChild(body);
+
+    const footer = doc.createElementNS(HTML_NS, "div");
+    footer.className = "swgt-footer";
+    const undoBtn = doc.createElementNS(HTML_NS, "button");
+    undoBtn.className = "swgt-undo";
+    undoBtn.type = "button";
+    undoBtn.textContent = "Undo all recent groups";
+    undoBtn.addEventListener("click", () => this._undoAll(win, panel));
+    footer.appendChild(undoBtn);
+    container.appendChild(footer);
+
+    panel.appendChild(container);
+
+    panel._body = body;
+    panel._undoBtn = undoBtn;
+    this._updateUndoButton(win, panel);
+    return panel;
+  },
+
+  /**
+   * (Re)render the body from panel._remaining. Called after every create/undo.
+   *
+   * @param {ChromeWindow} win
+   * @param {XULElement} panel
+   */
+  _renderBody(win, panel) {
+    const body = panel._body;
+    body.textContent = "";
+
+    const remaining = panel._remaining || [];
+    if (!remaining.length) {
+      let text;
+      if (panel._createdAny) {
+        text = "Tabs grouped. Undo below to reverse.";
+      } else if (panel._candidateCount < lazy.minCandidateTabs) {
+        text = "Open a few more tabs to get grouping suggestions.";
+      } else {
+        text = "No tab groups to suggest right now.";
+      }
+      this._setMessage(win, body, text);
+      this._updateUndoButton(win, panel);
+      return;
+    }
+
+    const groupAll = this._createRow(win, "Group all tabs", null);
+    groupAll.classList.add("swgt-row-primary");
+    groupAll.addEventListener("click", () => {
+      this._createGroups(win, remaining);
+      panel._createdAny = true;
+      panel._remaining = [];
+      this._renderBody(win, panel);
+    });
+    body.appendChild(groupAll);
+
+    for (const proposal of remaining) {
+      const label = proposal.label || "Untitled";
+      const count = proposal.tabs.length;
+      const row = this._createRow(
+        win,
+        `Create group '${label}'`,
+        `Moves ${count} tab${count > 1 ? "s" : ""}`
+      );
+      row.addEventListener("click", () => {
+        this._createGroups(win, [proposal]);
+        panel._createdAny = true;
+        panel._remaining = (panel._remaining || []).filter(p => p !== proposal);
+        this._renderBody(win, panel);
+      });
+      body.appendChild(row);
+    }
+
+    this._updateUndoButton(win, panel);
+  },
+
+  _createRow(win, title, subtitle) {
+    const doc = win.document;
+    const row = doc.createElementNS(HTML_NS, "button");
+    row.className = "swgt-row";
+    row.type = "button";
+
+    const titleEl = doc.createElementNS(HTML_NS, "span");
+    titleEl.className = "swgt-row-title";
+    titleEl.textContent = title;
+    row.appendChild(titleEl);
+
+    if (subtitle) {
+      const subtitleEl = doc.createElementNS(HTML_NS, "span");
+      subtitleEl.className = "swgt-row-subtitle";
+      subtitleEl.textContent = subtitle;
+      row.appendChild(subtitleEl);
+    }
+    return row;
+  },
+
+  _setMessage(win, body, text) {
+    body.textContent = "";
+    const msg = win.document.createElementNS(HTML_NS, "div");
+    msg.className = "swgt-message";
+    msg.textContent = text;
+    body.appendChild(msg);
+  },
+
+  _updateUndoButton(win, panel) {
+    if (panel._undoBtn) {
+      panel._undoBtn.disabled = !this._createdGroups.get(win)?.length;
     }
   },
 
   /**
-   * Clusters the candidate tabs and proposes/creates up to maxGroups groups.
+   * Ungroup every group this panel created in the window. Tabs stay open.
    *
    * @param {ChromeWindow} win
-   * @param {string} trigger
+   * @param {XULElement} panel
    */
-  async _run(win, trigger) {
-    const candidates = this._getCandidateTabs(win);
-    if (candidates.length < lazy.minCandidateTabs) {
-      lazy.console.debug(
-        `Only ${candidates.length} candidate tabs (< ${lazy.minCandidateTabs}); skipping`
-      );
-      return;
+  _undoAll(win, panel) {
+    const created = this._createdGroups.get(win) || [];
+    for (const group of created) {
+      if (group.parentNode) {
+        group.ungroupTabs();
+      }
     }
-
-    const groups = await this._buildGroupProposals(win, candidates);
-    if (!groups.length) {
-      lazy.console.debug("No clusters met the threshold; skipping");
-      return;
-    }
-
-    lazy.console.debug(
-      `Proposing ${groups.length} group(s) on ${trigger}`,
-      groups.map(g => `${g.label} (${g.tabs.length})`)
-    );
-
-    if (lazy.mode == "create") {
-      this._createGroups(win, groups);
-    } else if (lazy.reviewBeforeGrouping) {
-      this._showReviewPanel(win, groups);
-    } else {
-      this._showSuggestionBar(win, groups);
-    }
+    this._createdGroups.set(win, []);
+    this._updateUndoButton(win, panel);
   },
 
   /**
@@ -188,10 +405,8 @@ export const AutoTabGrouping = {
 
     let clusters = result.clusterRepresentations
       .filter(c => c.tabs && c.tabs.length >= lazy.minTabsPerGroup)
-      .sort((a, b) => b.tabs.length - a.tabs.length);
-
-    const moreAvailable = clusters.length > lazy.maxGroups;
-    clusters = clusters.slice(0, lazy.maxGroups);
+      .sort((a, b) => b.tabs.length - a.tabs.length)
+      .slice(0, lazy.maxGroups);
     if (!clusters.length) {
       return [];
     }
@@ -212,12 +427,11 @@ export const AutoTabGrouping = {
       }
       proposals.push({ label: label || "", tabs: cluster.tabs });
     }
-    this._moreAvailable = moreAvailable;
     return proposals;
   },
 
   /**
-   * Creates the proposed groups and shows an undo bar.
+   * Creates the given proposals as tab groups, tracking them for undo.
    *
    * @param {ChromeWindow} win
    * @param {Array<{label: string, tabs: MozTabbrowserTab[]}>} proposals
@@ -227,7 +441,7 @@ export const AutoTabGrouping = {
     const created = [];
     const windowTabs = new Set(win.gBrowser.tabs);
     for (const proposal of proposals) {
-      // Tabs may have been closed/moved/grouped while models ran, so only keep
+      // Tabs may have been closed/moved/grouped since clustering, so only keep
       // ungrouped tabs that still live in this window.
       const tabs = proposal.tabs.filter(
         t => !t.closing && !t.group && windowTabs.has(t)
@@ -235,224 +449,16 @@ export const AutoTabGrouping = {
       if (tabs.length < lazy.minTabsPerGroup) {
         continue;
       }
-      const group = win.gBrowser.addTabGroup(tabs, {
-        label: proposal.label,
-        telemetryUserCreateSource: "smartwindow-auto",
-      });
+      const group = win.gBrowser.addTabGroup(tabs, { label: proposal.label });
       if (group) {
         created.push(group);
       }
     }
     if (created.length) {
-      this._showUndoBar(win, created);
+      const list = this._createdGroups.get(win) || [];
+      list.push(...created);
+      this._createdGroups.set(win, list);
     }
     return created;
-  },
-
-  /**
-   * Suggest mode: offer the groups; only create them when the user accepts.
-   *
-   * @param {ChromeWindow} win
-   * @param {Array<{label: string, tabs: MozTabbrowserTab[]}>} proposals
-   */
-  _showSuggestionBar(win, proposals) {
-    const box = win.gNotificationBox;
-    if (!box) {
-      return;
-    }
-    const names = proposals
-      .map(p => p.label || "Untitled")
-      .filter(Boolean)
-      .join(", ");
-    const tabCount = proposals.reduce((n, p) => n + p.tabs.length, 0);
-
-    box.appendNotification(
-      NOTIFICATION_VALUE,
-      {
-        label: `Group ${tabCount} tabs into ${proposals.length} group${
-          proposals.length > 1 ? "s" : ""
-        }: ${names}?`,
-        priority: box.PRIORITY_INFO_MEDIUM,
-      },
-      [
-        {
-          label: "Group them",
-          callback: () => {
-            this._createGroups(win, proposals);
-            return false;
-          },
-        },
-        {
-          label: "Not now",
-          callback: () => false,
-        },
-      ]
-    );
-  },
-
-  /**
-   * Suggest mode + review pref: show an interactive panel where the user can
-   * rename each proposed group and uncheck individual member tabs before
-   * creating. Confirm routes through _createGroups (which re-validates tabs and
-   * shows the undo bar, keeping "Group more" working). Cancel creates nothing.
-   *
-   * @param {ChromeWindow} win
-   * @param {Array<{label: string, tabs: MozTabbrowserTab[]}>} proposals
-   */
-  _showReviewPanel(win, proposals) {
-    const doc = win.document;
-    const popupSet = doc.getElementById("mainPopupSet");
-    const anchor =
-      doc.getElementById("alltabs-button") ||
-      doc.getElementById("tabbrowser-tabs");
-    if (!popupSet || !anchor) {
-      // Fall back to the simple bar if the chrome we anchor to is missing.
-      this._showSuggestionBar(win, proposals);
-      return;
-    }
-
-    const HTML_NS = "http://www.w3.org/1999/xhtml";
-
-    const panel = doc.createXULElement("panel");
-    panel.setAttribute("type", "arrow");
-    panel.setAttribute("role", "dialog");
-    panel.setAttribute("orient", "vertical");
-    panel.setAttribute("class", "panel-no-padding");
-    panel.id = "smartwindow-auto-tab-grouping-review-panel";
-
-    const body = doc.createElementNS(HTML_NS, "div");
-    body.className = "panel-subview-body";
-
-    const title = doc.createElementNS(HTML_NS, "h1");
-    title.className = "panel-header";
-    doc.l10n.setAttributes(title, "tab-group-editor-title-suggest");
-    body.appendChild(title);
-
-    // Per-proposal mutable state: the name field plus the still-selected tabs.
-    const groupState = [];
-
-    for (const proposal of proposals) {
-      const state = { labelInput: null, selected: new Set(proposal.tabs) };
-
-      const nameWrap = doc.createElementNS(HTML_NS, "div");
-      nameWrap.className = "tab-group-editor-name";
-      const nameLabel = doc.createElementNS(HTML_NS, "label");
-      doc.l10n.setAttributes(nameLabel, "tab-group-editor-name-label");
-      const nameInput = doc.createElementNS(HTML_NS, "input");
-      nameInput.type = "text";
-      nameInput.value = proposal.label || "";
-      doc.l10n.setAttributes(nameInput, "tab-group-editor-name-field");
-      state.labelInput = nameInput;
-      nameWrap.append(nameLabel, nameInput);
-      body.appendChild(nameWrap);
-
-      // One checkbox per member tab (favicon + title), checked by default.
-      // Mirrors tabgroup-menu.js #createRow.
-      for (const tab of proposal.tabs) {
-        const checkbox = doc.createElement("moz-checkbox");
-        checkbox.label = tab.label;
-        checkbox.iconSrc = tab.image;
-        checkbox.checked = true;
-        checkbox.classList.add(
-          "tab-group-suggestion-checkbox",
-          "text-truncated-ellipsis"
-        );
-        checkbox.addEventListener("change", e => {
-          if (e.target.checked) {
-            state.selected.add(tab);
-          } else {
-            state.selected.delete(tab);
-          }
-        });
-        body.appendChild(checkbox);
-      }
-
-      groupState.push(state);
-    }
-
-    const footer = doc.createElement("moz-button-group");
-    footer.className = "panel-footer";
-    const cancelBtn = doc.createElement("moz-button");
-    doc.l10n.setAttributes(cancelBtn, "tab-group-editor-cancel");
-    const confirmBtn = doc.createElement("moz-button");
-    confirmBtn.setAttribute("type", "primary");
-    doc.l10n.setAttributes(confirmBtn, "tab-group-editor-done");
-    footer.append(cancelBtn, confirmBtn);
-    body.appendChild(footer);
-
-    panel.appendChild(body);
-    popupSet.appendChild(panel);
-
-    cancelBtn.addEventListener("command", () => panel.hidePopup());
-    confirmBtn.addEventListener("command", () => {
-      const confirmed = [];
-      for (const state of groupState) {
-        const tabs = [...state.selected];
-        if (tabs.length < lazy.minTabsPerGroup) {
-          continue;
-        }
-        confirmed.push({ label: state.labelInput.value.trim(), tabs });
-      }
-      panel.hidePopup();
-      if (confirmed.length) {
-        this._createGroups(win, confirmed);
-      }
-    });
-
-    panel.addEventListener("popuphidden", () => panel.remove(), { once: true });
-
-    panel.openPopup(anchor, { position: "bottomright topright" });
-  },
-
-  /**
-   * Create mode (and post-accept): show a one-click undo, plus "Group more"
-   * when additional clusterable tabs remain.
-   *
-   * @param {ChromeWindow} win
-   * @param {object[]} createdGroups
-   */
-  _showUndoBar(win, createdGroups) {
-    const box = win.gNotificationBox;
-    if (!box) {
-      return;
-    }
-    const tabCount = createdGroups.reduce((n, g) => n + g.tabs.length, 0);
-
-    const buttons = [
-      {
-        label: "Undo",
-        callback: () => {
-          for (const group of createdGroups) {
-            if (group.parentNode) {
-              group.ungroupTabs();
-            }
-          }
-          return false;
-        },
-      },
-    ];
-
-    if (this._moreAvailable) {
-      buttons.push({
-        label: "Group more",
-        callback: () => {
-          // Re-run on whatever is still ungrouped.
-          this._offeredWindows.delete(win);
-          this.maybeAutoGroup(win, "switch");
-          return false;
-        },
-      });
-    }
-
-    box.appendNotification(
-      NOTIFICATION_VALUE,
-      {
-        label: `Grouped ${tabCount} tabs into ${createdGroups.length} group${
-          createdGroups.length > 1 ? "s" : ""
-        }.`,
-        priority: box.PRIORITY_INFO_MEDIUM,
-      },
-      buttons
-    );
   },
 };

@@ -28,8 +28,6 @@ const PREF_SEMANTIC_HISTORY_SMARTWINDOW_FEATURE_GATE =
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
-  AutoTabGrouping:
-    "moz-src:///browser/components/aiwindow/ui/modules/AutoTabGrouping.sys.mjs",
   getAllModelsData:
     "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
   AIWindowTabStatesManager:
@@ -94,6 +92,7 @@ export const AIWindow = {
       this._windowStates.set(win, {});
       this.initializeAITabsToolbar(win);
       this._initializeAskButtonOnToolbox(win);
+      this._initializeGroupTabsButtonOnToolbox(win);
       const windowArgs = win?.arguments?.[1];
       if (
         windowArgs instanceof Ci.nsIPropertyBag2 &&
@@ -115,7 +114,6 @@ export const AIWindow = {
         new lazy.AIWindowTabStatesManager(win)
       );
       this._markActiveStart(win);
-      lazy.AutoTabGrouping.maybeAutoGroup(win, "open");
     }
 
     if (this._initialized) {
@@ -339,6 +337,21 @@ export const AIWindow = {
       return;
     }
     askButton.hidden = !this.isAIWindowActive(win);
+  },
+
+  /*
+   * Initializes the toolbox button that opens the "Group my tabs" panel.
+   */
+  _initializeGroupTabsButtonOnToolbox(win) {
+    const button = win.document.getElementById("smartwindow-group-tabs-button");
+    if (!button) {
+      return;
+    }
+    const enabled = Services.prefs.getBoolPref(
+      "browser.smartwindow.autoTabGrouping.enabled",
+      false
+    );
+    button.hidden = !(enabled && this.isAIWindowActive(win));
   },
 
   get isDefaultWindow() {
@@ -755,6 +768,7 @@ export const AIWindow = {
 
       this._reconcileNewTabPages(win, newTabPref, homePagePref);
       this._initializeAskButtonOnToolbox(win);
+      this._initializeGroupTabsButtonOnToolbox(win);
       Services.obs.notifyObservers(
         win,
         "ai-window-state-changed",
@@ -780,7 +794,6 @@ export const AIWindow = {
 
         this._markActiveStart(win);
         this.recordOpenWindowTelemetry(trigger, win);
-        lazy.AutoTabGrouping.maybeAutoGroup(win, "switch");
       } else {
         const duration_ms = this._consumeActiveDuration(win);
         const opened_tabs = win.gBrowser.tabs.length;

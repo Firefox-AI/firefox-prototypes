@@ -416,6 +416,10 @@
   }
 }
 
+#smartwindow-group-tabs-button-inner {
+  list-style-image: url("chrome://browser/content/aiwindow/assets/icon-grid-view.svg");
+}
+
 #document-pip-return-to-opener-button {
   list-style-image: url("chrome://global/skin/media/picture-in-picture-closed.svg");
 }

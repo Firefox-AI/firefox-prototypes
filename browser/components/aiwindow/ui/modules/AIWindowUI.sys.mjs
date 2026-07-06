@@ -9,6 +9,12 @@ import {
   AIWindow,
 } from "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs";
 
+const lazy = {};
+ChromeUtils.defineESModuleGetters(lazy, {
+  AutoTabGrouping:
+    "moz-src:///browser/components/aiwindow/ui/modules/AutoTabGrouping.sys.mjs",
+});
+
 const gFadingWindows = new WeakSet();
 
 /**
@@ -307,6 +313,15 @@ export const AIWindowUI = {
     if (aiWindowEl) {
       aiWindowEl.syncSmartbarMemoriesStateFromConversation();
     }
+  },
+
+  /**
+   * Toggle the "Group my tabs" panel anchored to its toolbar button.
+   *
+   * @param {Window} win
+   */
+  toggleGroupTabsPanel(win) {
+    lazy.AutoTabGrouping.toggleGroupTabsPanel(win);
   },
 
   /**

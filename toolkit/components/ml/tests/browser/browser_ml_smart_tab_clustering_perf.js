@@ -531,3 +531,150 @@ add_task(async function test_n_clustering() {
   generateEmbeddingsStub.restore();
   await cleanup();
 });
+
+// "Group my tabs" popup: phase-broken-down timing at increasing tab counts.
+// Mirrors the popup's real path (embedding generation -> k-means clustering ->
+// per-group topic labeling) so we can see which phase dominates as the number
+// of tabs grows. Embeddings and topic labels use the real on-device models.
+const GROUP_TAB_COUNTS = [1, 10, 50, 100];
+const MAX_GROUPS_TO_LABEL = 3;
+
+const groupPhaseMetrics = {};
+groupPhaseMetrics["GROUP-COLD-INIT-EMBEDDING-latency"] = [];
+groupPhaseMetrics["GROUP-COLD-INIT-LABELING-latency"] = [];
+for (const n of GROUP_TAB_COUNTS) {
+  groupPhaseMetrics[`GROUP-${n}-TABS-EMBEDDING-latency`] = [];
+  groupPhaseMetrics[`GROUP-${n}-TABS-CLUSTERING-latency`] = [];
+  groupPhaseMetrics[`GROUP-${n}-TABS-LABELING-latency`] = [];
+  groupPhaseMetrics[`GROUP-${n}-TABS-TOTAL-latency`] = [];
+}
+
+add_task(async function test_group_my_tabs_phase_breakdown() {
+  const modelHubRootUrl = Services.env.get("MOZ_MODELS_HUB");
+  const { cleanup } = await perfSetup({
+    prefs: [["browser.ml.modelHubRootUrl", modelHubRootUrl]],
+  });
+
+  const stgManager = new SmartTabGroupingManager();
+
+  // Use the real embedding model, matching the popup's generateClusters path
+  // (which passes null embeddings and runs inference on every invocation).
+  const generateEmbeddingsStub = sinon.stub(
+    SmartTabGroupingManager.prototype,
+    "_generateEmbeddings"
+  );
+  generateEmbeddingsStub.callsFake(textList => generateEmbeddings(textList));
+
+  const rawLabels = await fetchFile(ROOT_URL, "gen_set_2_labels.tsv");
+  const labels = parseTsvStructured(rawLabels);
+
+  const buildTabs = n => {
+    const { labels: sampled } = generateSamples(labels, null, n);
+    return sampled.map((l, i) =>
+      makeUrlTab(`https://example.com/${i}`, l.smart_group_label)
+    );
+  };
+
+  // Warm up first so one-time model download + engine init isn't charged to
+  // the first tab count. Reported separately as the cold-start cost.
+  let t = performance.now();
+  await stgManager._generateEmbeddings(["warm up the embedding engine"]);
+  groupPhaseMetrics["GROUP-COLD-INIT-EMBEDDING-latency"].push(
+    performance.now() - t
+  );
+  t = performance.now();
+  await stgManager.getPredictedLabelForGroup(
+    [makeUrlTab("https://example.com/warmup", "Warm Up Topic")],
+    []
+  );
+  groupPhaseMetrics["GROUP-COLD-INIT-LABELING-latency"].push(
+    performance.now() - t
+  );
+
+  const rows = [];
+  for (const n of GROUP_TAB_COUNTS) {
+    const tabs = buildTabs(n);
+
+    // Phase 1: embedding generation.
+    const structuredData = await stgManager._prepareTabData(tabs);
+    const texts = structuredData.map(d => d.combined_text);
+    t = performance.now();
+    const embeddings = await stgManager._generateEmbeddings(texts);
+    const embedMs = performance.now() - t;
+
+    // Phase 2: k-means clustering over the embeddings (embeddings precomputed
+    // above so only the clustering algorithm is timed here).
+    t = performance.now();
+    const result = await stgManager.generateClusters(
+      tabs,
+      embeddings,
+      0,
+      null,
+      [],
+      []
+    );
+    const clusterMs = performance.now() - t;
+
+    // Phase 3: topic labeling for the groups the popup would keep (the largest
+    // clusters, capped at maxGroups).
+    const reps = ((result && result.clusterRepresentations) || [])
+      .filter(c => c.tabs && c.tabs.length)
+      .sort((a, b) => b.tabs.length - a.tabs.length)
+      .slice(0, MAX_GROUPS_TO_LABEL);
+    const groupedTabs = new Set(reps.flatMap(c => c.tabs));
+    const otherTabs = tabs.filter(tab => !groupedTabs.has(tab));
+    let labeled = 0;
+    t = performance.now();
+    for (const rep of reps) {
+      const label = await stgManager.getPredictedLabelForGroup(
+        rep.tabs,
+        otherTabs
+      );
+      if (label) {
+        labeled++;
+      }
+    }
+    const labelMs = performance.now() - t;
+
+    const totalMs = embedMs + clusterMs + labelMs;
+    groupPhaseMetrics[`GROUP-${n}-TABS-EMBEDDING-latency`].push(embedMs);
+    groupPhaseMetrics[`GROUP-${n}-TABS-CLUSTERING-latency`].push(clusterMs);
+    groupPhaseMetrics[`GROUP-${n}-TABS-LABELING-latency`].push(labelMs);
+    groupPhaseMetrics[`GROUP-${n}-TABS-TOTAL-latency`].push(totalMs);
+    rows.push({
+      n,
+      groups: reps.length,
+      labeled,
+      embedMs,
+      clusterMs,
+      labelMs,
+      totalMs,
+    });
+
+    Assert.ok(
+      true,
+      `Grouped ${n} tab(s) into ${reps.length} group(s), ${labeled} labeled`
+    );
+  }
+
+  // Human-readable timing table (no thresholds asserted).
+  const col = (v, w) => String(v).padStart(w);
+  const ms = v => col(v.toFixed(1), 10);
+  let table =
+    "\nGroup my tabs - clustering phase timing (ms)\n" +
+    "tabs | groups | labeled | embedding | clustering |  labeling |     total\n" +
+    "-----+--------+---------+-----------+------------+-----------+----------\n";
+  for (const r of rows) {
+    table +=
+      `${col(r.n, 4)} |${col(r.groups, 7)} |${col(r.labeled, 8)} |` +
+      `${ms(r.embedMs)} |${ms(r.clusterMs)} |${ms(r.labelMs)} |${ms(r.totalMs)}\n`;
+  }
+  info(table);
+  dump(table);
+
+  reportMetrics(groupPhaseMetrics);
+
+  generateEmbeddingsStub.restore();
+  await EngineProcess.destroyMLEngine();
+  await cleanup();
+});

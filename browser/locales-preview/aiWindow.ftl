@@ -180,6 +180,12 @@ aiwindow-firstrun-default-checkbox-description = Switch in settings anytime
 smartwindow-ask-button =
     .label = Ask
 
+## Group my tabs toolbar button
+
+smartwindow-group-tabs-button =
+    .tooltiptext = Group my tabs
+    .aria-label = Group my tabs
+
 ## Memories toggle button
 
 aiwindow-memories-on =

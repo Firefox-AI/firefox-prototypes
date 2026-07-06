@@ -2285,24 +2285,15 @@ pref("browser.smartwindow.firstrun.explainerURL", "https://www.firefox.com/en-US
 pref("places.semanticHistory.smartwindow.featureGate", false);
 
 // Smart Window: Auto Tab Grouping (bug 2047660)
-// Master toggle for proactively clustering open tabs into groups when a
-// Smart Window opens or is switched to.
+// Feature gate for the "Group my tabs" toolbar button, which clusters the
+// window's open tabs into suggested groups on demand.
 pref("browser.smartwindow.autoTabGrouping.enabled", false);
-// UX flow to use. "suggest": offer the groups in a notification bar and only
-// create them once the user accepts. "create": create the groups immediately
-// and offer a one-click undo.
-pref("browser.smartwindow.autoTabGrouping.mode", "suggest");
 // Maximum number of groups to propose at once so users aren't overwhelmed.
 pref("browser.smartwindow.autoTabGrouping.maxGroups", 3);
 // Minimum number of tabs a cluster must have to be proposed as a group.
 pref("browser.smartwindow.autoTabGrouping.minTabsPerGroup", 2);
-// Minimum number of ungrouped candidate tabs required before we run at all.
+// Minimum number of ungrouped candidate tabs required before we suggest groups.
 pref("browser.smartwindow.autoTabGrouping.minCandidateTabs", 4);
-// Whether to run when a Smart Window first opens / the session starts.
-pref("browser.smartwindow.autoTabGrouping.triggerOnOpen", true);
-// Whether to run when an existing window is switched to Smart mode.
-pref("browser.smartwindow.autoTabGrouping.triggerOnSwitch", true);
-pref("browser.smartwindow.autoTabGrouping.reviewBeforeGrouping", false);
 pref("browser.smartwindow.autoTabGrouping.loglevel", "Warn");
 
 // Smart Window: Merino World Cup Soccer tool call (bug 2038266)
