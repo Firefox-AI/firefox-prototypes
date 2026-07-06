@@ -385,31 +385,36 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 .shortcut { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--text-color-deemphasized); font-size: 11px; }
 .shortcut .tile { width: 48px; height: 48px; border-radius: var(--border-radius-large); background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); display: grid; place-items: center; font-weight: var(--font-weight-semibold); font-size: 15px; color: var(--text-color); }
 
-/* Corner stack: collapsed deck; hover or focus fans it into a column; click a row to expand inline */
-.mstack { position: absolute; top: 16px; right: 16px; width: 324px; z-index: 30; pointer-events: none; }
-.mstack-list { display: flex; flex-direction: column; gap: var(--space-small); }
-.mstack-item { pointer-events: auto; position: relative; will-change: transform; transition: transform var(--motion-dur-soft) var(--motion-ease-reach); }
-/* Fan open = Reach: one continuous deal-out — staggered cards start from rest, never mid-flight */
-.mstack.open .mstack-item:nth-child(2) { transition-delay: 70ms; }
-.mstack.open .mstack-item:nth-child(3) { transition-delay: 140ms; }
-/* Tuck: decelerates into the deck, bottom card first */
-.mstack:not(.open) .mstack-item { transition-duration: var(--motion-dur-near); transition-timing-function: var(--motion-ease-edge); }
-.mstack:not(.open) .mstack-item:nth-child(1) { z-index: 3; }
-.mstack:not(.open) .mstack-item:nth-child(2) { transform: translateY(-49px) scale(.955); z-index: 2; transition-delay: 40ms; }
-.mstack:not(.open) .mstack-item:nth-child(3) { transform: translateY(-98px) scale(.91); z-index: 1; transition-delay: 0ms; }
-/* The wake: only the top card stirs; shadow is a pre-rendered layer faded in (compositor-cheap) */
-.mrow-mini::after { content: ""; position: absolute; inset: -1px; border-radius: var(--border-radius-large); box-shadow: var(--box-shadow-level-4); opacity: 0; transition: opacity var(--motion-dur-near) var(--motion-ease-edge); pointer-events: none; }
-.mstack.intent .mstack-item:nth-child(1) { transform: translateY(-2px); transition-duration: var(--motion-dur-near); transition-timing-function: var(--motion-ease-edge); transition-delay: 0ms; }
-.mstack.intent .mstack-item:nth-child(1) .mrow-mini::after { opacity: 1; }
+/* Corner stack, bottom-left: collapsed deck; hover fans it upward; click a card to expand in place */
+.mstack { position: absolute; bottom: 16px; left: 16px; width: 324px; z-index: 30; pointer-events: none; }
+.mstack-list { display: flex; flex-direction: column-reverse; gap: var(--space-small); }
+.mstack-list > * { pointer-events: auto; position: relative; will-change: transform; transition: transform var(--motion-dur-soft) var(--motion-ease-reach); }
+/* Fan open = Reach: deals upward from the front card */
+.mstack.open .mstack-list > :nth-child(2) { transition-delay: 70ms; }
+.mstack.open .mstack-list > :nth-child(3) { transition-delay: 140ms; }
+/* Tuck: settles back down, top card first */
+.mstack:not(.open) .mstack-list > * { transition-duration: var(--motion-dur-near); transition-timing-function: var(--motion-ease-edge); }
+.mstack:not(.open) .mstack-list > :nth-child(1) { z-index: 3; }
+.mstack:not(.open) .mstack-list > :nth-child(2) { transform: translateY(57px) scale(.955); z-index: 2; transition-delay: 40ms; }
+.mstack:not(.open) .mstack-list > :nth-child(3) { transform: translateY(114px) scale(.91); z-index: 1; transition-delay: 0ms; }
+/* The wake: the front card stirs; shadow is a pre-rendered layer faded in */
+.mitem::after { content: ""; position: absolute; inset: -1px; border-radius: var(--border-radius-large); box-shadow: var(--box-shadow-level-4); opacity: 0; transition: opacity var(--motion-dur-near) var(--motion-ease-edge); pointer-events: none; }
+.mstack.intent .mstack-list > :nth-child(1) { transform: translateY(-2px); transition: transform var(--motion-dur-near) var(--motion-ease-edge) 0ms; }
+.mstack.intent .mstack-list > :nth-child(1).mitem::after { opacity: 1; }
 /* Inline expand: measured height transition, no snap */
 .mstack-expand { height: 0; overflow: hidden; transition: height var(--motion-dur-near) var(--motion-ease-edge); }
 .mstack-expand-inner { padding-top: var(--space-small); }
-.mrow-mini { position: relative; display: flex; align-items: center; gap: var(--space-small); width: 100%; height: 48px; text-align: left; background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); padding: 0 var(--space-medium); box-shadow: var(--box-shadow-level-2); }
-.mrow-mini .favicon-sq { width: 22px; height: 22px; font-size: 10px; }
-.mrow-mini .nm { flex: 1; min-width: 0; font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mrow-mini .status-chip { padding: 2px 8px; font-size: 12px; }
-.mrow-mini .flag-attn { padding: 2px 8px; font-size: 12px; }
-.mstack-expand .mcard { box-shadow: var(--box-shadow-level-4); }
+/* One card — header and expandable body share the surface, like the chat card */
+.mitem { position: relative; padding: var(--space-small) var(--space-medium); gap: 0; }
+.mitem-head { display: flex; align-items: center; gap: var(--space-small); width: 100%; min-height: 40px; text-align: left; }
+.mitem-head .favicon-sq { width: 26px; height: 26px; }
+.mitem-head .mit { min-width: 0; flex: 1; line-height: 1.35; }
+.mitem-head .mcard-name { font-size: var(--font-size-small); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mitem-head .mcard-url { font-size: 12px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mitem-head .status-chip, .mitem-head .flag-attn { padding: 2px 8px; font-size: 12px; flex: none; }
+.mitem-head .chev { width: 15px; height: 15px; fill: none; stroke: var(--text-color-deemphasized); stroke-width: 2; flex: none; transition: rotate var(--motion-dur-near) var(--motion-ease-edge); }
+.mitem-head[aria-expanded="true"] .chev { rotate: 180deg; }
+.mitem-body { display: flex; flex-direction: column; gap: var(--space-medium); padding-top: var(--space-xsmall); }
 
 /* ============ OS notification toast ============ */
 .os-toast { position: absolute; top: 16px; right: 16px; width: 360px; z-index: 60; background: light-dark(rgba(250,250,252,.94), rgba(37,36,40,.96)); backdrop-filter: blur(14px); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-xlarge); box-shadow: var(--box-shadow-level-4); padding: var(--space-medium) var(--space-large); display: flex; gap: var(--space-medium); align-items: flex-start; cursor: pointer; text-align: left; animation: toast-in var(--motion-dur-soft) var(--motion-ease-reach) both; }
@@ -530,36 +535,39 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         <button class="btn-ghost" id="panel-new" style="padding:5px 12px">+ New</button>
       </div>
       <div class="rail-panel-body" id="rail-list">
-        <div class="mstack-item">
-          <button class="mrow-mini" aria-expanded="false">
+        <div class="mcard mitem">
+          <button class="mitem-head" aria-expanded="false">
             <span class="favicon-sq" style="background:#e8663a">S</span>
-            <span class="nm">Sony WH-1000XM5 price</span>
+            <span class="mit"><span class="mcard-name">Sony WH-1000XM5 price</span><span class="mcard-url">Below $270 · Auto</span></span>
             <span class="status-chip">$278 ▼ −7%</span>
+            <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
           </button>
-          <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mcard">
+          <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
             <div class="mvalue"><span class="now" style="font-size:24px">$278</span><span class="from">checked 2:14 PM · was $299</span></div>
             <div class="mrow"><span class="lbl">Alert me when</span><span class="val">the price drops below $270</span></div>
             <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
           </div></div></div>
         </div>
-        <div class="mstack-item">
-          <button class="mrow-mini" aria-expanded="false">
+        <div class="mcard mitem">
+          <button class="mitem-head" aria-expanded="false">
             <span class="favicon-sq" style="background:#2f855a">R</span>
-            <span class="nm">REI Danner hiking boots</span>
+            <span class="mit"><span class="mcard-name">REI Danner hiking boots</span><span class="mcard-url">rei.com · layout changed</span></span>
             <span class="flag-attn"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg> Needs a look</span>
+            <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
           </button>
-          <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mcard">
+          <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
             <p class="small" style="margin:0">The page layout changed — open it to point the monitor at the right spot again.</p>
             <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
           </div></div></div>
         </div>
-        <div class="mstack-item">
-          <button class="mrow-mini" aria-expanded="false">
+        <div class="mcard mitem">
+          <button class="mitem-head" aria-expanded="false">
             <span class="favicon-sq" style="background:#3a7ae8">C</span>
-            <span class="nm">Apartment listings · Mission</span>
+            <span class="mit"><span class="mcard-name">Apartment listings · Mission</span><span class="mcard-url">craigslist.org · checked 12m ago</span></span>
             <span class="status-chip">3 new</span>
+            <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
           </button>
-          <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mcard">
+          <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
             <div class="mvalue"><span class="now" style="font-size:24px">3 new</span><span class="from">since yesterday · craigslist.org</span></div>
             <div class="mrow"><span class="lbl">Alert me when</span><span class="val">a new listing matches my search</span></div>
             <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
@@ -627,7 +635,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite">Saved automatically</span></div>
               </div>
               </div></div>
-            </div>
             </div>
 
             <div class="dash-item">
@@ -733,51 +740,48 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
         <div class="mstack" id="mstack" data-show="9 10">
           <div class="mstack-list">
-            <div class="mstack-item">
-              <button class="mrow-mini" aria-expanded="false">
+            <div class="mcard mitem">
+              <button class="mitem-head" aria-expanded="false">
                 <span class="favicon-sq" style="background:#e8663a">S</span>
-                <span class="nm">Sony WH-1000XM5 price</span>
+                <span class="mit"><span class="mcard-name">Sony WH-1000XM5 price</span><span class="mcard-url">Below $270 · Auto</span></span>
                 <span class="status-chip">$278 ▼ −7%</span>
+                <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
               </button>
-              <div class="mstack-expand">
-                <div class="mstack-expand-inner"><div class="mcard">
-                  <div class="mvalue"><span class="now" style="font-size:24px">$278</span><span class="from">checked 2:14 PM · was $299</span></div>
-                  <div class="mrow"><span class="lbl">Alert me when</span><span class="val">the price drops below $270</span></div>
-                  <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
-                </div></div>
-              </div>
+              <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
+                <div class="mvalue"><span class="now" style="font-size:24px">$278</span><span class="from">checked 2:14 PM · was $299</span></div>
+                <div class="mrow"><span class="lbl">Alert me when</span><span class="val">the price drops below $270</span></div>
+                <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
+              </div></div></div>
             </div>
-            <div class="mstack-item">
-              <button class="mrow-mini" aria-expanded="false">
+            <div class="mcard mitem">
+              <button class="mitem-head" aria-expanded="false">
                 <span class="favicon-sq" style="background:#2f855a">R</span>
-                <span class="nm">REI Danner hiking boots</span>
+                <span class="mit"><span class="mcard-name">REI Danner hiking boots</span><span class="mcard-url">rei.com · layout changed</span></span>
                 <span class="flag-attn"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg> Needs a look</span>
+                <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
               </button>
-              <div class="mstack-expand">
-                <div class="mstack-expand-inner"><div class="mcard">
-                  <p class="small" style="margin:0">The page layout changed — open it to point the monitor at the right spot again.</p>
-                  <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
-                </div></div>
-              </div>
+              <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
+                <p class="small" style="margin:0">The page layout changed — open it to point the monitor at the right spot again.</p>
+                <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
+              </div></div></div>
             </div>
-            <div class="mstack-item">
-              <button class="mrow-mini" aria-expanded="false">
+            <div class="mcard mitem">
+              <button class="mitem-head" aria-expanded="false">
                 <span class="favicon-sq" style="background:#3a7ae8">C</span>
-                <span class="nm">Apartment listings · Mission</span>
+                <span class="mit"><span class="mcard-name">Apartment listings · Mission</span><span class="mcard-url">craigslist.org · checked 12m ago</span></span>
                 <span class="status-chip">3 new</span>
+                <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
               </button>
-              <div class="mstack-expand">
-                <div class="mstack-expand-inner"><div class="mcard">
-                  <div class="mvalue"><span class="now" style="font-size:24px">3 new</span><span class="from">since yesterday · craigslist.org</span></div>
-                  <div class="mrow"><span class="lbl">Alert me when</span><span class="val">a new listing matches my search</span></div>
-                  <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
-                </div></div>
-              </div>
+              <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
+                <div class="mvalue"><span class="now" style="font-size:24px">3 new</span><span class="from">since yesterday · craigslist.org</span></div>
+                <div class="mrow"><span class="lbl">Alert me when</span><span class="val">a new listing matches my search</span></div>
+                <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
+              </div></div></div>
             </div>
           </div>
         </div>
 
-        <div class="annot point-right" style="top:26px; right:332px" data-show="9">Monitors ride along on New Tab — hover the stack.</div>
+        <div class="annot point-left" style="bottom:40px; left:356px" data-show="9">Monitors ride along on New Tab — hover the stack.</div>
       </div>
 
       <!-- ---------- OS notification toast ---------- -->
@@ -1045,7 +1049,7 @@ function stackSet(open) {
   mstack.classList.toggle("open", open);
   if (!open) {
     mstack.querySelectorAll(".mstack-expand").forEach(b => setExpand(b, false));
-    mstack.querySelectorAll(".mrow-mini").forEach(b => b.setAttribute("aria-expanded", "false"));
+    mstack.querySelectorAll(".mitem-head").forEach(b => b.setAttribute("aria-expanded", "false"));
   }
 }
 mstack.addEventListener("mouseenter", () => {
@@ -1064,13 +1068,13 @@ mstack.addEventListener("focusin", () => { clearTimeout(stackTimer); if (!mstack
 document.addEventListener("click", e => {
   if (mstack.classList.contains("open") && !e.target.closest("#mstack")) stackSet(false);
 });
-mstack.querySelectorAll(".mrow-mini").forEach(btn => {
+mstack.querySelectorAll(".mitem-head").forEach(btn => {
   btn.addEventListener("click", () => {
     if (!mstack.classList.contains("open")) { stackSet(true); return; }
     const body = btn.parentElement.querySelector(".mstack-expand");
     const wasOpen = body.classList.contains("exp-open");
     mstack.querySelectorAll(".mstack-expand").forEach(b => setExpand(b, false));
-    mstack.querySelectorAll(".mrow-mini").forEach(b => b.setAttribute("aria-expanded", "false"));
+    mstack.querySelectorAll(".mitem-head").forEach(b => b.setAttribute("aria-expanded", "false"));
     setExpand(body, !wasOpen);
     btn.setAttribute("aria-expanded", String(!wasOpen));
   });
@@ -1082,12 +1086,10 @@ document.getElementById("rail-monitors").onclick = () => go(10);
 document.getElementById("panel-new").onclick = () => openModal(null);
 document.getElementById("panel-open-about").onclick = (e) => { e.preventDefault(); go(5); };
 const railList = document.getElementById("rail-list");
-railList.querySelectorAll(".mrow-mini").forEach(btn => {
+railList.querySelectorAll(".mitem-head").forEach(btn => {
   btn.addEventListener("click", () => {
     const body = btn.parentElement.querySelector(".mstack-expand");
     const wasOpen = body.classList.contains("exp-open");
-    railList.querySelectorAll(".mstack-expand").forEach(b => setExpand(b, false));
-    railList.querySelectorAll(".mrow-mini").forEach(b => b.setAttribute("aria-expanded", "false"));
     setExpand(body, !wasOpen);
     btn.setAttribute("aria-expanded", String(!wasOpen));
   });
