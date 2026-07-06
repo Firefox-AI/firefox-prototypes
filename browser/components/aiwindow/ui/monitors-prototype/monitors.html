@@ -886,7 +886,7 @@ const STEPS = [
   "Open page — pinned to the chat + history",
   "Pinned to New Tab — hover the stack",
 ];
-let step = 1;
+let step = Math.min(Math.max(parseInt(location.hash.slice(1), 10) || 1, 1), STEPS.length);
 const N = STEPS.length;
 const dots = document.getElementById("dots");
 STEPS.forEach((_, i) => { const s = document.createElement("span"); if (i === 0) s.className = "on"; dots.appendChild(s); });
@@ -901,7 +901,7 @@ function render() {
   document.getElementById("sidebar").style.width = step === 9 ? "452px" : "416px";
   if (step !== 10) stackSet(false);
 }
-function go(n) { step = Math.max(1, Math.min(N, n)); render(); }
+function go(n) { step = Math.max(1, Math.min(N, n)); history.replaceState(null, "", "#" + step); render(); }
 document.getElementById("next").onclick = () => go(step + 1);
 document.getElementById("prev").onclick = () => go(step - 1);
 document.addEventListener("keydown", e => {
