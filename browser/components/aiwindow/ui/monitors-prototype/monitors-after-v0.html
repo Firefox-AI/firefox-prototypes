@@ -151,6 +151,7 @@ h1,h2,h3,h4,p { margin: 0; }
 .page-action.attn { color: var(--smartwindow-icon-color-accent); }
 .page-action.danger { color: var(--text-color-error); }
 .page-action.danger:hover { background: var(--background-color-critical); }
+[data-act="delete"].armed { width: auto; padding: 0 12px; background: var(--background-color-critical); color: var(--text-color-error); font-size: 12px; font-weight: var(--font-weight-semibold); border: 1px solid var(--text-color-error); border-radius: var(--border-radius-circle); }
 .mcard-actions .page-action.danger { width: 36px; height: 36px; border: 1px solid var(--border-color); border-radius: var(--border-radius-circle); }
 .mcard-actions { margin-top: var(--space-xsmall); }
 .page-action .dot { position: absolute; top: 2px; right: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--icon-color-success); border: 1.5px solid var(--background-color-box); }
@@ -364,6 +365,13 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 .rail-panel-title { font-weight: var(--font-weight-semibold); }
 .rail-panel-body { flex: 1; overflow: auto; padding: 0 var(--space-medium) var(--space-medium); display: flex; flex-direction: column; gap: var(--space-small); }
 .rail-panel-foot { padding: var(--space-medium) var(--space-large); border-top: 1px solid var(--border-color-deemphasized); }
+.add-new-wrap { position: relative; }
+.add-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 180px; background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-medium); box-shadow: var(--box-shadow-level-4); padding: var(--space-xsmall); display: flex; flex-direction: column; }
+.add-menu[hidden] { display: none; }
+.add-menu button { display: flex; align-items: center; gap: var(--space-small); padding: 8px var(--space-small); border-radius: var(--border-radius-small); font-size: var(--font-size-small); text-align: left; color: var(--text-color); }
+.add-menu button:hover { background: var(--background-color-box-info); }
+.add-menu .mi { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; flex: none; }
+.add-menu .mi svg { width: 13px; height: 13px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* Slash tool picker (type "/" → Monitor / Scout / Research) */
 .slash-menu { margin: 0 var(--space-large) var(--space-small); background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); box-shadow: var(--box-shadow-level-4); padding: var(--space-xsmall); }
@@ -405,14 +413,17 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 .mstack { position: absolute; bottom: 16px; left: 16px; width: 324px; z-index: 30; pointer-events: none; }
 .mstack-list { display: flex; flex-direction: column-reverse; gap: var(--space-small); }
 .mstack-list > * { pointer-events: auto; position: relative; will-change: transform; transform-origin: 50% 100%; transition: transform var(--motion-dur-soft) var(--motion-ease-reach), border-color var(--motion-dur-away) var(--motion-ease-edge); }
-/* Fan open = Reach: leisurely, dealt with variance — never sprung */
-.mstack.open .mstack-list > :nth-child(2) { transition-delay: 90ms; }
-.mstack.open .mstack-list > :nth-child(3) { transition-delay: 205ms; }
+/* Constant paint order: the front card stays on top through every transit — no pop at fan start */
+.mstack .mstack-list > :nth-child(1) { z-index: 3; }
+.mstack .mstack-list > :nth-child(2) { z-index: 2; }
+.mstack .mstack-list > :nth-child(3) { z-index: 1; }
+/* Fan open = Reach: leisurely, dealt with variance — never sprung. Delay rides transform only. */
+.mstack.open .mstack-list > :nth-child(2) { transition-delay: 90ms, 0ms; }
+.mstack.open .mstack-list > :nth-child(3) { transition-delay: 205ms, 0ms; }
 /* Tuck = Return: comes home faster than it left, with a confident settle */
-.mstack:not(.open) .mstack-list > * { transition-duration: var(--motion-dur-near); transition-timing-function: var(--motion-ease-return); }
-.mstack:not(.open) .mstack-list > :nth-child(1) { z-index: 3; }
-.mstack:not(.open) .mstack-list > :nth-child(2) { transform: translateY(57px) scale(.955); z-index: 2; transition-delay: 45ms; }
-.mstack:not(.open) .mstack-list > :nth-child(3) { transform: translateY(114px) scale(.91); z-index: 1; transition-delay: 0ms; }
+.mstack:not(.open) .mstack-list > * { transition-duration: var(--motion-dur-near), var(--motion-dur-away); transition-timing-function: var(--motion-ease-return), var(--motion-ease-edge); }
+.mstack:not(.open) .mstack-list > :nth-child(2) { transform: translateY(57px) scale(.955); transition-delay: 45ms, 0ms; }
+.mstack:not(.open) .mstack-list > :nth-child(3) { transform: translateY(114px) scale(.91); transition-delay: 0ms, 0ms; }
 /* The wake: the front card stirs; shadow is a pre-rendered layer faded in */
 .mitem::after { content: ""; position: absolute; inset: -1px; border-radius: var(--border-radius-large); box-shadow: var(--box-shadow-level-4); opacity: 0; transition: opacity var(--motion-dur-near) var(--motion-ease-edge); pointer-events: none; }
 .mstack.intent .mstack-list > :nth-child(1) { transform: translateY(-2px); transition: transform var(--motion-dur-near) var(--motion-ease-edge) 0ms; }
@@ -538,9 +549,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       <button class="rail-btn" title="Bookmarks" aria-label="Bookmarks"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8L3.5 9.7l5.9-.9z"/></svg></button>
       <button class="rail-btn" title="Passwords" aria-label="Passwords"><svg viewBox="0 0 24 24"><circle cx="8" cy="14" r="3.5"/><path d="M10.5 11.5 19 3M15 7l2.5 2.5"/></svg></button>
       <div class="rail-sep" role="separator"></div>
-      <button class="rail-btn" id="rail-monitors" title="Monitors" aria-label="Monitors"><svg viewBox="0 0 24 24"><path d="M4 12h4l2-6 4 12 2-6h4"/></svg><span class="dot"></span></button>
-      <button class="rail-btn" title="Scout" aria-label="Scout"><svg viewBox="0 0 24 24"><path d="M3 11l8-8h7v7l-8 8z"/><circle cx="14.5" cy="7.5" r="1.2"/></svg></button>
-      <button class="rail-btn" title="Research" aria-label="Research"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></button>
+      <button class="rail-btn" id="rail-monitors" title="Tools" aria-label="Tools"><svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h9M17 17h3"/><circle cx="15" cy="7" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="17" r="1.6"/></svg><span class="dot"></span></button>
       <span class="rail-spacer"></span>
       <button class="rail-btn" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2.1 2.1M16.9 16.9L19 19M19 5l-2.1 2.1M7.1 16.9L5 19"/></svg></button>
     </nav>
@@ -548,12 +557,19 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
     <!-- Monitors tool panel (step 11) -->
     <aside class="rail-panel" data-show="10" aria-label="Monitors panel">
       <div class="rail-panel-head">
-        <span class="rail-panel-title">Monitors</span>
-        <span class="deemphasized small">3 active</span>
+        <span class="rail-panel-title">Tools</span>
         <span style="flex:1"></span>
-        <button class="btn-ghost" id="panel-new" style="padding:5px 12px">+ New</button>
+        <span class="add-new-wrap">
+          <button class="btn-primary" id="panel-new" aria-haspopup="menu" aria-expanded="false" style="display:inline-flex;align-items:center;gap:5px">Add new <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+          <div class="add-menu" id="add-menu" hidden role="menu">
+            <button role="menuitem" data-new="monitor"><span class="mi" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span> Monitor</button>
+            <button role="menuitem" data-new="scout"><span class="mi" style="background:linear-gradient(135deg,#db54bf,#f4682c)"><svg viewBox="0 0 24 24"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg></span> Scout</button>
+            <button role="menuitem" data-new="research"><span class="mi" style="background:linear-gradient(135deg,#455fe7,#10a4ca)"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg></span> Research</button>
+          </div>
+        </span>
       </div>
       <div class="rail-panel-body" id="rail-list">
+        <div class="group-label" style="margin: 2px 4px 0">Monitors · 3 active</div>
         <div class="mcard mitem">
           <button class="mitem-head" aria-expanded="false">
             <span class="favicon-sq" style="background:#e8663a">S</span>
@@ -590,6 +606,32 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <div class="mvalue"><span class="now" style="font-size:24px">3 new</span><span class="from">since yesterday · craigslist.org</span></div>
             <div class="mrow"><span class="lbl">Alert me when</span><span class="val">a new listing matches my search</span></div>
             <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
+          </div></div></div>
+        </div>
+        <div class="group-label" style="margin: 10px 4px 0">Scout</div>
+        <div class="mcard mitem">
+          <button class="mitem-head" aria-expanded="false">
+            <span class="favicon-sq" style="background:linear-gradient(135deg,#db54bf,#f4682c)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg></span>
+            <span class="mit"><span class="mcard-name">SoundNest checkout codes</span><span class="mcard-url">3 codes found · ran 2h ago</span></span>
+            <span class="status-chip">Saves $12</span>
+            <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
+            <div class="mrow"><span class="lbl">Best code</span><span class="val">SAVE12 — $12 off</span></div>
+            <div class="mrow"><span class="lbl">Also found</span><span class="val">FREESHIP · WELCOME10</span></div>
+          </div></div></div>
+        </div>
+        <div class="group-label" style="margin: 10px 4px 0">Research</div>
+        <div class="mcard mitem">
+          <button class="mitem-head" aria-expanded="false">
+            <span class="favicon-sq" style="background:linear-gradient(135deg,#455fe7,#10a4ca)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg></span>
+            <span class="mit"><span class="mcard-name">ANC headphones under $300</span><span class="mcard-url">14 sources · finished yesterday</span></span>
+            <span class="status-chip">Report ready</span>
+            <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
+            <div class="mrow"><span class="lbl">Top pick</span><span class="val">Sony WH-1000XM5 at $278</span></div>
+            <a class="accent-link" href="#" onclick="return false">Open report</a>
           </div></div></div>
         </div>
       </div>
@@ -632,7 +674,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </div>
 
           <!-- Empty-state lead (only when there are no monitors) -->
-          <div class="empty-lead" data-show="11"><h3>Watch any page for changes</h3><p>Start from a monitor prompt, or open any page and type <b>/monitor</b> in Smart Window.</p></div>
+          <div class="empty-lead" data-show="11"><h3>Watch any page for changes</h3><p>Open any page and type <b>/monitor</b> in Smart Window, or start with New monitor.</p></div>
 
           <!-- Populated: running + paused monitors -->
           <div data-show="5 6">
@@ -734,6 +776,13 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             </div>
           </div>
 
+          <!-- Loading skeleton (state demo) -->
+          <div data-show="11">
+            <div class="group-label">Loading</div>
+            <div class="skel"><div class="sk circle"></div><div style="flex:1"><div class="sk line" style="width:44%;margin-bottom:7px"></div><div class="sk line" style="width:66%"></div></div><div class="sk line" style="width:54px;height:20px"></div></div>
+            <div class="skel"><div class="sk circle"></div><div style="flex:1"><div class="sk line" style="width:38%;margin-bottom:7px"></div><div class="sk line" style="width:58%"></div></div><div class="sk line" style="width:54px;height:20px"></div></div>
+          </div>
+
           <!-- Monitor prompts — always under the running + paused monitors; each opens the create modal pre-filled -->
           <div class="group-label" data-show="5 6">Monitor prompts <span class="scope-tag">after v0</span></div>
           <div class="starter-grid" data-show="5 6 11">
@@ -745,24 +794,28 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <button class="starter"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg></span><span class="st-name">Dates / slots</span><span class="st-desc">Appointment or reservation</span></button>
           </div>
 
-          <!-- Loading skeleton (state demo) -->
-          <div data-show="11">
-            <div class="group-label">Loading</div>
-            <div class="skel"><div class="sk circle"></div><div style="flex:1"><div class="sk line" style="width:44%;margin-bottom:7px"></div><div class="sk line" style="width:66%"></div></div><div class="sk line" style="width:54px;height:20px"></div></div>
-            <div class="skel"><div class="sk circle"></div><div style="flex:1"><div class="sk line" style="width:38%;margin-bottom:7px"></div><div class="sk line" style="width:58%"></div></div><div class="sk line" style="width:54px;height:20px"></div></div>
-          </div>
-
           <!-- Scout -->
           <div class="tool-sect">
             <span class="ti" style="background:linear-gradient(135deg,#db54bf,#f4682c)"><svg viewBox="0 0 24 24"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg></span>
             <span class="tn">Scout</span>
             <span class="tc">finds deals and coupons</span>
+            <span class="spacer"></span>
+            <button class="btn-primary">New scout</button>
           </div>
-          <div class="grow" style="cursor: default" data-show="5 6">
-            <span class="dot-status active"></span>
-            <span class="favicon-sq" style="background:#e8663a">S</span>
-            <span class="gmain"><span class="gname">SoundNest checkout codes</span><br/><span class="gmeta truncate">3 codes found · ran 2h ago</span></span>
-            <span class="gvalue"><span class="status-chip">Saves $12</span></span>
+          <div class="dash-item" data-show="5 6">
+            <div class="grow" role="button" tabindex="0" aria-expanded="false">
+              <span class="dot-status active"></span>
+              <span class="favicon-sq" style="background:#e8663a">S</span>
+              <span class="gmain"><span class="gname">SoundNest checkout codes</span><br/><span class="gmeta truncate">3 codes found · ran 2h ago</span></span>
+              <span class="gvalue"><span class="status-chip">Saves $12</span></span>
+            </div>
+            <div class="mstack-expand"><div class="mstack-expand-inner">
+            <div class="mcard">
+              <div class="mrow"><span class="lbl">Best code</span><span class="val">SAVE12 — $12 off</span></div>
+              <div class="mrow"><span class="lbl">Also found</span><span class="val">FREESHIP · WELCOME10</span></div>
+              <div class="mrow"><span class="lbl">Ran</span><span class="val">2h ago on checkout</span></div>
+            </div>
+            </div></div>
           </div>
           <p class="mono-dim" data-show="11" style="margin: 0 0 var(--space-small)">No scouts yet — call <b>/scout</b> on any checkout page.</p>
 
@@ -771,12 +824,23 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <span class="ti" style="background:linear-gradient(135deg,#455fe7,#10a4ca)"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg></span>
             <span class="tn">Research</span>
             <span class="tc">digs into a topic and reports back</span>
+            <span class="spacer"></span>
+            <button class="btn-primary">New research</button>
           </div>
-          <div class="grow" style="cursor: default" data-show="5 6">
-            <span class="dot-status active"></span>
-            <span class="favicon-sq" style="background:linear-gradient(135deg,#455fe7,#10a4ca)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg></span>
-            <span class="gmain"><span class="gname">ANC headphones under $300</span><br/><span class="gmeta truncate">14 sources · finished yesterday</span></span>
-            <span class="gvalue"><a class="accent-link" href="#" onclick="return false">Open report</a></span>
+          <div class="dash-item" data-show="5 6">
+            <div class="grow" role="button" tabindex="0" aria-expanded="false">
+              <span class="dot-status active"></span>
+              <span class="favicon-sq" style="background:linear-gradient(135deg,#455fe7,#10a4ca)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg></span>
+              <span class="gmain"><span class="gname">ANC headphones under $300</span><br/><span class="gmeta truncate">14 sources · finished yesterday</span></span>
+              <span class="gvalue"><span class="status-chip">Report ready</span></span>
+            </div>
+            <div class="mstack-expand"><div class="mstack-expand-inner">
+            <div class="mcard">
+              <div class="mrow"><span class="lbl">Top pick</span><span class="val">Sony WH-1000XM5 at $278</span></div>
+              <div class="mrow"><span class="lbl">Sources</span><span class="val">14 · finished yesterday</span></div>
+              <div class="mcard-actions"><span class="spacer"></span><a class="accent-link" href="#" onclick="return false">Open report</a></div>
+            </div>
+            </div></div>
           </div>
           <p class="mono-dim" data-show="11" style="margin: 0 0 var(--space-small)">No reports yet — ask <b>/research</b> to dig into anything.</p>
         </div>
@@ -1067,7 +1131,7 @@ const STEPS = [
   "Open page — pinned to the chat + history",
   "Pinned to New Tab — hover the stack",
   "Tools in the sidebar — Monitors at hand",
-  "Day zero — empty state & monitor prompts",
+  "Day zero — the empty state",
 ];
 let step = Math.min(Math.max(parseInt(location.hash.slice(1), 10) || 1, 1), STEPS.length);
 const N = STEPS.length;
@@ -1157,7 +1221,16 @@ document.querySelectorAll("[data-open-page]").forEach(b => { b.addEventListener(
 
 // Tools rail: Monitors lives in the chrome
 document.getElementById("rail-monitors").onclick = () => go(10);
-document.getElementById("panel-new").onclick = () => openModal(null);
+const addMenu = document.getElementById("add-menu");
+const panelNew = document.getElementById("panel-new");
+function closeAddMenu() { addMenu.hidden = true; panelNew.setAttribute("aria-expanded", "false"); }
+panelNew.onclick = (e) => { e.stopPropagation(); const willOpen = addMenu.hidden; closeAddMenu(); if (willOpen) { addMenu.hidden = false; panelNew.setAttribute("aria-expanded", "true"); } };
+document.addEventListener("click", e => { if (!e.target.closest(".add-new-wrap")) closeAddMenu(); });
+addMenu.querySelectorAll("[data-new]").forEach(b => b.addEventListener("click", e => {
+  e.stopPropagation();
+  closeAddMenu();
+  if (b.dataset.new === "monitor") openModal(null);
+}));
 document.getElementById("panel-open-about").onclick = (e) => { e.preventDefault(); go(5); };
 const railList = document.getElementById("rail-list");
 railList.querySelectorAll(".mitem-head").forEach(btn => {
@@ -1169,7 +1242,7 @@ railList.querySelectorAll(".mitem-head").forEach(btn => {
   });
 });
 
-// Monitor prompts + New monitor open the create card as a modal (no page to read here — you paste a URL)
+// New monitor opens the create card as a modal (no page to read here — you paste a URL). PROMPTS parked for after v0 — see monitors-after-v0.html
 const PROMPTS = {
   "Price drop": { cond: "the price drops", chips: [["Any drop", "the price drops at all"], ["Below a target", "the price drops below $—"], ["10% off or more", "the price drops 10% or more"]] },
   "Back in stock": { cond: "it's back in stock", chips: [["Any restock", "it's back in stock"], ["My size", "my size is back in stock"]] },
@@ -1313,10 +1386,17 @@ function showUndo() { undoToast.hidden = false; clearTimeout(undoTimer); undoTim
 document.getElementById("undo-btn").onclick = () => { clearTimeout(undoTimer); undoToast.hidden = true; };
 document.getElementById("undo-x").onclick = () => { clearTimeout(undoTimer); undoToast.hidden = true; };
 
-document.querySelectorAll('[data-act]').forEach(el => {
+document.querySelectorAll('[data-act="delete"]').forEach(el => {
+  const original = el.innerHTML;
+  let disarmTimer = null;
+  const disarm = () => { clearTimeout(disarmTimer); el.classList.remove("armed"); el.innerHTML = original; };
   el.addEventListener("click", e => {
     e.stopPropagation();
-    if (el.getAttribute("data-act") === "delete") showUndo();
+    if (el.classList.contains("armed")) { disarm(); showUndo(); return; }
+    el.classList.add("armed");
+    el.textContent = "Sure?";
+    clearTimeout(disarmTimer);
+    disarmTimer = setTimeout(disarm, 3000);
   });
 });
 
