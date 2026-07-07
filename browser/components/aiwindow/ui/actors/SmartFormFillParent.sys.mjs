@@ -152,6 +152,10 @@ export class SmartFormFillParent extends JSWindowActorParent {
     const storedValue = await this.#readStoredValue(field.name);
     this.sendAsyncMessage("SmartFormFill:Preview", { targetIdentifier });
 
+    const highConfidenceOnly = Services.prefs.getBoolPref(
+      "browser.smartwindow.formfill.highConfidence",
+      true
+    );
     const suggestion = await lazy.generateSuggestion({
       page,
       field,
@@ -164,9 +168,12 @@ export class SmartFormFillParent extends JSWindowActorParent {
     );
 
     let chosen = null;
-    if (suggestion?.value && confidence >= CONFIDENCE_THRESHOLD) {
-      chosen = { value: suggestion.value, source: "llm" };
-    } else if (storedValue) {
+    if (suggestion?.value) {
+      if (!highConfidenceOnly || confidence >= CONFIDENCE_THRESHOLD) {
+        chosen = { value: suggestion.value, source: "llm" };
+      }
+    }
+    if (!chosen && storedValue) {
       chosen = { value: storedValue, source: "stored" };
     }
 

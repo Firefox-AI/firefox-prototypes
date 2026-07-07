@@ -1018,8 +1018,18 @@ export class nsContextMenu {
         false
       );
       this.setItemAttr("context-smartformfill-all", "checked", fillAll);
+      const highConfidence = Services.prefs.getBoolPref(
+        "browser.smartwindow.formfill.highConfidence",
+        true
+      );
+      this.setItemAttr(
+        "context-smartformfill-highconfidence",
+        "checked",
+        highConfidence
+      );
     }
     this.showItem("context-smartformfill-all", showSmartFormFill);
+    this.showItem("context-smartformfill-highconfidence", showSmartFormFill);
 
     this.showItem("context-undo", this.onTextInput);
     this.showItem("context-redo", this.onTextInput);
@@ -1449,6 +1459,13 @@ export class nsContextMenu {
     const newVal = !Services.prefs.getBoolPref(pref, false);
     Services.prefs.setBoolPref(pref, newVal);
     this.setItemAttr("context-smartformfill-all", "checked", newVal);
+  }
+
+  toggleSmartFormFillHighConfidence() {
+    const pref = "browser.smartwindow.formfill.highConfidence";
+    const newVal = !Services.prefs.getBoolPref(pref, true);
+    Services.prefs.setBoolPref(pref, newVal);
+    this.setItemAttr("context-smartformfill-highconfidence", "checked", newVal);
   }
 
   isLoginForm() {

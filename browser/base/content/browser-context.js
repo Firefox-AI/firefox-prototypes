@@ -189,6 +189,9 @@ document.addEventListener(
         case "context-smartformfill-all":
           gContextMenu.toggleSmartFormFillAll();
           break;
+        case "context-smartformfill-highconfidence":
+          gContextMenu.toggleSmartFormFillHighConfidence();
+          break;
         case "context-print-selection":
           gContextMenu.printSelection();
           break;

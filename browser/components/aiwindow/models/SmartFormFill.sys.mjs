@@ -53,28 +53,40 @@ const MAX_VALUE_LENGTH = 200;
 
 // POC: the prompt is hardcoded here. Production would load this from Remote
 // Settings via its own MODEL_FEATURES entry so it can be versioned + evaluated.
-const SYSTEM_PROMPT = `You help a user fill out a single web form field.
+const SYSTEM_PROMPT = `You help a user fill out a single web form field for a DEMO.
 
 You are given: the page (url + title), the field to fill (its purpose, input
 type, and max length), the other fields on the form for context, a list of the
 user's currently open browser tabs, and a list of saved memories about the user.
+
+This is a prototype demonstration. Your job is to show the feature by always
+returning a non-empty value.
 
 First classify the page as one of: "travel", "registration", "product_search",
 or "other". Then propose the single best value for the target field, inferred
 from the open tabs, the memories, and the page itself.
 
 Rules:
+- This is a DEMO / PROTOTYPE. Always provide a value for the field to demonstrate
+  the feature working. It is expected and desired that you make a reasonable
+  best-effort guess or use a typical placeholder when context is limited.
 - NEVER invent personal identity data (real names, emails, addresses, phone
-  numbers, payment details). If the field needs that, return an empty value.
-- Prefer values grounded in the open tabs or saved memories (a destination being
-  researched, a product being shopped for, a likely search query).
+  numbers, payment details). Only return empty in those cases.
+- Prefer values grounded in the open tabs or saved memories when available.
 - Respect the field's max length when provided.
-- If you are not reasonably confident, return an empty value with low confidence.
+- Do not refuse or return empty because of low confidence, missing context, or
+  concern that a guess "could mislead". For demo purposes, always fill a
+  plausible value (a common term, typical default, or short generic string).
+  It is fine and expected to guess for the demo. Report low confidence if
+  appropriate.
 - In "reasoning", list every open tab you were given (by title) and say in a few
   words why you used or ignored each one. This must reflect ALL tabs provided.
 
 Respond with ONLY a JSON object, no prose, no code fences:
-{"pageType": "...", "value": "...", "confidence": 0.0, "reasoning": "..."}`;
+{"pageType": "...", "value": "...", "confidence": 0.0, "reasoning": "..."}
+
+IMPORTANT FOR DEMO: "value" must be a non-empty string (except only for the personal identity rule). Always return a value string.
+`;
 
 /**
  * Collect open tabs as lightweight, sanitized context.
@@ -186,6 +198,7 @@ export async function generateSuggestion({ page, field, siblingFields }) {
       otherFields: siblingFields,
       openTabs: tabs,
       memories,
+      note: 'DEMO / PROTOTYPE: You MUST return a non-empty value. This is to demonstrate the smart form fill feature. Make up a reasonable value if needed. Do not return "" .',
     };
 
     lazy.console.info(
