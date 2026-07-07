@@ -31,7 +31,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   MemoriesManager:
     "moz-src:///browser/components/aiwindow/models/memories/MemoriesManager.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
-  loadCallContext:
+  buildEngineForFeature:
     "moz-src:///browser/components/aiwindow/models/PromptLoader.sys.mjs",
 });
 
@@ -166,19 +166,13 @@ export async function generateSuggestion({ page, field, siblingFields }) {
   try {
     // POC: borrow an existing feature's call context to get a working model.
     // Production gets its own MODEL_FEATURES + Remote Settings prompt config.
-    const callContext = await lazy.loadCallContext(
+    const { engine, parameters } = await lazy.buildEngineForFeature(
       MODEL_FEATURES.TITLE_GENERATION
     );
     // POC: reuse the borrowed feature's purpose verbatim. `purpose` is sent as
     // an HTTP header the endpoint validates against known features, so a custom
     // value (e.g. "smart_form_fill") is rejected with a 400. Production gets its
     // own registered feature + purpose.
-    const engine = await openAIEngine.build({
-      model: callContext.model,
-      serviceType: callContext.serviceType,
-      purpose: callContext.purpose,
-      feature: MODEL_FEATURES.TITLE_GENERATION,
-    });
 
     const tabs = gatherOpenTabs();
     const memories = await gatherMemories();
@@ -215,7 +209,7 @@ export async function generateSuggestion({ page, field, siblingFields }) {
     const response = await engine.run({
       args: messages,
       fxAccountToken: await openAIEngine.getFxAccountToken(),
-      ...callContext.parameters,
+      ...parameters,
     });
 
     lazy.console.info("raw model output:", response?.finalOutput);
