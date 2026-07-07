@@ -282,6 +282,8 @@ let JSWINDOWACTORS = {
         "moz-src:///browser/components/aiwindow/ui/actors/SmartFormFillChild.sys.mjs",
     },
     enablePreference: "browser.smartwindow.enabled",
+    allFrames: true,
+    safeForUntrustedWebProcess: true,
   },
 
   BackupUI: {
