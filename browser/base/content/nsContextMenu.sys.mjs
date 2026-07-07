@@ -1004,15 +1004,22 @@ export class nsContextMenu {
     // Smart Form Fill (spike): only on a text input in the top-level document
     // of an HTTPS page, never on passwords, and only when Smart Window is on
     // and we are not in a private window.
-    this.showItem(
-      "context-smartformfill",
+    const showSmartFormFill =
       this.onTextInput &&
-        !this.onPassword &&
-        !this.inFrame &&
-        !!this.browser?.currentURI?.schemeIs("https") &&
-        lazy.AIWindow.isAIWindowEnabled() &&
-        !lazy.PrivateBrowsingUtils.isWindowPrivate(this.window)
-    );
+      !this.onPassword &&
+      !this.inFrame &&
+      !!this.browser?.currentURI?.schemeIs("https") &&
+      lazy.AIWindow.isAIWindowEnabled() &&
+      !lazy.PrivateBrowsingUtils.isWindowPrivate(this.window);
+    this.showItem("context-smartformfill", showSmartFormFill);
+    if (showSmartFormFill) {
+      const fillAll = Services.prefs.getBoolPref(
+        "browser.smartwindow.formfill.all",
+        false
+      );
+      this.setItemAttr("context-smartformfill-all", "checked", fillAll);
+    }
+    this.showItem("context-smartformfill-all", showSmartFormFill);
 
     this.showItem("context-undo", this.onTextInput);
     this.showItem("context-redo", this.onTextInput);
@@ -1421,10 +1428,27 @@ export class nsContextMenu {
   }
 
   smartFormFill() {
-    console.log("[SmartFormFill] context menu item clicked");
+    console.warn("[SmartFormFill] context menu item clicked");
     let actor =
-      this.browser.browsingContext.currentWindowGlobal.getActor("SmartFormFill");
-    actor.smartFill(this.targetIdentifier).catch(console.error);
+      this.browser.browsingContext.currentWindowGlobal.getActor(
+        "SmartFormFill"
+      );
+    const fillAll = Services.prefs.getBoolPref(
+      "browser.smartwindow.formfill.all",
+      false
+    );
+    if (fillAll) {
+      actor.smartFillForm(this.targetIdentifier).catch(console.error);
+    } else {
+      actor.smartFill(this.targetIdentifier).catch(console.error);
+    }
+  }
+
+  toggleSmartFormFillAll() {
+    const pref = "browser.smartwindow.formfill.all";
+    const newVal = !Services.prefs.getBoolPref(pref, false);
+    Services.prefs.setBoolPref(pref, newVal);
+    this.setItemAttr("context-smartformfill-all", "checked", newVal);
   }
 
   isLoginForm() {

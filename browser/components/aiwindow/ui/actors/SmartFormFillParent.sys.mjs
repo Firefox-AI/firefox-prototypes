@@ -35,6 +35,9 @@ ChromeUtils.defineLazyGetter(lazy, "console", () =>
 // values more; lower it to let the model win more often.
 const CONFIDENCE_THRESHOLD = 0.7;
 
+/**
+ *
+ */
 export class SmartFormFillParent extends JSWindowActorParent {
   /**
    * Entry point invoked from the context menu handler.
@@ -64,6 +67,13 @@ export class SmartFormFillParent extends JSWindowActorParent {
     return this.#run(data.targetIdentifier, data);
   }
 
+  async smartFillForm(targetIdentifier) {
+    const data = await this.sendQuery("SmartFormFill:ClassifyForm", {
+      targetIdentifier,
+    });
+    return this.#runForm(data);
+  }
+
   async #run(targetIdentifier, data) {
     try {
       lazy.console.info("smartFill invoked");
@@ -75,10 +85,6 @@ export class SmartFormFillParent extends JSWindowActorParent {
 
       const { clicked } = data;
 
-      // Arbiter (spike: category gate).
-      // - Credit card / password fields never reach the model.
-      // - Identity facts defer to the existing stores; we do not generate them.
-      // - Only contextual (unclassified) fields go to the LLM.
       if (clicked.category === "creditCard") {
         lazy.console.info("Skipping credit card field");
         return { status: "skipped-creditcard" };
@@ -91,57 +97,99 @@ export class SmartFormFillParent extends JSWindowActorParent {
       }
 
       lazy.console.info("Contextual field; asking the model");
-      // Stored value (e.g. a past search) is read on the client and never sent
-      // to the model.
-      const storedValue = await this.#readStoredValue(clicked.name);
-      // Show the busy indicator on the field while the model works.
-      this.sendAsyncMessage("SmartFormFill:Preview", { targetIdentifier });
-
-      const suggestion = await lazy.generateSuggestion({
-        page: data.page,
-        field: clicked,
-        siblingFields: data.siblingFields,
-      });
-
-      // Arbiter: prefer a confident LLM value, otherwise fall back to the stored
-      // value, otherwise fill nothing.
-      const confidence = suggestion?.confidence ?? 0;
-      lazy.console.info(
-        `arbiter: llm=${JSON.stringify(suggestion?.value)} confidence=${confidence} threshold=${CONFIDENCE_THRESHOLD} stored=${JSON.stringify(storedValue)}`
-      );
-
-      let chosen = null;
-      if (suggestion?.value && confidence >= CONFIDENCE_THRESHOLD) {
-        chosen = { value: suggestion.value, source: "llm" };
-      } else if (storedValue) {
-        chosen = { value: storedValue, source: "stored" };
-      }
-
-      if (!chosen) {
-        lazy.console.warn("arbiter: no value chosen");
-        this.sendAsyncMessage("SmartFormFill:ClearPreview", {
-          targetIdentifier,
-        });
-        return { status: "no-value", suggestion };
-      }
-
-      lazy.console.info(`arbiter: chose ${chosen.source} -> "${chosen.value}"`);
-      const filled = await this.sendQuery("SmartFormFill:Fill", {
+      return this.#suggestAndFill(
         targetIdentifier,
-        value: chosen.value,
-      });
-
-      lazy.console.info(`Fill ${filled ? "succeeded" : "failed"}`);
-      return {
-        status: filled ? "filled" : "fill-failed",
-        source: chosen.source,
-        suggestion,
-      };
+        data.page,
+        clicked,
+        data.siblingFields
+      );
     } catch (e) {
       lazy.console.error("smartFill failed", e);
       this.sendAsyncMessage("SmartFormFill:ClearPreview", { targetIdentifier });
       return { status: "error" };
     }
+  }
+
+  async #runForm(data) {
+    try {
+      lazy.console.info("smartFillForm invoked");
+      if (!data?.ok) {
+        return { status: "unavailable" };
+      }
+      const { page, fields = [] } = data;
+      let filled = 0;
+      for (const field of fields) {
+        if (field.category === "creditCard" || field.category) {
+          continue;
+        }
+        if (!field.targetIdentifier) {
+          continue;
+        }
+        try {
+          const res = await this.#suggestAndFill(
+            field.targetIdentifier,
+            page,
+            field,
+            fields
+          );
+          if (res?.status === "filled") {
+            filled++;
+          }
+        } catch (e) {
+          this.sendAsyncMessage("SmartFormFill:ClearPreview", {
+            targetIdentifier: field.targetIdentifier,
+          });
+        }
+      }
+      return { status: "form-filled", filled };
+    } catch (e) {
+      lazy.console.error("smartFillForm failed", e);
+      return { status: "error" };
+    }
+  }
+
+  async #suggestAndFill(targetIdentifier, page, field, siblingFields) {
+    const storedValue = await this.#readStoredValue(field.name);
+    this.sendAsyncMessage("SmartFormFill:Preview", { targetIdentifier });
+
+    const suggestion = await lazy.generateSuggestion({
+      page,
+      field,
+      siblingFields,
+    });
+
+    const confidence = suggestion?.confidence ?? 0;
+    lazy.console.info(
+      `arbiter: llm=${JSON.stringify(suggestion?.value)} confidence=${confidence} threshold=${CONFIDENCE_THRESHOLD} stored=${JSON.stringify(storedValue)}`
+    );
+
+    let chosen = null;
+    if (suggestion?.value && confidence >= CONFIDENCE_THRESHOLD) {
+      chosen = { value: suggestion.value, source: "llm" };
+    } else if (storedValue) {
+      chosen = { value: storedValue, source: "stored" };
+    }
+
+    if (!chosen) {
+      lazy.console.warn("arbiter: no value chosen");
+      this.sendAsyncMessage("SmartFormFill:ClearPreview", {
+        targetIdentifier,
+      });
+      return { status: "no-value", suggestion };
+    }
+
+    lazy.console.info(`arbiter: chose ${chosen.source} -> "${chosen.value}"`);
+    const filled = await this.sendQuery("SmartFormFill:Fill", {
+      targetIdentifier,
+      value: chosen.value,
+    });
+
+    lazy.console.info(`Fill ${filled ? "succeeded" : "failed"}`);
+    return {
+      status: filled ? "filled" : "fill-failed",
+      source: chosen.source,
+      suggestion,
+    };
   }
 
   /**

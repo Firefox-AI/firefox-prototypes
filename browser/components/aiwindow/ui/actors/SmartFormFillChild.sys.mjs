@@ -48,6 +48,9 @@ function isFillable(element) {
   );
 }
 
+/**
+ *
+ */
 export class SmartFormFillChild extends JSWindowActorChild {
   async receiveMessage(message) {
     switch (message.name) {
@@ -55,6 +58,8 @@ export class SmartFormFillChild extends JSWindowActorChild {
         return this.#classify(message.data.targetIdentifier);
       case "SmartFormFill:ClassifyFocused":
         return this.#classifyFocused();
+      case "SmartFormFill:ClassifyForm":
+        return this.#classifyForm(message.data.targetIdentifier);
       case "SmartFormFill:Fill":
         return this.#fill(message.data.targetIdentifier, message.data.value);
       case "SmartFormFill:Preview":
@@ -96,6 +101,7 @@ export class SmartFormFillChild extends JSWindowActorChild {
       inputType: element?.type ?? "",
       name: element?.name || element?.id || "",
       isClicked: element === clickedElement,
+      maxLength: element?.maxLength > 0 ? element.maxLength : null,
     };
   }
 
@@ -127,7 +133,10 @@ export class SmartFormFillChild extends JSWindowActorChild {
     }
 
     const formLike = lazy.AutofillFormFactory.createFromField(element);
-    const fieldDetails = lazy.FormAutofillHeuristics.getFormInfo(formLike, true);
+    const fieldDetails = lazy.FormAutofillHeuristics.getFormInfo(
+      formLike,
+      true
+    );
     lazy.console.info(
       `classify: ${fieldDetails.length} fields in form; clicked type=${element.type} name=${element.name || element.id}`
     );
@@ -158,6 +167,51 @@ export class SmartFormFillChild extends JSWindowActorChild {
       },
       clicked,
       siblingFields,
+    };
+  }
+
+  #classifyForm(targetIdentifier) {
+    const clickedEl = lazy.ContentDOMReference.resolve(targetIdentifier);
+    if (!clickedEl || !isFillable(clickedEl)) {
+      return { ok: false, reason: "not-fillable" };
+    }
+    const formLike = lazy.AutofillFormFactory.createFromField(clickedEl);
+    const fieldDetails = lazy.FormAutofillHeuristics.getFormInfo(
+      formLike,
+      true
+    );
+    const fields = [];
+    let foundClicked = false;
+    for (const fd of fieldDetails) {
+      const el = fd.element;
+      if (!el || !isFillable(el)) {
+        continue;
+      }
+      const desc = this.#describeField(fd, clickedEl);
+      desc.targetIdentifier = lazy.ContentDOMReference.get(el);
+      if (el === clickedEl) {
+        foundClicked = true;
+      }
+      fields.push(desc);
+    }
+    if (!foundClicked) {
+      fields.push({
+        fieldName: "",
+        category: null,
+        inputType: clickedEl.type ?? "",
+        name: clickedEl.name || clickedEl.id || "",
+        isClicked: true,
+        maxLength: clickedEl.maxLength > 0 ? clickedEl.maxLength : null,
+        targetIdentifier,
+      });
+    }
+    return {
+      ok: true,
+      page: {
+        url: this.document.documentURIObject?.spec ?? "",
+        title: this.document.title ?? "",
+      },
+      fields,
     };
   }
 
