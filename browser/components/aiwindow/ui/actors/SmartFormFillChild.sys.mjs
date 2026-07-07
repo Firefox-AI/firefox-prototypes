@@ -9,7 +9,7 @@
  *
  * Two jobs:
  * - Classify: resolve the right-clicked field, run the existing FormAutofill
- *   heuristics over its form, and return field STRUCTURE only (never values).
+ *   heuristics over its form, and return field STRUCTURE (with currentValue).
  * - Fill: write the chosen value back via setUserInput so the page sees it as
  *   real user input, and flag it as autofilled for the highlight + undo path.
  */
@@ -93,7 +93,7 @@ export class SmartFormFillChild extends JSWindowActorChild {
   #describeField(fieldDetail, clickedElement) {
     const element = fieldDetail.element;
     const fieldName = fieldDetail.fieldName || "";
-    return {
+    const desc = {
       fieldName,
       category: fieldName
         ? (lazy.AutofillDataTypes.fieldToSubCategory[fieldName] ?? null)
@@ -102,7 +102,9 @@ export class SmartFormFillChild extends JSWindowActorChild {
       name: element?.name || element?.id || "",
       isClicked: element === clickedElement,
       maxLength: element?.maxLength > 0 ? element.maxLength : null,
+      currentValue: element ? (element.value ?? null) : null,
     };
+    return desc;
   }
 
   // Context-menu entry: classify the right-clicked element.
@@ -154,6 +156,7 @@ export class SmartFormFillChild extends JSWindowActorChild {
         inputType: element.type ?? "",
         name: element.name || element.id || "",
         isClicked: true,
+        currentValue: element.value ?? null,
       };
       siblingFields.push(clicked);
     }
@@ -202,6 +205,7 @@ export class SmartFormFillChild extends JSWindowActorChild {
         name: clickedEl.name || clickedEl.id || "",
         isClicked: true,
         maxLength: clickedEl.maxLength > 0 ? clickedEl.maxLength : null,
+        currentValue: clickedEl.value ?? null,
         targetIdentifier,
       });
     }

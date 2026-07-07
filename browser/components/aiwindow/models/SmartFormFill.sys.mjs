@@ -14,7 +14,8 @@
  *
  * Safety invariants for the spike:
  * - The user's saved data (form history, addresses, cards, logins) is NEVER
- *   sent to the model. This module only ever receives field STRUCTURE.
+ *   sent to the model. This module receives field STRUCTURE plus currentValue
+ *   for fields.
  * - Only contextual fields reach the model. Identity classification and the
  *   decision to call this module at all live in SmartFormFillParent.
  */
@@ -56,8 +57,9 @@ const MAX_VALUE_LENGTH = 200;
 const SYSTEM_PROMPT = `You help a user fill out a single web form field for a DEMO.
 
 You are given: the page (url + title), the field to fill (its purpose, input
-type, and max length), the other fields on the form for context, a list of the
-user's currently open browser tabs, and a list of saved memories about the user.
+type, max length, and currentValue if present), the other fields on the form for
+context (each with currentValue if present), a list of the user's currently open
+browser tabs, and a list of saved memories about the user.
 
 This is a prototype demonstration. Your job is to show the feature by always
 returning a non-empty value.
@@ -74,6 +76,8 @@ Rules:
   numbers, payment details). Only return empty in those cases.
 - Prefer values grounded in the open tabs or saved memories when available.
 - Respect the field's max length when provided.
+- Use currentValue (if present) on the target field or other fields as a starting
+  point and edit or complete using context.
 - Do not refuse or return empty because of low confidence, missing context, or
   concern that a guess "could mislead". For demo purposes, always fill a
   plausible value (a common term, typical default, or short generic string).
@@ -170,8 +174,8 @@ function parseSuggestion(raw) {
  *
  * @param {object} options
  * @param {{url: string, title: string}} options.page
- * @param {object} options.field         The clicked field descriptor (no value).
- * @param {Array<object>} options.siblingFields  Other fields on the form (no values).
+ * @param {object} options.field         The target field descriptor (with currentValue).
+ * @param {Array<object>} options.siblingFields  Other fields on the form (with currentValue).
  * @returns {Promise<{pageType: string, value: string, confidence: number, reasoning: string} | null>}
  */
 export async function generateSuggestion({ page, field, siblingFields }) {
