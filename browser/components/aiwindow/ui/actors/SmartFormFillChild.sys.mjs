@@ -22,6 +22,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   FormAutofillHeuristics:
     "resource://gre/modules/shared/FormAutofillHeuristics.sys.mjs",
   FormAutofillUtils: "resource://gre/modules/shared/FormAutofillUtils.sys.mjs",
+  AutofillDataTypes: "resource://gre/modules/shared/AutofillDataTypes.sys.mjs",
 });
 
 ChromeUtils.defineLazyGetter(lazy, "console", () =>
@@ -90,7 +91,7 @@ export class SmartFormFillChild extends JSWindowActorChild {
     return {
       fieldName,
       category: fieldName
-        ? lazy.FormAutofillUtils.getCategoryFromFieldName(fieldName) ?? null
+        ? (lazy.AutofillDataTypes.fieldToSubCategory[fieldName] ?? null)
         : null,
       inputType: element?.type ?? "",
       name: element?.name || element?.id || "",
