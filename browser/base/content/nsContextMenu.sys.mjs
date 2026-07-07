@@ -23,6 +23,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   NetUtil: "resource://gre/modules/NetUtil.sys.mjs",
   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+  sanitizeUntrustedContent:
+    "moz-src:///browser/components/aiwindow/models/ChatUtils.sys.mjs",
   ScreenshotsUtils:
     "moz-src:///browser/components/screenshots/ScreenshotsUtils.sys.mjs",
   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
@@ -1030,6 +1032,15 @@ export class nsContextMenu {
     }
     this.showItem("context-smartformfill-all", showSmartFormFill);
     this.showItem("context-smartformfill-highconfidence", showSmartFormFill);
+    this.showItem("context-smartformfill-using-tab", showSmartFormFill);
+    if (showSmartFormFill) {
+      const popup = this.document.getElementById(
+        "context-smartformfill-using-tab-popup"
+      );
+      if (popup) {
+        this.populateSmartFormFillUsingTabMenu(popup);
+      }
+    }
 
     this.showItem("context-undo", this.onTextInput);
     this.showItem("context-redo", this.onTextInput);
@@ -1466,6 +1477,115 @@ export class nsContextMenu {
     const newVal = !Services.prefs.getBoolPref(pref, true);
     Services.prefs.setBoolPref(pref, newVal);
     this.setItemAttr("context-smartformfill-highconfidence", "checked", newVal);
+  }
+
+  populateSmartFormFillUsingTabMenu(popup) {
+    while (popup.firstChild) {
+      popup.firstChild.remove();
+    }
+
+    const tabsInfo = [];
+    const gBrowser = this.window.gBrowser;
+    if (gBrowser) {
+      for (const tab of gBrowser.tabs) {
+        const uri = tab.linkedBrowser?.currentURI;
+        if (!uri || !(uri.schemeIs("http") || uri.schemeIs("https"))) {
+          continue;
+        }
+        if (tab.linkedBrowser === this.browser) {
+          continue; // skip the tab the context menu is for
+        }
+        const host = uri.host || uri.spec;
+        let label = tab.label || host;
+        if (label.length > 60) {
+          label = label.slice(0, 57) + "…";
+        }
+        tabsInfo.push({ tab, label: `${label} (${host})` });
+        if (tabsInfo.length >= 20) {
+          break;
+        }
+      }
+    }
+
+    if (!tabsInfo.length) {
+      const mi = this.document.createXULElement("menuitem");
+      mi.setAttribute("label", "No other tabs");
+      mi.setAttribute("disabled", "true");
+      popup.appendChild(mi);
+      return;
+    }
+
+    // sort by last accessed desc
+    tabsInfo.sort(
+      (a, b) => (b.tab.lastAccessed || 0) - (a.tab.lastAccessed || 0)
+    );
+
+    for (const info of tabsInfo) {
+      const mi = this.document.createXULElement("menuitem");
+      mi.setAttribute("label", info.label);
+      mi.addEventListener("command", () => {
+        this.smartFormFillUsingTab(info.tab);
+      });
+      popup.appendChild(mi);
+    }
+  }
+
+  smartFormFillUsingTab(tab) {
+    console.warn("[SmartFormFill] context menu 'using tab' item clicked");
+    this.#fetchPageContentForTab(tab)
+      .then(context => {
+        const actor =
+          this.browser.browsingContext.currentWindowGlobal.getActor(
+            "SmartFormFill"
+          );
+        const fillAll = Services.prefs.getBoolPref(
+          "browser.smartwindow.formfill.all",
+          false
+        );
+        if (fillAll) {
+          actor
+            .smartFillFormWithTabContext(this.targetIdentifier, context)
+            .catch(console.error);
+        } else {
+          actor
+            .smartFillWithTabContext(this.targetIdentifier, context)
+            .catch(console.error);
+        }
+      })
+      .catch(e => {
+        console.error("Failed to fetch tab content for smart form fill", e);
+        // fallback to regular
+        this.smartFormFill();
+      });
+  }
+
+  async #fetchPageContentForTab(tab) {
+    if (!tab || !tab.linkedBrowser) {
+      return null;
+    }
+    try {
+      const browser = tab.linkedBrowser;
+      const uri = browser.currentURI;
+      const bc = browser.browsingContext?.currentWindowContext;
+      if (!bc) {
+        return null;
+      }
+      const pageExtractor = await bc.getActor("PageExtractor");
+      const extraction = await pageExtractor.getText({
+        sufficientLength: 6000,
+        cleanWhitespace: true,
+        removeBoilerplate: true,
+        sourceUrl: uri.spec,
+      });
+      return {
+        title: lazy.sanitizeUntrustedContent(tab.label ?? ""),
+        url: uri.spec,
+        content: extraction && extraction.text ? extraction.text : "",
+      };
+    } catch (e) {
+      console.warn("fetchPageContentForTab failed", e);
+      return null;
+    }
   }
 
   isLoginForm() {

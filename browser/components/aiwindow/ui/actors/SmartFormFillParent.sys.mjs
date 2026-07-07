@@ -74,6 +74,46 @@ export class SmartFormFillParent extends JSWindowActorParent {
     return this.#runForm(data);
   }
 
+  async smartFillWithTabContext(targetIdentifier, tabContext) {
+    const data = await this.sendQuery("SmartFormFill:Classify", {
+      targetIdentifier,
+    });
+    if (!data?.ok) {
+      lazy.console.warn("Field not classifiable:", data?.reason);
+      return { status: "unavailable" };
+    }
+    const { clicked } = data;
+    if (clicked.category === "creditCard") {
+      return { status: "skipped-creditcard" };
+    }
+    if (clicked.category) {
+      lazy.console.info(
+        `Identity field (${clicked.fieldName}); deferring to existing autofill`
+      );
+      return { status: "deferred-identity" };
+    }
+    try {
+      return this.#suggestAndFill(
+        targetIdentifier,
+        data.page,
+        clicked,
+        data.siblingFields,
+        tabContext
+      );
+    } catch (e) {
+      lazy.console.error("smartFillWithTabContext failed", e);
+      this.sendAsyncMessage("SmartFormFill:ClearPreview", { targetIdentifier });
+      return { status: "error" };
+    }
+  }
+
+  async smartFillFormWithTabContext(targetIdentifier, tabContext) {
+    const data = await this.sendQuery("SmartFormFill:ClassifyForm", {
+      targetIdentifier,
+    });
+    return this.#runForm(data, tabContext);
+  }
+
   async #run(targetIdentifier, data) {
     try {
       lazy.console.info("smartFill invoked");
@@ -101,7 +141,8 @@ export class SmartFormFillParent extends JSWindowActorParent {
         targetIdentifier,
         data.page,
         clicked,
-        data.siblingFields
+        data.siblingFields,
+        null
       );
     } catch (e) {
       lazy.console.error("smartFill failed", e);
@@ -110,7 +151,7 @@ export class SmartFormFillParent extends JSWindowActorParent {
     }
   }
 
-  async #runForm(data) {
+  async #runForm(data, extraTabContext = null) {
     try {
       lazy.console.info("smartFillForm invoked");
       if (!data?.ok) {
@@ -130,7 +171,8 @@ export class SmartFormFillParent extends JSWindowActorParent {
             field.targetIdentifier,
             page,
             field,
-            fields
+            fields,
+            extraTabContext
           );
           if (res?.status === "filled") {
             filled++;
@@ -148,7 +190,13 @@ export class SmartFormFillParent extends JSWindowActorParent {
     }
   }
 
-  async #suggestAndFill(targetIdentifier, page, field, siblingFields) {
+  async #suggestAndFill(
+    targetIdentifier,
+    page,
+    field,
+    siblingFields,
+    extraTabContext = null
+  ) {
     const storedValue = await this.#readStoredValue(field.name);
     this.sendAsyncMessage("SmartFormFill:Preview", { targetIdentifier });
 
@@ -160,6 +208,7 @@ export class SmartFormFillParent extends JSWindowActorParent {
       page,
       field,
       siblingFields,
+      extraTabContext,
     });
 
     const confidence = suggestion?.confidence ?? 0;

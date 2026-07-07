@@ -59,7 +59,9 @@ const SYSTEM_PROMPT = `You help a user fill out a single web form field for a DE
 You are given: the page (url + title), the field to fill (its purpose, input
 type, max length, and currentValue if present), the other fields on the form for
 context (each with currentValue if present), a list of the user's currently open
-browser tabs, and a list of saved memories about the user.
+browser tabs (titles and urls only), and a list of saved memories about the user.
+Optionally you are also given extraTabContext containing the full extracted page
+content (title, url, content) from one specific tab the user chose.
 
 This is a prototype demonstration. Your job is to show the feature by always
 returning a non-empty value.
@@ -78,6 +80,8 @@ Rules:
 - Respect the field's max length when provided.
 - Use currentValue (if present) on the target field or other fields as a starting
   point and edit or complete using context.
+- If extraTabContext is provided, use relevant information from its page content
+  to help fill the target field.
 - Do not refuse or return empty because of low confidence, missing context, or
   concern that a guess "could mislead". For demo purposes, always fill a
   plausible value (a common term, typical default, or short generic string).
@@ -176,9 +180,16 @@ function parseSuggestion(raw) {
  * @param {{url: string, title: string}} options.page
  * @param {object} options.field         The target field descriptor (with currentValue).
  * @param {Array<object>} options.siblingFields  Other fields on the form (with currentValue).
+ * @param {{title: string, url: string, content: string} | null} [options.extraTabContext]
+ *   Optional full page content from a user-chosen tab to use as context.
  * @returns {Promise<{pageType: string, value: string, confidence: number, reasoning: string} | null>}
  */
-export async function generateSuggestion({ page, field, siblingFields }) {
+export async function generateSuggestion({
+  page,
+  field,
+  siblingFields,
+  extraTabContext = null,
+}) {
   try {
     // POC: borrow an existing feature's call context to get a working model.
     // Production gets its own MODEL_FEATURES + Remote Settings prompt config.
@@ -202,6 +213,7 @@ export async function generateSuggestion({ page, field, siblingFields }) {
       otherFields: siblingFields,
       openTabs: tabs,
       memories,
+      ...(extraTabContext ? { extraTabContext } : {}),
       note: 'DEMO / PROTOTYPE: You MUST return a non-empty value. This is to demonstrate the smart form fill feature. Make up a reasonable value if needed. Do not return "" .',
     };
 
@@ -212,6 +224,11 @@ export async function generateSuggestion({ page, field, siblingFields }) {
       `open tabs sent as context (${tabs.length}):\n` +
         tabs.map((t, i) => `  ${i + 1}. ${t.title} | ${t.url}`).join("\n")
     );
+    if (extraTabContext) {
+      lazy.console.info(
+        `extra tab context: ${extraTabContext.title} | ${extraTabContext.url} (content len=${(extraTabContext.content || "").length})`
+      );
+    }
     lazy.console.info(
       `memories sent as context (${memories.length}):\n` +
         memories.map((m, i) => `  ${i + 1}. ${m}`).join("\n")
