@@ -8,8 +8,9 @@
  * Content-side actor for Smart Form Fill (spike POC).
  *
  * Two jobs:
- * - Classify: resolve the right-clicked field, run the existing FormAutofill
- *   heuristics over its form, and return field STRUCTURE (with currentValue).
+ * - Classify: resolve a field, run the existing FormAutofill heuristics over
+ *   its form, and return field STRUCTURE (with currentValue) for every
+ *   fillable control. Single- and multi-field fill both use this form shape.
  * - Fill: write the chosen value back via setUserInput so the page sees it as
  *   real user input, and flag it as autofilled for the highlight + undo path.
  */
@@ -54,12 +55,10 @@ function isFillable(element) {
 export class SmartFormFillChild extends JSWindowActorChild {
   async receiveMessage(message) {
     switch (message.name) {
-      case "SmartFormFill:Classify":
-        return this.#classify(message.data.targetIdentifier);
-      case "SmartFormFill:ClassifyFocused":
-        return this.#classifyFocused();
       case "SmartFormFill:ClassifyForm":
         return this.#classifyForm(message.data.targetIdentifier);
+      case "SmartFormFill:ClassifyFocusedForm":
+        return this.#classifyFocusedForm();
       case "SmartFormFill:Fill":
         return this.#fill(message.data.targetIdentifier, message.data.value);
       case "SmartFormFill:Preview":
@@ -93,7 +92,7 @@ export class SmartFormFillChild extends JSWindowActorChild {
   #describeField(fieldDetail, clickedElement) {
     const element = fieldDetail.element;
     const fieldName = fieldDetail.fieldName || "";
-    const desc = {
+    return {
       fieldName,
       category: fieldName
         ? (lazy.AutofillDataTypes.fieldToSubCategory[fieldName] ?? null)
@@ -104,73 +103,20 @@ export class SmartFormFillChild extends JSWindowActorChild {
       maxLength: element?.maxLength > 0 ? element.maxLength : null,
       currentValue: element ? (element.value ?? null) : null,
     };
-    return desc;
   }
 
-  // Context-menu entry: classify the right-clicked element.
-  #classify(targetIdentifier) {
-    const element = lazy.ContentDOMReference.resolve(targetIdentifier);
-    return this.#classifyElement(element);
-  }
-
-  // Keyboard entry: classify the currently focused element and hand back an
-  // identifier so the parent can preview/fill the same element.
-  #classifyFocused() {
+  // Keyboard entry: classify the form around the focused field.
+  #classifyFocusedForm() {
     const element = this.document.activeElement;
-    const result = this.#classifyElement(element);
-    if (result.ok) {
-      result.targetIdentifier = lazy.ContentDOMReference.get(element);
-    }
-    return result;
-  }
-
-  #classifyElement(element) {
     if (!element || !isFillable(element)) {
       lazy.console.warn(
-        "classify: not a fillable input",
+        "classifyFocusedForm: not a fillable input",
         element?.tagName,
         element?.type
       );
       return { ok: false, reason: "not-fillable" };
     }
-
-    const formLike = lazy.AutofillFormFactory.createFromField(element);
-    const fieldDetails = lazy.FormAutofillHeuristics.getFormInfo(
-      formLike,
-      true
-    );
-    lazy.console.info(
-      `classify: ${fieldDetails.length} fields in form; clicked type=${element.type} name=${element.name || element.id}`
-    );
-
-    const siblingFields = fieldDetails.map(fd =>
-      this.#describeField(fd, element)
-    );
-    let clicked = siblingFields.find(f => f.isClicked);
-    if (!clicked) {
-      // The clicked field was not picked up by the heuristics (e.g. an
-      // unclassified search box). Treat it directly as a contextual field.
-      clicked = {
-        fieldName: "",
-        category: null,
-        inputType: element.type ?? "",
-        name: element.name || element.id || "",
-        isClicked: true,
-        currentValue: element.value ?? null,
-      };
-      siblingFields.push(clicked);
-    }
-    clicked.maxLength = element.maxLength > 0 ? element.maxLength : null;
-
-    return {
-      ok: true,
-      page: {
-        url: this.document.documentURIObject?.spec ?? "",
-        title: this.document.title ?? "",
-      },
-      clicked,
-      siblingFields,
-    };
+    return this.#classifyFormFromElement(element);
   }
 
   #classifyForm(targetIdentifier) {
@@ -178,11 +124,19 @@ export class SmartFormFillChild extends JSWindowActorChild {
     if (!clickedEl || !isFillable(clickedEl)) {
       return { ok: false, reason: "not-fillable" };
     }
+    return this.#classifyFormFromElement(clickedEl, targetIdentifier);
+  }
+
+  #classifyFormFromElement(clickedEl, targetIdentifier = null) {
     const formLike = lazy.AutofillFormFactory.createFromField(clickedEl);
     const fieldDetails = lazy.FormAutofillHeuristics.getFormInfo(
       formLike,
       true
     );
+    lazy.console.info(
+      `classifyForm: ${fieldDetails.length} heuristic fields; clicked type=${clickedEl.type} name=${clickedEl.name || clickedEl.id}`
+    );
+
     const fields = [];
     let foundClicked = false;
     for (const fd of fieldDetails) {
@@ -206,7 +160,8 @@ export class SmartFormFillChild extends JSWindowActorChild {
         isClicked: true,
         maxLength: clickedEl.maxLength > 0 ? clickedEl.maxLength : null,
         currentValue: clickedEl.value ?? null,
-        targetIdentifier,
+        targetIdentifier:
+          targetIdentifier || lazy.ContentDOMReference.get(clickedEl),
       });
     }
     return {

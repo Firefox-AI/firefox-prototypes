@@ -7,17 +7,18 @@
 /**
  * Parent-side actor for Smart Form Fill (spike POC).
  *
- * Orchestrates a single fill: ask content to classify the field, run the
- * client-side arbiter, and (only for contextual fields) call the LLM and write
- * the result back. The arbiter is the only place stored values live: credit
- * card / identity fields never reach the model, and for a contextual field it
- * picks the LLM value when confident enough, else the stored value, else none.
+ * Orchestrates fill for one or more fields: classify the form, run a single
+ * batch LLM call for all contextual targets, then arbitrate and write back per
+ * field. Single-field fill is the same path as multi-field with targets.length
+ * of 1. The arbiter is the only place stored values live: credit card /
+ * identity fields never reach the model, and for a contextual field it picks
+ * the LLM value when confident enough, else the stored value, else none.
  */
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   FormHistory: "resource://gre/modules/FormHistory.sys.mjs",
-  generateSuggestion:
+  generateSuggestions:
     "moz-src:///browser/components/aiwindow/models/SmartFormFill.sys.mjs",
 });
 
@@ -40,180 +41,190 @@ const CONFIDENCE_THRESHOLD = 0.7;
  */
 export class SmartFormFillParent extends JSWindowActorParent {
   /**
-   * Entry point invoked from the context menu handler.
+   * Fill the right-clicked field only (batch of one).
    *
    * @param {object} targetIdentifier  ContentDOMReference for the clicked field.
-   * @returns {Promise<{status: string, suggestion?: object}>}
+   * @returns {Promise<{status: string, filled?: number, results?: object[]}>}
    */
   async smartFill(targetIdentifier) {
-    const data = await this.sendQuery("SmartFormFill:Classify", {
+    const data = await this.sendQuery("SmartFormFill:ClassifyForm", {
       targetIdentifier,
     });
-    return this.#run(targetIdentifier, data);
+    return this.#runForm(data, { onlyClicked: true });
   }
 
   /**
-   * Keyboard entry point: act on the focused field. Content resolves the
-   * focused element and hands back an identifier for it.
+   * Keyboard entry: fill the focused field only (batch of one).
    *
-   * @returns {Promise<{status: string, suggestion?: object}>}
+   * @returns {Promise<{status: string, filled?: number, results?: object[]}>}
    */
   async smartFillFocused() {
-    const data = await this.sendQuery("SmartFormFill:ClassifyFocused", {});
+    const data = await this.sendQuery("SmartFormFill:ClassifyFocusedForm", {});
     if (!data?.ok) {
       lazy.console.warn("Focused field not classifiable:", data?.reason);
       return { status: "unavailable" };
     }
-    return this.#run(data.targetIdentifier, data);
+    return this.#runForm(data, { onlyClicked: true });
   }
 
+  /**
+   * Fill every contextual field on the form (one batch model call).
+   *
+   * @param {object} targetIdentifier
+   * @returns {Promise<{status: string, filled?: number, results?: object[]}>}
+   */
   async smartFillForm(targetIdentifier) {
     const data = await this.sendQuery("SmartFormFill:ClassifyForm", {
       targetIdentifier,
     });
-    return this.#runForm(data);
+    return this.#runForm(data, { onlyClicked: false });
   }
 
+  /**
+   * Fill the right-clicked field using extra page content from a chosen tab.
+   *
+   * @param {object} targetIdentifier
+   * @param {object} tabContext
+   * @returns {Promise<{status: string, filled?: number, results?: object[]}>}
+   */
   async smartFillWithTabContext(targetIdentifier, tabContext) {
-    const data = await this.sendQuery("SmartFormFill:Classify", {
+    const data = await this.sendQuery("SmartFormFill:ClassifyForm", {
       targetIdentifier,
     });
-    if (!data?.ok) {
-      lazy.console.warn("Field not classifiable:", data?.reason);
-      return { status: "unavailable" };
-    }
-    const { clicked } = data;
-    if (clicked.category === "creditCard") {
-      return { status: "skipped-creditcard" };
-    }
-    if (clicked.category) {
-      lazy.console.info(
-        `Identity field (${clicked.fieldName}); deferring to existing autofill`
-      );
-      return { status: "deferred-identity" };
-    }
-    try {
-      return this.#suggestAndFill(
-        targetIdentifier,
-        data.page,
-        clicked,
-        data.siblingFields,
-        tabContext
-      );
-    } catch (e) {
-      lazy.console.error("smartFillWithTabContext failed", e);
-      this.sendAsyncMessage("SmartFormFill:ClearPreview", { targetIdentifier });
-      return { status: "error" };
-    }
+    return this.#runForm(data, {
+      onlyClicked: true,
+      extraTabContext: tabContext,
+    });
   }
 
+  /**
+   * Fill every contextual field using extra page content from a chosen tab.
+   *
+   * @param {object} targetIdentifier
+   * @param {object} tabContext
+   * @returns {Promise<{status: string, filled?: number, results?: object[]}>}
+   */
   async smartFillFormWithTabContext(targetIdentifier, tabContext) {
     const data = await this.sendQuery("SmartFormFill:ClassifyForm", {
       targetIdentifier,
     });
-    return this.#runForm(data, tabContext);
+    return this.#runForm(data, {
+      onlyClicked: false,
+      extraTabContext: tabContext,
+    });
   }
 
-  async #run(targetIdentifier, data) {
+  /**
+   * Shared path for single- and multi-field fill. Always one model call over
+   * `targets`; single fill is just targets.length === 1.
+   *
+   * @param {object} data  ClassifyForm result.
+   * @param {object} [options]
+   * @param {boolean} [options.onlyClicked]
+   * @param {object | null} [options.extraTabContext]
+   * @returns {Promise<{status: string, filled?: number, results?: object[]}>}
+   */
+  async #runForm(data, { onlyClicked = false, extraTabContext = null } = {}) {
+    const previewIds = [];
     try {
-      lazy.console.info("smartFill invoked");
-      lazy.console.info("classify result:", data);
+      lazy.console.info(`smartFill form invoked (onlyClicked=${onlyClicked})`);
       if (!data?.ok) {
-        lazy.console.warn("Field not classifiable:", data?.reason);
+        lazy.console.warn("Form not classifiable:", data?.reason);
         return { status: "unavailable" };
       }
 
-      const { clicked } = data;
-
-      if (clicked.category === "creditCard") {
-        lazy.console.info("Skipping credit card field");
-        return { status: "skipped-creditcard" };
-      }
-      if (clicked.category) {
-        lazy.console.info(
-          `Identity field (${clicked.fieldName}); deferring to existing autofill`
-        );
-        return { status: "deferred-identity" };
-      }
-
-      lazy.console.info("Contextual field; asking the model");
-      return this.#suggestAndFill(
-        targetIdentifier,
-        data.page,
-        clicked,
-        data.siblingFields,
-        null
-      );
-    } catch (e) {
-      lazy.console.error("smartFill failed", e);
-      this.sendAsyncMessage("SmartFormFill:ClearPreview", { targetIdentifier });
-      return { status: "error" };
-    }
-  }
-
-  async #runForm(data, extraTabContext = null) {
-    try {
-      lazy.console.info("smartFillForm invoked");
-      if (!data?.ok) {
-        return { status: "unavailable" };
-      }
       const { page, fields = [] } = data;
-      let filled = 0;
-      for (const field of fields) {
-        if (field.category === "creditCard" || field.category) {
-          continue;
+      const clicked = fields.find(f => f.isClicked);
+
+      let targets = fields.filter(f => f.targetIdentifier && !f.category);
+      if (onlyClicked) {
+        targets = targets.filter(f => f.isClicked);
+      }
+
+      if (!targets.length) {
+        if (clicked?.category === "creditCard") {
+          lazy.console.info("Skipping credit card field");
+          return { status: "skipped-creditcard" };
         }
-        if (!field.targetIdentifier) {
-          continue;
-        }
-        try {
-          const res = await this.#suggestAndFill(
-            field.targetIdentifier,
-            page,
-            field,
-            fields,
-            extraTabContext
+        if (clicked?.category) {
+          lazy.console.info(
+            `Identity field (${clicked.fieldName}); deferring to existing autofill`
           );
-          if (res?.status === "filled") {
+          return { status: "deferred-identity" };
+        }
+        lazy.console.warn("No contextual fields to fill");
+        return { status: "unavailable" };
+      }
+
+      for (const field of targets) {
+        previewIds.push(field.targetIdentifier);
+        this.sendAsyncMessage("SmartFormFill:Preview", {
+          targetIdentifier: field.targetIdentifier,
+        });
+      }
+
+      const highConfidenceOnly = Services.prefs.getBoolPref(
+        "browser.smartwindow.formfill.highConfidence",
+        true
+      );
+      const suggestions = await lazy.generateSuggestions({
+        page,
+        fields: targets,
+        extraTabContext,
+      });
+
+      let filled = 0;
+      const results = [];
+      for (let i = 0; i < targets.length; i++) {
+        const field = targets[i];
+        const suggestion = suggestions?.get(i) ?? null;
+        try {
+          const res = await this.#arbitrateAndFill(
+            field,
+            suggestion,
+            highConfidenceOnly
+          );
+          if (res.status === "filled") {
             filled++;
           }
+          results.push(res);
         } catch (e) {
+          lazy.console.error("arbitrateAndFill failed", e);
           this.sendAsyncMessage("SmartFormFill:ClearPreview", {
             targetIdentifier: field.targetIdentifier,
           });
+          results.push({ status: "error" });
         }
       }
-      return { status: "form-filled", filled };
+
+      lazy.console.info(`form fill done: filled=${filled}/${targets.length}`);
+      return { status: "form-filled", filled, results };
     } catch (e) {
-      lazy.console.error("smartFillForm failed", e);
+      lazy.console.error("smartFill form failed", e);
+      for (const targetIdentifier of previewIds) {
+        this.sendAsyncMessage("SmartFormFill:ClearPreview", {
+          targetIdentifier,
+        });
+      }
       return { status: "error" };
     }
   }
 
-  async #suggestAndFill(
-    targetIdentifier,
-    page,
-    field,
-    siblingFields,
-    extraTabContext = null
-  ) {
+  /**
+   * Pick LLM vs stored value for one field and write it, or clear preview.
+   *
+   * @param {object} field
+   * @param {object | null} suggestion
+   * @param {boolean} highConfidenceOnly
+   * @returns {Promise<{status: string, source?: string, suggestion?: object}>}
+   */
+  async #arbitrateAndFill(field, suggestion, highConfidenceOnly) {
+    const targetIdentifier = field.targetIdentifier;
     const storedValue = await this.#readStoredValue(field.name);
-    this.sendAsyncMessage("SmartFormFill:Preview", { targetIdentifier });
-
-    const highConfidenceOnly = Services.prefs.getBoolPref(
-      "browser.smartwindow.formfill.highConfidence",
-      true
-    );
-    const suggestion = await lazy.generateSuggestion({
-      page,
-      field,
-      siblingFields,
-      extraTabContext,
-    });
-
     const confidence = suggestion?.confidence ?? 0;
+
     lazy.console.info(
-      `arbiter: llm=${JSON.stringify(suggestion?.value)} confidence=${confidence} threshold=${CONFIDENCE_THRESHOLD} stored=${JSON.stringify(storedValue)}`
+      `arbiter[${field.name || field.fieldName || "?"}] llm=${JSON.stringify(suggestion?.value)} confidence=${confidence} threshold=${CONFIDENCE_THRESHOLD} stored=${JSON.stringify(storedValue)}`
     );
 
     let chosen = null;
