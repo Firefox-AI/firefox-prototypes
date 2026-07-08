@@ -106,6 +106,13 @@ export class SmartFormFillChild extends JSWindowActorChild {
         );
       case "SmartFormFill:ClearFill":
         return this.#clearFill(message.data.targetIdentifier);
+      case "SmartFormFill:PreviewValue":
+        return this.#previewValue(
+          message.data.targetIdentifier,
+          message.data.value
+        );
+      case "SmartFormFill:ClearValuePreview":
+        return this.#clearValuePreview(message.data.targetIdentifier);
     }
     return null;
   }
@@ -142,6 +149,7 @@ export class SmartFormFillChild extends JSWindowActorChild {
       input.name || input.id || "",
       searchString
     );
+    // Current applied value (transparency).
     acResult.externalEntries.push(
       new lazy.GenericAutocompleteItem(
         "",
@@ -149,17 +157,37 @@ export class SmartFormFillChild extends JSWindowActorChild {
         session.secondary || "",
         "SmartFormFill:Keep",
         { targetIdentifier }
-      ),
-      new lazy.GenericAutocompleteItem(
-        "",
-        "Clear smart fill",
-        "Remove this value and transparency",
-        "SmartFormFill:Clear",
-        { targetIdentifier }
       )
     );
-    // action style for clear row
-    acResult.externalEntries[1].style = "action";
+    // Alternative suggestions — selecting applies that value.
+    for (const alt of session.alternatives || []) {
+      if (!alt?.value || alt.value === session.value) {
+        continue;
+      }
+      acResult.externalEntries.push(
+        new lazy.GenericAutocompleteItem(
+          "",
+          alt.value,
+          alt.secondary || "",
+          "SmartFormFill:Apply",
+          {
+            targetIdentifier,
+            value: alt.value,
+            confidence: alt.confidence ?? 0,
+            reasoning: alt.reasoning ?? "",
+          }
+        )
+      );
+    }
+    const clearItem = new lazy.GenericAutocompleteItem(
+      "",
+      "Clear smart fill",
+      "Remove this value and transparency",
+      "SmartFormFill:Clear",
+      { targetIdentifier }
+    );
+    clearItem.style = "action";
+    acResult.externalEntries.push(clearItem);
     return acResult;
   }
 
@@ -360,6 +388,39 @@ export class SmartFormFillChild extends JSWindowActorChild {
     element.setUserInput("");
     element.autofillState = lazy.FormAutofillUtils.FIELD_STATES.NORMAL;
     this.#teardownField(element);
+    return true;
+  }
+
+  /**
+   * Ghost-preview an alternative value while hovering a panel row.
+   *
+   * @param {object} targetIdentifier  ContentDOMReference for the field.
+   * @param {string} value
+   */
+  #previewValue(targetIdentifier, value) {
+    const element = lazy.ContentDOMReference.resolve(targetIdentifier);
+    if (!element || !isFillable(element) || typeof value !== "string") {
+      return false;
+    }
+    element.previewValue = value;
+    element.autofillState = lazy.FormAutofillUtils.FIELD_STATES.PREVIEW;
+    return true;
+  }
+
+  /**
+   * Clear alt hover preview; restore autofilled highlight if still smart-filled.
+   *
+   * @param {object} targetIdentifier  ContentDOMReference for the field.
+   */
+  #clearValuePreview(targetIdentifier) {
+    const element = lazy.ContentDOMReference.resolve(targetIdentifier);
+    if (!element || !isFillable(element)) {
+      return false;
+    }
+    element.previewValue = "";
+    element.autofillState = this.#enabledFields.has(element)
+      ? lazy.FormAutofillUtils.FIELD_STATES.AUTO_FILLED
+      : lazy.FormAutofillUtils.FIELD_STATES.NORMAL;
     return true;
   }
 

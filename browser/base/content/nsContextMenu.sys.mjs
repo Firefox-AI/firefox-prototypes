@@ -1029,9 +1029,12 @@ export class nsContextMenu {
         "checked",
         highConfidence
       );
+      this.#updateSmartFormFillAlternativesMenuItems();
     }
     this.showItem("context-smartformfill-all", showSmartFormFill);
     this.showItem("context-smartformfill-highconfidence", showSmartFormFill);
+    this.showItem("context-smartformfill-more-alts", showSmartFormFill);
+    this.showItem("context-smartformfill-fewer-alts", showSmartFormFill);
     this.showItem("context-smartformfill-using-tab", showSmartFormFill);
     if (showSmartFormFill) {
       const popup = this.document.getElementById(
@@ -1477,6 +1480,48 @@ export class nsContextMenu {
     const newVal = !Services.prefs.getBoolPref(pref, true);
     Services.prefs.setBoolPref(pref, newVal);
     this.setItemAttr("context-smartformfill-highconfidence", "checked", newVal);
+  }
+
+  #getSmartFormFillAlternatives() {
+    return Services.prefs.getIntPref(
+      "browser.smartwindow.formfill.alternatives",
+      1
+    );
+  }
+
+  #updateSmartFormFillAlternativesMenuItems() {
+    const n = this.#getSmartFormFillAlternatives();
+    this.setItemAttr(
+      "context-smartformfill-more-alts",
+      "label",
+      `Increase to ${n + 1} alternatives`
+    );
+    this.setItemAttr(
+      "context-smartformfill-fewer-alts",
+      "label",
+      `Decrease to ${n - 1} alternatives`
+    );
+    this.setItemAttr(
+      "context-smartformfill-more-alts",
+      "disabled",
+      n >= 5 ? true : null
+    );
+    this.setItemAttr(
+      "context-smartformfill-fewer-alts",
+      "disabled",
+      n <= 0 ? true : null
+    );
+  }
+
+  adjustSmartFormFillAlternatives(delta) {
+    const pref = "browser.smartwindow.formfill.alternatives";
+    const cur = Services.prefs.getIntPref(pref, 1);
+    const next = Math.max(0, Math.min(5, cur + delta));
+    if (next === cur) {
+      return;
+    }
+    Services.prefs.setIntPref(pref, next);
+    this.#updateSmartFormFillAlternativesMenuItems();
   }
 
   populateSmartFormFillUsingTabMenu(popup) {

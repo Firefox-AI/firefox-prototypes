@@ -53,30 +53,54 @@ const ALLOWED_PROTOCOLS = new Set(["http:", "https:"]);
 // Hard cap on the generated value regardless of the field's own maxlength.
 const MAX_VALUE_LENGTH = 200;
 
-// POC: the prompt is hardcoded here. Production would load this from Remote
-// Settings via its own MODEL_FEATURES entry so it can be versioned + evaluated.
-const SYSTEM_PROMPT = `You help a user fill out web form fields for a DEMO.
+// Cap alternatives requested from the model (matches UI pref clamp).
+const MAX_ALTERNATIVES = 5;
+
+/**
+ * POC system prompt. Production would load this from Remote Settings via its
+ * own MODEL_FEATURES entry so it can be versioned + evaluated.
+ *
+ * @param {number} alternativeCount  How many alternatives beyond the primary.
+ * @returns {string}
+ */
+function buildSystemPrompt(alternativeCount) {
+  const n = Math.max(0, Math.min(MAX_ALTERNATIVES, alternativeCount | 0));
+  const altRules =
+    n === 0
+      ? `- For each field set "alternatives" to an empty array [].`
+      : `- For each field provide exactly ${n} alternative suggestion(s) in
+  "alternatives", each with its own value, confidence (0..1), and short
+  reasoning (one sentence).
+- Alternatives MUST be meaningfully different from the primary "value" and
+  from each other — vary phrasing, specificity, or plausible options (e.g.
+  different cities, product terms, or phrasings). Do not repeat near-duplicates.
+- Rank alternatives by confidence descending when possible. Prefer grounded
+  variety from open tabs / memories when available; otherwise offer distinct
+  plausible demo options.`;
+
+  return `You help a user fill out web form fields for a DEMO.
 
 You are given: the page (url + title), an array of fields to fill (each with
 id, purpose, input type, max length, and currentValue if present), a list of
 the user's currently open browser tabs (titles and urls only), and a list of
 saved memories about the user. Optionally you are also given extraTabContext
 containing the full extracted page content (title, url, content) from one
-specific tab the user chose.
+specific tab the user chose. You are also told alternativeCount (${n}): how
+many alternative suggestions to include per field beyond the primary value.
 
 The fields array may contain one field or many. Treat both the same: propose a
-value for every field in the array.
+primary value for every field in the array.
 
 This is a prototype demonstration. Your job is to show the feature by always
-returning a non-empty value for each field.
+returning a non-empty primary value for each field.
 
 First classify the page as one of: "travel", "registration", "product_search",
-or "other". Then propose the best value for each field, inferred from the open
-tabs, the memories, the page itself, and the other fields being filled (keep
-values consistent across fields).
+or "other". Then propose the best primary value for each field, inferred from
+the open tabs, the memories, the page itself, and the other fields being filled
+(keep multi-field values consistent).
 
 Rules:
-- This is a DEMO / PROTOTYPE. Always provide a value for each field to
+- This is a DEMO / PROTOTYPE. Always provide a primary value for each field to
   demonstrate the feature working. It is expected and desired that you make a
   reasonable best-effort guess or use a typical placeholder when context is
   limited.
@@ -90,22 +114,26 @@ Rules:
   to help fill the fields.
 - Do not refuse or return empty because of low confidence, missing context, or
   concern that a guess "could mislead". For demo purposes, always fill a
-  plausible value (a common term, typical default, or short generic string).
-  It is fine and expected to guess for the demo. Report low confidence if
-  appropriate.
+  plausible primary value (a common term, typical default, or short generic
+  string). It is fine and expected to guess for the demo. Report low confidence
+  if appropriate.
 - Keep multi-field answers consistent (e.g. same trip, same product intent).
 - In overall "reasoning", list every open tab you were given (by title) and say
   in a few words why you used or ignored each one. This must reflect ALL tabs
   provided.
+${altRules}
 
 Respond with ONLY a JSON object, no prose, no code fences:
-{"pageType": "...", "reasoning": "...", "fields": [{"id": 0, "value": "...", "confidence": 0.0, "reasoning": "..."}, ...]}
+{"pageType": "...", "reasoning": "...", "fields": [{"id": 0, "value": "...", "confidence": 0.0, "reasoning": "...", "alternatives": [{"value": "...", "confidence": 0.0, "reasoning": "..."}]}, ...]}
 
 - "fields" MUST include one entry for every input field id you were given.
 - Match each entry's "id" to the corresponding field id from the input.
-- IMPORTANT FOR DEMO: each "value" must be a non-empty string (except only for
-  the personal identity rule). Always return a value string per field.
+- Primary "value" is the best single choice; "alternatives" holds ${n} other
+  option(s) (or [] if ${n} is 0).
+- IMPORTANT FOR DEMO: each primary "value" must be a non-empty string (except
+  only for the personal identity rule). Always return a value string per field.
 `;
+}
 
 /**
  * Collect open tabs as lightweight, sanitized context.
@@ -153,23 +181,65 @@ async function gatherMemories() {
 }
 
 /**
+ * @param {object} alt
+ * @returns {{value: string, confidence: number, reasoning: string} | null}
+ */
+function normalizeAlternative(alt) {
+  if (!alt || typeof alt.value !== "string" || !alt.value.trim()) {
+    return null;
+  }
+  return {
+    value: alt.value.slice(0, MAX_VALUE_LENGTH),
+    confidence: Number(alt.confidence) || 0,
+    reasoning: String(alt.reasoning ?? "").trim(),
+  };
+}
+
+/**
  * Normalize one field suggestion from model output.
  *
  * @param {object} entry
  * @param {string} pageType
  * @param {string} overallReasoning
- * @returns {{id: number, pageType: string, value: string, confidence: number, reasoning: string} | null}
+ * @param {number} maxAlternatives
+ * @returns {{id: number, pageType: string, value: string, confidence: number, reasoning: string, alternatives: Array<{value: string, confidence: number, reasoning: string}>} | null}
  */
-function normalizeFieldSuggestion(entry, pageType, overallReasoning) {
+function normalizeFieldSuggestion(
+  entry,
+  pageType,
+  overallReasoning,
+  maxAlternatives
+) {
   if (!entry || typeof entry.value !== "string") {
     return null;
+  }
+  const value = entry.value.slice(0, MAX_VALUE_LENGTH);
+  const alternatives = [];
+  if (maxAlternatives > 0 && Array.isArray(entry.alternatives)) {
+    const seen = new Set([value.toLowerCase()]);
+    for (const raw of entry.alternatives) {
+      const alt = normalizeAlternative(raw);
+      if (!alt) {
+        continue;
+      }
+      const key = alt.value.toLowerCase();
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      alternatives.push(alt);
+      if (alternatives.length >= maxAlternatives) {
+        break;
+      }
+    }
   }
   return {
     id: Number.isFinite(Number(entry.id)) ? Number(entry.id) : -1,
     pageType,
-    value: entry.value.slice(0, MAX_VALUE_LENGTH),
+    value,
     confidence: Number(entry.confidence) || 0,
     reasoning: String(entry.reasoning ?? overallReasoning ?? ""),
+    alternatives,
   };
 }
 
@@ -181,9 +251,10 @@ function normalizeFieldSuggestion(entry, pageType, overallReasoning) {
  *
  * @param {string} raw
  * @param {number} expectedCount
- * @returns {Map<number, {id: number, pageType: string, value: string, confidence: number, reasoning: string}> | null}
+ * @param {number} maxAlternatives
+ * @returns {Map<number, object> | null}
  */
-function parseSuggestions(raw, expectedCount) {
+function parseSuggestions(raw, expectedCount, maxAlternatives) {
   if (!raw || typeof raw !== "string") {
     return null;
   }
@@ -203,7 +274,8 @@ function parseSuggestions(raw, expectedCount) {
         const suggestion = normalizeFieldSuggestion(
           entry,
           pageType,
-          overallReasoning
+          overallReasoning,
+          maxAlternatives
         );
         if (suggestion && suggestion.id >= 0) {
           byId.set(suggestion.id, suggestion);
@@ -215,7 +287,8 @@ function parseSuggestions(raw, expectedCount) {
           const suggestion = normalizeFieldSuggestion(
             { ...entry, id: index },
             pageType,
-            overallReasoning
+            overallReasoning,
+            maxAlternatives
           );
           if (suggestion) {
             byId.set(index, suggestion);
@@ -225,9 +298,16 @@ function parseSuggestions(raw, expectedCount) {
     } else if (typeof parsed.value === "string" && expectedCount === 1) {
       // Single-field object shape (or model collapsed a 1-field form).
       const suggestion = normalizeFieldSuggestion(
-        { id: 0, value: parsed.value, confidence: parsed.confidence },
+        {
+          id: 0,
+          value: parsed.value,
+          confidence: parsed.confidence,
+          reasoning: parsed.reasoning,
+          alternatives: parsed.alternatives,
+        },
         pageType,
-        overallReasoning
+        overallReasoning,
+        maxAlternatives
       );
       if (suggestion) {
         byId.set(0, suggestion);
@@ -270,16 +350,24 @@ function toModelField(field, id) {
  *   results are keyed by the 0-based index assigned here.
  * @param {{title: string, url: string, content: string} | null} [options.extraTabContext]
  *   Optional full page content from a user-chosen tab to use as context.
- * @returns {Promise<Map<number, {id: number, pageType: string, value: string, confidence: number, reasoning: string}> | null>}
+ * @param {number} [options.alternativeCount]
+ *   How many alternative suggestions to request per field (beyond primary).
+ * @returns {Promise<Map<number, object> | null>}
  */
 export async function generateSuggestions({
   page,
   fields,
   extraTabContext = null,
+  alternativeCount = 0,
 }) {
   if (!Array.isArray(fields) || !fields.length) {
     return null;
   }
+
+  const maxAlternatives = Math.max(
+    0,
+    Math.min(MAX_ALTERNATIVES, alternativeCount | 0)
+  );
 
   try {
     // POC: borrow an existing feature's call context to get a working model.
@@ -304,12 +392,13 @@ export async function generateSuggestions({
       fields: modelFields,
       openTabs: tabs,
       memories,
+      alternativeCount: maxAlternatives,
       ...(extraTabContext ? { extraTabContext } : {}),
-      note: 'DEMO / PROTOTYPE: You MUST return a non-empty value for every field. This is to demonstrate the smart form fill feature. Make up a reasonable value if needed. Do not return "" .',
+      note: 'DEMO / PROTOTYPE: You MUST return a non-empty primary value for every field. Make up a reasonable value if needed. Do not return "" . Provide distinct alternatives when alternativeCount > 0.',
     };
 
     lazy.console.info(
-      `generateSuggestions: fields=${modelFields.length} tabs=${tabs.length} memories=${memories.length}`
+      `generateSuggestions: fields=${modelFields.length} alternatives=${maxAlternatives} tabs=${tabs.length} memories=${memories.length}`
     );
     lazy.console.info(
       `fields to fill:\n` +
@@ -336,7 +425,7 @@ export async function generateSuggestions({
     lazy.console.debug("full prompt payload:", JSON.stringify(payload));
 
     const messages = [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: buildSystemPrompt(maxAlternatives) },
       { role: "user", content: JSON.stringify(payload) },
     ];
 
@@ -349,7 +438,8 @@ export async function generateSuggestions({
     lazy.console.info("raw model output:", response?.finalOutput);
     const suggestions = parseSuggestions(
       response?.finalOutput,
-      modelFields.length
+      modelFields.length,
+      maxAlternatives
     );
     lazy.console.info(
       "parsed suggestions:",

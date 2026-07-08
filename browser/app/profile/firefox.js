@@ -2297,6 +2297,8 @@ pref("browser.smartwindow.enabled", false);
 pref("browser.smartwindow.endpoint", "https://mlpa-prod-prod-mozilla.global.ssl.fastly.net/v1");
 pref("browser.smartwindow.formfill.all", true);
 pref("browser.smartwindow.formfill.highConfidence", true);
+// Number of alternative smart-fill suggestions per field (beyond the primary).
+pref("browser.smartwindow.formfill.alternatives", 1);
 pref("browser.smartwindow.memories.generateFromHistory", true);
 pref("browser.smartwindow.memories.generateFromConversation", true);
 pref("browser.smartwindow.memories.hasSeenMemories", false);

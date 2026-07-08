@@ -192,6 +192,12 @@ document.addEventListener(
         case "context-smartformfill-highconfidence":
           gContextMenu.toggleSmartFormFillHighConfidence();
           break;
+        case "context-smartformfill-more-alts":
+          gContextMenu.adjustSmartFormFillAlternatives(1);
+          break;
+        case "context-smartformfill-fewer-alts":
+          gContextMenu.adjustSmartFormFillAlternatives(-1);
+          break;
         case "context-print-selection":
           gContextMenu.printSelection();
           break;

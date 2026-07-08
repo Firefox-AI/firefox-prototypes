@@ -291,10 +291,15 @@ export class SmartFormFillParent extends JSWindowActorParent {
         "browser.smartwindow.formfill.highConfidence",
         true
       );
+      const alternativeCount = Services.prefs.getIntPref(
+        "browser.smartwindow.formfill.alternatives",
+        1
+      );
       const suggestions = await lazy.generateSuggestions({
         page,
         fields: targets,
         extraTabContext,
+        alternativeCount,
       });
 
       let filled = 0;
@@ -317,6 +322,7 @@ export class SmartFormFillParent extends JSWindowActorParent {
               confidence: suggestion?.confidence ?? 0,
               reasoning: suggestion?.reasoning ?? "",
               pageType: suggestion?.pageType ?? "",
+              alternatives: suggestion?.alternatives ?? [],
               targetIdentifier: field.targetIdentifier,
             });
             filledFields.push({
@@ -390,32 +396,38 @@ export class SmartFormFillParent extends JSWindowActorParent {
   }
 
   /**
-   * Format secondary line for autocomplete provider path.
+   * Format secondary line for a primary or alternative suggestion.
    *
-   * @param {object} session
+   * @param {object} entry
+   * @param {string} [entry.source]
+   * @param {number} [entry.confidence]
+   * @param {string} [entry.reasoning]
+   * @param {string} [sourceLabel]
    * @returns {string}
    */
-  #formatSecondary(session) {
-    let sourceLabel = "Unknown";
-    if (session.source === "llm") {
-      sourceLabel = "AI suggestion";
-    } else if (session.source === "stored") {
-      sourceLabel = "Form history";
-    } else if (session.source) {
-      sourceLabel = session.source;
+  #formatSecondary(entry, sourceLabel = null) {
+    let label = sourceLabel;
+    if (!label) {
+      if (entry.source === "llm") {
+        label = "AI suggestion";
+      } else if (entry.source === "stored") {
+        label = "Form history";
+      } else if (entry.source) {
+        label = entry.source;
+      } else {
+        label = "Alternative";
+      }
     }
     const conf =
-      typeof session.confidence === "number"
-        ? session.confidence.toFixed(2)
-        : "—";
-    let reasoning = (session.reasoning || "").trim().replace(/\s+/g, " ");
+      typeof entry.confidence === "number" ? entry.confidence.toFixed(2) : "—";
+    let reasoning = (entry.reasoning || "").trim().replace(/\s+/g, " ");
     if (reasoning.length > MAX_REASONING_CHARS) {
       reasoning = reasoning.slice(0, MAX_REASONING_CHARS - 1) + "…";
     }
     if (reasoning) {
-      return `${sourceLabel} · confidence ${conf} — ${reasoning}`;
+      return `${label} · confidence ${conf} — ${reasoning}`;
     }
-    return `${sourceLabel} · confidence ${conf}`;
+    return `${label} · confidence ${conf}`;
   }
 
   // --- AutoComplete provider (parent) ------------------------------------
@@ -432,10 +444,17 @@ export class SmartFormFillParent extends JSWindowActorParent {
     if (!session) {
       return null;
     }
+    const alternatives = (session.alternatives || []).map(alt => ({
+      value: alt.value,
+      confidence: alt.confidence,
+      reasoning: alt.reasoning,
+      secondary: this.#formatSecondary(alt, "Alternative"),
+    }));
     return {
       session: {
         ...session,
         secondary: this.#formatSecondary(session),
+        alternatives,
       },
     };
   }
@@ -448,6 +467,19 @@ export class SmartFormFillParent extends JSWindowActorParent {
           .getActor("AutoComplete")
           ?.closePopup();
         break;
+      case "SmartFormFill:Apply": {
+        const targetIdentifier = data?.targetIdentifier;
+        const value = data?.value;
+        if (!targetIdentifier || typeof value !== "string" || !value) {
+          break;
+        }
+        this.#applyAlternative(targetIdentifier, {
+          value,
+          confidence: data.confidence ?? 0,
+          reasoning: data.reasoning ?? "",
+        }).catch(e => lazy.console.error("Apply alternative failed", e));
+        break;
+      }
       case "SmartFormFill:Clear": {
         const targetIdentifier = data?.targetIdentifier;
         if (!targetIdentifier) {
@@ -467,11 +499,79 @@ export class SmartFormFillParent extends JSWindowActorParent {
     }
   }
 
-  onAutoCompleteEntryHovered(_message, _data) {
-    // Phase 1: no alternate-value hover preview yet.
+  /**
+   * Apply an alternative suggestion as the field value and update the session.
+   *
+   * @param {object} targetIdentifier
+   * @param {{value: string, confidence: number, reasoning: string}} alt
+   */
+  async #applyAlternative(targetIdentifier, alt) {
+    const key = refKey(targetIdentifier);
+    const session = this.#sessions.get(key);
+    const filled = await this.sendQuery("SmartFormFill:Fill", {
+      targetIdentifier,
+      value: alt.value,
+    });
+    if (!filled) {
+      return;
+    }
+    // Move previous primary into alternatives when distinct; drop applied alt.
+    const previous = session
+      ? {
+          value: session.value,
+          confidence: session.confidence,
+          reasoning: session.reasoning,
+        }
+      : null;
+    let alternatives = (session?.alternatives || []).filter(
+      a => a.value !== alt.value
+    );
+    if (previous && previous.value && previous.value !== alt.value) {
+      alternatives = [
+        previous,
+        ...alternatives.filter(a => a.value !== previous.value),
+      ];
+    }
+    this.#sessions.set(key, {
+      value: alt.value,
+      source: "llm",
+      confidence: alt.confidence,
+      reasoning: alt.reasoning,
+      pageType: session?.pageType ?? "",
+      alternatives,
+      targetIdentifier,
+    });
+    this.browsingContext.currentWindowGlobal
+      .getActor("AutoComplete")
+      ?.closePopup();
   }
 
-  onAutoCompleteEntryClearPreview(_message, _data) {}
+  onAutoCompleteEntryHovered(message, data) {
+    if (
+      message === "SmartFormFill:Apply" &&
+      data?.value &&
+      data?.targetIdentifier
+    ) {
+      this.sendAsyncMessage("SmartFormFill:PreviewValue", {
+        targetIdentifier: data.targetIdentifier,
+        value: data.value,
+      });
+      return;
+    }
+    if (data?.targetIdentifier) {
+      this.sendAsyncMessage("SmartFormFill:ClearValuePreview", {
+        targetIdentifier: data.targetIdentifier,
+      });
+    }
+  }
+
+  onAutoCompleteEntryClearPreview(_message, data) {
+    if (data?.targetIdentifier) {
+      this.sendAsyncMessage("SmartFormFill:ClearValuePreview", {
+        targetIdentifier: data.targetIdentifier,
+      });
+    }
+  }
 
   onAutoCompletePopupOpened(_elementId) {}
 
