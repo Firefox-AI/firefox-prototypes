@@ -47,10 +47,15 @@ export class SmartFormFillParent extends JSWindowActorParent {
    * @returns {Promise<{status: string, filled?: number, results?: object[]}>}
    */
   async smartFill(targetIdentifier) {
+    // Busy state on the target immediately — do not wait for classification.
+    this.sendAsyncMessage("SmartFormFill:Preview", { targetIdentifier });
     const data = await this.sendQuery("SmartFormFill:ClassifyForm", {
       targetIdentifier,
     });
-    return this.#runForm(data, { onlyClicked: true });
+    return this.#runForm(data, {
+      onlyClicked: true,
+      earlyPreviewAnchor: targetIdentifier,
+    });
   }
 
   /**
@@ -64,7 +69,17 @@ export class SmartFormFillParent extends JSWindowActorParent {
       lazy.console.warn("Focused field not classifiable:", data?.reason);
       return { status: "unavailable" };
     }
-    return this.#runForm(data, { onlyClicked: true });
+    // Focused path has no target id until classify; preview the clicked field now.
+    const clicked = data.fields?.find(f => f.isClicked);
+    if (clicked?.targetIdentifier) {
+      this.sendAsyncMessage("SmartFormFill:Preview", {
+        targetIdentifier: clicked.targetIdentifier,
+      });
+    }
+    return this.#runForm(data, {
+      onlyClicked: true,
+      earlyPreviewAnchor: clicked?.targetIdentifier ?? null,
+    });
   }
 
   /**
@@ -74,44 +89,89 @@ export class SmartFormFillParent extends JSWindowActorParent {
    * @returns {Promise<{status: string, filled?: number, results?: object[]}>}
    */
   async smartFillForm(targetIdentifier) {
-    const data = await this.sendQuery("SmartFormFill:ClassifyForm", {
-      targetIdentifier,
-    });
-    return this.#runForm(data, { onlyClicked: false });
-  }
-
-  /**
-   * Fill the right-clicked field using extra page content from a chosen tab.
-   *
-   * @param {object} targetIdentifier
-   * @param {object} tabContext
-   * @returns {Promise<{status: string, filled?: number, results?: object[]}>}
-   */
-  async smartFillWithTabContext(targetIdentifier, tabContext) {
-    const data = await this.sendQuery("SmartFormFill:ClassifyForm", {
-      targetIdentifier,
-    });
-    return this.#runForm(data, {
-      onlyClicked: true,
-      extraTabContext: tabContext,
-    });
-  }
-
-  /**
-   * Fill every contextual field using extra page content from a chosen tab.
-   *
-   * @param {object} targetIdentifier
-   * @param {object} tabContext
-   * @returns {Promise<{status: string, filled?: number, results?: object[]}>}
-   */
-  async smartFillFormWithTabContext(targetIdentifier, tabContext) {
+    // Yellow "Smart filling…" on every fillable field immediately.
+    this.sendAsyncMessage("SmartFormFill:PreviewForm", { targetIdentifier });
     const data = await this.sendQuery("SmartFormFill:ClassifyForm", {
       targetIdentifier,
     });
     return this.#runForm(data, {
       onlyClicked: false,
-      extraTabContext: tabContext,
+      earlyPreviewAnchor: targetIdentifier,
+      earlyPreviewWholeForm: true,
     });
+  }
+
+  /**
+   * Fill the right-clicked field using extra page content from a chosen tab.
+   * Busy preview starts immediately; tab extract and classify run in parallel.
+   *
+   * @param {object} targetIdentifier
+   * @param {object | Promise<object | null>} tabContext
+   *   Resolved tab page content, or a promise of it (e.g. in-flight extract).
+   * @returns {Promise<{status: string, filled?: number, results?: object[]}>}
+   */
+  async smartFillWithTabContext(targetIdentifier, tabContext) {
+    this.sendAsyncMessage("SmartFormFill:Preview", { targetIdentifier });
+    const [data, resolvedContext] = await Promise.all([
+      this.sendQuery("SmartFormFill:ClassifyForm", { targetIdentifier }),
+      this.#resolveTabContext(tabContext),
+    ]);
+    return this.#runForm(data, {
+      onlyClicked: true,
+      extraTabContext: resolvedContext,
+      earlyPreviewAnchor: targetIdentifier,
+    });
+  }
+
+  /**
+   * Fill every contextual field using extra page content from a chosen tab.
+   * Busy preview starts immediately; tab extract and classify run in parallel.
+   *
+   * @param {object} targetIdentifier
+   * @param {object | Promise<object | null>} tabContext
+   *   Resolved tab page content, or a promise of it (e.g. in-flight extract).
+   * @returns {Promise<{status: string, filled?: number, results?: object[]}>}
+   */
+  async smartFillFormWithTabContext(targetIdentifier, tabContext) {
+    this.sendAsyncMessage("SmartFormFill:PreviewForm", { targetIdentifier });
+    const [data, resolvedContext] = await Promise.all([
+      this.sendQuery("SmartFormFill:ClassifyForm", { targetIdentifier }),
+      this.#resolveTabContext(tabContext),
+    ]);
+    return this.#runForm(data, {
+      onlyClicked: false,
+      extraTabContext: resolvedContext,
+      earlyPreviewAnchor: targetIdentifier,
+      earlyPreviewWholeForm: true,
+    });
+  }
+
+  /**
+   * @param {object | Promise<object | null> | null} tabContext
+   * @returns {Promise<object | null>}
+   */
+  async #resolveTabContext(tabContext) {
+    try {
+      return (await tabContext) ?? null;
+    } catch (e) {
+      lazy.console.warn("tab context failed; continuing without it", e);
+      return null;
+    }
+  }
+
+  #clearEarlyPreview(earlyPreviewAnchor, earlyPreviewWholeForm) {
+    if (!earlyPreviewAnchor) {
+      return;
+    }
+    if (earlyPreviewWholeForm) {
+      this.sendAsyncMessage("SmartFormFill:ClearFormPreview", {
+        targetIdentifier: earlyPreviewAnchor,
+      });
+    } else {
+      this.sendAsyncMessage("SmartFormFill:ClearPreview", {
+        targetIdentifier: earlyPreviewAnchor,
+      });
+    }
   }
 
   /**
@@ -122,14 +182,27 @@ export class SmartFormFillParent extends JSWindowActorParent {
    * @param {object} [options]
    * @param {boolean} [options.onlyClicked]
    * @param {object | null} [options.extraTabContext]
+   * @param {object | null} [options.earlyPreviewAnchor]
+   *   ContentDOMReference used for the pre-classify busy preview.
+   * @param {boolean} [options.earlyPreviewWholeForm]
+   *   When true, early preview covered every fillable field in the form.
    * @returns {Promise<{status: string, filled?: number, results?: object[]}>}
    */
-  async #runForm(data, { onlyClicked = false, extraTabContext = null } = {}) {
+  async #runForm(
+    data,
+    {
+      onlyClicked = false,
+      extraTabContext = null,
+      earlyPreviewAnchor = null,
+      earlyPreviewWholeForm = false,
+    } = {}
+  ) {
     const previewIds = [];
     try {
       lazy.console.info(`smartFill form invoked (onlyClicked=${onlyClicked})`);
       if (!data?.ok) {
         lazy.console.warn("Form not classifiable:", data?.reason);
+        this.#clearEarlyPreview(earlyPreviewAnchor, earlyPreviewWholeForm);
         return { status: "unavailable" };
       }
 
@@ -142,6 +215,7 @@ export class SmartFormFillParent extends JSWindowActorParent {
       }
 
       if (!targets.length) {
+        this.#clearEarlyPreview(earlyPreviewAnchor, earlyPreviewWholeForm);
         if (clicked?.category === "creditCard") {
           lazy.console.info("Skipping credit card field");
           return { status: "skipped-creditcard" };
@@ -156,8 +230,32 @@ export class SmartFormFillParent extends JSWindowActorParent {
         return { status: "unavailable" };
       }
 
+      const targetIdSet = new Set(targets.map(f => f.targetIdentifier));
       for (const field of targets) {
         previewIds.push(field.targetIdentifier);
+      }
+
+      // Drop busy state on fields we will not fill (identity / non-targets
+      // that were previewed with PreviewForm before classification).
+      if (earlyPreviewWholeForm) {
+        for (const field of fields) {
+          if (
+            field.targetIdentifier &&
+            !targetIdSet.has(field.targetIdentifier)
+          ) {
+            this.sendAsyncMessage("SmartFormFill:ClearPreview", {
+              targetIdentifier: field.targetIdentifier,
+            });
+          }
+        }
+      } else if (earlyPreviewAnchor && !targetIdSet.has(earlyPreviewAnchor)) {
+        this.sendAsyncMessage("SmartFormFill:ClearPreview", {
+          targetIdentifier: earlyPreviewAnchor,
+        });
+      }
+
+      // Ensure targets show busy state (no-op if early preview already did).
+      for (const field of targets) {
         this.sendAsyncMessage("SmartFormFill:Preview", {
           targetIdentifier: field.targetIdentifier,
         });
@@ -201,10 +299,22 @@ export class SmartFormFillParent extends JSWindowActorParent {
       return { status: "form-filled", filled, results };
     } catch (e) {
       lazy.console.error("smartFill form failed", e);
-      for (const targetIdentifier of previewIds) {
-        this.sendAsyncMessage("SmartFormFill:ClearPreview", {
-          targetIdentifier,
+      if (earlyPreviewWholeForm && earlyPreviewAnchor) {
+        this.sendAsyncMessage("SmartFormFill:ClearFormPreview", {
+          targetIdentifier: earlyPreviewAnchor,
         });
+      } else {
+        for (const targetIdentifier of previewIds) {
+          this.sendAsyncMessage("SmartFormFill:ClearPreview", {
+            targetIdentifier,
+          });
+        }
+        // ContentDOMReference objects may not match by identity after IPC.
+        if (earlyPreviewAnchor) {
+          this.sendAsyncMessage("SmartFormFill:ClearPreview", {
+            targetIdentifier: earlyPreviewAnchor,
+          });
+        }
       }
       return { status: "error" };
     }

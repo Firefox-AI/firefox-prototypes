@@ -63,10 +63,24 @@ export class SmartFormFillChild extends JSWindowActorChild {
         return this.#fill(message.data.targetIdentifier, message.data.value);
       case "SmartFormFill:Preview":
         return this.#preview(message.data.targetIdentifier);
+      case "SmartFormFill:PreviewForm":
+        return this.#previewForm(message.data.targetIdentifier);
       case "SmartFormFill:ClearPreview":
         return this.#clearPreview(message.data.targetIdentifier);
+      case "SmartFormFill:ClearFormPreview":
+        return this.#clearFormPreview(message.data.targetIdentifier);
     }
     return null;
+  }
+
+  #setPreviewState(element) {
+    element.previewValue = BUSY_PREVIEW_TEXT;
+    element.autofillState = lazy.FormAutofillUtils.FIELD_STATES.PREVIEW;
+  }
+
+  #clearPreviewState(element) {
+    element.previewValue = "";
+    element.autofillState = lazy.FormAutofillUtils.FIELD_STATES.NORMAL;
   }
 
   #preview(targetIdentifier) {
@@ -74,8 +88,7 @@ export class SmartFormFillChild extends JSWindowActorChild {
     if (!element || !isFillable(element)) {
       return false;
     }
-    element.previewValue = BUSY_PREVIEW_TEXT;
-    element.autofillState = lazy.FormAutofillUtils.FIELD_STATES.PREVIEW;
+    this.#setPreviewState(element);
     return true;
   }
 
@@ -84,9 +97,56 @@ export class SmartFormFillChild extends JSWindowActorChild {
     if (!element || !isFillable(element)) {
       return false;
     }
-    element.previewValue = "";
-    element.autofillState = lazy.FormAutofillUtils.FIELD_STATES.NORMAL;
+    this.#clearPreviewState(element);
     return true;
+  }
+
+  /**
+   * Immediately show busy preview on every fillable field in the form so the
+   * UI reacts before classification / the model round-trip finish.
+   *
+   * @param {object} targetIdentifier  ContentDOMReference for a field in the form.
+   */
+  #previewForm(targetIdentifier) {
+    for (const el of this.#fillableElementsInForm(targetIdentifier)) {
+      this.#setPreviewState(el);
+    }
+    return true;
+  }
+
+  #clearFormPreview(targetIdentifier) {
+    for (const el of this.#fillableElementsInForm(targetIdentifier)) {
+      this.#clearPreviewState(el);
+    }
+    return true;
+  }
+
+  #fillableElementsInForm(targetIdentifier) {
+    const clickedEl = lazy.ContentDOMReference.resolve(targetIdentifier);
+    if (!clickedEl || !isFillable(clickedEl)) {
+      return [];
+    }
+    const formLike = lazy.AutofillFormFactory.createFromField(clickedEl);
+    const fieldDetails = lazy.FormAutofillHeuristics.getFormInfo(
+      formLike,
+      true
+    );
+    const elements = [];
+    let foundClicked = false;
+    for (const fd of fieldDetails) {
+      const el = fd.element;
+      if (!el || !isFillable(el)) {
+        continue;
+      }
+      if (el === clickedEl) {
+        foundClicked = true;
+      }
+      elements.push(el);
+    }
+    if (!foundClicked) {
+      elements.push(clickedEl);
+    }
+    return elements;
   }
 
   #describeField(fieldDetail, clickedElement) {
@@ -116,6 +176,8 @@ export class SmartFormFillChild extends JSWindowActorChild {
       );
       return { ok: false, reason: "not-fillable" };
     }
+    // No parent-side target id yet — show busy state before heuristics run.
+    this.#setPreviewState(element);
     return this.#classifyFormFromElement(element);
   }
 

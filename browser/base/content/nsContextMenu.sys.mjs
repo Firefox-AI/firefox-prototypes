@@ -1532,31 +1532,26 @@ export class nsContextMenu {
 
   smartFormFillUsingTab(tab) {
     console.warn("[SmartFormFill] context menu 'using tab' item clicked");
-    this.#fetchPageContentForTab(tab)
-      .then(context => {
-        const actor =
-          this.browser.browsingContext.currentWindowGlobal.getActor(
-            "SmartFormFill"
-          );
-        const fillAll = Services.prefs.getBoolPref(
-          "browser.smartwindow.formfill.all",
-          false
-        );
-        if (fillAll) {
-          actor
-            .smartFillFormWithTabContext(this.targetIdentifier, context)
-            .catch(console.error);
-        } else {
-          actor
-            .smartFillWithTabContext(this.targetIdentifier, context)
-            .catch(console.error);
-        }
-      })
-      .catch(e => {
-        console.error("Failed to fetch tab content for smart form fill", e);
-        // fallback to regular
-        this.smartFormFill();
-      });
+    const actor =
+      this.browser.browsingContext.currentWindowGlobal.getActor(
+        "SmartFormFill"
+      );
+    const fillAll = Services.prefs.getBoolPref(
+      "browser.smartwindow.formfill.all",
+      false
+    );
+    // Pass the in-flight extract promise so the actor can show busy UI and
+    // classify immediately instead of waiting on PageExtractor first.
+    const tabContextPromise = this.#fetchPageContentForTab(tab);
+    if (fillAll) {
+      actor
+        .smartFillFormWithTabContext(this.targetIdentifier, tabContextPromise)
+        .catch(console.error);
+    } else {
+      actor
+        .smartFillWithTabContext(this.targetIdentifier, tabContextPromise)
+        .catch(console.error);
+    }
   }
 
   async #fetchPageContentForTab(tab) {
