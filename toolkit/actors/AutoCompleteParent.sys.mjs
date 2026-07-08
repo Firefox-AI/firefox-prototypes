@@ -527,7 +527,12 @@ export class AutoCompleteParent extends JSWindowActorParent {
   // entry. LoginManager is prioritized to handle potential username fields first,
   // allowing FormAutofill to safely support single email fields without
   // manual exclusions.
-  #AUTOCOMPLETE_PROVIDERS = ["LoginManager", "FormAutofill", "FormHistory"];
+  #AUTOCOMPLETE_PROVIDERS = [
+    "LoginManager",
+    "FormAutofill",
+    "SmartFormFill",
+    "FormHistory",
+  ];
 
   /**
    * Search across multiple module to gather autocomplete entries for a given search string.
@@ -572,6 +577,7 @@ export class AutoCompleteParent extends JSWindowActorParent {
     const prefixToActor = [
       { prefix: "PasswordManager", actor: "LoginManager" },
       { prefix: "FormAutofill", actor: "FormAutofill" },
+      { prefix: "SmartFormFill", actor: "SmartFormFill" },
     ];
 
     const name = prefixToActor.find(x => message.startsWith(x.prefix))?.actor;

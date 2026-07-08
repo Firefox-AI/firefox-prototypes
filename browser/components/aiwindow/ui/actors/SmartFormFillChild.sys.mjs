@@ -7,12 +7,11 @@
 /**
  * Content-side actor for Smart Form Fill (spike POC).
  *
- * Two jobs:
- * - Classify: resolve a field, run the existing FormAutofill heuristics over
- *   its form, and return field STRUCTURE (with currentValue) for every
- *   fillable control. Single- and multi-field fill both use this form shape.
- * - Fill: write the chosen value back via setUserInput so the page sees it as
- *   real user input, and flag it as autofilled for the highlight + undo path.
+ * - Classify: resolve a field, run FormAutofill heuristics, return structure.
+ * - Fill: write via setUserInput + AUTO_FILLED highlight.
+ * - Transparency: after fill, register fields with the shared autocomplete
+ *   popup provider and open the panel on focus/hover (auto-open is driven by
+ *   the parent for the originally triggered field).
  */
 
 const lazy = {};
@@ -24,6 +23,9 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "resource://gre/modules/shared/FormAutofillHeuristics.sys.mjs",
   FormAutofillUtils: "resource://gre/modules/shared/FormAutofillUtils.sys.mjs",
   AutofillDataTypes: "resource://gre/modules/shared/AutofillDataTypes.sys.mjs",
+  GenericAutocompleteItem: "resource://gre/modules/FillHelpers.sys.mjs",
+  FormHistoryAutoCompleteResult:
+    "resource://gre/modules/FormHistoryAutoComplete.sys.mjs",
 });
 
 ChromeUtils.defineLazyGetter(lazy, "console", () =>
@@ -42,6 +44,16 @@ const BUSY_PREVIEW_TEXT = "Smart filling…";
 // are excluded outright and left to Firefox's existing autofill.
 const FILLABLE_INPUT_TYPES = new Set(["text", "search"]);
 
+// Debounce hover-open so moving across the form does not thrash the panel.
+const HOVER_OPEN_MS = 200;
+
+// After context-menu fill, wait for menu dismissal before opening the panel.
+const AUTO_OPEN_DELAY_MS = 100;
+
+const gFormFillController = Cc[
+  "@mozilla.org/satchel/form-fill-controller;1"
+].getService(Ci.nsIFormFillController);
+
 function isFillable(element) {
   return (
     HTMLInputElement.isInstance(element) &&
@@ -53,6 +65,24 @@ function isFillable(element) {
  *
  */
 export class SmartFormFillChild extends JSWindowActorChild {
+  /** @type {WeakSet<Element>} */
+  #enabledFields = new WeakSet();
+
+  /** @type {WeakMap<Element, object>} */
+  #fieldIdentifiers = new WeakMap();
+
+  /** @type {number} */
+  #hoverTimer = 0;
+
+  /** @type {Element | null} */
+  #hoverTarget = null;
+
+  didDestroy() {
+    if (this.#hoverTimer) {
+      this.contentWindow?.clearTimeout(this.#hoverTimer);
+    }
+  }
+
   async receiveMessage(message) {
     switch (message.name) {
       case "SmartFormFill:ClassifyForm":
@@ -69,9 +99,71 @@ export class SmartFormFillChild extends JSWindowActorChild {
         return this.#clearPreview(message.data.targetIdentifier);
       case "SmartFormFill:ClearFormPreview":
         return this.#clearFormPreview(message.data.targetIdentifier);
+      case "SmartFormFill:EnableTransparency":
+        return this.#enableTransparency(
+          message.data.fields,
+          message.data.autoOpenTargetIdentifier
+        );
+      case "SmartFormFill:ClearFill":
+        return this.#clearFill(message.data.targetIdentifier);
     }
     return null;
   }
+
+  // --- AutoComplete provider (child) -------------------------------------
+
+  get actorName() {
+    return "SmartFormFill";
+  }
+
+  getAutoCompleteSearchOption(input) {
+    return {
+      targetIdentifier:
+        this.#fieldIdentifiers.get(input) ||
+        lazy.ContentDOMReference.get(input),
+    };
+  }
+
+  shouldSearchForAutoComplete(input) {
+    return this.#enabledFields.has(input);
+  }
+
+  searchResultToAutoCompleteResult(searchString, input, records) {
+    if (!records?.session) {
+      return null;
+    }
+    const session = records.session;
+    const targetIdentifier =
+      this.#fieldIdentifiers.get(input) || lazy.ContentDOMReference.get(input);
+
+    const acResult = new lazy.FormHistoryAutoCompleteResult(
+      input,
+      [],
+      input.name || input.id || "",
+      searchString
+    );
+    acResult.externalEntries.push(
+      new lazy.GenericAutocompleteItem(
+        "",
+        session.value,
+        session.secondary || "",
+        "SmartFormFill:Keep",
+        { targetIdentifier }
+      ),
+      new lazy.GenericAutocompleteItem(
+        "",
+        "Clear smart fill",
+        "Remove this value and transparency",
+        "SmartFormFill:Clear",
+        { targetIdentifier }
+      )
+    );
+    // action style for clear row
+    acResult.externalEntries[1].style = "action";
+    return acResult;
+  }
+
+  // --- Preview / fill ----------------------------------------------------
 
   #setPreviewState(element) {
     element.previewValue = BUSY_PREVIEW_TEXT;
@@ -258,4 +350,181 @@ export class SmartFormFillChild extends JSWindowActorChild {
     lazy.console.info(`fill: set "${finalValue}"`);
     return true;
   }
+
+  #clearFill(targetIdentifier) {
+    const element = lazy.ContentDOMReference.resolve(targetIdentifier);
+    if (!element || !isFillable(element)) {
+      return false;
+    }
+    element.previewValue = "";
+    element.setUserInput("");
+    element.autofillState = lazy.FormAutofillUtils.FIELD_STATES.NORMAL;
+    this.#teardownField(element);
+    return true;
+  }
+
+  // --- Transparency registration / panel triggers ------------------------
+
+  /**
+   * @param {Array<object>} fieldIdentifiers  ContentDOMReferences for filled fields.
+   * @param {object | null} autoOpenTargetIdentifier
+   *   If set, open the transparency panel on this field after a short delay.
+   * @returns {boolean}
+   */
+  #enableTransparency(fieldIdentifiers, autoOpenTargetIdentifier = null) {
+    const autoComplete = this.manager.getActor("AutoComplete");
+    if (!autoComplete) {
+      lazy.console.warn("AutoComplete actor unavailable");
+      return false;
+    }
+
+    for (const targetIdentifier of fieldIdentifiers || []) {
+      const element = lazy.ContentDOMReference.resolve(targetIdentifier);
+      if (!element || !isFillable(element)) {
+        continue;
+      }
+      if (this.#enabledFields.has(element)) {
+        this.#fieldIdentifiers.set(element, targetIdentifier);
+        continue;
+      }
+
+      this.#enabledFields.add(element);
+      this.#fieldIdentifiers.set(element, targetIdentifier);
+      autoComplete.markAsAutoCompletableField(element, this);
+      element.addEventListener("focus", this.#onFocus, true);
+      element.addEventListener("mouseover", this.#onMouseOver, true);
+      element.addEventListener("mouseout", this.#onMouseOut, true);
+      lazy.console.info(
+        `transparency enabled on ${element.name || element.id || element.type}`
+      );
+    }
+
+    if (autoOpenTargetIdentifier) {
+      // Delay so context-menu dismissal does not immediately dismiss the panel.
+      this.contentWindow.setTimeout(() => {
+        this.#openTransparencyPopup(autoOpenTargetIdentifier, {
+          focusField: true,
+        });
+      }, AUTO_OPEN_DELAY_MS);
+    }
+    return true;
+  }
+
+  #teardownField(element) {
+    if (!element || !this.#enabledFields.has(element)) {
+      return;
+    }
+    this.#enabledFields.delete(element);
+    this.#fieldIdentifiers.delete(element);
+    element.removeEventListener("focus", this.#onFocus, true);
+    element.removeEventListener("mouseover", this.#onMouseOver, true);
+    element.removeEventListener("mouseout", this.#onMouseOut, true);
+  }
+
+  /** When true, ignore focus-driven open (programmatic focus during auto-open). */
+  #suppressFocusOpen = false;
+
+  /**
+   * Open the shared form-fill autocomplete popup for a smart-filled field.
+   * Same machinery as pressing Down while focused — uses nsIFormFillController
+   * so SmartFormFill is queried as an autocomplete provider.
+   *
+   * Important: nsIFormFillController.showPopup() *toggles* if already open, so
+   * we never call it when the popup is already showing for this field.
+   *
+   * @param {object} targetIdentifier
+   * @param {object} [options]
+   * @param {boolean} [options.focusField]
+   * @returns {boolean}
+   */
+  #openTransparencyPopup(targetIdentifier, { focusField = false } = {}) {
+    const element = lazy.ContentDOMReference.resolve(targetIdentifier);
+    if (!element || !isFillable(element) || !this.#enabledFields.has(element)) {
+      lazy.console.warn("openTransparencyPopup: field not ready");
+      return false;
+    }
+
+    const autoComplete = this.manager.getActor("AutoComplete");
+
+    if (focusField && this.document.activeElement !== element) {
+      this.#suppressFocusOpen = true;
+      try {
+        element.focus({ preventScroll: true });
+      } catch (e) {
+        lazy.console.warn("openTransparencyPopup: focus failed", e);
+      } finally {
+        this.#suppressFocusOpen = false;
+      }
+    }
+
+    try {
+      // Already open for this field — do not call showPopup() (it would close).
+      if (
+        autoComplete?.popupOpen &&
+        gFormFillController.controlledElement === element
+      ) {
+        return true;
+      }
+      if (autoComplete?.popupOpen) {
+        autoComplete.closePopup();
+      }
+
+      // Attach form-fill to this field (works without keyboard focus for hover).
+      gFormFillController.controlledElement = element;
+      gFormFillController.showPopup();
+      lazy.console.info(
+        `openTransparencyPopup: showPopup on ${element.name || element.id || element.type}`
+      );
+      return true;
+    } catch (e) {
+      lazy.console.error("openTransparencyPopup failed", e);
+      return false;
+    }
+  }
+
+  #onFocus = event => {
+    if (this.#suppressFocusOpen) {
+      return;
+    }
+    const element = event.currentTarget;
+    if (!this.#enabledFields.has(element)) {
+      return;
+    }
+    const targetIdentifier = this.#fieldIdentifiers.get(element);
+    if (targetIdentifier) {
+      this.#openTransparencyPopup(targetIdentifier);
+    }
+  };
+
+  #onMouseOver = event => {
+    const element = event.currentTarget;
+    if (!this.#enabledFields.has(element)) {
+      return;
+    }
+    this.#hoverTarget = element;
+    if (this.#hoverTimer) {
+      this.contentWindow.clearTimeout(this.#hoverTimer);
+    }
+    this.#hoverTimer = this.contentWindow.setTimeout(() => {
+      this.#hoverTimer = 0;
+      if (this.#hoverTarget !== element) {
+        return;
+      }
+      const targetIdentifier = this.#fieldIdentifiers.get(element);
+      if (targetIdentifier) {
+        this.#openTransparencyPopup(targetIdentifier);
+      }
+    }, HOVER_OPEN_MS);
+  };
+
+  #onMouseOut = event => {
+    if (event.currentTarget !== this.#hoverTarget) {
+      return;
+    }
+    this.#hoverTarget = null;
+    if (this.#hoverTimer) {
+      this.contentWindow.clearTimeout(this.#hoverTimer);
+      this.#hoverTimer = 0;
+    }
+  };
 }

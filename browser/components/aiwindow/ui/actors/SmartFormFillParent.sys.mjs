@@ -13,6 +13,9 @@
  * of 1. The arbiter is the only place stored values live: credit card /
  * identity fields never reach the model, and for a contextual field it picks
  * the LLM value when confident enough, else the stored value, else none.
+ *
+ * After a successful fill, per-field transparency is kept in a session map and
+ * shown via the shared autocomplete popup (satchel/formfill panel).
  */
 
 const lazy = {};
@@ -36,10 +39,33 @@ ChromeUtils.defineLazyGetter(lazy, "console", () =>
 // values more; lower it to let the model win more often.
 const CONFIDENCE_THRESHOLD = 0.7;
 
+const MAX_REASONING_CHARS = 180;
+
+/**
+ * Stable map key for a ContentDOMReference identifier.
+ *
+ * @param {object} ref
+ * @returns {string}
+ */
+function refKey(ref) {
+  if (!ref) {
+    return "";
+  }
+  return `${ref.browsingContextId}:${ref.id}`;
+}
+
 /**
  *
  */
 export class SmartFormFillParent extends JSWindowActorParent {
+  /**
+   * Per-field transparency after a smart fill.
+   * key: refKey(targetIdentifier) → session
+   *
+   * @type {Map<string, object>}
+   */
+  #sessions = new Map();
+
   /**
    * Fill the right-clicked field only (batch of one).
    *
@@ -273,6 +299,7 @@ export class SmartFormFillParent extends JSWindowActorParent {
 
       let filled = 0;
       const results = [];
+      const filledFields = [];
       for (let i = 0; i < targets.length; i++) {
         const field = targets[i];
         const suggestion = suggestions?.get(i) ?? null;
@@ -284,6 +311,18 @@ export class SmartFormFillParent extends JSWindowActorParent {
           );
           if (res.status === "filled") {
             filled++;
+            this.#sessions.set(refKey(field.targetIdentifier), {
+              value: res.value,
+              source: res.source,
+              confidence: suggestion?.confidence ?? 0,
+              reasoning: suggestion?.reasoning ?? "",
+              pageType: suggestion?.pageType ?? "",
+              targetIdentifier: field.targetIdentifier,
+            });
+            filledFields.push({
+              targetIdentifier: field.targetIdentifier,
+              isTrigger: !!field.isClicked,
+            });
           }
           results.push(res);
         } catch (e) {
@@ -296,6 +335,11 @@ export class SmartFormFillParent extends JSWindowActorParent {
       }
 
       lazy.console.info(`form fill done: filled=${filled}/${targets.length}`);
+
+      if (filledFields.length) {
+        await this.#enableTransparency(filledFields);
+      }
+
       return { status: "form-filled", filled, results };
     } catch (e) {
       lazy.console.error("smartFill form failed", e);
@@ -321,12 +365,123 @@ export class SmartFormFillParent extends JSWindowActorParent {
   }
 
   /**
+   * Register filled fields for autocomplete transparency and auto-open the
+   * panel on the originally triggered field.
+   *
+   * Opens via content-side form-fill showPopup() (same path as VK_DOWN), not
+   * AutoCompleteParent.showPopupWithResults — the latter is unreliable right
+   * after context-menu dismissal / without form-fill controller attachment.
+   *
+   * @param {Array<{targetIdentifier: object, isTrigger: boolean}>} filledFields
+   */
+  async #enableTransparency(filledFields) {
+    const autoOpen =
+      filledFields.find(f => f.isTrigger)?.targetIdentifier ??
+      filledFields[0].targetIdentifier;
+
+    try {
+      await this.sendQuery("SmartFormFill:EnableTransparency", {
+        fields: filledFields.map(f => f.targetIdentifier),
+        autoOpenTargetIdentifier: autoOpen,
+      });
+    } catch (e) {
+      lazy.console.warn("EnableTransparency failed", e);
+    }
+  }
+
+  /**
+   * Format secondary line for autocomplete provider path.
+   *
+   * @param {object} session
+   * @returns {string}
+   */
+  #formatSecondary(session) {
+    let sourceLabel = "Unknown";
+    if (session.source === "llm") {
+      sourceLabel = "AI suggestion";
+    } else if (session.source === "stored") {
+      sourceLabel = "Form history";
+    } else if (session.source) {
+      sourceLabel = session.source;
+    }
+    const conf =
+      typeof session.confidence === "number"
+        ? session.confidence.toFixed(2)
+        : "—";
+    let reasoning = (session.reasoning || "").trim().replace(/\s+/g, " ");
+    if (reasoning.length > MAX_REASONING_CHARS) {
+      reasoning = reasoning.slice(0, MAX_REASONING_CHARS - 1) + "…";
+    }
+    if (reasoning) {
+      return `${sourceLabel} · confidence ${conf} — ${reasoning}`;
+    }
+    return `${sourceLabel} · confidence ${conf}`;
+  }
+
+  // --- AutoComplete provider (parent) ------------------------------------
+
+  /**
+   * @param {string} searchString
+   * @param {object} options
+   * @param {object} [options.targetIdentifier]
+   * @returns {Promise<object | null>}
+   */
+  async searchAutoCompleteEntries(searchString, options) {
+    const key = refKey(options?.targetIdentifier);
+    const session = this.#sessions.get(key);
+    if (!session) {
+      return null;
+    }
+    return {
+      session: {
+        ...session,
+        secondary: this.#formatSecondary(session),
+      },
+    };
+  }
+
+  onAutoCompleteEntrySelected(message, data) {
+    switch (message) {
+      case "SmartFormFill:Keep":
+        // Transparency-only row; keep current value and dismiss.
+        this.browsingContext.currentWindowGlobal
+          .getActor("AutoComplete")
+          ?.closePopup();
+        break;
+      case "SmartFormFill:Clear": {
+        const targetIdentifier = data?.targetIdentifier;
+        if (!targetIdentifier) {
+          break;
+        }
+        this.#sessions.delete(refKey(targetIdentifier));
+        this.sendAsyncMessage("SmartFormFill:ClearFill", {
+          targetIdentifier,
+        });
+        this.browsingContext.currentWindowGlobal
+          .getActor("AutoComplete")
+          ?.closePopup();
+        break;
+      }
+      default:
+        lazy.console.warn("Unsupported autocomplete message:", message);
+    }
+  }
+
+  onAutoCompleteEntryHovered(_message, _data) {
+    // Phase 1: no alternate-value hover preview yet.
+  }
+
+  onAutoCompleteEntryClearPreview(_message, _data) {}
+
+  onAutoCompletePopupOpened(_elementId) {}
+
+  /**
    * Pick LLM vs stored value for one field and write it, or clear preview.
    *
    * @param {object} field
    * @param {object | null} suggestion
    * @param {boolean} highConfidenceOnly
-   * @returns {Promise<{status: string, source?: string, suggestion?: object}>}
+   * @returns {Promise<{status: string, source?: string, value?: string, suggestion?: object}>}
    */
   async #arbitrateAndFill(field, suggestion, highConfidenceOnly) {
     const targetIdentifier = field.targetIdentifier;
@@ -365,6 +520,7 @@ export class SmartFormFillParent extends JSWindowActorParent {
     return {
       status: filled ? "filled" : "fill-failed",
       source: chosen.source,
+      value: chosen.value,
       suggestion,
     };
   }
