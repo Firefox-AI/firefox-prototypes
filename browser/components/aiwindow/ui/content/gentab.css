@@ -1,0 +1,65 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: light-dark(var(--color-gray-05, #f0f0f4), var(--color-gray-90, #1c1b22));
+  color: var(--text-color);
+}
+
+.gentab-status {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: var(--space-large);
+  box-sizing: border-box;
+}
+
+.gentab-status[hidden] {
+  display: none;
+}
+
+.gentab-status-message {
+  max-width: 36em;
+  text-align: center;
+  font-size: 1.1rem;
+  line-height: 1.4;
+  margin: 0;
+}
+
+#multi-stage-message-root {
+  min-height: 100vh;
+}
+
+#multi-stage-message-root .main-content,
+#multi-stage-message-root .section-main,
+#multi-stage-message-root .dialog-initial,
+#multi-stage-message-root .onboardingContainer {
+  box-shadow: none;
+}
+
+/* Single-page GenTab: stack sections with breathing room */
+#multi-stage-message-root #content-tiles-container {
+  margin-block: var(--space-large, 24px);
+  margin-inline: auto;
+  width: min(720px, 100%);
+}
+
+#multi-stage-message-root .content-tile {
+  margin-block-end: var(--space-xlarge, 32px);
+}
+
+#multi-stage-message-root .confirmation-checklist-container {
+  margin-inline: auto;
+}
+
+#multi-stage-message-root .tile-title-container {
+  margin-block-end: var(--space-small, 8px);
+  text-align: start;
+}

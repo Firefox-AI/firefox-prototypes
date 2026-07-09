@@ -2322,6 +2322,10 @@ pref("browser.ml.pageAssist.enabled", false);
 
 // Smart Window Feature
 pref("browser.smartwindow.enabled", false);
+// GenTab V0 spike: page/tab context menu → aboutwelcome artifact
+pref("browser.smartwindow.gentab.enabled", true);
+// Last single-select option id chosen on a GenTab (spike only)
+pref("browser.smartwindow.gentab.lastOption", "");
 // Default endpoint for preset models
 pref("browser.smartwindow.endpoint", "https://mlpa-prod-prod-mozilla.global.ssl.fastly.net/v1");
 pref("browser.smartwindow.memories.generateFromHistory", true);

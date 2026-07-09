@@ -34,6 +34,7 @@ MOZ_SRC_FILES += [
     "modules/ChatStore.sys.mjs",
     "modules/ChatUtils.sys.mjs",
     "modules/FeedbackModal.sys.mjs",
+    "modules/GenTab.sys.mjs",
     "modules/SmartWindowTelemetry.sys.mjs",
     "modules/TabManagementService.sys.mjs",
     "modules/ToolActionLog.sys.mjs",

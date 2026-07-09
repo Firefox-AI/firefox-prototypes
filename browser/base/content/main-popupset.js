@@ -49,6 +49,11 @@ document.addEventListener(
         case "context_reloadTab":
           gBrowser.reloadTab(TabContextMenu.contextTab);
           break;
+        case "context_createGenTab":
+          TabContextMenu.GenTab.createFromBrowser(
+            TabContextMenu.contextTab?.linkedBrowser
+          );
+          break;
         case "context_reloadSelectedTabs":
           gBrowser.reloadMultiSelectedTabs();
           break;
