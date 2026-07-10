@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="en" data-scheme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PUWYLO Option C — inline tab selector · built on Nova / Smart Window components</title>
+<style>
+/* =====================================================================
+ * Nova design tokens (excerpt)
+ * Source: toolkit/themes/shared/design-system/dist/tokens-shared.css
+ *         + button.nova.tokens.json component overrides
+ * Smart Window assumes browser.nova.enabled — Nova overrides active.
+ * All product surfaces below resolve through light-dark(); no raw hex
+ * outside this token block (site favicons/brand colors are content,
+ * not product UI).
+ * ===================================================================== */
+:root{
+  color-scheme:light;
+
+  /* --- base tier (reference only — components never touch these) --- */
+  --color-violet-0:#f5ecff; --color-violet-10:#eaddff; --color-violet-20:#d4c1ff;
+  --color-violet-30:#b89cff; --color-violet-40:#9871ff; --color-violet-50:#764edd;
+  --color-violet-60:#5939a8; --color-violet-70:#3e2976;
+  --color-violet-desaturated-0:#f2f0f8; --color-violet-desaturated-90:#14092b;
+  --color-neutral-0:#f6f8ff; --color-neutral-10:#e9eaf1; --color-neutral-20:#d7d8e3;
+  --color-neutral-30:#b6b7c4; --color-neutral-50:#6b6c7a; --color-neutral-60:#4a4b57;
+  --color-neutral-70:#26272f; --color-neutral-80:#181820; --color-neutral-90:#101118;
+  --color-green-40:#3da321; --color-green-50:#1d883d;
+  --color-yellow-40:#e8a400; --color-orange-40:#f4682c;
+  --color-red-50:#c50042; --color-blue-50:#2b6cff;
+
+  /* --- semantic tier (what components use) --- */
+  --background-color-canvas:light-dark(var(--color-violet-desaturated-0),var(--color-neutral-90));
+  --background-color-box:light-dark(#ffffff,var(--color-neutral-70));
+  --background-color-box-info:light-dark(var(--color-violet-0),#221c38);
+  --text-color:light-dark(var(--color-violet-desaturated-90),var(--color-violet-desaturated-0));
+  --text-color-deemphasized:light-dark(rgba(20,9,43,.70),rgba(242,240,248,.70));
+  --text-color-disabled:light-dark(rgba(21,20,26,.4),rgba(251,251,254,.4));
+  --border-color:light-dark(var(--color-neutral-20),var(--color-neutral-60));
+  --border-color-deemphasized:light-dark(var(--color-neutral-10),var(--color-neutral-70));
+  --border-color-selected:var(--color-accent-primary);
+  --color-accent-primary:light-dark(var(--color-violet-50),var(--color-violet-30));
+  --color-accent-primary-hover:light-dark(var(--color-violet-60),var(--color-violet-40));
+  --text-color-accent-primary-selected:light-dark(#ffffff,var(--color-neutral-90));
+
+  --space-xxsmall:.125rem; --space-xsmall:.25rem; --space-small:.5rem;
+  --space-medium:.75rem; --space-large:1rem; --space-xlarge:1.5rem; --space-xxlarge:2rem;
+
+  --border-radius-xsmall:2px; --border-radius-small:4px; --border-radius-medium:8px;
+  --border-radius-large:16px; --border-radius-circle:9999px;
+  --border-width:1px;
+
+  --font-size-small:12px; --font-size-root:15px; --font-size-large:17px; --font-size-xlarge:20px;
+  --font-weight:400; --font-weight-semibold:600; --font-weight-heading:var(--font-weight-semibold);
+
+  --box-shadow-level-1:0 1px 2px light-dark(rgba(20,9,43,.08),rgba(0,0,0,.4)),0 1px 1px light-dark(rgba(20,9,43,.05),rgba(0,0,0,.3));
+  --box-shadow-level-2:0 1px 2px light-dark(rgba(118,78,221,.12),rgba(0,0,0,.45)),0 4px 12px light-dark(rgba(118,78,221,.18),rgba(0,0,0,.4));
+  --box-shadow-level-4:0 4px 10px light-dark(rgba(118,78,221,.16),rgba(0,0,0,.5)),0 16px 44px light-dark(rgba(118,78,221,.24),rgba(0,0,0,.55));
+
+  --focus-outline-color:var(--color-accent-primary);
+  --focus-outline:2px solid var(--focus-outline-color);
+  --focus-outline-offset:2px;
+
+  --icon-size:16px;
+  --icon-color:light-dark(var(--color-neutral-70),var(--color-neutral-0));
+
+  /* --- component tier --- */
+  /* button.nova.tokens.json — Nova pill buttons */
+  --button-border-radius:var(--border-radius-circle);
+  --button-min-height:32px;
+  --button-background-color-primary:var(--color-accent-primary);
+  --button-background-color-primary-hover:var(--color-accent-primary-hover);
+  --button-text-color-primary:var(--text-color-accent-primary-selected);
+  --card-border-radius:var(--border-radius-large);
+  --card-box-shadow:var(--box-shadow-level-2);
+  --input-min-height:40px;
+
+  /* aiwindow gradient tokens — browser/components/aiwindow/ui (existing) */
+  --smartwindow-border-color-gradient:linear-gradient(117deg,#321bfd -17.87%,#cf30e2 52.93%,#f90 89.02%,#f5c451 109.44%);
+  --aiwindow-gradient-button:linear-gradient(97deg,#8341ca -31.39%,#656fff 90.52%);
+
+  /* conversation-starter chip (Nova spec values, from the component sheet) */
+  --conversation-starter-background:light-dark(#ffffff,rgba(30,29,32,.75));
+  --conversation-starter-border-color:light-dark(rgba(89,57,168,.45),rgba(178,149,255,.6));
+  --conversation-starter-text-color:light-dark(rgba(20,9,43,.8),rgba(251,251,254,.8));
+  --conversation-starter-gradient-hover:linear-gradient(100deg,#b295ff,#ff9565);
+  --conversation-starter-gradient-active:linear-gradient(100deg,#b295ff,#f585d3);
+
+  /* proposed component tokens — puwylo tab selector (Figma confirmation card) */
+  --tabselector-background:light-dark(#ffffff,#363539);
+  --tabselector-border-color:light-dark(var(--color-violet-30),#75669f);
+  --tabselector-row-background:light-dark(rgba(118,78,221,.08),rgba(179,147,255,.12));
+  --tabselector-row-background-hover:light-dark(rgba(118,78,221,.15),rgba(179,147,255,.2));
+  --tabselector-check-background:light-dark(var(--color-violet-50),var(--color-violet-20));
+  --tabselector-check-color:light-dark(#ffffff,#161519);
+  --tabselector-secondary-background:light-dark(var(--color-neutral-20),#626165);
+  --tabselector-secondary-text-color:light-dark(var(--color-neutral-70),#fcfbff);
+
+  /* proposed component tokens — smartbar composer */
+  --smartbar-background:light-dark(#ffffff,#15131f);
+  --smartbar-pill-background:light-dark(var(--color-violet-0),#262038);
+  --smartbar-glow-start:light-dark(rgba(50,27,253,.14),rgba(138,99,255,.30));
+  --smartbar-glow-end:light-dark(rgba(245,196,81,.12),rgba(255,180,92,.16));
+}
+:root[data-scheme="dark"]{color-scheme:dark;}
+
+*{box-sizing:border-box;}
+html,body{margin:0;height:100%;}
+body{
+  /* :root { font: message-box } → system UI font */
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  font-size:13px;line-height:1.5;
+  height:100vh;display:flex;flex-direction:column;overflow:hidden;
+  background:#0c0b12;color:#f3f1f8; /* harness chrome only — not product */
+}
+button{font:inherit;}
+code{font-family:ui-monospace,Menlo,monospace;font-size:.82em;}
+
+/* =====================================================================
+ * PROTOTYPE HARNESS (topbar) — scaffolding, not product UI
+ * ===================================================================== */
+.topbar{padding:10px 22px;display:flex;align-items:center;gap:14px;flex-shrink:0;}
+.topbar .mark{font-size:15px;font-weight:600;}
+.topbar .mark em{color:#b89cff;font-style:italic;}
+.topbar .tagline{font-size:12px;color:rgba(243,241,248,.4);}
+.topbar .tagline b{color:#7fd97f;}
+.topbar .hbtn{font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:999px;border:1px solid #2b2638;background:#1c1926;color:#f3f1f8;cursor:pointer;white-space:nowrap;}
+.topbar .hbtn:first-of-type{margin-left:auto;}
+.topbar .hbtn[aria-pressed="true"]{background:#3d3355;border-color:#764edd;}
+.topbar .pref{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:rgba(243,241,248,.45);background:#17141f;border:1px solid #2b2638;border-radius:6px;padding:5px 10px;white-space:nowrap;}
+.topbar .pref b{color:#7fd97f;font-weight:600;}
+
+/* =====================================================================
+ * THE PRODUCT — a Firefox window. Everything below uses Nova tokens.
+ * ===================================================================== */
+.stage{flex:1;min-height:0;display:flex;justify-content:center;padding:0 22px 10px;}
+.frame{position:relative;width:100%;max-width:1280px;border:1px solid #2b2638;border-radius:14px 14px 0 0;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 30px 90px rgba(0,0,0,.5);
+  background:var(--background-color-canvas);color:var(--text-color);}
+
+/* ============ Tab strip — browser: #TabsToolbar ============ */
+.tab-strip{display:flex;align-items:center;height:44px;padding:6px 8px 0;background:var(--background-color-canvas);gap:2px;flex-shrink:0;}
+.traffic-lights{display:flex;gap:8px;padding:0 12px 6px 8px;flex-shrink:0;}
+.traffic-lights span{width:12px;height:12px;border-radius:50%;}
+.tl-close{background:#ff5f57;} .tl-min{background:#febc2e;} .tl-max{background:#28c840;}
+.tabs{display:flex;align-items:center;gap:2px;flex:1;min-width:0;height:100%;}
+.tab{display:flex;align-items:center;gap:7px;height:34px;padding:0 10px;min-width:36px;max-width:200px;flex:0 1 auto;
+  border-radius:var(--border-radius-medium) var(--border-radius-medium) 0 0;
+  cursor:default;user-select:none;overflow:hidden;transition:background .15s ease;}
+.tab:hover:not(.active){background:light-dark(rgba(21,20,26,.07),rgba(251,251,254,.07));border-radius:var(--border-radius-medium);height:30px;}
+.tab.active{background:var(--background-color-box);box-shadow:var(--box-shadow-level-1);}
+.tab .tab-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:var(--font-size-small);color:var(--text-color);}
+.tab .favicon{flex-shrink:0;}
+.tab.interactive{cursor:pointer;}
+.favicon{width:16px;height:16px;border-radius:var(--border-radius-small);display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;}
+.new-tab-btn{width:30px;height:30px;border:none;background:none;border-radius:var(--border-radius-small);color:var(--icon-color);font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.new-tab-btn:hover{background:light-dark(rgba(21,20,26,.07),rgba(251,251,254,.07));}
+
+/* tab groups — browser: tabbrowser tab-group */
+.tab-group{display:flex;align-items:center;gap:2px;height:100%;min-width:0;flex:0 1 auto;
+  opacity:0;transform:translateY(6px);
+  transition:opacity .4s cubic-bezier(.22,1,.36,1),transform .4s cubic-bezier(.22,1,.36,1);}
+.tab-group.in{opacity:1;transform:translateY(0);}
+.tab-group.leaving{opacity:0;transform:translateY(6px);}
+.group-label{display:flex;align-items:center;height:22px;padding:0 9px;margin:0 3px;border-radius:5px;font-size:11px;font-weight:var(--font-weight-semibold);color:#fff;white-space:nowrap;flex-shrink:0;align-self:center;}
+.tab-group .tab{opacity:0;transform:translateY(5px);
+  transition:opacity .35s cubic-bezier(.22,1,.36,1),transform .35s cubic-bezier(.22,1,.36,1),background .15s ease;}
+.tab-group.in .tab{opacity:1;transform:translateY(0);}
+.tab-group .tab.active{box-shadow:inset 0 -2px 0 var(--group-color,var(--color-accent-primary)),var(--box-shadow-level-1);background:var(--background-color-box);}
+
+/* ============ Toolbar — browser: #nav-bar + urlbar ============ */
+.toolbar{display:flex;align-items:center;gap:4px;height:44px;padding:0 10px;background:var(--background-color-box);border-bottom:var(--border-width) solid var(--border-color-deemphasized);flex-shrink:0;}
+.tool-btn{width:32px;height:32px;border:none;background:none;border-radius:var(--border-radius-small);color:var(--icon-color);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.tool-btn:hover{background:light-dark(rgba(21,20,26,.07),rgba(251,251,254,.07));}
+.tool-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+.tool-btn.disabled{opacity:.4;pointer-events:none;}
+.urlbar{flex:1;display:flex;align-items:center;gap:8px;height:32px;margin:0 6px;padding:0 12px;background:var(--background-color-canvas);border:var(--border-width) solid var(--border-color-deemphasized);border-radius:var(--border-radius-circle);color:var(--text-color-deemphasized);font-size:13px;}
+.urlbar svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;flex-shrink:0;}
+.urlbar .url-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.urlbar .url-text .domain{color:var(--text-color);}
+
+.frame-body{flex:1;min-height:0;position:relative;display:flex;overflow:hidden;}
+
+/* ============ Smart Window page — aiwindow/ui content ============ */
+.sw-wash{
+  background:
+    radial-gradient(1200px 700px at 20% -10%, light-dark(rgba(118,78,221,.10),rgba(152,113,255,.16)), transparent 60%),
+    radial-gradient(1000px 600px at 85% 110%, light-dark(rgba(207,48,226,.05),rgba(227,91,168,.10)), transparent 60%),
+    var(--background-color-canvas);}
+.sw-page{flex:1;min-width:0;min-height:0;overflow-y:auto;}
+.sw-inner{max-width:980px;margin:0 auto;padding:calc(7vh + 40px) 32px 60px;display:flex;flex-direction:column;align-items:center;}
+
+/* logo — aiwindow assets: smart window wordmark */
+.sw-logo{display:flex;align-items:center;gap:14px;margin-bottom:34px;}
+.sw-logo svg{width:44px;height:44px;}
+.sw-logo .name{font-size:30px;font-weight:500;color:light-dark(var(--color-violet-60),var(--color-violet-20));letter-spacing:.2px;}
+.sw-logo .beta{font-size:var(--font-size-small);font-weight:var(--font-weight-semibold);color:light-dark(var(--color-violet-60),var(--color-violet-20));border:var(--border-width) solid light-dark(rgba(89,57,168,.5),rgba(203,184,245,.5));border-radius:var(--border-radius-medium);padding:3px 9px;letter-spacing:.8px;margin-inline-start:2px;}
+
+/* smartbar composer — the gradient border is the REAL smartwindow token */
+.sw-input-wrap{width:min(760px,100%);border-radius:22px;padding:1.5px;
+  background:var(--smartwindow-border-color-gradient);
+  box-shadow:-40px 10px 110px var(--smartbar-glow-start),40px 30px 110px var(--smartbar-glow-end),var(--box-shadow-level-2);
+  margin-bottom:30px;transition:box-shadow .3s ease;}
+.sw-input-wrap:focus-within{box-shadow:-40px 10px 130px var(--smartbar-glow-start),40px 30px 130px var(--smartbar-glow-end),var(--box-shadow-level-2);}
+.sw-input{background:var(--smartbar-background);border-radius:21px;padding:22px 22px 14px;}
+.sw-input input{width:100%;border:none;outline:none;background:none;font-size:19px;color:var(--text-color);font-family:inherit;margin-bottom:22px;}
+.sw-input input::placeholder{color:var(--text-color-deemphasized);}
+.sw-input-row{display:flex;align-items:center;gap:10px;}
+.sw-ic-btn{width:32px;height:32px;border:none;background:none;border-radius:var(--border-radius-medium);color:var(--text-color-deemphasized);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;}
+.sw-ic-btn:hover{background:light-dark(rgba(21,20,26,.06),rgba(251,251,254,.07));}
+.sw-ic-btn svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+.sw-spacer{flex:1;}
+.sw-mode{display:flex;align-items:center;gap:7px;height:38px;padding:0 16px;border:none;border-radius:12px;background:var(--smartbar-pill-background);color:var(--text-color);font-size:15px;font-family:inherit;cursor:pointer;}
+.sw-mode:hover{background:light-dark(var(--color-violet-10),#2f2842);}
+.sw-mode svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;}
+.sw-send{width:46px;height:38px;border:none;border-radius:12px;background:light-dark(var(--color-neutral-10),#322c46);color:var(--text-color-deemphasized);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.sw-send:hover{background:light-dark(var(--color-neutral-20),#3c3554);color:var(--text-color);}
+.sw-send svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+/* send flips to a stop state while the reply streams */
+.sw-send .ic-stop{display:none;}
+.sw-send.streaming{background:transparent;border:2px solid var(--color-accent-primary);border-radius:50%;width:38px;color:var(--color-accent-primary);}
+.sw-send.streaming .ic-arrow{display:none;}
+.sw-send.streaming .ic-stop{display:block;width:10px;height:10px;}
+
+/* ============ Conversation starters — smartwindow-prompts (Nova chip) ============ */
+smartwindow-prompts.sw-chips{display:flex;flex-wrap:nowrap;justify-content:center;gap:10px;margin-bottom:40px;max-width:100%;}
+.sw-chip{display:flex;align-items:center;gap:8px;height:30px;padding:8px 12px;border-radius:var(--border-radius-circle);
+  background:var(--conversation-starter-background);
+  border:var(--border-width) solid var(--conversation-starter-border-color);
+  color:var(--conversation-starter-text-color);font-size:13px;font-weight:var(--font-weight);
+  font-family:inherit;cursor:pointer;white-space:nowrap;flex-shrink:0;
+  transition:color .15s ease,border-color .15s ease;}
+.sw-chip:hover{color:var(--text-color);border-color:transparent;
+  background:linear-gradient(var(--conversation-starter-background),var(--conversation-starter-background)) padding-box,
+             var(--conversation-starter-gradient-hover) border-box;}
+.sw-chip:active{color:var(--text-color);border-color:transparent;
+  background:linear-gradient(var(--conversation-starter-background),var(--conversation-starter-background)) padding-box,
+             var(--conversation-starter-gradient-active) border-box;}
+/* PUWYLO chips keep the full smart window gradient on hover */
+.sw-chip.puwylo:hover,.sw-chip.puwylo:active{
+  background:linear-gradient(var(--conversation-starter-background),var(--conversation-starter-background)) padding-box,
+             var(--smartwindow-border-color-gradient) border-box;}
+.sw-chip:focus-visible{outline:var(--focus-outline);outline-offset:var(--focus-outline-offset);}
+.chip-label{white-space:nowrap;}
+.mini-cluster{display:flex;flex-shrink:0;}
+.mini-cluster .favicon{width:14px;height:14px;border-radius:var(--border-radius-small);font-size:7.5px;border:1.5px solid light-dark(#ffffff,#201936);margin-inline-start:-4px;}
+.mini-cluster .favicon:first-child{margin-inline-start:0;}
+
+/* ============ Bottom nav (History / Chats) — aiwindow/ui nav ============ */
+.sw-bottom-nav{position:absolute;inset-block-end:26px;inset-inline-start:50%;transform:translateX(-50%);display:flex;gap:44px;z-index:10;}
+.sw-bottom-nav button{display:flex;flex-direction:column;align-items:center;gap:7px;border:none;background:none;cursor:pointer;color:light-dark(var(--color-violet-60),var(--color-violet-20));font-size:13px;font-family:inherit;opacity:.85;}
+.sw-bottom-nav button:hover{opacity:1;}
+.sw-bottom-nav svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;}
+
+/* ============ Shortcuts — newtab: .top-site-outer ============ */
+.sw-shortcuts{display:flex;gap:26px;justify-content:center;flex-wrap:wrap;}
+.top-site-outer{display:flex;flex-direction:column;align-items:center;gap:9px;width:86px;cursor:pointer;}
+.top-site-outer .tile{width:62px;height:62px;border-radius:var(--border-radius-large);background:var(--background-color-box);border:var(--border-width) solid var(--border-color-deemphasized);display:flex;align-items:center;justify-content:center;box-shadow:var(--box-shadow-level-1);transition:transform .2s cubic-bezier(.22,1,.36,1),box-shadow .2s ease;}
+.top-site-outer:hover .tile{transform:translateY(-2px);box-shadow:var(--box-shadow-level-2);}
+.top-site-outer .tile .favicon{width:30px;height:30px;border-radius:var(--border-radius-medium);font-size:14px;}
+.top-site-outer .name{font-size:12.5px;color:light-dark(var(--color-violet-60),var(--color-violet-20));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:86px;}
+
+/* =====================================================================
+ * Full page chat — aiwindow/ui full-surface conversation
+ * ===================================================================== */
+.fullchat{position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;
+  opacity:0;transform:translateY(14px);pointer-events:none;
+  transition:opacity .4s ease,transform .5s cubic-bezier(.22,1,.36,1);}
+.fullchat.open{opacity:1;transform:translateY(0);pointer-events:auto;}
+.fc-new{position:absolute;inset-block-start:18px;inset-inline-end:20px;width:34px;height:34px;border:none;background:none;border-radius:var(--border-radius-medium);color:var(--text-color-deemphasized);cursor:pointer;opacity:.85;display:flex;align-items:center;justify-content:center;z-index:5;}
+.fc-new:hover{background:light-dark(rgba(21,20,26,.07),rgba(251,251,254,.08));opacity:1;}
+.fc-new svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+
+/* ai-chat-content — REAL component, the scrolling conversation */
+ai-chat-content{display:block;flex:1;width:min(820px,calc(100% - 140px));overflow-y:auto;padding:34px 0 20px;min-height:0;}
+
+.fc-user{display:flex;justify-content:flex-end;margin-bottom:30px;opacity:0;transform:translateY(8px);
+  transition:opacity .35s ease,transform .4s cubic-bezier(.22,1,.36,1);}
+.fc-user.in{opacity:1;transform:translateY(0);}
+.fc-user .pill{background:var(--background-color-box);border:var(--border-width) solid var(--border-color-deemphasized);border-radius:12px;padding:13px 22px;font-size:15.5px;max-width:75%;box-shadow:var(--box-shadow-level-1);color:var(--text-color);}
+
+/* ai-chat-message — REAL component, assistant turn (no bubble) */
+ai-chat-message.fc-ai{display:block;font-size:15px;line-height:1.65;color:var(--text-color);}
+.fc-ai p,.fc-ai ul{margin:0 0 14px;opacity:0;transform:translateY(6px);
+  transition:opacity .45s ease,transform .5s cubic-bezier(.22,1,.36,1);}
+.fc-ai p.in,.fc-ai ul.in{opacity:1;transform:translateY(0);}
+.fc-ai ul{margin-inline-start:24px;padding:0;}
+.fc-ai li{margin-bottom:10px;}
+.fc-ai strong{font-weight:var(--font-weight-semibold);}
+.fc-ai .muted{color:var(--text-color-deemphasized);}
+
+.fc-actions{display:flex;gap:4px;margin:2px 0 26px;opacity:0;transition:opacity .4s ease;}
+.fc-actions.in{opacity:1;}
+.fc-actions button{width:28px;height:28px;border:none;background:none;border-radius:7px;color:var(--text-color-deemphasized);opacity:.8;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.fc-actions button:hover{background:light-dark(rgba(21,20,26,.07),rgba(251,251,254,.08));opacity:1;}
+.fc-actions svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;}
+
+/* smartwindow-prompts — REAL component, suggestion chips after a reply */
+smartwindow-prompts.fc-sugs{display:flex;flex-direction:column;align-items:flex-start;gap:13px;}
+.fc-pill{display:inline-flex;align-items:center;height:30px;padding:8px 12px;border-radius:var(--border-radius-circle);
+  border:var(--border-width) solid var(--conversation-starter-border-color);
+  background:var(--conversation-starter-background);
+  color:var(--conversation-starter-text-color);font-size:13px;font-weight:var(--font-weight);
+  font-family:inherit;cursor:pointer;
+  opacity:0;transform:translateY(6px);
+  transition:opacity .4s ease,transform .45s cubic-bezier(.22,1,.36,1),border-color .15s ease,color .15s ease;}
+.fc-pill.in{opacity:1;transform:translateY(0);}
+.fc-pill:hover{color:var(--text-color);border-color:transparent;
+  background:linear-gradient(var(--conversation-starter-background),var(--conversation-starter-background)) padding-box,
+             var(--conversation-starter-gradient-hover) border-box;}
+.fc-pill:active{color:var(--text-color);border-color:transparent;
+  background:linear-gradient(var(--conversation-starter-background),var(--conversation-starter-background)) padding-box,
+             var(--conversation-starter-gradient-active) border-box;}
+.fc-pill:focus-visible{outline:var(--focus-outline);outline-offset:var(--focus-outline-offset);}
+
+/* ============ Action log — proposed: ai-action-log (Nova disclosure) ============ */
+ai-action-log{display:block;margin-bottom:16px;opacity:0;transform:translateY(6px);
+  transition:opacity .35s ease,transform .4s cubic-bezier(.22,1,.36,1);}
+ai-action-log.in{opacity:1;transform:translateY(0);}
+.alog-head{display:flex;align-items:center;gap:8px;font-size:13px;line-height:16px;font-weight:var(--font-weight-semibold);color:var(--text-color);cursor:pointer;user-select:none;width:fit-content;}
+.alog-head .al-spark{width:16px;height:16px;fill:var(--tabselector-check-background);flex-shrink:0;}
+.alog-head .al-chev{width:11px;height:11px;fill:none;stroke:var(--text-color-deemphasized);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s ease;}
+ai-action-log.open .al-chev{transform:rotate(90deg);}
+.alog-body{display:none;margin-block-start:8px;margin-inline-start:7px;padding-inline-start:18px;border-inline-start:var(--border-width) solid light-dark(rgba(118,78,221,.3),rgba(212,193,255,.3));}
+ai-action-log.open .alog-body{display:block;}
+.alog-item{position:relative;margin:10px 0;}
+.alog-item::before{content:"";position:absolute;inset-inline-start:-22px;inset-block-start:5px;width:7px;height:7px;border-radius:50%;background:light-dark(rgba(118,78,221,.55),rgba(179,147,255,.6));}
+.al-item-text{font-size:13px;line-height:16px;font-weight:500;color:var(--text-color);}
+.alog-pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+/* pills reuse the ai-website-chip pattern */
+.alog-pill{display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 12px;background:var(--tabselector-row-background);border-radius:var(--border-radius-circle);font-size:12.5px;color:var(--text-color);white-space:nowrap;}
+.alog-pill .favicon{width:14px;height:14px;border-radius:3px;font-size:7px;}
+
+.fc-spinner{width:17px;height:17px;border-radius:50%;border:2px solid light-dark(rgba(118,78,221,.25),rgba(158,120,255,.25));border-top-color:var(--color-accent-primary);animation:fcspin .9s linear infinite;margin:2px 0 22px 3px;}
+@keyframes fcspin{to{transform:rotate(360deg);}}
+
+/* =====================================================================
+ * Inline tab selector — proposed: puwylo-tab-selector
+ * (Figma "confirmation card" component, Nova dark values preserved)
+ * ===================================================================== */
+puwylo-tab-selector{position:relative;display:block;width:318px;margin:6px 0 18px;
+  background:var(--tabselector-background);
+  border:var(--border-width) solid var(--tabselector-border-color);
+  border-radius:20px;
+  box-shadow:0 4px 12px 2px light-dark(rgba(58,15,110,.14),rgba(58,15,110,.24));
+  padding:12px 10px 10px;
+  opacity:0;transform:translateY(6px);
+  transition:opacity .45s ease,transform .5s cubic-bezier(.22,1,.36,1);}
+puwylo-tab-selector.in{opacity:1;transform:translateY(0);}
+puwylo-tab-selector.dismissed{display:none;}
+
+.sel-close{position:absolute;inset-block-start:-8px;inset-inline-end:-8px;width:24px;height:24px;
+  background:light-dark(#ffffff,#1e1d20);border:var(--border-width) solid var(--tabselector-border-color);border-radius:var(--border-radius-circle);
+  box-shadow:0 .25px .75px rgba(0,0,0,.06),0 2px 8px rgba(0,0,0,.12);
+  color:light-dark(var(--color-neutral-60),#d8d7dc);cursor:pointer;font-size:11px;line-height:1;
+  display:flex;align-items:center;justify-content:center;}
+.sel-close:hover{background:light-dark(var(--color-neutral-10),#2b2a2e);}
+
+.sel-scroll{display:flex;flex-direction:column;gap:4px;max-height:156px;/* four rows, fifth peeking */overflow-y:auto;scrollbar-width:none;}
+.sel-scroll::-webkit-scrollbar{display:none;}
+.sel-fade{position:sticky;bottom:-1px;flex-shrink:0;min-height:38px;margin-top:-38px;backdrop-filter:blur(5px);
+  background:light-dark(rgba(255,255,255,.01),rgba(54,53,57,.01));
+  -webkit-mask-image:linear-gradient(to bottom,transparent,#000 65%);
+  mask-image:linear-gradient(to bottom,transparent,#000 65%);
+  pointer-events:none;display:none;}
+puwylo-tab-selector.has-overflow .sel-fade{display:block;}
+
+.sel-row{display:flex;align-items:center;gap:16px;height:32px;padding:8px 12px;background:var(--tabselector-row-background);border-radius:20px;cursor:pointer;user-select:none;}
+.sel-row:focus-visible{outline:var(--focus-outline);outline-offset:var(--focus-outline-offset);}
+.sel-row:hover{background:var(--tabselector-row-background-hover);}
+.sel-row .cb{width:16px;height:16px;border-radius:var(--border-radius-small);flex-shrink:0;background:transparent;border:var(--border-width) solid light-dark(var(--color-neutral-30),#817f84);display:flex;align-items:center;justify-content:center;transition:background .15s ease,border-color .15s ease;}
+.sel-row.checked .cb{background:var(--tabselector-check-background);border-color:var(--tabselector-check-background);}
+.sel-row .cb svg{width:9px;height:7px;fill:none;stroke:var(--tabselector-check-color);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:0;}
+.sel-row.checked .cb svg{opacity:1;}
+.sel-tabinfo{display:flex;align-items:center;gap:8px;min-width:0;}
+.sel-row .favicon{width:16px;height:16px;border-radius:2px;font-size:8px;flex-shrink:0;}
+.sel-row .sel-title{font-size:13px;line-height:16px;color:var(--text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+.sel-foot{display:flex;flex-direction:column;gap:4px;padding-top:10px;}
+
+/* toolkit moz-button — Nova pill (selector footer + generated actions) */
+moz-button{display:flex;width:100%;}
+moz-button button{width:100%;min-height:var(--button-min-height);display:flex;align-items:center;justify-content:center;
+  padding:4px 16px;border:none;border-radius:var(--button-border-radius);
+  font-size:15px;line-height:18px;font-weight:var(--font-weight-semibold);font-family:inherit;cursor:pointer;
+  background:var(--tabselector-secondary-background);color:var(--tabselector-secondary-text-color);
+  transition:background .15s ease,opacity .15s ease;}
+moz-button button:hover:not(:disabled){background:light-dark(var(--color-neutral-30),#6f6e73);}
+moz-button[type="primary"] button{background:var(--tabselector-check-background);color:var(--tabselector-check-color);}
+moz-button[type="primary"] button:hover:not(:disabled){background:light-dark(var(--color-violet-60),#c4adfb);}
+moz-button[type="primary"] button:disabled{opacity:.7;cursor:default;}
+moz-button button:disabled{opacity:.5;cursor:default;}
+moz-button button:focus-visible{outline:var(--focus-outline);outline-offset:var(--focus-outline-offset);}
+
+/* full-chat composer — smartwindow-footer + gradient smartbar */
+.fc-input-zone{display:flex;flex-direction:column;align-items:center;width:100%;}
+.fc-input-wrap{width:min(720px,calc(100% - 140px));border-radius:20px;padding:1.5px;
+  background:var(--smartwindow-border-color-gradient);
+  box-shadow:-20px 6px 70px var(--smartbar-glow-start),20px 14px 70px var(--smartbar-glow-end);}
+.fc-input{background:var(--smartbar-background);border-radius:19px;padding:16px 16px 12px;}
+.fc-input input{width:100%;border:none;outline:none;background:none;font-size:16px;color:var(--text-color);font-family:inherit;margin-bottom:14px;}
+.fc-input input::placeholder{color:var(--text-color-deemphasized);}
+.fc-note{font-size:12.5px;color:var(--text-color-deemphasized);margin:10px 0 16px;}
+
+/* =====================================================================
+ * Site view — a group tab is focused; ai-window rides along
+ * ===================================================================== */
+.site-view{position:absolute;inset:0;z-index:50;display:flex;opacity:0;pointer-events:none;transition:opacity .35s ease;}
+.site-view.open{opacity:1;pointer-events:auto;}
+.site-main{flex:1;min-width:0;background:var(--background-color-box);padding:34px 48px;overflow:hidden;}
+.site-header{display:flex;align-items:center;gap:12px;margin-bottom:30px;}
+.site-header .favicon{width:28px;height:28px;border-radius:7px;font-size:13px;}
+.site-header .site-name{font-size:17px;font-weight:var(--font-weight-semibold);color:var(--text-color);}
+.skel{background:light-dark(rgba(21,20,26,.06),rgba(251,251,254,.07));border-radius:var(--border-radius-medium);margin-bottom:14px;}
+.skel.hero{height:180px;border-radius:12px;margin-bottom:26px;}
+.skel.row{height:14px;}
+.skel.w80{width:80%;} .skel.w60{width:60%;} .skel.w90{width:90%;} .skel.w45{width:45%;}
+.skel-cards{display:flex;gap:16px;margin-top:26px;}
+.skel-cards .skel{flex:1;height:120px;margin:0;border-radius:12px;}
+
+/* ai-window — REAL component, docked like the Firefox sidebar */
+ai-window{position:relative;width:372px;flex-shrink:0;display:flex;flex-direction:column;overflow:hidden;
+  background:var(--background-color-box);
+  border-inline-start:var(--border-width) solid var(--border-color-deemphasized);
+  transform:translateX(20px);opacity:0;
+  transition:transform .5s cubic-bezier(.22,1,.36,1) .05s,opacity .4s ease .05s;}
+.site-view.open ai-window{transform:translateX(0);opacity:1;}
+/* the Smart Window gradient seam on the leading edge */
+ai-window::before{content:"";position:absolute;inset-inline-start:0;top:0;bottom:0;width:2px;background:var(--smartwindow-border-color-gradient);z-index:5;}
+
+smartwindow-heading{display:flex;align-items:center;gap:9px;padding:14px 16px;border-bottom:var(--border-width) solid var(--border-color-deemphasized);flex-shrink:0;background:var(--background-color-box);}
+smartwindow-heading .dot{width:9px;height:9px;border-radius:3px;flex-shrink:0;}
+smartwindow-heading .jt-title{font-size:13.5px;font-weight:var(--font-weight-semibold);color:var(--text-color);}
+smartwindow-heading .jt-scope{font-size:10.5px;color:var(--text-color-deemphasized);}
+
+ai-window ai-chat-content{width:auto;flex:1;overflow-y:auto;padding:16px;}
+
+.jt-divider{display:flex;align-items:center;gap:10px;font-size:10.5px;font-weight:var(--font-weight-semibold);letter-spacing:.4px;color:var(--text-color-deemphasized);text-transform:uppercase;margin:4px 0 14px;}
+.jt-divider::before,.jt-divider::after{content:"";flex:1;height:1px;background:var(--border-color-deemphasized);}
+
+.jt-user{display:flex;justify-content:flex-end;margin-bottom:12px;}
+.jt-user .pill{background:var(--background-color-box-info);border:var(--border-width) solid light-dark(var(--color-violet-10),rgba(158,120,255,.2));border-radius:13px 13px 4px 13px;padding:8px 13px;font-size:12.5px;max-width:82%;color:var(--text-color);}
+ai-chat-message.jt-ai{display:block;font-size:12.5px;line-height:1.55;color:var(--text-color-deemphasized);margin-bottom:14px;}
+.jt-ai strong{color:var(--text-color);font-weight:var(--font-weight-semibold);}
+.jt-ai .muted{color:var(--text-color-deemphasized);}
+.jt-ai p{margin:0 0 9px;}
+.group-pill{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:9px;background:light-dark(rgba(21,20,26,.05),rgba(251,251,254,.07));font-size:var(--font-size-small);font-weight:var(--font-weight-semibold);color:var(--text-color);margin-bottom:10px;}
+.group-pill .dot{width:8px;height:8px;border-radius:3px;}
+
+smartwindow-prompts.jt-chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px;}
+.jt-chips .fc-pill{font-size:var(--font-size-small);padding:7px 13px;opacity:1;transform:none;height:auto;}
+
+smartwindow-footer{display:block;padding:12px 14px 14px;border-top:var(--border-width) solid var(--border-color-deemphasized);flex-shrink:0;background:var(--background-color-box);}
+input-cta{display:flex;align-items:center;gap:8px;border:var(--border-width) solid var(--border-color);border-radius:11px;padding:9px 12px;background:var(--background-color-canvas);}
+input-cta input{flex:1;border:none;outline:none;background:none;font-size:12.5px;color:var(--text-color);font-family:inherit;min-width:0;}
+input-cta input::placeholder{color:var(--text-color-deemphasized);}
+input-cta .sw-send{width:26px;height:26px;border-radius:7px;}
+input-cta .sw-send svg{width:12px;height:12px;}
+
+/* =====================================================================
+ * Inspect mode — labels every element with its source path
+ * ===================================================================== */
+body.inspect [data-src]{outline:1px dashed color-mix(in srgb,var(--color-accent-primary) 65%,transparent);outline-offset:2px;position:relative;}
+body.inspect [data-src]::after{content:attr(data-src);position:absolute;inset-block-start:-9px;inset-inline-start:8px;z-index:60;font-family:ui-monospace,Menlo,monospace;font-size:8.5px;line-height:1;padding:3px 6px;border-radius:4px;background:light-dark(var(--color-violet-70),var(--color-violet-30));color:light-dark(#fff,var(--color-neutral-90));white-space:nowrap;pointer-events:none;}
+body.inspect [data-src^="proposed"]::after{background:var(--color-orange-40);color:#fff;}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms!important;transition-delay:0ms!important;animation:none!important;}}
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <span class="mark">PUWYLO Option C — <em>inline tab selector</em></span>
+    <span class="tagline">built on Nova tokens + aiwindow components · June '26 brief · <b>rev 1 — nova/firefox components</b></span>
+    <button class="hbtn" id="inspectBtn" aria-pressed="false">{ } Inspect</button>
+    <button class="hbtn" id="schemeBtn" aria-pressed="true">◐ Dark</button>
+    <span class="pref">browser.smartwindow.puwylo.enabled = <b>true</b></span>
+  </div>
+
+  <div class="stage">
+    <div class="frame" data-src="browser/base — navigator window">
+
+      <!-- Tab strip -->
+      <div class="tab-strip" data-src="browser: #TabsToolbar">
+        <div class="traffic-lights"><span class="tl-close"></span><span class="tl-min"></span><span class="tl-max"></span></div>
+        <div class="tabs" id="tabs">
+          <div class="tab" id="preexisting-tab">
+            <span class="favicon" style="background:#003580">B</span>
+            <span class="tab-title">Booking.com | Shibuya hotels</span>
+          </div>
+          <div class="tab active" id="newtab-tab">
+            <svg class="favicon" viewBox="0 0 16 16" style="background:none"><path d="M8 1.5l1.3 3.9 3.9 1.3-3.9 1.3L8 11.9 6.7 8 2.8 6.7l3.9-1.3z" fill="#b89cff"/></svg>
+            <span class="tab-title" data-l10n-id="tabbrowser-empty-tab-title">New tab</span>
+          </div>
+          <button class="new-tab-btn" id="newtab-plus" data-l10n-id="tabs-toolbar-new-tab" title="Open a new tab">+</button>
+        </div>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar" data-src="browser: #nav-bar">
+        <button class="tool-btn disabled" id="back-btn" data-l10n-id="toolbar-button-back" title="Go back"><svg viewBox="0 0 16 16"><path d="M10.5 3.5 6 8l4.5 4.5"/></svg></button>
+        <button class="tool-btn disabled" data-l10n-id="toolbar-button-forward" title="Go forward"><svg viewBox="0 0 16 16"><path d="M5.5 3.5 10 8l-4.5 4.5"/></svg></button>
+        <button class="tool-btn" data-l10n-id="toolbar-button-reload" title="Reload page"><svg viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.8v2.4h-2.4"/></svg></button>
+        <div class="urlbar" data-src="browser/components/urlbar">
+          <svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+          <span class="url-text" id="url-text">Search with Google or enter address</span>
+        </div>
+        <button class="tool-btn" title="Extensions"><svg viewBox="0 0 16 16"><path d="M6 2.8c0-.7.6-1.3 1.3-1.3s1.3.6 1.3 1.3v.7h2.9v2.9h.7c.7 0 1.3.6 1.3 1.3S12.9 9 12.2 9h-.7v2.9H8.6v.7c0 .7-.6 1.3-1.3 1.3S6 13.3 6 12.6v-.7H3.1V9h-.7C1.7 9 1.1 8.4 1.1 7.7s.6-1.3 1.3-1.3h.7V3.5H6v-.7z"/></svg></button>
+        <button class="tool-btn" title="Account"><svg viewBox="0 0 16 16"><circle cx="8" cy="5.5" r="2.8"/><path d="M2.8 13.5c.9-2.4 2.9-3.7 5.2-3.7s4.3 1.3 5.2 3.7"/></svg></button>
+        <button class="tool-btn" title="Open application menu"><svg viewBox="0 0 16 16"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg></button>
+      </div>
+
+      <div class="frame-body">
+
+        <!-- Smart Window new tab -->
+        <div class="sw-page sw-wash" data-src="aiwindow/ui: smart window new tab">
+          <div class="sw-inner">
+
+            <div class="sw-logo" data-src="aiwindow assets: smart window wordmark">
+              <svg viewBox="0 0 48 48">
+                <defs>
+                  <linearGradient id="starg" x1="0%" y1="100%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#321bfd"/>
+                    <stop offset="55%" stop-color="#cf30e2"/>
+                    <stop offset="100%" stop-color="#f5c451"/>
+                  </linearGradient>
+                </defs>
+                <path d="M22 6c1.6 8.5 5.5 12.4 14 14-8.5 1.6-12.4 5.5-14 14-1.6-8.5-5.5-12.4-14-14 8.5-1.6 12.4-5.5 14-14z" fill="none" stroke="url(#starg)" stroke-width="3.4" stroke-linejoin="round"/>
+                <path d="M37 5c.5 2.8 1.8 4.1 4.6 4.6-2.8.5-4.1 1.8-4.6 4.6-.5-2.8-1.8-4.1-4.6-4.6 2.8-.5 4.1-1.8 4.6-4.6z" fill="url(#starg)"/>
+              </svg>
+              <span class="name" data-l10n-id="smartwindow-heading-title">Smart Window</span>
+              <span class="beta" data-l10n-id="smartwindow-beta-badge">BETA</span>
+            </div>
+
+            <div class="sw-input-wrap" data-src="aiwindow/ui: smartbar composer (input-cta pattern)">
+              <div class="sw-input">
+                <input type="text" id="sw-field" data-l10n-id="smartwindow-input-placeholder" placeholder="Ask, search, or type a URL">
+                <div class="sw-input-row">
+                  <button class="sw-ic-btn" title="Add attachment">+</button>
+                  <button class="sw-ic-btn" title="Browse prompts"><svg viewBox="0 0 16 16"><rect x="3" y="2" width="10" height="12" rx="1.5"/><path d="M6 5.5h4M6 8h4"/></svg></button>
+                  <div class="sw-spacer"></div>
+                  <button class="sw-mode">Flexible <svg viewBox="0 0 12 12"><path d="M2.5 4.5 6 8l3.5-3.5"/></svg></button>
+                  <button class="sw-send" id="sw-send" title="Send"><svg class="ic-arrow" viewBox="0 0 16 16"><path d="M2.5 8h10M9 4.5 13 8l-4 3.5"/></svg></button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Starter chips: PUWYLO memory journeys + standard prompts -->
+            <smartwindow-prompts class="sw-chips" id="sw-chips" data-src="aiwindow/ui/components/smartwindow-prompts">
+              <button class="sw-chip puwylo" data-starter="tokyo" data-src="proposed: puwylo-chip (starter variant)" title="From your recent activity">
+                <span class="mini-cluster">
+                  <span class="favicon" style="background:#4285f4">F</span>
+                  <span class="favicon" style="background:#13294b">N</span>
+                  <span class="favicon" style="background:#003580">B</span>
+                </span>
+                <span class="chip-label">Pick up your Tokyo trip</span>
+              </button>
+              <button class="sw-chip puwylo" data-starter="lacrosse" data-src="proposed: puwylo-chip (starter variant)" title="From your recent activity">
+                <span class="mini-cluster">
+                  <span class="favicon" style="background:#1565c0">L</span>
+                  <span class="favicon" style="background:#00713d">D</span>
+                  <span class="favicon" style="background:#0a2240">U</span>
+                </span>
+                <span class="chip-label">Finish the lacrosse signup</span>
+              </button>
+              <button class="sw-chip" data-starter="writing">Improve writing</button>
+              <button class="sw-chip" data-starter="brainstorm">Brainstorm ideas</button>
+              <button class="sw-chip" data-starter="compare">Compare tabs</button>
+            </smartwindow-prompts>
+
+            <div class="sw-bottom-nav" data-src="aiwindow/ui: history / chats nav">
+              <button title="History"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5"/><path d="M10 5.8V10l3 1.8"/></svg>History</button>
+              <button title="Chats"><svg viewBox="0 0 20 20"><path d="M17 9.5a7 7 0 0 1-7 6.7c-1.1 0-2.2-.2-3.1-.7L3 16.5l1-3.6a7 7 0 1 1 13-3.4z"/><path d="M10 7.5l.9 2.2 2.2.3-1.6 1.5.4 2.2-1.9-1-1.9 1 .4-2.2-1.6-1.5 2.2-.3z" fill="currentColor" stroke="none"/></svg>Chats</button>
+            </div>
+
+            <div class="sw-shortcuts" id="sw-shortcuts" data-src="newtab: .top-site-outer">
+              <div class="top-site-outer"><div class="tile"><span class="favicon" style="background:#4285f4">D</span></div><span class="name">docs.google</span></div>
+              <div class="top-site-outer"><div class="tile"><span class="favicon" style="background:#ea4335">M</span></div><span class="name">mail.google</span></div>
+              <div class="top-site-outer"><div class="tile"><span class="favicon" style="background:#0fa47f">C</span></div><span class="name">chatgpt</span></div>
+              <div class="top-site-outer"><div class="tile"><span class="favicon" style="background:#1a73e8">29</span></div><span class="name">calendar.g...</span></div>
+              <div class="top-site-outer"><div class="tile"><span class="favicon" style="background:#24292f">G</span></div><span class="name">github</span></div>
+              <div class="top-site-outer"><div class="tile"><span class="favicon" style="background:#5b5b66">W</span></div><span class="name">deploy-pre...</span></div>
+              <div class="top-site-outer"><div class="tile"><span class="favicon" style="background:#c13584">I</span></div><span class="name">instagram</span></div>
+              <div class="top-site-outer"><div class="tile"><span class="favicon" style="background:#0052cc">A</span></div><span class="name">home.atlas...</span></div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Full page chat -->
+        <div class="fullchat sw-wash" id="fullchat" data-src="aiwindow/ui: full-surface conversation">
+          <button class="fc-new" id="fc-new" data-l10n-id="smartwindow-new-tab-button" title="New tab"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.3"/><path d="M8 5.5v5M5.5 8h5"/></svg></button>
+          <ai-chat-content id="fc-scroll" data-src="aiwindow/ui/components/ai-chat-content"></ai-chat-content>
+          <div class="fc-input-zone">
+            <div class="fc-input-wrap" data-src="aiwindow/ui: smartbar composer (input-cta pattern)">
+              <div class="fc-input">
+                <input type="text" id="fc-field" data-l10n-id="smartwindow-input-placeholder" placeholder="Ask, search, or type a URL">
+                <div class="sw-input-row">
+                  <button class="sw-ic-btn" title="Add attachment">+</button>
+                  <button class="sw-ic-btn" title="Browse prompts"><svg viewBox="0 0 16 16"><rect x="3" y="2" width="10" height="12" rx="1.5"/><path d="M6 5.5h4M6 8h4"/></svg></button>
+                  <div class="sw-spacer"></div>
+                  <button class="sw-mode">Flexible <svg viewBox="0 0 12 12"><path d="M2.5 4.5 6 8l3.5-3.5"/></svg></button>
+                  <button class="sw-send" id="fc-send" title="Send"><svg class="ic-arrow" viewBox="0 0 16 16"><path d="M2.5 8h10M9 4.5 13 8l-4 3.5"/></svg><svg class="ic-stop" viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" rx="1.5" fill="currentColor" stroke="none"/></svg></button>
+                </div>
+              </div>
+            </div>
+            <div class="fc-note" data-l10n-id="smartwindow-disclaimer">AI can make mistakes.</div>
+          </div>
+        </div>
+
+        <!-- Site view: a tab from the group is focused, ai-window rides along -->
+        <div class="site-view" id="site-view">
+          <div class="site-main" data-src="content area (web page)">
+            <div class="site-header">
+              <span class="favicon" id="site-favicon" style="background:#4285f4">F</span>
+              <span class="site-name" id="site-name">Google Flights</span>
+            </div>
+            <div class="skel hero"></div>
+            <div class="skel row w80"></div>
+            <div class="skel row w60"></div>
+            <div class="skel row w90"></div>
+            <div class="skel row w45"></div>
+            <div class="skel-cards"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
+          </div>
+          <ai-window data-src="aiwindow/ui/components/ai-window">
+            <smartwindow-heading data-src="aiwindow/ui/components/smartwindow-heading">
+              <span class="dot" id="jt-dot" style="background:#ab71ff"></span>
+              <div style="flex:1; min-width:0">
+                <div class="jt-title" id="jt-title">Tokyo trip</div>
+                <div class="jt-scope" data-l10n-id="puwylo-journey-scope">One conversation for this tab group</div>
+              </div>
+            </smartwindow-heading>
+            <ai-chat-content id="jt-scroll" data-src="aiwindow/ui/components/ai-chat-content"></ai-chat-content>
+            <smartwindow-footer data-src="aiwindow/ui/components/smartwindow-footer">
+              <input-cta data-src="aiwindow/ui/components/input-cta">
+                <input type="text" id="jt-field" data-l10n-id="puwylo-journey-input-placeholder" placeholder="Ask about this trip">
+                <button class="sw-send" id="jt-send" title="Send"><svg class="ic-arrow" viewBox="0 0 16 16"><path d="M2.5 8h10M9 4.5 13 8l-4 3.5"/></svg></button>
+              </input-cta>
+            </smartwindow-footer>
+          </ai-window>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ================= Data (content, not product UI — favicon colors are site brands) ================= */
+const SESSIONS = {
+  tokyo: {
+    name: "Tokyo trip", color: "#ab71ff",
+    userMsg: "Pick up my Tokyo trip planning",
+    tabs: [
+      { t: "Google Flights", c: "#4285f4", l: "F", u: "google.com/travel/flights" },
+      { t: "ANA | Book flights", c: "#13294b", l: "N", u: "ana.co.jp/en/us" },
+      { t: "Booking.com | Shibuya hotels", c: "#003580", l: "B", u: "booking.com/searchresults" },
+      { t: "Airbnb | Shinjuku", c: "#ff5a5f", l: "A", u: "airbnb.com/s/shinjuku" },
+      { t: "Cerulean Tower Hotel", c: "#37474f", l: "C", u: "ceruleantower-hotel.com" },
+      { t: "japan-guide.com", c: "#c1272d", l: "J", u: "japan-guide.com/e/e3014.html" },
+      { t: "Tokyo itinerary - Google Docs", c: "#4285f4", l: "D", u: "docs.google.com/document" },
+      { t: "Tabelog | Shibuya ramen", c: "#f2a900", l: "T", u: "tabelog.com/en/tokyo" },
+      { t: "r/JapanTravel", c: "#ff4500", l: "R", u: "reddit.com/r/JapanTravel" }
+    ],
+    pill: `Tab group created · 9 tabs`,
+    groupLabel: "Trip to Tokyo",
+    changed: `One change since you left: <strong>the ANA departure you starred dropped $80</strong>.`,
+    preChecked: 2,
+    historyDay: "Yesterday",
+    history: [
+      { u: "Is the ryokan in Asakusa near a metro stop?" },
+      { a: "Yes. It is a 4 minute walk from Asakusa station on the Ginza line, about 35 minutes to Shibuya. Quiet street, and the rooftop bath faces the Skytree." },
+      { u: "Keep it in the running with the Cerulean." },
+      { a: "Done. Those two are your final hotel shortlist." }
+    ],
+    summary: [
+      "I found <strong>9 tabs</strong> from this trip, including the Booking.com one you still have open.",
+      "Here is where you left off: flights are narrowed to <strong>two ANA options for Oct 12 to 19</strong>, and you were mid-comparison on hotels. Cerulean Tower in Shibuya and the ryokan in Asakusa were the last two you looked at. Your itinerary doc covers days 1 to 3.",
+      "<span class=\"muted\">The hotel tabs were your most recent activity. Picking one would unlock the rest of the itinerary.</span>"
+    ],
+    chips: ["Compare the two hotels", "Check ANA baggage rules", "Draft a 5-day itinerary"]
+  },
+  camps: {
+    name: "Summer camps", color: "#2ac3a2",
+    userMsg: "Pick up the summer camp search",
+    tabs: [
+      { t: "CampNavigator | Day camps", c: "#2e7d32", l: "C", u: "campnavigator.com/day-camps" },
+      { t: "YMCA summer programs", c: "#5e35b1", l: "Y", u: "ymca.org/summer" },
+      { t: "ActivityHero | STEM camps", c: "#00897b", l: "A", u: "activityhero.com/stem" },
+      { t: "Camp comparison - Sheets", c: "#188038", l: "S", u: "docs.google.com/spreadsheets" },
+      { t: "Gmail | Camp Evergreen", c: "#ea4335", l: "M", u: "mail.google.com" }
+    ],
+    pill: `Tab group created · 5 tabs`,
+    groupLabel: "Summer camps",
+    preChecked: 2,
+    historyDay: "Friday",
+    history: [
+      { u: "Which one had the early-bird discount?" },
+      { a: "Camp Evergreen. The discount ends Friday and applies to the July session you asked about." }
+    ],
+    summary: [
+      "Reopened your 5 tabs in the background as <strong>Summer camps</strong>.",
+      "You compared three day camps in your spreadsheet: Camp Evergreen, the YMCA adventure program, and a STEM camp on ActivityHero. Camp Evergreen emailed you back about the July session, and its <strong>early-bird price ends Friday</strong>.",
+      "<span class=\"muted\">Your spreadsheet has ratings filled in for two of the three camps.</span>"
+    ],
+    chips: ["Finish the comparison sheet", "Reply to Camp Evergreen", "Check July availability"]
+  },
+  lacrosse: {
+    name: "Lacrosse signup", color: "#ff8a50",
+    userMsg: "Finish the lacrosse signup",
+    tabs: [
+      { t: "LeagueApps | Spring registration", c: "#1565c0", l: "L", u: "leagueapps.com/register" },
+      { t: "DICK'S | Lacrosse starter gear", c: "#00713d", l: "D", u: "dickssportinggoods.com/lacrosse" },
+      { t: "USA Lacrosse | Membership", c: "#0a2240", l: "U", u: "usalacrosse.com/membership" }
+    ],
+    pill: `Tab group created · 3 tabs`,
+    groupLabel: "Lacrosse signup",
+    preChecked: 2,
+    historyDay: "Tuesday",
+    history: [
+      { u: "What is left on the registration?" },
+      { a: "Just the USA Lacrosse membership number. Everything else is filled in, and the gear set is in your cart." }
+    ],
+    summary: [
+      "I found <strong>3 tabs</strong> from this signup.",
+      "The registration form is <strong>half filled out</strong>. It still needs a USA Lacrosse membership number, which is why that tab is open. The starter gear set is sitting in your cart.",
+      "<span class=\"muted\">Finishing the membership first gets you the number the form needs.</span>"
+    ],
+    chips: ["Finish the registration", "Review the gear cart"]
+  }
+};
+
+/* Prompts that do not open tabs get the full page chat.
+   Each mirrors the live behavior for that chip. */
+const STARTERS = {
+  writing: {
+    userMsg: "Improve writing",
+    reply: [
+      "<p>I'd be happy to help improve your writing. Could you share what you're working on? For example:</p>",
+      `<ul>
+        <li>Paste the text right here in the chat</li>
+        <li>Use @ to point me at a tab, doc, or draft</li>
+        <li>Tell me the tone you're going for</li>
+      </ul>`,
+      "<p>Let me know so I can assist you better.</p>"
+    ],
+    pills: []
+  },
+  brainstorm: {
+    userMsg: "Brainstorm ideas",
+    reply: [
+      "<p>Here are a few brainstorming ideas across different categories:</p>",
+      `<ul>
+        <li><strong>Personal Productivity:</strong> Design a browser extension that summarizes open tabs by topic and suggests focused work sessions based on tab usage patterns.</li>
+        <li><strong>Learning &amp; Development:</strong> Create a guided learning path for AI-powered design tools, combining UX research with hands-on practice in prototyping.</li>
+        <li><strong>Shopping Innovation:</strong> Explore how agentic AI can compare product features, prices, and user reviews across retailers to assist in purchase decisions.</li>
+        <li><strong>Career Growth:</strong> Research senior product design roles that integrate AI and user-centered design, focusing on companies leading in tech innovation.</li>
+      </ul>`
+    ],
+    pills: ["Tell me more about the AI shopping idea", "Help me refine the productivity extension concept"]
+  },
+  compare: {
+    userMsg: "Compare tabs",
+    searchTabs: true,
+    reply: [
+      "<p>I looked across your open tabs and found two sets worth comparing:</p>",
+      `<ul>
+        <li><strong>Hotels:</strong> Cerulean Tower Hotel and the Booking.com Shibuya results.</li>
+        <li><strong>Flights:</strong> the two ANA options on Google Flights.</li>
+      </ul>`,
+      "<p>Which comparison do you want? Or use @ to pick any two tabs yourself.</p>"
+    ],
+    pills: ["Compare the two hotels", "Compare the flight options"]
+  }
+};
+
+/* Selector order: the two tabs the summary references come first (pre-checked) */
+SESSIONS.tokyo.selTabs = [1, 4, 0, 2, 3, 5, 6, 7, 8].map(i => SESSIONS.tokyo.tabs[i]);
+SESSIONS.camps.selTabs = [...SESSIONS.camps.tabs];
+SESSIONS.lacrosse.selTabs = [0, 2, 1].map(i => SESSIONS.lacrosse.tabs[i]);
+
+/* ================= Elements ================= */
+const tabsEl = document.getElementById("tabs");
+const newtabTab = document.getElementById("newtab-tab");
+const preexistingTab = document.getElementById("preexisting-tab");
+const chipsEl = document.getElementById("sw-chips");
+const swField = document.getElementById("sw-field");
+const fullchat = document.getElementById("fullchat");
+const fcScroll = document.getElementById("fc-scroll");
+const fcField = document.getElementById("fc-field");
+const fcSendBtn = document.getElementById("fc-send");
+let openGroup = null;
+let animTimers = [];
+function clearTimers() { animTimers.forEach(clearTimeout); animTimers = []; }
+function later(fn, ms) { animTimers.push(setTimeout(fn, ms)); }
+function setStreaming(on) { fcSendBtn.classList.toggle("streaming", on); }
+
+/* ================= Starter chips =================
+   Every chip opens the full page chat. Memory journeys
+   run a "Searching tabs" pass and offer the tab selector;
+   standard prompts reply directly. */
+chipsEl.querySelectorAll(".sw-chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    const key = chip.dataset.starter;
+    if (SESSIONS[key]) return openFullChat({ journey: SESSIONS[key] });
+    openFullChat(STARTERS[key]);
+  });
+});
+
+/* ================= Full page chat ================= */
+function openFullChat(data) {
+  clearTimers();
+  fcScroll.innerHTML = "";
+  currentLog = null;
+  fullchat.classList.add("open");
+
+  if (data.journey) {
+    addFcUser(data.journey.userMsg);
+    runJourney(data.journey);
+  } else if (data.searchTabs) {
+    addFcUser(data.userMsg);
+    runStarterSearch(data);
+  } else {
+    addFcUser(data.userMsg);
+    setStreaming(true);
+    later(() => addFcReply(data.reply, data.pills), 500);
+  }
+  fcField.focus();
+  if (navDepth === 0) history.pushState({ d: 1 }, "");
+  navDepth = 1;
+  updateNav();
+}
+
+/* ============ Action log — proposed: ai-action-log ============ */
+let currentLog = null;
+
+function buildActionLog(title) {
+  const log = document.createElement("ai-action-log");
+  log.setAttribute("data-src", "proposed: aiwindow/ui/components/ai-action-log");
+  log.innerHTML = `
+    <div class="alog-head">
+      <svg class="al-spark" viewBox="0 0 16 16"><path d="M8 1l1.8 4.5L14.5 7l-4.7 1.5L8 13 6.2 8.5 1.5 7l4.7-1.5z"/></svg>
+      <span class="al-title"></span>
+      <svg class="al-chev" viewBox="0 0 12 12"><path d="M4.5 2.5 8 6l-3.5 3.5"/></svg>
+    </div>
+    <div class="alog-body"></div>`;
+  log.querySelector(".al-title").textContent = title;
+  log.querySelector(".alog-head").addEventListener("click", () => {
+    if (log.querySelector(".alog-body").children.length) log.classList.toggle("open");
+  });
+  fcScroll.appendChild(log);
+  requestAnimationFrame(() => requestAnimationFrame(() => log.classList.add("in")));
+  return log;
+}
+
+function alogTitle(log, t) { log.querySelector(".al-title").textContent = t; }
+
+function alogItem(log, text, tabs) {
+  const item = document.createElement("div");
+  item.className = "alog-item";
+  const span = document.createElement("div");
+  span.className = "al-item-text";
+  span.textContent = text;
+  item.appendChild(span);
+  if (tabs && tabs.length) {
+    const pills = document.createElement("div");
+    pills.className = "alog-pills";
+    pills.setAttribute("data-src", "aiwindow/ui/components/website-chip-container");
+    tabs.slice(0, 2).forEach(t => {
+      const pl = document.createElement("span");
+      pl.className = "alog-pill";
+      pl.innerHTML = `<span class="favicon" style="background:${t.c}">${t.l}</span><span class="pill-t"></span>`;
+      pl.querySelector(".pill-t").textContent = t.t.length > 16 ? t.t.slice(0, 16) + "..." : t.t;
+      pills.appendChild(pl);
+    });
+    if (tabs.length > 2) {
+      const more = document.createElement("span");
+      more.className = "alog-pill";
+      more.textContent = `+ ${tabs.length - 2} more`;
+      pills.appendChild(more);
+    }
+    item.appendChild(pills);
+  }
+  log.querySelector(".alog-body").appendChild(item);
+}
+
+/* Journey: searching state, then the summary + tab selector.
+   No tabs open until the user chooses. */
+function runJourney(s) {
+  setStreaming(true);
+
+  const log = buildActionLog("Searching tabs");
+  currentLog = log;
+
+  const spin = document.createElement("div");
+  spin.className = "fc-spinner";
+  fcScroll.appendChild(spin);
+
+  later(() => {
+    spin.remove();
+    alogTitle(log, "Searched tabs");
+    alogItem(log, `Found ${s.selTabs.length} tabs from this task`, s.selTabs);
+  }, 1300);
+
+  later(() => buildJourneyReply(s), 1800);
+}
+
+/* Chips that search tabs but do not open any (e.g. Compare tabs) */
+function runStarterSearch(s) {
+  setStreaming(true);
+
+  const log = buildActionLog("Searching tabs");
+
+  const spin = document.createElement("div");
+  spin.className = "fc-spinner";
+  fcScroll.appendChild(spin);
+
+  later(() => {
+    spin.remove();
+    alogTitle(log, "Searched tabs");
+    alogItem(log, "Looked across 11 open tabs");
+  }, 1300);
+
+  later(() => addFcReply(s.reply, s.pills), 1800);
+}
+
+function buildJourneyReply(s) {
+  const ai = document.createElement("ai-chat-message");
+  ai.className = "fc-ai";
+  ai.setAttribute("data-src", "aiwindow/ui/components/ai-chat-message");
+  fcScroll.appendChild(ai);
+
+  const blocks = [...s.summary.map(html => `<p>${html}</p>`)];
+  if (s.changed) blocks.push(`<p>${s.changed}</p>`);
+  const els = blocks.map(html => {
+    const wrap = document.createElement("div");
+    wrap.innerHTML = html;
+    const el = wrap.firstElementChild;
+    ai.appendChild(el);
+    return el;
+  });
+
+  const selector = buildSelector(s);
+  ai.appendChild(selector);
+
+  const sugs = document.createElement("smartwindow-prompts");
+  sugs.className = "fc-sugs";
+  sugs.setAttribute("data-src", "aiwindow/ui/components/smartwindow-prompts");
+  const pillEls = s.chips.map(text => {
+    const b = document.createElement("button");
+    b.className = "fc-pill";
+    b.textContent = text;
+    b.addEventListener("click", () => fcFollowUp(text));
+    sugs.appendChild(b);
+    return b;
+  });
+  ai.appendChild(sugs);
+
+  els.forEach((el, i) => later(() => el.classList.add("in"), 300 + i * 420));
+  later(() => selector.classList.add("in"), 400 + els.length * 420);
+  pillEls.forEach((p, i) => later(() => p.classList.add("in"), 700 + els.length * 420 + i * 110));
+  later(() => setStreaming(false), 800 + els.length * 420 + pillEls.length * 110);
+  fcScroll.scrollTop = fcScroll.scrollHeight;
+}
+
+/* Inline tab selector — proposed: puwylo-tab-selector.
+   Footer buttons are toolkit moz-button (Nova pills). */
+function buildSelector(s) {
+  const card = document.createElement("puwylo-tab-selector");
+  card.setAttribute("data-src", "proposed: aiwindow/ui/components/puwylo-tab-selector");
+
+  const checked = new Set(s.selTabs.slice(0, s.preChecked));
+
+  card.innerHTML = `
+    <button class="sel-close" data-l10n-id="puwylo-selector-dismiss" title="Dismiss">✕</button>
+    <div class="sel-scroll"></div>
+    <div class="sel-foot">
+      <moz-button data-src="toolkit moz-button (Nova pill)"><button class="btn-open-all" data-l10n-id="puwylo-selector-open-all">Open all</button></moz-button>
+      <moz-button type="primary" data-src="toolkit moz-button (Nova pill)"><button class="btn-open-selected" data-l10n-id="puwylo-selector-open-selected">Open selected (${checked.size})</button></moz-button>
+    </div>`;
+
+  const scroll = card.querySelector(".sel-scroll");
+  const primary = card.querySelector(".btn-open-selected");
+
+  function updateCount() {
+    primary.textContent = `Open selected (${checked.size})`;
+    primary.disabled = checked.size === 0;
+  }
+
+  s.selTabs.forEach(t => {
+    const row = document.createElement("div");
+    row.className = "sel-row" + (checked.has(t) ? " checked" : "");
+    row.setAttribute("role", "checkbox");
+    row.setAttribute("aria-checked", checked.has(t));
+    row.setAttribute("tabindex", "0");
+    row.innerHTML = `
+      <span class="cb"><svg viewBox="0 0 12 12"><path d="M2.5 6.5 5 9l4.5-5.5"/></svg></span>
+      <span class="sel-tabinfo">
+        <span class="favicon" style="background:${t.c}">${t.l}</span>
+        <span class="sel-title"></span>
+      </span>`;
+    row.querySelector(".sel-title").textContent = t.t;
+    const toggle = () => {
+      if (checked.has(t)) checked.delete(t); else checked.add(t);
+      row.classList.toggle("checked", checked.has(t));
+      row.setAttribute("aria-checked", checked.has(t));
+      updateCount();
+    };
+    row.addEventListener("click", toggle);
+    row.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+    });
+    scroll.appendChild(row);
+  });
+
+  const fade = document.createElement("div");
+  fade.className = "sel-fade";
+  scroll.appendChild(fade);
+  if (s.selTabs.length > 4) card.classList.add("has-overflow");
+
+  card.querySelector(".sel-close").addEventListener("click", () => card.classList.add("dismissed"));
+  card.querySelector(".btn-open-all").addEventListener("click", () => openSelection(s, [...s.selTabs], card));
+  primary.addEventListener("click", () => {
+    openSelection(s, s.selTabs.filter(t => checked.has(t)), card);
+  });
+
+  return card;
+}
+
+/* Open the chosen tabs. Group (with the chat as its first tab) when
+   more than one; a plain focused tab when exactly one. */
+let chatTabEl = null;
+
+function openSelection(s, chosen, card) {
+  if (openGroup || chosen.length === 0) return;
+  card.querySelectorAll("moz-button button").forEach(b => b.disabled = true);
+  s.pill = chosen.length > 1
+    ? `Tab group created · ${chosen.length} tabs`
+    : `Opened 1 tab`;
+
+  const group = document.createElement("div");
+  group.className = "tab-group";
+  group.setAttribute("data-src", "browser: tabbrowser tab-group");
+  group.style.setProperty("--group-color", s.color);
+
+  if (chosen.length > 1) {
+    const label = document.createElement("span");
+    label.className = "group-label";
+    label.style.background = s.color;
+    label.textContent = s.groupLabel;
+    group.appendChild(label);
+
+    chatTabEl = document.createElement("div");
+    chatTabEl.className = "tab interactive";
+    chatTabEl.innerHTML = `<svg class="favicon" viewBox="0 0 16 16" style="background:none"><path d="M8 1l1.8 4.5L14.5 7l-4.7 1.5L8 13 6.2 8.5 1.5 7l4.7-1.5z" fill="#b89cff"/></svg><span class="tab-title"></span>`;
+    chatTabEl.querySelector(".tab-title").textContent = s.name; // conversation name
+    chatTabEl.addEventListener("click", () => {
+      if (siteView.classList.contains("open")) history.back();
+    });
+    group.appendChild(chatTabEl);
+  }
+
+  let firstTabEl = null;
+  chosen.forEach((t, i) => {
+    const tab = document.createElement("div");
+    tab.className = "tab interactive";
+    tab.style.transitionDelay = `${0.1 + i * 0.05}s`; // stagger is data-driven (index)
+    tab.innerHTML = `<span class="favicon" style="background:${t.c}">${t.l}</span><span class="tab-title"></span>`;
+    tab.querySelector(".tab-title").textContent = t.t;
+    tab.addEventListener("click", () => openTabView(s, t, tab));
+    group.appendChild(tab);
+    if (!firstTabEl) firstTabEl = tab;
+  });
+
+  // The New tab leads the strip, group follows it
+  tabsEl.insertBefore(newtabTab, tabsEl.firstChild);
+  tabsEl.insertBefore(group, newtabTab.nextSibling);
+  openGroup = group;
+  if (chosen.some(t => t.t.startsWith("Booking.com"))) preexistingTab.style.display = "none";
+  requestAnimationFrame(() => requestAnimationFrame(() => group.classList.add("in")));
+
+  // Log the open in the action log
+  if (currentLog) {
+    alogItem(currentLog, chosen.length > 1
+      ? `Opened ${chosen.length} tabs into "${s.groupLabel}"`
+      : `Opened ${chosen[0].t}`);
+  }
+
+  // Focus the first selected tab once the group has landed
+  later(() => openTabView(s, chosen[0], firstTabEl), 700);
+}
+
+/* ================= Site view: journey-scoped chat on a tab =================
+   One conversation per tab group. Clicking any tab in the group opens
+   that page with the same thread inside ai-window: what you asked the
+   other day, then today's pickup message from the New tab chat. */
+const siteView = document.getElementById("site-view");
+const jtScroll = document.getElementById("jt-scroll");
+const jtField = document.getElementById("jt-field");
+
+function openTabView(s, t, tabEl) {
+  fullchat.classList.remove("open");
+  document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+  tabEl.classList.add("active");
+
+  const fav = document.getElementById("site-favicon");
+  fav.style.background = t.c;
+  fav.textContent = t.l;
+  document.getElementById("site-name").textContent = t.t.split(" | ")[0].split(" - ")[0];
+  urlTextSet(t.u);
+
+  document.getElementById("jt-dot").style.background = s.color;
+  document.getElementById("jt-title").textContent = s.name;
+  buildJourneyThread(s);
+  siteView.classList.add("open");
+  if (navDepth < 2) history.pushState({ d: 2 }, "");
+  navDepth = 2;
+  updateNav();
+}
+
+function urlTextSet(u) {
+  const el = document.getElementById("url-text");
+  el.innerHTML = `<span class="domain"></span>`;
+  el.querySelector(".domain").textContent = u;
+}
+
+function buildJourneyThread(s) {
+  jtScroll.innerHTML = "";
+  const divider = label => {
+    const d = document.createElement("div");
+    d.className = "jt-divider";
+    d.textContent = label;
+    jtScroll.appendChild(d);
+  };
+  const userMsg = text => {
+    const u = document.createElement("div");
+    u.className = "jt-user";
+    u.innerHTML = `<div class="pill"></div>`;
+    u.querySelector(".pill").textContent = text;
+    jtScroll.appendChild(u);
+  };
+  const aiMsg = html => {
+    const a = document.createElement("ai-chat-message");
+    a.className = "jt-ai";
+    a.setAttribute("data-src", "aiwindow/ui/components/ai-chat-message");
+    a.innerHTML = html;
+    jtScroll.appendChild(a);
+    return a;
+  };
+
+  divider(s.historyDay);
+  s.history.forEach(m => m.u ? userMsg(m.u) : aiMsg(m.a));
+
+  divider("Today · from your New tab chat");
+  aiMsg(
+    `<div class="group-pill"><span class="dot" style="background:${s.color}"></span>${s.pill}</div>` +
+    s.summary.map(p => `<p>${p}</p>`).join("")
+  );
+
+  const chipsWrap = document.createElement("smartwindow-prompts");
+  chipsWrap.className = "jt-chips";
+  chipsWrap.setAttribute("data-src", "aiwindow/ui/components/smartwindow-prompts");
+  s.chips.forEach(text => {
+    const b = document.createElement("button");
+    b.className = "fc-pill";
+    b.textContent = text;
+    b.addEventListener("click", () => {
+      userMsg(text);
+      aiMsg(`<span class="muted">Prototype note: "${text}" would continue this conversation.</span>`);
+      jtScroll.scrollTop = jtScroll.scrollHeight;
+    });
+    chipsWrap.appendChild(b);
+  });
+  jtScroll.appendChild(chipsWrap);
+  jtScroll.scrollTop = jtScroll.scrollHeight;
+}
+
+function jtSend() {
+  const text = jtField.value.trim();
+  if (!text) return;
+  jtField.value = "";
+  const u = document.createElement("div");
+  u.className = "jt-user";
+  u.innerHTML = `<div class="pill"></div>`;
+  u.querySelector(".pill").textContent = text;
+  jtScroll.appendChild(u);
+  const a = document.createElement("ai-chat-message");
+  a.className = "jt-ai";
+  a.innerHTML = `<span class="muted">Prototype note: "${text}" would continue this conversation.</span>`;
+  jtScroll.appendChild(a);
+  jtScroll.scrollTop = jtScroll.scrollHeight;
+}
+document.getElementById("jt-send").addEventListener("click", jtSend);
+jtField.addEventListener("keydown", e => { if (e.key === "Enter") jtSend(); });
+
+function closeSiteView() {
+  siteView.classList.remove("open");
+  document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+  if (chatTabEl && openGroup) chatTabEl.classList.add("active");
+  else newtabTab.classList.add("active");
+  document.getElementById("url-text").textContent = "Search with Google or enter address";
+  fullchat.classList.add("open");
+  updateNav();
+}
+
+function addFcUser(text) {
+  const u = document.createElement("div");
+  u.className = "fc-user";
+  u.setAttribute("data-src", "aiwindow/ui/components/ai-chat-message (user)");
+  u.innerHTML = `<div class="pill"></div>`;
+  u.querySelector(".pill").textContent = text;
+  fcScroll.appendChild(u);
+  requestAnimationFrame(() => requestAnimationFrame(() => u.classList.add("in")));
+}
+
+function addFcReply(blocks, pills) {
+  const ai = document.createElement("ai-chat-message");
+  ai.className = "fc-ai";
+  ai.setAttribute("data-src", "aiwindow/ui/components/ai-chat-message");
+  fcScroll.appendChild(ai);
+
+  const els = blocks.map(html => {
+    const wrap = document.createElement("div");
+    wrap.innerHTML = html;
+    const el = wrap.firstElementChild;
+    ai.appendChild(el);
+    return el;
+  });
+
+  const actions = document.createElement("div");
+  actions.className = "fc-actions";
+  actions.innerHTML = `
+    <button title="Good response"><svg viewBox="0 0 16 16"><path d="M4.5 7.5v6h-2v-6h2zm0 0L7 2.5c.9 0 1.5.7 1.5 1.5v2.5h4c.8 0 1.4.7 1.2 1.5l-1 4.5c-.1.6-.7 1-1.3 1H4.5"/></svg></button>
+    <button title="Bad response"><svg viewBox="0 0 16 16"><path d="M11.5 8.5v-6h2v6h-2zm0 0L9 13.5c-.9 0-1.5-.7-1.5-1.5V9.5h-4c-.8 0-1.4-.7-1.2-1.5l1-4.5c.1-.6.7-1 1.3-1h6.9"/></svg></button>
+    <button title="Copy"><svg viewBox="0 0 16 16"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2"/></svg></button>
+    <button title="Try again"><svg viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.8v2.4h-2.4"/></svg></button>`;
+  ai.appendChild(actions);
+
+  let sugs = null, pillEls = [];
+  if (pills && pills.length) {
+    sugs = document.createElement("smartwindow-prompts");
+    sugs.className = "fc-sugs";
+    sugs.setAttribute("data-src", "aiwindow/ui/components/smartwindow-prompts");
+    pillEls = pills.map(text => {
+      const b = document.createElement("button");
+      b.className = "fc-pill";
+      b.textContent = text;
+      b.addEventListener("click", () => fcFollowUp(text));
+      sugs.appendChild(b);
+      return b;
+    });
+    ai.appendChild(sugs);
+  }
+
+  els.forEach((el, i) => later(() => el.classList.add("in"), 350 + i * 420));
+  later(() => actions.classList.add("in"), 350 + els.length * 420);
+  pillEls.forEach((p, i) => later(() => p.classList.add("in"), 500 + els.length * 420 + i * 110));
+  later(() => setStreaming(false), 600 + els.length * 420 + pillEls.length * 110);
+  fcScroll.scrollTop = fcScroll.scrollHeight;
+}
+
+function fcFollowUp(text) {
+  addFcUser(text);
+  // The Tokyo pill bridges into the pickup journey, right here in the chat
+  if (text === "Continue planning the Tokyo trip") {
+    runJourney(SESSIONS.tokyo);
+    return;
+  }
+  setStreaming(true);
+  addFcReply([
+    `<p><span class="muted">Prototype note: "${text}" would continue the conversation here.</span></p>`
+  ], []);
+  fcScroll.scrollTop = fcScroll.scrollHeight;
+}
+
+function closeFullChat() {
+  fullchat.classList.remove("open");
+  setStreaming(false);
+  setTimeout(() => { fcScroll.innerHTML = ""; }, 400);
+}
+document.getElementById("fc-new").addEventListener("click", () => goHome());
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && navDepth > 0) history.back();
+});
+
+function fcSend() {
+  const text = fcField.value.trim();
+  if (!text) return;
+  fcField.value = "";
+  fcFollowUp(text);
+}
+document.getElementById("fc-send").addEventListener("click", fcSend);
+fcField.addEventListener("keydown", e => { if (e.key === "Enter") fcSend(); });
+
+/* ================= Back button =================
+   Backed by real browser history, so the prototype's back arrow,
+   the browser's own back button, and trackpad swipes all work. */
+const backBtn = document.getElementById("back-btn");
+let navDepth = 0; // 0 = new tab, 1 = full chat, 2 = site view
+
+function updateNav() {
+  backBtn.classList.toggle("disabled", navDepth === 0);
+}
+
+function applyDepth(d) {
+  if (d >= navDepth) { navDepth = d; updateNav(); return; }
+  if (d <= 1 && siteView.classList.contains("open")) closeSiteView();
+  if (d === 0) resetAll();
+  navDepth = d;
+  updateNav();
+}
+
+backBtn.addEventListener("click", () => { if (navDepth > 0) history.back(); });
+window.addEventListener("popstate", e => applyDepth((e.state && e.state.d) || 0));
+
+function goHome() { if (navDepth > 0) history.go(-navDepth); else resetAll(); }
+
+/* ================= Reset ================= */
+newtabTab.addEventListener("click", () => {
+  if (navDepth > 0 || openGroup) goHome();
+});
+
+function resetAll() {
+  clearTimers();
+  siteView.classList.remove("open");
+  closeFullChat();
+  preexistingTab.style.display = "";
+  newtabTab.classList.add("active");
+  document.getElementById("url-text").textContent = "Search with Google or enter address";
+  if (openGroup) {
+    const g = openGroup;
+    openGroup = null;
+    g.classList.add("leaving");
+    setTimeout(() => g.remove(), 400);
+  }
+  tabsEl.appendChild(newtabTab); // back to its usual spot on the right
+  tabsEl.appendChild(document.getElementById("newtab-plus")); // + stays after the last tab
+  chatTabEl = null;
+  newtabTab.classList.add("active");
+  updateNav();
+}
+
+/* Typing in the main field opens the full page chat */
+function fieldSend() {
+  const text = swField.value.trim();
+  if (!text) return;
+  swField.value = "";
+  openFullChat({
+    userMsg: text,
+    reply: [`<p><span class="muted">Prototype note: "${text}" would start a conversation here. The wired flows are the starter chips: "Pick up your Tokyo trip", "Finish the lacrosse signup", "Improve writing", "Brainstorm ideas", and "Compare tabs".</span></p>`],
+    pills: []
+  });
+}
+document.getElementById("sw-send").addEventListener("click", fieldSend);
+swField.addEventListener("keydown", e => { if (e.key === "Enter") fieldSend(); });
+
+/* ================= Harness: inspect + scheme (scaffolding, not product) ================= */
+document.getElementById("inspectBtn").onclick = e => {
+  const on = document.body.classList.toggle("inspect");
+  e.currentTarget.setAttribute("aria-pressed", on);
+};
+document.getElementById("schemeBtn").onclick = e => {
+  const dark = document.documentElement.getAttribute("data-scheme") !== "dark";
+  document.documentElement.setAttribute("data-scheme", dark ? "dark" : "light");
+  e.currentTarget.setAttribute("aria-pressed", dark);
+};
+</script>
+</body>
+</html>
