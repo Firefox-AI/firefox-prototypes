@@ -38,16 +38,68 @@ ChromeUtils.defineLazyGetter(lazy, "console", () =>
 const VIEWER_PRINCIPAL = "resource://pdf.js/web/viewer.html";
 
 // Geometry thresholds, in CSS pixels (client coords, y grows downward). Tuned
-// for LTR at default zoom; RTL is later work.
+// for LTR at default zoom; RTL is later work. Scoring is anchored on the field's
+// writing line (its bottom edge), not the full box, so an oversized field box
+// does not push the true label out of range.
 const EDGE_TOLERANCE = 4;
 const LEFT_ALIGN_TOLERANCE = 25;
 const MAX_LEFT_GAP = 400;
 const MAX_ABOVE_GAP = 50;
 const COLON_BONUS = 150;
-const MIN_VERTICAL_OVERLAP_RATIO = 0.25;
+// How far a same-row label's baseline may differ from the field's and still
+// count as the same line.
+const BASELINE_TOLERANCE = 12;
+// A label whose span horizontally contains the field (the "Prompt: ____" pattern
+// where the fill line is part of the label span and the input overlays it) is a
+// strong match; bonus sits above COLON_BONUS so it beats an adjacent or above label.
+const CONTAINMENT_BONUS = 300;
+// Slack allowing the field's right edge to sit slightly past the label's.
+const CONTAINMENT_SLACK = 8;
+
+// Name-match disambiguation. A field's AcroForm name (and TU alt text) often
+// echoes its label; when it does, use that to break near-ties between adjacent
+// geometry candidates. Spike knobs; the weight sits above COLON_BONUS and a
+// typical adjacent-gap difference so a strong name match flips an adjacent
+// mis-pick, but only among labels that already scored on geometry.
+const USE_NAME_MATCH_BONUS = true;
+const NAME_MATCH_THRESHOLD = 0.6;
+const NAME_MATCH_WEIGHT = 400;
 
 function overlap1D(aStart, aEnd, bStart, bEnd) {
   return Math.max(0, Math.min(aEnd, bEnd) - Math.max(aStart, bStart));
+}
+
+// Split "addressLine1" / "f2_1" into space-separated words.
+function splitMixedCase(str) {
+  return (str ?? "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_\-.[\]]+/g, " ")
+    .trim();
+}
+
+// Lowercase, split on non-alphanumerics, drop words shorter than 3 chars.
+function tokenizeName(str) {
+  return (str ?? "")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(word => word.length >= 3);
+}
+
+// Overlap coefficient of two token lists: |intersection| / min(|a|, |b|). This
+// rewards "the label's words are contained in the name" ("Street address" vs
+// StreetAddress; "City" vs cityStateZip). 0 if either side has no usable tokens.
+function labelNameSimilarity(nameTokens, labelTokens) {
+  if (!nameTokens.length || !labelTokens.length) {
+    return 0;
+  }
+  const nameSet = new Set(nameTokens);
+  let shared = 0;
+  for (const token of new Set(labelTokens)) {
+    if (nameSet.has(token)) {
+      shared++;
+    }
+  }
+  return shared / Math.min(nameSet.size, new Set(labelTokens).size);
 }
 
 function leafName(fullName) {
@@ -58,7 +110,12 @@ function leafName(fullName) {
 }
 
 function cleanLabel(str) {
-  return str.trim().replace(/\s+/g, " ").replace(/:$/, "").trim();
+  return str
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\s*[_.]{2,}$/, "") // trailing fill line (underscores/dots)
+    .replace(/:$/, "")
+    .trim();
 }
 
 export class PdfFormFillChild extends JSWindowActorChild {
@@ -241,7 +298,10 @@ export class PdfFormFillChild extends JSWindowActorChild {
     const byPage = new Map();
     for (const span of this.document.querySelectorAll(".textLayer span")) {
       const str = span.textContent;
-      if (!str || !str.trim()) {
+      // Skip blanks and decoration-only spans (fill lines of underscores/dots,
+      // bare symbols like "$"): they are not labels, and a fill line that
+      // encloses a field would otherwise win as an empty containment match.
+      if (!str || !/[a-z0-9]/i.test(str)) {
         continue;
       }
       const page = span.closest(".page")?.dataset.pageNumber ?? null;
@@ -254,40 +314,35 @@ export class PdfFormFillChild extends JSWindowActorChild {
   }
 
   // Score how likely `label` is the label for `field` (0 = not a candidate).
-  // Client coordinates: y grows downward, so "above" means a smaller `top`.
+  // Anchored on the field's writing line, its bottom-left point in LTR, so an
+  // oversized field box (top far above the input line) does not gate out the
+  // true label. Client coordinates: y grows downward, so a label "above" the
+  // line has a smaller `bottom` than the field's.
   #scoreLabel(fieldRect, label) {
     const lr = label.rect;
-
-    // A label overlapping the field box is the field's own value, not a label.
-    if (
-      overlap1D(lr.left, lr.right, fieldRect.left, fieldRect.right) > 0 &&
-      overlap1D(lr.top, lr.bottom, fieldRect.top, fieldRect.bottom) > 0
-    ) {
-      return 0;
-    }
-
     const colonBonus = label.str.trim().endsWith(":") ? COLON_BONUS : 0;
     let score = 0;
 
-    // Label to the left on the same row.
+    // Label to the left on the same writing line. Qualifying on the label's
+    // start (not its end) lets a span that begins left of the field and extends
+    // into or past it count: the "Prompt: ____" pattern renders the prompt and
+    // fill line as one span with the input overlaid, so the label horizontally
+    // contains the field. That containment is a strong signal and earns a bonus.
     const leftGap = fieldRect.left - lr.right;
-    const verticalOverlap = overlap1D(
-      lr.top,
-      lr.bottom,
-      fieldRect.top,
-      fieldRect.bottom
-    );
-    const labelHeight = Math.max(lr.height, 1);
-    if (
-      leftGap >= -EDGE_TOLERANCE &&
-      leftGap <= MAX_LEFT_GAP &&
-      verticalOverlap / labelHeight > MIN_VERTICAL_OVERLAP_RATIO
-    ) {
-      score = Math.max(score, 1000 - leftGap + colonBonus);
+    const sameLine = Math.abs(lr.bottom - fieldRect.bottom) <= BASELINE_TOLERANCE;
+    const startsLeft = lr.left <= fieldRect.left + EDGE_TOLERANCE;
+    if (startsLeft && sameLine && leftGap <= MAX_LEFT_GAP) {
+      const contains = fieldRect.right <= lr.right + CONTAINMENT_SLACK;
+      const containmentBonus = contains ? CONTAINMENT_BONUS : 0;
+      score = Math.max(
+        score,
+        1000 - Math.max(0, leftGap) + colonBonus + containmentBonus
+      );
     }
 
-    // Label directly above.
-    const aboveGap = fieldRect.top - lr.bottom;
+    // Label above the writing line. Requiring a gap strictly above the line
+    // drops a value that sits on it (aboveGap near 0).
+    const aboveGap = fieldRect.bottom - lr.bottom;
     const horizontalOverlap = overlap1D(
       lr.left,
       lr.right,
@@ -295,7 +350,7 @@ export class PdfFormFillChild extends JSWindowActorChild {
       fieldRect.right
     );
     if (
-      aboveGap >= -EDGE_TOLERANCE &&
+      aboveGap > EDGE_TOLERANCE &&
       aboveGap <= MAX_ABOVE_GAP &&
       (horizontalOverlap > 0 ||
         Math.abs(lr.left - fieldRect.left) <= LEFT_ALIGN_TOLERANCE)
@@ -332,6 +387,41 @@ export class PdfFormFillChild extends JSWindowActorChild {
     const rawScores = pageFields.map(field =>
       labels.map(label => this.#scoreLabel(field.rect, label))
     );
+    // Geometry-only snapshot, for the diagnostic below (rawScores gets the
+    // name bonus added in place).
+    const geometryScores = rawScores.map(row => row.slice());
+
+    const nameTokensByField = pageFields.map(field =>
+      tokenizeName(`${splitMixedCase(field.leaf)} ${field.tu ?? ""}`)
+    );
+
+    // Name-match bonus: when a field's name (plus TU alt text) echoes a label
+    // it already scored on geometry, boost that pair so the assignment breaks
+    // near-ties toward the name. Gated to positive-geometry candidates so the
+    // name only disambiguates plausible neighbors, never pulls in a far label.
+    const nameBoosted = pageFields.map(() => labels.map(() => false));
+    if (USE_NAME_MATCH_BONUS) {
+      pageFields.forEach((field, i) => {
+        const nameTokens = nameTokensByField[i];
+        if (!nameTokens.length) {
+          return;
+        }
+        for (let j = 0; j < labels.length; j++) {
+          if (rawScores[i][j] <= 0) {
+            continue;
+          }
+          const similarity = labelNameSimilarity(
+            nameTokens,
+            tokenizeName(labels[j].str)
+          );
+          if (similarity >= NAME_MATCH_THRESHOLD) {
+            rawScores[i][j] += NAME_MATCH_WEIGHT * similarity;
+            nameBoosted[i][j] = true;
+          }
+        }
+      });
+    }
+
     const usefulLabels = [];
     for (let j = 0; j < labels.length; j++) {
       if (rawScores.some(row => row[j] > 0)) {
@@ -350,14 +440,74 @@ export class PdfFormFillChild extends JSWindowActorChild {
     pageFields.forEach((field, i) => {
       const column = assignment[i];
       if (column >= 0) {
-        field.associatedLabel = cleanLabel(labels[usefulLabels[column]].str);
+        const labelIndex = usefulLabels[column];
+        field.associatedLabel = cleanLabel(labels[labelIndex].str);
         field.labelScore = Math.round(matrix[i][column]);
-        field.labelSource = "geometry";
+        field.labelSource = nameBoosted[i][labelIndex]
+          ? "geometry+name"
+          : "geometry";
       }
       field.assignmentStrategy = strategy;
-      lazy.console.debug(
-        `${field.leaf} -> "${field.associatedLabel}" (score ${field.labelScore})`
+
+      // Diagnostic: name/TU similarity to every label, ignoring the geometry
+      // gate. Reveals whether the true label matched the name but scored 0 on
+      // geometry (gated out) or just lost a near-tie.
+      const nameTokens = nameTokensByField[i];
+      const simScores = labels.map(label =>
+        nameTokens.length
+          ? labelNameSimilarity(nameTokens, tokenizeName(label.str))
+          : 0
       );
+      let bestSim = 0;
+      let bestJ = -1;
+      simScores.forEach((sim, j) => {
+        if (sim > bestSim) {
+          bestSim = sim;
+          bestJ = j;
+        }
+      });
+      const nameMatch =
+        bestJ >= 0
+          ? `bestName="${cleanLabel(labels[bestJ].str)}" sim=${bestSim.toFixed(
+              2
+            )} geo=${Math.round(geometryScores[i][bestJ])}`
+          : "bestName=none";
+      lazy.console.debug(
+        `${field.leaf} tu="${field.tu ?? ""}" -> "${field.associatedLabel}" (score ${field.labelScore}, ${field.labelSource}) | ${nameMatch}`
+      );
+
+      // Dump competing candidates when a boosted label won, a strong name match
+      // was gated out, or the field got no label at all. dx/dy are each label's
+      // offset from the field's top-left (negative = left/above), so a missed
+      // field shows whether the nearby labels are positioned where we score.
+      const gatedNameMatch = simScores.some(
+        (sim, j) => sim >= NAME_MATCH_THRESHOLD && geometryScores[i][j] <= 0
+      );
+      if (
+        field.labelSource === "geometry+name" ||
+        gatedNameMatch ||
+        field.labelSource === "none"
+      ) {
+        const fr = field.rect;
+        const candidates = labels
+          .map((label, j) => ({
+            text: cleanLabel(label.str),
+            geo: Math.round(geometryScores[i][j]),
+            sim: simScores[j],
+            dx: Math.round(label.rect.left - fr.left),
+            dy: Math.round(label.rect.top - fr.top),
+            dist: Math.hypot(label.rect.left - fr.left, label.rect.top - fr.top),
+          }))
+          .filter(c => c.text)
+          .sort((a, b) => b.geo - a.geo || a.dist - b.dist)
+          .slice(0, 6)
+          .map(
+            c =>
+              `"${c.text}"(geo=${c.geo},sim=${c.sim.toFixed(2)},dx=${c.dx},dy=${c.dy})`
+          )
+          .join("  ");
+        lazy.console.debug(`   candidates: ${candidates}`);
+      }
     });
   }
 
@@ -367,6 +517,7 @@ export class PdfFormFillChild extends JSWindowActorChild {
       const r = byId.get(f.id) ?? {};
       return {
         name: f.leaf,
+        fullName: f.name,
         label: f.associatedLabel,
         labelSource: f.labelSource,
         tu: f.tu,
