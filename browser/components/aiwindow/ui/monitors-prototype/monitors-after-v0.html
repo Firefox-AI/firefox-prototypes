@@ -435,25 +435,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 .shortcut { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--text-color-deemphasized); font-size: 11px; }
 .shortcut .tile { width: 48px; height: 48px; border-radius: var(--border-radius-large); background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); display: grid; place-items: center; font-weight: var(--font-weight-semibold); font-size: 15px; color: var(--text-color); }
 
-/* Corner stack, bottom-left: collapsed deck; hover fans it upward; click a card to expand in place */
-.mstack { position: absolute; bottom: 16px; left: 16px; width: 324px; z-index: 30; pointer-events: none; }
-.mstack-list { display: flex; flex-direction: column-reverse; gap: var(--space-small); }
-.mstack-list > * { pointer-events: auto; position: relative; will-change: transform; transform-origin: 50% 100%; transition: transform var(--motion-dur-soft) var(--motion-ease-reach), border-color var(--motion-dur-away) var(--motion-ease-edge); }
-/* Constant paint order: the front card stays on top through every transit — no pop at fan start */
-.mstack .mstack-list > :nth-child(1) { z-index: 3; }
-.mstack .mstack-list > :nth-child(2) { z-index: 2; }
-.mstack .mstack-list > :nth-child(3) { z-index: 1; }
-/* Fan open = Reach: leisurely, dealt with variance — never sprung. Delay rides transform only. */
-.mstack.open .mstack-list > :nth-child(2) { transition-delay: 90ms, 0ms; }
-.mstack.open .mstack-list > :nth-child(3) { transition-delay: 205ms, 0ms; }
-/* Tuck = Return: comes home faster than it left, with a confident settle */
-.mstack:not(.open) .mstack-list > * { transition-duration: var(--motion-dur-near), var(--motion-dur-away); transition-timing-function: var(--motion-ease-return), var(--motion-ease-edge); }
-.mstack:not(.open) .mstack-list > :nth-child(2) { transform: translateY(57px) scale(.955); transition-delay: 45ms, 0ms; }
-.mstack:not(.open) .mstack-list > :nth-child(3) { transform: translateY(114px) scale(.91); transition-delay: 0ms, 0ms; }
-/* The wake: the front card stirs; shadow is a pre-rendered layer faded in */
-.mitem::after { content: ""; position: absolute; inset: -1px; border-radius: var(--border-radius-large); box-shadow: var(--box-shadow-level-4); opacity: 0; transition: opacity var(--motion-dur-near) var(--motion-ease-edge); pointer-events: none; }
-.mstack.intent .mstack-list > :nth-child(1) { transform: translateY(-2px); transition: transform var(--motion-dur-near) var(--motion-ease-edge) 0ms; }
-.mstack.intent .mstack-list > :nth-child(1).mitem::after { opacity: 1; }
 /* Inline expand: measured height transition, no snap */
 .mstack-expand { height: 0; overflow: hidden; transition: height var(--motion-dur-away) var(--motion-ease-leave); }
 .mstack-expand.exp-open { transition: height var(--motion-dur-near) var(--motion-ease-edge); }
@@ -470,7 +451,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 .mitem-head[aria-expanded="true"] .chev { rotate: 180deg; }
 .mitem-body { display: flex; flex-direction: column; gap: var(--space-medium); padding-top: var(--space-xsmall); }
 .rail-panel .mitem { transition: border-color var(--motion-dur-away) var(--motion-ease-edge); }
-.mstack.open .mitem:hover, .rail-panel .mitem:hover { border-color: var(--border-color); }
+.rail-panel .mitem:hover { border-color: var(--border-color); }
 
 /* ============ OS notification toast ============ */
 .os-toast { position: absolute; top: 16px; right: 16px; width: 360px; z-index: 60; background: light-dark(rgba(250,250,252,.94), rgba(37,36,40,.96)); backdrop-filter: blur(14px); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-xlarge); box-shadow: var(--box-shadow-level-4); padding: var(--space-medium) var(--space-large); display: flex; gap: var(--space-medium); align-items: flex-start; cursor: pointer; text-align: left; animation: toast-in var(--motion-dur-soft) var(--motion-ease-reach) both; }
@@ -520,7 +501,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
     </div>
 
     <!-- about:tools tab -->
-    <div class="tab active" data-show="5 6 11" style="min-width:150px">
+    <div class="tab active" data-show="5 6 10" style="min-width:150px">
       <span class="favicon sw"><svg viewBox="0 0 24 24" width="15" height="15"><rect width="24" height="24" rx="4" fill="url(#g)"/><path d="M5 12h3l2-5 4 10 2-5h3" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="g" x1="0" y1="0" x2="24" y2="24"><stop offset="0" stop-color="#321bfd"/><stop offset=".5" stop-color="#cf30e2"/><stop offset="1" stop-color="#ff9900"/></linearGradient></defs></svg></span>
       <span class="truncate">about:tools</span>
     </div>
@@ -534,7 +515,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
     </div>
 
     <div class="tab" style="min-width:110px" data-show="1 2 3 4 7 8"><span class="favicon" style="background:#67666a">+</span><span>New Tab</span></div>
-    <div class="tab active" style="min-width:130px" data-show="9 10"><span class="favicon" style="background:#67666a">+</span><span>New Tab</span></div>
+    <div class="tab active" style="min-width:130px" data-show="9"><span class="favicon" style="background:#67666a">+</span><span>New Tab</span></div>
   </div>
 
   <!-- ===================== Toolbar ===================== -->
@@ -552,12 +533,12 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       </button>
     </div>
 
-    <div class="urlbar" data-show="5 6 11">
+    <div class="urlbar" data-show="5 6 10">
       <span class="lock"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg></span>
       <span class="address"><span class="internal">about:tools</span></span>
     </div>
 
-    <div class="urlbar" data-show="9 10">
+    <div class="urlbar" data-show="9">
       <span class="lock"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></span>
       <span class="address" style="color:var(--text-color-deemphasized)">Search with Firefox or enter address</span>
     </div>
@@ -581,7 +562,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
     </nav>
 
     <!-- Monitors tool panel (step 11) -->
-    <aside class="rail-panel" data-show="10" aria-label="Monitors panel">
+    <aside class="rail-panel" data-show="9" aria-label="Monitors panel">
       <div class="rail-panel-head">
         <span class="rail-panel-title">Tools</span>
         <span style="flex:1"></span>
@@ -696,7 +677,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       </div>
 
       <!-- ---------- about:tools ---------- -->
-      <div class="aboutpage" data-show="5 6 11">
+      <div class="aboutpage" data-show="5 6 10">
         <div class="aboutpage-inner">
           <div class="about-head">
             <span class="brandmark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h9M17 17h3"/><circle cx="15" cy="7" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="17" r="1.6"/></svg></span>
@@ -720,7 +701,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </div>
 
           <!-- Empty-state lead (only when there are no monitors) -->
-          <div class="empty-lead" data-show="11"><h3>Watch any page for changes</h3><p>Open any page and type <b>/monitor</b> in Smart Window, or hit Add new.</p></div>
+          <div class="empty-lead" data-show="10"><h3>Watch any page for changes</h3><p>Open any page and type <b>/monitor</b> in Smart Window, or hit Add new.</p></div>
 
           <!-- Populated: running + paused monitors -->
           <div data-show="5 6">
@@ -827,7 +808,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </div>
 
           <!-- Loading skeleton (state demo) -->
-          <div data-show="11">
+          <div data-show="10">
             <div class="group-label">Loading</div>
             <div class="skel"><div class="sk circle"></div><div style="flex:1"><div class="sk line" style="width:44%;margin-bottom:7px"></div><div class="sk line" style="width:66%"></div></div><div class="sk line" style="width:54px;height:20px"></div></div>
             <div class="skel"><div class="sk circle"></div><div style="flex:1"><div class="sk line" style="width:38%;margin-bottom:7px"></div><div class="sk line" style="width:58%"></div></div><div class="sk line" style="width:54px;height:20px"></div></div>
@@ -865,7 +846,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             </div>
             </div></div>
           </div>
-          <p class="mono-dim" data-show="11" style="margin: 0 0 var(--space-small)">No scouts yet — call <b>/scout</b> on any checkout page.</p>
+          <p class="mono-dim" data-show="10" style="margin: 0 0 var(--space-small)">No scouts yet — call <b>/scout</b> on any checkout page.</p>
 
           <!-- Research -->
           <div class="tool-sect">
@@ -888,7 +869,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             </div>
             </div></div>
           </div>
-          <p class="mono-dim" data-show="11" style="margin: 0 0 var(--space-small)">No reports yet — ask <b>/research</b> to dig into anything.</p>
+          <p class="mono-dim" data-show="10" style="margin: 0 0 var(--space-small)">No reports yet — ask <b>/research</b> to dig into anything.</p>
         </div>
       </div>
 
@@ -908,8 +889,8 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         </div>
       </div>
 
-      <!-- ---------- New Tab with the corner monitor stack ---------- -->
-      <div class="newtab" data-show="9 10">
+      <!-- ---------- New Tab ---------- -->
+      <div class="newtab" data-show="9">
         <div class="newtab-inner">
           <div class="newtab-logo"><span class="fx"></span> Firefox</div>
           <div class="newtab-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg> Search with Firefox or enter address</div>
@@ -920,49 +901,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <span class="shortcut"><span class="tile" style="color:#b8860b">N</span>bhphoto</span>
             <span class="shortcut"><span class="tile">M</span>mozilla</span>
             <span class="shortcut"><span class="tile">W</span>wikipedia</span>
-          </div>
-        </div>
-
-        <div class="mstack" id="mstack" data-show="9 10">
-          <div class="mstack-list">
-            <div class="mcard mitem">
-              <button class="mitem-head" aria-expanded="false">
-                <span class="favicon-sq" style="background:#e8663a">S</span>
-                <span class="mit"><span class="mcard-name">Sony WH-1000XM5 price</span><span class="mcard-url">Below $270 · Daily</span></span>
-                <span class="status-chip">$278 ▼ −7%</span>
-                <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
-              </button>
-              <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
-                <div class="mvalue"><span class="now" style="font-size:24px">$278</span><span class="from">checked 2:14 PM · was $299</span></div>
-                <div class="mrow"><span class="lbl">Alert me when</span><span class="val">the price drops below $270</span></div>
-                <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
-              </div></div></div>
-            </div>
-            <div class="mcard mitem">
-              <button class="mitem-head" aria-expanded="false">
-                <span class="favicon-sq" style="background:#2f855a">R</span>
-                <span class="mit"><span class="mcard-name">REI Danner hiking boots</span><span class="mcard-url">rei.com · page changed</span></span>
-                <span class="flag-attn"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg> Needs a look</span>
-                <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
-              </button>
-              <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
-                <p class="small" style="margin:0">The page changed and the monitor can't find the price. Open the page and it will find it again.</p>
-                <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
-              </div></div></div>
-            </div>
-            <div class="mcard mitem">
-              <button class="mitem-head" aria-expanded="false">
-                <span class="favicon-sq" style="background:#3a7ae8">C</span>
-                <span class="mit"><span class="mcard-name">Apartment listings · Mission</span><span class="mcard-url">craigslist.org · checked 12m ago</span></span>
-                <span class="status-chip">3 new</span>
-                <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
-              </button>
-              <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
-                <div class="mvalue"><span class="now" style="font-size:24px">3 new</span><span class="from">since yesterday · craigslist.org</span></div>
-                <div class="mrow"><span class="lbl">Alert me when</span><span class="val">a new listing matches my search</span></div>
-                <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
-              </div></div></div>
-            </div>
           </div>
         </div>
       </div>
@@ -1133,7 +1071,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 <div class="dock" role="group" aria-label="Prototype walkthrough">
   <button id="prev" aria-label="Previous step"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
   <span class="dots" id="dots"></span>
-  <span class="step-label"><span class="step-num" id="step-num">1 / 9</span><span id="step-text">On the page you're watching</span></span>
+  <span class="step-label"><span class="step-num" id="step-num">1 / 10</span><span id="step-text">On the page you're watching</span></span>
   <button id="next" aria-label="Next step"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
   <span class="divider"></span>
   <button class="theme-btn" id="theme" aria-label="Toggle theme"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6L19 19M19 5l-1.4 1.4M6.4 17.6L5 19"/></svg></button>
@@ -1149,7 +1087,6 @@ const STEPS = [
   "The row becomes the card — hit Edit to make changes",
   "A confident change fires a notification",
   "Open page — pinned to the chat + history",
-  "Pinned to New Tab — hover the stack",
   "Tools in the sidebar — Monitors at hand",
   "Day zero — the empty state",
 ];
@@ -1166,8 +1103,7 @@ function render() {
   document.getElementById("step-text").textContent = STEPS[step - 1];
   [...dots.children].forEach((d, i) => d.classList.toggle("on", i < step));
   document.getElementById("sidebar").style.width = step === 8 ? "452px" : "416px";
-  if (step !== 9 && step !== 10) stackSet(false);
-  document.getElementById("rail-monitors").classList.toggle("active", step === 10);
+  document.getElementById("rail-monitors").classList.toggle("active", step === 9);
   const createCard = document.getElementById("create-card");
   const savedState = step === 4;
   createCard.classList.toggle("saved", savedState);
@@ -1190,7 +1126,6 @@ document.getElementById("prev").onclick = () => go(step - 1);
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && !scrim.hidden) { closeModal(); return; }
   if (!scrim.hidden) return;
-  if (e.key === "Escape" && mstack.classList.contains("open")) { stackSet(false); return; }
   if (e.key === "ArrowRight") go(step + 1);
   if (e.key === "ArrowLeft") go(step - 1);
 });
@@ -1214,56 +1149,16 @@ document.getElementById("undo-create").addEventListener("click", () => go(3));
 document.getElementById("pa-monitor").onclick = () => { if (step === 1) go(2); };
 document.getElementById("agent-monitor").onclick = (e) => { e.stopPropagation(); go(3); };
 
-// New Tab corner stack. Hover wakes the deck, then it fans (Reach). Leaving starts a
-// grace period before it tucks (Leave) — and it never tucks while a card is expanded;
-// that state dismisses only on Esc or a click elsewhere.
-const mstack = document.getElementById("mstack");
-let stackTimer = null;
-const stackPinned = () => !!mstack.querySelector(".mstack-expand.exp-open");
+// One-card expansion: measured height so the surface animates reliably
 function setExpand(body, open) {
   body.classList.toggle("exp-open", open);
   body.style.height = open ? body.firstElementChild.offsetHeight + "px" : "0px";
 }
-function stackSet(open) {
-  clearTimeout(stackTimer);
-  mstack.classList.remove("intent");
-  mstack.classList.toggle("open", open);
-  if (!open) {
-    mstack.querySelectorAll(".mstack-expand").forEach(b => setExpand(b, false));
-    mstack.querySelectorAll(".mitem-head").forEach(b => b.setAttribute("aria-expanded", "false"));
-  }
-}
-mstack.addEventListener("mouseenter", () => {
-  clearTimeout(stackTimer);
-  if (mstack.classList.contains("open")) return;
-  mstack.classList.add("intent");
-  stackTimer = setTimeout(() => stackSet(true), 140);
-});
-mstack.addEventListener("mouseleave", () => {
-  clearTimeout(stackTimer);
-  mstack.classList.remove("intent");
-  if (!mstack.classList.contains("open") || stackPinned()) return;
-  stackTimer = setTimeout(() => stackSet(false), 700);
-});
-mstack.addEventListener("focusin", () => { clearTimeout(stackTimer); if (!mstack.classList.contains("open")) stackSet(true); });
-document.addEventListener("click", e => {
-  if (mstack.classList.contains("open") && !e.target.closest("#mstack")) stackSet(false);
-});
-mstack.querySelectorAll(".mitem-head").forEach(btn => {
-  btn.addEventListener("click", () => {
-    if (!mstack.classList.contains("open")) { stackSet(true); return; }
-    const body = btn.parentElement.querySelector(".mstack-expand");
-    const wasOpen = body.classList.contains("exp-open");
-    mstack.querySelectorAll(".mstack-expand").forEach(b => setExpand(b, false));
-    mstack.querySelectorAll(".mitem-head").forEach(b => b.setAttribute("aria-expanded", "false"));
-    setExpand(body, !wasOpen);
-    btn.setAttribute("aria-expanded", String(!wasOpen));
-  });
-});
+
 document.querySelectorAll("[data-open-page]").forEach(b => { b.addEventListener("click", () => go(8)); });
 
 // Tools rail: Monitors lives in the chrome
-document.getElementById("rail-monitors").onclick = () => go(10);
+document.getElementById("rail-monitors").onclick = () => go(9);
 function wireAddMenu(btnId, menuId) {
   const btn = document.getElementById(btnId);
   const menu = document.getElementById(menuId);
