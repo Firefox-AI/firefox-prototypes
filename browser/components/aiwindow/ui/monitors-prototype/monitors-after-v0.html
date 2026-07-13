@@ -51,8 +51,6 @@
   --color-accent-primary-hover: light-dark(var(--color-violet-60), var(--color-violet-30));
   --icon-color-warning: light-dark(var(--color-yellow-50), var(--color-yellow-20));
   --icon-color-success: light-dark(var(--color-green-50), var(--color-green-20));
-  --card-background-color: var(--background-color-box);
-  --card-border-color: light-dark(color-mix(in srgb, currentColor 10%, transparent), color-mix(in srgb, currentColor 6%, transparent));
   --color-neutral-120: #1e1d20;
 
   /* box-shadow (Nova lighter layers) */
@@ -210,10 +208,10 @@ h1,h2,h3,h4,p { margin: 0; }
 .scope-tag { font-size: 11px; font-weight: 400; color: var(--text-color-deemphasized); text-transform: none; letter-spacing: 0; margin-left: var(--space-xsmall); opacity: .8; }
 
 /* Glance row */
-.grow { display: flex; align-items: center; gap: var(--space-medium); padding: var(--space-medium) var(--space-large); background: var(--card-background-color); border: var(--border-width, 1px) solid var(--card-border-color); border-radius: var(--border-radius-medium); margin-bottom: var(--space-small); width: 100%; text-align: left; transition: border-color var(--motion-dur-near) var(--motion-ease-edge), box-shadow var(--motion-dur-near) var(--motion-ease-edge); }
+.grow { display: flex; align-items: center; gap: var(--space-medium); padding: var(--space-medium) var(--space-large); background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); margin-bottom: var(--space-small); width: 100%; text-align: left; transition: border-color var(--motion-dur-near) var(--motion-ease-edge), box-shadow var(--motion-dur-near) var(--motion-ease-edge); }
 .grow:hover { border-color: var(--border-color); box-shadow: var(--box-shadow-level-2); }
 .grow { cursor: pointer; }
-.dash-item { background: var(--card-background-color); border: var(--border-width, 1px) solid var(--card-border-color); border-radius: var(--border-radius-medium); margin-bottom: var(--space-small); transition: border-color var(--motion-dur-away) var(--motion-ease-edge); }
+.dash-item { background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); margin-bottom: var(--space-small); transition: border-color var(--motion-dur-away) var(--motion-ease-edge); }
 .dash-item:hover { border-color: var(--border-color); }
 .dash-item.attn { border-color: var(--icon-color-warning); }
 .dash-item .grow, .dash-item .grow:hover { background: none; border: 0; box-shadow: none; margin-bottom: 0; }
@@ -240,7 +238,7 @@ h1,h2,h3,h4,p { margin: 0; }
 .empty-lead h3 { font-size: var(--font-size-heading-large); font-weight: var(--font-weight-bold); margin-bottom: 4px; }
 .empty-lead p { color: var(--text-color-deemphasized); }
 .starter-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-medium); }
-.starter { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; padding: var(--space-large); background: var(--card-background-color); border: var(--border-width, 1px) solid var(--card-border-color); border-radius: var(--border-radius-medium); text-align: left; transition: border-color var(--motion-dur-near) var(--motion-ease-edge); }
+.starter { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; padding: var(--space-large); background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); text-align: left; transition: border-color var(--motion-dur-near) var(--motion-ease-edge); }
 .starter:hover { border-color: var(--color-accent-primary); }
 .starter .ic { width: 30px; height: 30px; border-radius: var(--border-radius-medium); background: var(--background-color-box-info); display: grid; place-items: center; color: var(--smartwindow-icon-color-accent); }
 .starter .ic svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
@@ -261,7 +259,7 @@ h1,h2,h3,h4,p { margin: 0; }
 @keyframes shimmer { 50% { opacity: .45; } }
 
 /* ============ The monitor card — one component, three homes ============ */
-.mcard { background: var(--card-background-color); border: var(--border-width, 1px) solid var(--card-border-color); border-radius: var(--border-radius-medium); padding: var(--space-large); display: flex; flex-direction: column; gap: var(--space-medium); }
+.mcard { background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); padding: var(--space-large); display: flex; flex-direction: column; gap: var(--space-medium); }
 /* Live monitor card in chat — the violet ring marks it as pinned and updating */
 .mcard-head { display: flex; align-items: center; gap: var(--space-small); }
 .mcard-name { font-weight: var(--font-weight-semibold); }
@@ -365,11 +363,9 @@ h1,h2,h3,h4,p { margin: 0; }
 hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); margin: var(--space-small) 0 var(--space-xsmall); width: 100%; }
 
 /* Change history */
-.history { display: flex; flex-direction: column; gap: var(--space-medium); }
-.hist-item { display: block; border-inline-start: var(--border-width, 1px) solid var(--card-border-color); padding-inline-start: var(--space-medium); font-size: var(--font-size-small); }
-.hist-item .when { display: block; color: var(--text-color-deemphasized); margin-block-end: 2px; }
-.hist-item.ok { border-inline-start-color: var(--icon-color-success); }
-.hist-item.err { border-inline-start-color: var(--text-color-error); }
+.history { display: flex; flex-direction: column; }
+.hist-item { display: flex; align-items: baseline; gap: var(--space-small); padding: 6px 0; font-size: var(--font-size-small); }
+.hist-item .when { color: var(--text-color-deemphasized); min-width: 84px; flex: none; }
 .hist-item .oldv { color: var(--text-color-deemphasized); text-decoration: line-through; }
 .hist-item .newv { font-weight: var(--font-weight-semibold); }
 .hist-item .arrow { color: var(--text-color-deemphasized); }
@@ -613,7 +609,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </button>
           <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
             <div class="history">
-              <div class="hist-item ok"><span class="when">Today</span><span class="oldv">$299</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$278</span><span class="deemphasized">met your alert</span></div>
+              <div class="hist-item"><span class="when">Today</span><span class="oldv">$299</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$278</span><span class="deemphasized">met your alert</span></div>
               <div class="hist-item low"><span class="when">Jun 24</span><span>checked — no change</span></div>
               <div class="hist-item"><span class="when">Jun 17</span><span class="deemphasized">first checked · $299</span></div>
             </div>
@@ -630,7 +626,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
             <p class="small" style="margin:0">The page changed and the monitor can't find the price.</p>
             <div class="history">
-              <div class="hist-item err"><span class="when">Jun 30</span><span class="hist-flag">value lost</span><span class="deemphasized">the page changed</span></div>
+              <div class="hist-item"><span class="when">Jun 30</span><span class="hist-flag">value lost</span><span class="deemphasized">the page changed</span></div>
               <div class="hist-item"><span class="when">Jun 12</span><span class="deemphasized">first checked · $189</span></div>
             </div>
             <a class="accent-link" href="#5" data-open-tools="rei">See and edit on about:tools</a>
@@ -645,7 +641,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </button>
           <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
             <div class="history">
-              <div class="hist-item ok"><span class="when">Today</span><span class="newv" style="color:var(--text-color-success)">3 new listings</span></div>
+              <div class="hist-item"><span class="when">Today</span><span class="newv" style="color:var(--text-color-success)">3 new listings</span></div>
               <div class="hist-item"><span class="when">Yesterday</span><span class="newv">2 new listings</span></div>
             </div>
             <a class="accent-link" href="#5" data-open-tools="apt">See and edit on about:tools</a>
@@ -778,7 +774,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <p class="mon-sentence">The page changed and the monitor <b>can't find the price</b>.</p>
                 <div class="history">
                   <div class="mon-eyebrow">History</div>
-                  <div class="hist-item err"><span class="when">Jun 30</span><span class="hist-flag">value lost</span><span class="deemphasized">the page changed</span></div>
+                  <div class="hist-item"><span class="when">Jun 30</span><span class="hist-flag">value lost</span><span class="deemphasized">the page changed</span></div>
                   <div class="hist-item"><span class="when">Jun 12</span><span class="deemphasized">first checked · $189</span></div>
                 </div>
                 <div class="mcard-actions"><button class="btn-primary" data-open-page>Open page</button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
@@ -798,7 +794,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <p class="mon-sentence">Alerts you when <b>a new listing matches my search</b> · checks daily</p>
                 <div class="history">
                   <div class="mon-eyebrow">History</div>
-                  <div class="hist-item ok"><span class="when">Today</span><span class="newv" style="color:var(--text-color-success)">3 new listings</span></div>
+                  <div class="hist-item"><span class="when">Today</span><span class="newv" style="color:var(--text-color-success)">3 new listings</span></div>
                   <div class="hist-item"><span class="when">Yesterday</span><span class="newv">2 new listings</span></div>
                   <div class="hist-item"><span class="when">Jun 28</span><span class="deemphasized">first checked · 41 listings</span></div>
                 </div>
