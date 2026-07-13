@@ -585,8 +585,12 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </button>
           <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
             <div class="mvalue"><span class="now" style="font-size:24px">$278</span><span class="from">checked 2:14 PM · was $299</span></div>
-            <div class="mrow"><span class="lbl">Alert me when</span><span class="val">the price drops below $270</span></div>
-            <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
+            <div class="history">
+              <div class="hist-item"><span class="when">Today</span><span class="oldv">$299</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$278</span><span class="deemphasized">−7%</span></div>
+              <div class="hist-item low"><span class="when">Jun 24</span><span class="hist-flag">possible change</span><span class="deemphasized">held</span></div>
+              <div class="hist-item"><span class="when">Jun 17</span><span class="deemphasized">first checked · $299</span></div>
+            </div>
+            <a class="accent-link" href="#5" data-open-tools="sony">See and edit on about:tools</a>
           </div></div></div>
         </div>
         <div class="mcard mitem">
@@ -597,8 +601,12 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
           </button>
           <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
-            <p class="small" style="margin:0">The page changed and the monitor can't find the price. Open the page and it will find it again.</p>
-            <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
+            <p class="small" style="margin:0">The page changed and the monitor can't find the price.</p>
+            <div class="history">
+              <div class="hist-item"><span class="when">Jun 30</span><span class="hist-flag">value lost</span><span class="deemphasized">the page changed</span></div>
+              <div class="hist-item"><span class="when">Jun 12</span><span class="deemphasized">first checked · $189</span></div>
+            </div>
+            <a class="accent-link" href="#5" data-open-tools="rei">See and edit on about:tools</a>
           </div></div></div>
         </div>
         <div class="mcard mitem">
@@ -609,9 +617,12 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
           </button>
           <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
-            <div class="mvalue"><span class="now" style="font-size:24px">3 new</span><span class="from">since yesterday · craigslist.org</span></div>
-            <div class="mrow"><span class="lbl">Alert me when</span><span class="val">a new listing matches my search</span></div>
-            <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
+            <div class="mvalue"><span class="now" style="font-size:24px">3 new</span><span class="from">since yesterday · checked 12m ago</span></div>
+            <div class="history">
+              <div class="hist-item"><span class="when">Today</span><span class="newv" style="color:var(--text-color-success)">3 new listings</span></div>
+              <div class="hist-item"><span class="when">Yesterday</span><span class="newv">2 new listings</span></div>
+            </div>
+            <a class="accent-link" href="#5" data-open-tools="apt">See and edit on about:tools</a>
           </div></div></div>
         </div>
         <div class="group-label" style="margin: 10px 4px 0">Scout</div>
@@ -625,6 +636,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
             <div class="mrow"><span class="lbl">Best code</span><span class="val">SAVE12 — $12 off</span></div>
             <div class="mrow"><span class="lbl">Also found</span><span class="val">FREESHIP · WELCOME10</span></div>
+            <a class="accent-link" href="#5" data-open-tools="scout">See on about:tools</a>
           </div></div></div>
         </div>
         <div class="group-label" style="margin: 10px 4px 0">Research</div>
@@ -637,7 +649,8 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </button>
           <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
             <div class="mrow"><span class="lbl">Top pick</span><span class="val">Sony WH-1000XM5 at $278</span></div>
-            <a class="accent-link" href="#" onclick="return false">Open report</a>
+            <div class="mrow"><span class="lbl">Sources</span><span class="val">14 · finished yesterday</span></div>
+            <a class="accent-link" href="#5" data-open-tools="research">See on about:tools</a>
           </div></div></div>
         </div>
       </div>
@@ -693,7 +706,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           <div data-show="5 6">
             <div class="group-label">Active · 3</div>
 
-            <div class="dash-item">
+            <div class="dash-item" id="dash-sony">
               <div class="grow" id="row-sony" role="button" tabindex="0" aria-expanded="false">
                 <span class="dot-status active"></span>
                 <span class="favicon-sq" style="background:#e8663a">S</span>
@@ -725,7 +738,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               </div></div>
             </div>
 
-            <div class="dash-item attn">
+            <div class="dash-item attn" id="dash-rei">
               <div class="grow attn" role="button" tabindex="0" aria-expanded="false">
                 <span class="dot-status active"></span>
                 <span class="favicon-sq" style="background:#2f855a">R</span>
@@ -744,7 +757,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               </div></div>
             </div>
 
-            <div class="dash-item">
+            <div class="dash-item" id="dash-apt">
               <div class="grow" role="button" tabindex="0" aria-expanded="false">
                 <span class="dot-status active"></span>
                 <span class="favicon-sq" style="background:#3a7ae8">C</span>
@@ -813,7 +826,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <span class="tn">Scout</span>
             <span class="tc">finds deals and coupons</span>
           </div>
-          <div class="dash-item" data-show="5 6">
+          <div class="dash-item" data-show="5 6" id="dash-scout">
             <div class="grow" role="button" tabindex="0" aria-expanded="false">
               <span class="dot-status active"></span>
               <span class="favicon-sq" style="background:#e8663a">S</span>
@@ -836,7 +849,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <span class="tn">Research</span>
             <span class="tc">digs into a topic and reports back</span>
           </div>
-          <div class="dash-item" data-show="5 6">
+          <div class="dash-item" data-show="5 6" id="dash-research">
             <div class="grow" role="button" tabindex="0" aria-expanded="false">
               <span class="dot-status active"></span>
               <span class="favicon-sq" style="background:linear-gradient(135deg,#455fe7,#10a4ca)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg></span>
@@ -1219,6 +1232,18 @@ function wireAddMenu(btnId, menuId) {
     if (b.dataset.new === "monitor") openModal(null);
   }));
 }
+document.querySelectorAll("[data-open-tools]").forEach(a => a.addEventListener("click", e => {
+  e.preventDefault();
+  e.stopPropagation();
+  go(5);
+  const item = document.getElementById("dash-" + a.dataset.openTools);
+  if (!item) return;
+  const body = item.querySelector(".mstack-expand");
+  setExpand(body, true);
+  item.querySelector(".grow").setAttribute("aria-expanded", "true");
+  requestAnimationFrame(() => item.scrollIntoView({ block: "center", behavior: "smooth" }));
+}));
+
 wireAddMenu("panel-new", "add-menu");
 wireAddMenu("page-add-new", "page-add-menu");
 document.getElementById("panel-open-about").onclick = (e) => { e.preventDefault(); go(5); };
