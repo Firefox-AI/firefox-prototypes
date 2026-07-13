@@ -213,7 +213,7 @@ h1,h2,h3,h4,p { margin: 0; }
 .dash-item .mstack-expand-inner { padding-top: 0; }
 .dash-item .mstack-expand .mcard { border: 0; background: none; box-shadow: none; border-radius: 0; padding: 0 var(--space-large) var(--space-large); }
 .grow .gmain { min-width: 0; flex: 1; }
-.grow .gname { font-weight: var(--font-weight-semibold); }
+.grow .gname { font-weight: var(--font-weight-semibold); display: inline-flex; align-items: center; min-height: 30px; }
 .grow .gmeta { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
 .grow .gvalue { text-align: right; flex: none; }
 .grow .gvalue .now { font-weight: var(--font-weight-bold); font-size: var(--font-size-heading-medium); }
@@ -327,14 +327,23 @@ h1,h2,h3,h4,p { margin: 0; }
 .mon-sentence { margin: 0; color: var(--text-color-deemphasized); line-height: 1.5; }
 .mon-sentence b { color: var(--text-color); font-weight: var(--font-weight-semibold); }
 .mon-eyebrow { font-size: 11px; font-weight: var(--font-weight-semibold); letter-spacing: .07em; text-transform: uppercase; color: var(--text-color-deemphasized); }
-/* In-place rename, the classic-window widget pattern: the title itself becomes the input */
-.gname-edit { display: none; position: relative; align-items: center; width: min(100%, 380px); margin: 2px 0 4px; }
+/* In-place rename, the classic-window widget pattern: the title itself becomes the input.
+   The input occupies the same 30px slot as the title and its text keeps the title's x —
+   the ring extends left instead of pushing content. The swap is a fade, not a move. */
+.gname-edit { display: none; position: relative; align-items: center; min-height: 30px; width: min(100%, 360px); margin: 0 0 0 -10px; }
 .dash-item.editing .gname { display: none; }
-.dash-item.editing .gname-edit { display: inline-flex; }
-.gname-input { font: inherit; font-weight: var(--font-weight-semibold); color: var(--text-color); width: 100%; background: var(--background-color-box); border: 2px solid var(--color-accent-primary); border-radius: var(--border-radius-medium); padding: 5px 34px 5px 10px; }
+.dash-item.editing .gname-edit { display: inline-flex; animation: fadein var(--motion-dur-near) var(--motion-ease-edge); }
+.gname-input { font: inherit; font-weight: var(--font-weight-semibold); color: var(--text-color); width: 100%; height: 28px; background: var(--background-color-box); border: 2px solid var(--color-accent-primary); border-radius: var(--border-radius-medium); padding: 0 30px 0 8px; }
 .gname-input:focus-visible { outline: none; }
-.gname-x { position: absolute; right: 5px; top: 50%; translate: 0 -50%; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--border-radius-circle); color: var(--text-color-deemphasized); font-size: 15px; line-height: 1; }
+.gname-x { position: absolute; right: 4px; top: 50%; translate: 0 -50%; width: 22px; height: 22px; display: grid; place-items: center; border-radius: var(--border-radius-circle); color: var(--text-color-deemphasized); font-size: 14px; line-height: 1; }
 .gname-x:hover { color: var(--text-color); background: light-dark(rgba(0,0,0,.08), rgba(255,255,255,.12)); }
+@keyframes fadein { from { opacity: 0; } }
+/* Mode swap is one gesture: incoming content Lands while the surface height eases on the same curve */
+.mcard.editable .view-only, .mcard.editable .edit-only { animation: land var(--motion-dur-near) var(--motion-ease-edge); }
+@media (prefers-reduced-motion: reduce) {
+  .mcard.editable .view-only, .mcard.editable .edit-only, .dash-item.editing .gname-edit { animation: none; }
+  .mstack-expand, .mstack-expand.exp-open { transition: none; }
+}
 /* Collapsed rows read as status: trend spark + value + change + the alert target */
 .spark { width: 60px; height: 20px; flex: none; }
 .spark-line { color: var(--text-color-success); }
@@ -1343,14 +1352,18 @@ document.getElementById("sony-edit").addEventListener("click", e => {
   cardSony.classList.add("editing");
   dashSony.classList.add("editing");
   sonyRemeasure();
-  sonyTitle.focus();
-  sonyTitle.select();
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  setTimeout(() => { sonyTitle.focus({ preventScroll: true }); sonyTitle.select(); }, reduced ? 0 : 150);
 });
 document.getElementById("sony-save").addEventListener("click", e => {
   e.stopPropagation();
   document.querySelector("#row-sony .gname").textContent = sonyTitle.value.trim() || "Untitled monitor";
   const cond = sonyCond.value.trim();
   if (cond) document.getElementById("sony-cond-view").textContent = cond;
+  const SUBS = { "Any drop": "alerts on any drop", "Below $270": "alerts below $270", "Below $250": "alerts below $250", "Back in stock": "alerts when back in stock" };
+  const pickedChip = document.querySelector("#sony-chips .chip.selected");
+  const statusSub = document.querySelector("#row-sony .gvalue .sub");
+  if (statusSub) statusSub.textContent = (pickedChip && SUBS[pickedChip.textContent]) || "custom alert";
   cardSony.classList.remove("editing");
   dashSony.classList.remove("editing");
   sonyRemeasure();
