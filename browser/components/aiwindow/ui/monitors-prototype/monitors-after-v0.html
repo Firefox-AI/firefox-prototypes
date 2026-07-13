@@ -353,7 +353,7 @@ h1,h2,h3,h4,p { margin: 0; }
 .gvalue .chg { font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--text-color-success); }
 @media (max-width: 900px) { .spark { display: none; } }
 
-/* Undo toast — delete is reversible (§2 guarded exception + undo) */
+/* Status toasts (deleted confirmation, started) */
 .undo-toast { position: absolute; bottom: 76px; left: 50%; transform: translateX(-50%); z-index: 80; display: flex; align-items: center; gap: var(--space-medium); background: light-dark(#180e30, #f2f0f8); color: light-dark(#f2f0f8, #180e30); padding: 10px 12px 10px 16px; border-radius: var(--border-radius-circle); box-shadow: var(--box-shadow-level-4); font-size: var(--font-size-small); animation: toast-in var(--motion-dur-soft) var(--motion-ease-reach) both; }
 .undo-toast .undo { color: inherit; font-weight: var(--font-weight-semibold); text-decoration: underline; }
 .undo-toast .x { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; color: inherit; opacity: .7; }
@@ -1084,15 +1084,14 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
   <div class="modal-scrim" id="confirm-scrim" hidden>
     <div class="mcard modal-card confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-body">
       <span class="mcard-name" id="confirm-title">Delete this monitor?</span>
-      <p class="mon-sentence" id="confirm-body"><b id="confirm-name">This monitor</b> will stop watching its page. You can undo right after.</p>
+      <p class="mon-sentence" id="confirm-body"><b id="confirm-name">This monitor</b> will stop watching its page. This can't be undone.</p>
       <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost" id="confirm-cancel">Cancel</button><button class="btn-destructive" id="confirm-delete">Delete</button></div>
     </div>
   </div>
 
-  <!-- Undo toast — delete is reversible (§2) -->
+  <!-- Deleted toast — confirmation only; undo exists only on chat creation -->
   <div class="undo-toast" id="undo-toast" hidden>
     <span>Monitor deleted.</span>
-    <button class="undo" id="undo-btn">Undo</button>
     <button class="x" id="undo-x" aria-label="Dismiss"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg></button>
   </div>
 
@@ -1408,11 +1407,10 @@ document.querySelector("#row-sony .gname-x").addEventListener("click", e => {
 });
 document.getElementById("pin-cond").addEventListener("input", () => noteSaved(pinNote, ""));
 
-// Undo toast (guarded, reversible delete)
+// Deleted toast (delete confirms via dialog; not undoable)
 const undoToast = document.getElementById("undo-toast");
 let undoTimer = null;
 function showUndo() { undoToast.hidden = false; clearTimeout(undoTimer); undoTimer = setTimeout(() => { undoToast.hidden = true; }, 6000); }
-document.getElementById("undo-btn").onclick = () => { clearTimeout(undoTimer); undoToast.hidden = true; };
 document.getElementById("undo-x").onclick = () => { clearTimeout(undoTimer); undoToast.hidden = true; };
 
 const confirmScrim = document.getElementById("confirm-scrim");
