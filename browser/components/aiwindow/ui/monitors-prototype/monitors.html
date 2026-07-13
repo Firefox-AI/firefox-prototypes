@@ -332,6 +332,14 @@ h1,h2,h3,h4,p { margin: 0; }
 .gname-input:focus-visible { outline: none; }
 .gname-x { position: absolute; right: 5px; top: 50%; translate: 0 -50%; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--border-radius-circle); color: var(--text-color-deemphasized); font-size: 15px; line-height: 1; }
 .gname-x:hover { color: var(--text-color); background: light-dark(rgba(0,0,0,.08), rgba(255,255,255,.12)); }
+/* Collapsed rows read as status: trend spark + value + change + the alert target */
+.spark { width: 60px; height: 20px; flex: none; }
+.spark-line { color: var(--text-color-success); }
+.spark-line polyline { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.spark-bars { color: var(--color-accent-primary); }
+.spark-bars rect { fill: currentColor; }
+.gvalue .chg { font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--text-color-success); }
+@media (max-width: 900px) { .spark { display: none; } }
 
 /* Undo toast — delete is reversible (§2 guarded exception + undo) */
 .undo-toast { position: absolute; bottom: 76px; left: 50%; transform: translateX(-50%); z-index: 80; display: flex; align-items: center; gap: var(--space-medium); background: light-dark(#180e30, #f2f0f8); color: light-dark(#f2f0f8, #180e30); padding: 10px 12px 10px 16px; border-radius: var(--border-radius-circle); box-shadow: var(--box-shadow-level-4); font-size: var(--font-size-small); animation: toast-in var(--motion-dur-soft) var(--motion-ease-reach) both; }
@@ -718,7 +726,8 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <span class="dot-status active"></span>
                 <span class="favicon-sq" style="background:#e8663a">S</span>
                 <span class="gmain"><span class="gname">Sony WH-1000XM5 price</span><span class="gname-edit"><input class="gname-input" id="sony-title" value="Sony WH-1000XM5 price" aria-label="Monitor name" /><button class="gname-x" aria-label="Clear name">×</button></span><br/><span class="gmeta truncate">soundnest.com · checked 3m ago</span></span>
-                <span class="gvalue"><span class="now">$299</span><br/><span class="sub">watching for a drop</span></span>
+                <svg class="spark spark-line" viewBox="0 0 60 20" aria-hidden="true"><polyline points="0,3 12,4.5 24,8 36,10.5 48,13.5 60,17"/></svg>
+                <span class="gvalue"><span class="now">$299 <span class="chg">▼ −6%</span></span><br/><span class="sub">alerts below $270</span></span>
               </div>
               <div class="mstack-expand"><div class="mstack-expand-inner">
               <div id="card-sony" class="mcard editable">
@@ -753,7 +762,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <span class="dot-status active"></span>
                 <span class="favicon-sq" style="background:#2f855a">R</span>
                 <span class="gmain"><span class="gname">REI Danner hiking boots</span><br/><span class="gmeta truncate">rei.com · the page changed</span></span>
-                <span class="gvalue"><span class="flag-attn"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg> Needs a look</span></span>
+                <span class="gvalue"><span class="flag-attn"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg> Needs a look</span><br/><span class="sub">last knew $189 · Jun 30</span></span>
               </div>
               <div class="mstack-expand"><div class="mstack-expand-inner">
               <div class="mcard">
@@ -773,7 +782,8 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <span class="dot-status active"></span>
                 <span class="favicon-sq" style="background:#3a7ae8">C</span>
                 <span class="gmain"><span class="gname">Apartment listings · Mission</span><br/><span class="gmeta truncate">craigslist.org · checked 12m ago</span></span>
-                <span class="gvalue"><span class="now">3 new</span><br/><span class="sub">since yesterday</span></span>
+                <svg class="spark spark-bars" viewBox="0 0 60 20" aria-hidden="true"><rect x="0" y="12.7" width="7" height="5.3" rx="1.5"/><rect x="10" y="17" width="7" height="1" rx="0.5"/><rect x="20" y="7.3" width="7" height="10.7" rx="1.5"/><rect x="30" y="12.7" width="7" height="5.3" rx="1.5"/><rect x="40" y="7.3" width="7" height="10.7" rx="1.5"/><rect x="50" y="2" width="7" height="16" rx="1.5"/></svg>
+                <span class="gvalue"><span class="now">3 new <span class="chg">▲ +1</span></span><br/><span class="sub">since yesterday</span></span>
               </div>
               <div class="mstack-expand"><div class="mstack-expand-inner">
               <div class="mcard">
@@ -795,7 +805,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <span class="dot-status paused"></span>
                 <span class="favicon-sq" style="background:#b8860b">N</span>
                 <span class="gmain"><span class="gname">Nikon Z6 III price</span><br/><span class="gmeta truncate">bhphotovideo.com · paused · last $1,999</span></span>
-                <span class="gvalue"><a class="accent-link" href="#" onclick="return false">Resume</a></span>
+                <span class="gvalue"><span class="now">$1,999</span><br/><span class="sub">paused · <a class="accent-link" href="#" onclick="return false">Resume</a></span></span>
               </div>
               <div class="mstack-expand"><div class="mstack-expand-inner">
               <div class="mcard">
