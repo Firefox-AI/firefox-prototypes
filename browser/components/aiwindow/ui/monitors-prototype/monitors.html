@@ -219,9 +219,6 @@ h1,h2,h3,h4,p { margin: 0; }
 .grow .gvalue .now { font-weight: var(--font-weight-bold); font-size: var(--font-size-heading-medium); }
 .grow .gvalue .sub { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
 .grow.paused { opacity: .72; }
-.dot-status { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.dot-status.active { background: var(--icon-color-success); }
-.dot-status.paused { background: var(--border-color); }
 .favicon-sq { width: 26px; height: 26px; border-radius: var(--border-radius-small); flex: none; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 12px; }
 
 .flag-attn { display: inline-flex; align-items: center; gap: 6px; color: var(--text-color-warning); background: var(--background-color-warning); padding: 3px 10px; border-radius: var(--border-radius-circle); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); }
@@ -362,7 +359,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
 /* Change history */
 .history { display: flex; flex-direction: column; }
-.hist-item { display: flex; align-items: baseline; gap: var(--space-small); padding: var(--space-small) 0; border-top: 1px solid var(--border-color-deemphasized); font-size: var(--font-size-small); }
+.hist-item { display: flex; align-items: baseline; gap: var(--space-small); padding: 6px 0; font-size: var(--font-size-small); }
 .hist-item .when { color: var(--text-color-deemphasized); min-width: 84px; flex: none; }
 .hist-item .oldv { color: var(--text-color-deemphasized); text-decoration: line-through; }
 .hist-item .newv { font-weight: var(--font-weight-semibold); }
@@ -607,8 +604,8 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </button>
           <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
             <div class="history">
-              <div class="hist-item"><span class="when">Today</span><span class="oldv">$299</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$278</span><span class="deemphasized">−7%</span></div>
-              <div class="hist-item low"><span class="when">Jun 24</span><span class="hist-flag">possible change</span><span class="deemphasized">held</span></div>
+              <div class="hist-item"><span class="when">Today</span><span class="oldv">$299</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$278</span><span class="deemphasized">met your alert</span></div>
+              <div class="hist-item low"><span class="when">Jun 24</span><span>checked — no change</span></div>
               <div class="hist-item"><span class="when">Jun 17</span><span class="deemphasized">first checked · $299</span></div>
             </div>
             <a class="accent-link" href="#5" data-open-tools="sony">See and edit on about:tools</a>
@@ -728,7 +725,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
             <div class="dash-item" id="dash-sony">
               <div class="grow" id="row-sony" role="button" tabindex="0" aria-expanded="false">
-                <span class="dot-status active"></span>
                 <span class="favicon-sq" style="background:#e8663a">S</span>
                 <span class="gmain"><span class="gname">Sony WH-1000XM5 price</span><span class="gname-edit"><input class="gname-input" id="sony-title" value="Sony WH-1000XM5 price" aria-label="Monitor name" /><button class="gname-x" aria-label="Clear name">×</button></span><br/><span class="gmeta truncate">soundnest.com · checked 3m ago</span></span>
                 <svg class="spark spark-line" viewBox="0 0 60 20" aria-hidden="true"><polyline points="0,3 12,4.5 24,8 36,10.5 48,13.5 60,17"/></svg>
@@ -740,8 +736,8 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                   <p class="mon-sentence">Alerts you when <b id="sony-cond-view">the price drops below $270</b> · checks daily</p>
                   <div class="history">
                     <div class="mon-eyebrow">History</div>
-                    <div class="hist-item low"><span class="when">Jun 24</span><span class="hist-flag">possible change</span><span class="deemphasized">low confidence · held, no notification</span></div>
-                    <div class="hist-item"><span class="when">Jun 17</span><span class="oldv">$319</span><span class="arrow">→</span><span class="newv">$299</span><span class="deemphasized">first checked</span></div>
+                    <div class="hist-item low"><span class="when">Jun 24</span><span>checked — didn't meet your alert</span></div>
+                    <div class="hist-item"><span class="when">Jun 17</span><span class="deemphasized">first checked · $299</span></div>
                   </div>
                   <div class="mcard-actions"><button class="btn-ghost" id="sony-edit">Edit</button><button class="btn-ghost">Pause</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
                 </div>
@@ -764,7 +760,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
             <div class="dash-item attn" id="dash-rei">
               <div class="grow attn" role="button" tabindex="0" aria-expanded="false">
-                <span class="dot-status active"></span>
                 <span class="favicon-sq" style="background:#2f855a">R</span>
                 <span class="gmain"><span class="gname">REI Danner hiking boots</span><br/><span class="gmeta truncate">rei.com · the page changed</span></span>
                 <span class="gvalue"><span class="flag-attn"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg> Needs a look</span><br/><span class="sub">last knew $189 · Jun 30</span></span>
@@ -775,7 +770,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <div class="history">
                   <div class="mon-eyebrow">History</div>
                   <div class="hist-item"><span class="when">Jun 30</span><span class="hist-flag">value lost</span><span class="deemphasized">the page changed</span></div>
-                  <div class="hist-item"><span class="when">Jun 12</span><span class="newv">$189</span><span class="deemphasized">first checked</span></div>
+                  <div class="hist-item"><span class="when">Jun 12</span><span class="deemphasized">first checked · $189</span></div>
                 </div>
                 <div class="mcard-actions"><button class="btn-primary" data-open-page>Open page</button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
               </div>
@@ -784,7 +779,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
             <div class="dash-item" id="dash-apt">
               <div class="grow" role="button" tabindex="0" aria-expanded="false">
-                <span class="dot-status active"></span>
                 <span class="favicon-sq" style="background:#3a7ae8">C</span>
                 <span class="gmain"><span class="gname">Apartment listings · Mission</span><br/><span class="gmeta truncate">craigslist.org · checked 12m ago</span></span>
                 <svg class="spark spark-bars" viewBox="0 0 60 20" aria-hidden="true"><rect x="0" y="12.7" width="7" height="5.3" rx="1.5"/><rect x="10" y="17" width="7" height="1" rx="0.5"/><rect x="20" y="7.3" width="7" height="10.7" rx="1.5"/><rect x="30" y="12.7" width="7" height="5.3" rx="1.5"/><rect x="40" y="7.3" width="7" height="10.7" rx="1.5"/><rect x="50" y="2" width="7" height="16" rx="1.5"/></svg>
@@ -807,7 +801,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <div class="group-label" id="mon-count-paused">Paused · 1</div>
             <div class="dash-item" id="dash-nikon">
               <div class="grow paused" role="button" tabindex="0" aria-expanded="false">
-                <span class="dot-status paused"></span>
                 <span class="favicon-sq" style="background:#b8860b">N</span>
                 <span class="gmain"><span class="gname">Nikon Z6 III price</span><br/><span class="gmeta truncate">bhphotovideo.com · paused · last $1,999</span></span>
                 <span class="gvalue"><span class="now">$1,999</span><br/><span class="sub">paused · <a class="accent-link" href="#" onclick="return false">Resume</a></span></span>
@@ -842,7 +835,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </div>
           <div class="dash-item" data-show="5 6" id="dash-scout">
             <div class="grow" role="button" tabindex="0" aria-expanded="false">
-              <span class="dot-status active"></span>
               <span class="favicon-sq" style="background:#e8663a">S</span>
               <span class="gmain"><span class="gname">SoundNest checkout codes</span><br/><span class="gmeta truncate">3 codes found · ran 2h ago</span></span>
               <span class="gvalue"><span class="status-chip">Saves $12</span></span>
@@ -865,7 +857,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </div>
           <div class="dash-item" data-show="5 6" id="dash-research">
             <div class="grow" role="button" tabindex="0" aria-expanded="false">
-              <span class="dot-status active"></span>
               <span class="favicon-sq" style="background:linear-gradient(135deg,#455fe7,#10a4ca)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg></span>
               <span class="gmain"><span class="gname">ANC headphones under $300</span><br/><span class="gmeta truncate">14 sources · finished yesterday</span></span>
               <span class="gvalue"><span class="status-chip">Report ready</span></span>
@@ -1073,7 +1064,7 @@ const STEPS = [
   "Start monitoring — saved, confirmed in chat",
   "about:tools — every tool in one place",
   "The row becomes the card — hit Edit to make changes",
-  "A confident change fires a notification",
+  "The alert is met — a notification fires",
   "Open page — the chat picks up where you left off",
   "Tools in the sidebar — Monitors at hand",
   "Day zero — the empty state",
