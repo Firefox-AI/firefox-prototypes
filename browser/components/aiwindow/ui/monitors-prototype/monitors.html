@@ -298,7 +298,6 @@ h1,h2,h3,h4,p { margin: 0; }
 
 /* Create card, saved: inputs lock and Start monitoring becomes the saved state */
 .mcard.saved .field-input, .mcard.saved .chip, .mcard.saved .page-pill, .mcard.saved .gname-input { opacity: .55; pointer-events: none; }
-.mcard.saved .gname-input { border-color: var(--border-color-deemphasized); }
 .mcard.saved .gname-x { display: none; }
 .mcard.saved .mcard-actions .btn-ghost { display: none; }
 .mcard.saved #start-monitoring { background: var(--background-color-success); color: var(--text-color-success); display: inline-flex; align-items: center; gap: 5px; }
@@ -324,13 +323,16 @@ h1,h2,h3,h4,p { margin: 0; }
 /* In-place rename, the classic-window widget pattern: the title itself becomes the input.
    The input occupies the same 30px slot as the title and its text keeps the title's x —
    the ring extends left instead of pushing content. The swap is a fade, not a move. */
-.gname-edit { display: none; position: relative; align-items: center; min-height: 32px; width: min(100%, 380px); margin: 0 0 0 -14px; }
+.gname-edit { display: none; position: relative; align-items: center; min-height: 32px; width: min(100%, 380px); margin: 0 0 0 -10px; }
 .gname-edit.show { display: inline-flex; }
 .dash-item.editing .gname { display: none; }
 .dash-item.editing .gname-edit { display: inline-flex; animation: fadein var(--motion-dur-near) var(--motion-ease-edge); }
-.gname-input { font: inherit; font-weight: var(--font-weight-semibold); color: var(--text-color); width: 100%; height: 32px; background: var(--background-color-box); border: 2px solid var(--color-accent-primary); border-radius: var(--border-radius-medium); padding: 0 38px 0 12px; }
-.gname-input:focus-visible { outline: none; }
-.gname-x { position: absolute; right: 6px; top: 50%; translate: 0 -50%; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--border-radius-circle); color: var(--text-color-deemphasized); font-size: 15px; line-height: 1; }
+/* Quiet at rest — it reads as the title. Hover hints, focus brings the classic ring + clear. */
+.gname-input { font: inherit; font-weight: var(--font-weight-semibold); color: var(--text-color); width: 100%; height: 32px; background: transparent; border: 2px solid transparent; border-radius: var(--border-radius-medium); padding: 0 34px 0 8px; transition: background-color var(--motion-dur-near) var(--motion-ease-edge), border-color var(--motion-dur-near) var(--motion-ease-edge); }
+.gname-input:hover { background: var(--background-color-box); }
+.gname-input:focus, .gname-input:focus-visible { outline: none; background: var(--background-color-box); border-color: var(--color-accent-primary); }
+.gname-x { position: absolute; right: 6px; top: 50%; translate: 0 -50%; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--border-radius-circle); color: var(--text-color-deemphasized); font-size: 15px; line-height: 1; opacity: 0; pointer-events: none; transition: opacity var(--motion-dur-near) var(--motion-ease-edge); }
+.gname-edit:focus-within .gname-x { opacity: 1; pointer-events: auto; }
 .gname-x:hover { color: var(--text-color); background: light-dark(rgba(0,0,0,.08), rgba(255,255,255,.12)); }
 @keyframes fadein { from { opacity: 0; } }
 /* Mode swap is one gesture: incoming content Lands while the surface height eases on the same curve */
