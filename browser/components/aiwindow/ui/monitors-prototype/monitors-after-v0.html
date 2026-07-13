@@ -291,6 +291,10 @@ h1,h2,h3,h4,p { margin: 0; }
 .mcard-actions .spacer { flex: 1; }
 .mono-dim { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
 
+/* Post-action undo, matching the group-tabs pattern */
+.undo-pill { padding: 7px 18px; border-radius: var(--border-radius-circle); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--color-accent-primary); background: var(--background-color-box); border: 1px solid light-dark(rgba(118,78,221,.35), rgba(212,193,255,.4)); box-shadow: var(--box-shadow-level-1); }
+.undo-pill:hover { background: light-dark(var(--color-violet-0), rgba(118,78,221,.18)); }
+
 /* Create card, saved: inputs lock and Start monitoring becomes the saved state */
 .mcard.saved .field-input, .mcard.saved .chip, .mcard.saved .page-pill, .mcard.saved .title-input { opacity: .55; pointer-events: none; }
 .mcard.saved .mcard-actions .btn-ghost { display: none; }
@@ -1003,6 +1007,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         <!-- Step 4: started — the setup card locks in, the chat confirms -->
         <div data-show="4" class="anim-land" style="display:flex;flex-direction:column;gap:var(--space-medium)">
           <div class="message-assistant">Watching <b>Sony WH-1000XM5 price</b>. You'll hear from me if it drops below $270. To view it or make edits, head to <a href="#" onclick="return false">about:tools</a>.</div>
+          <div><button class="undo-pill" id="undo-create">Undo</button></div>
         </div>
 
         <!-- Step 9: Open page — the card is pinned to THIS CHAT, plus change history -->
@@ -1191,6 +1196,8 @@ document.getElementById("smart-cursor").addEventListener("click", e => {
   e.currentTarget.textContent = "Locked: main product price";
   setTimeout(() => price.classList.remove("sc-ring"), 2600);
 });
+
+document.getElementById("undo-create").addEventListener("click", () => go(3));
 
 // Story shortcuts
 document.getElementById("pa-monitor").onclick = () => { if (step === 1) go(2); };
