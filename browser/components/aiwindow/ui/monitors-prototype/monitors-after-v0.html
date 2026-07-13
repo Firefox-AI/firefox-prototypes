@@ -291,11 +291,20 @@ h1,h2,h3,h4,p { margin: 0; }
 .mcard-actions .spacer { flex: 1; }
 .mono-dim { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
 
-/* Create card, saved: inputs lock, actions give way to the confirmation */
-.saved-flag { display: none; }
-.mcard.saved .field-input, .mcard.saved .chip, .mcard.saved .page-pill { opacity: .55; pointer-events: none; }
-.mcard.saved .mcard-actions .btn-ghost, .mcard.saved .mcard-actions .btn-primary { display: none; }
-.mcard.saved .saved-flag { display: inline-flex; }
+/* Create card, saved: inputs lock and Start monitoring becomes the saved state */
+.mcard.saved .field-input, .mcard.saved .chip, .mcard.saved .page-pill, .mcard.saved .title-input { opacity: .55; pointer-events: none; }
+.mcard.saved .mcard-actions .btn-ghost { display: none; }
+.mcard.saved #start-monitoring { background: var(--background-color-success); color: var(--text-color-success); display: inline-flex; align-items: center; gap: 5px; }
+.mcard.saved #start-monitoring svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Monitor title edits in place */
+.title-input { font: inherit; font-weight: var(--font-weight-semibold); color: var(--text-color); background: none; border: 0; border-bottom: 1px dashed transparent; padding: 0; width: 100%; min-width: 0; }
+.title-input:hover { border-bottom-color: var(--border-color); }
+.title-input:focus-visible { outline: none; border-bottom: 1px solid var(--color-accent-primary); }
+
+/* Smart Cursor: the page element the monitor locked onto */
+.sc-ring { position: relative; border-radius: var(--border-radius-small); box-shadow: 0 0 0 2px var(--color-accent-primary), 0 0 18px rgba(118, 78, 221, .45); animation: sc-pulse 1.2s var(--motion-ease-edge) 2; }
+@keyframes sc-pulse { 50% { box-shadow: 0 0 0 4px var(--color-accent-primary), 0 0 26px rgba(118, 78, 221, .6); } }
 
 .btn-ghost:disabled { opacity: .55; cursor: default; }
 .btn-ghost:disabled:hover { background: none; }
@@ -667,7 +676,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           <div class="product-info">
             <div class="product-brand">Sony</div>
             <div class="product-title">WH-1000XM5 Wireless Headphones</div>
-            <div class="product-price">$299</div>
+            <div class="product-price" id="stage-price" style="display:inline-block">$299</div>
             <div class="product-stock"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> In stock</div>
             <div class="product-buy"><button class="btn-primary lg">Add to cart</button><button class="btn-ghost">Save for later</button></div>
             <div class="product-meta">Free returns within 30 days · Ships in 2–3 business days<br/>Price last changed 14 days ago</div>
@@ -973,8 +982,9 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           <div class="message-assistant">Looks like a product page — I've set this up to watch the price. Tweak anything, then start it.</div>
 
           <div class="mcard" id="create-card">
-            <div class="mcard-head"><span class="favicon-sq" style="background:#e8663a">S</span><span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url">soundnest.com/audio/sony-wh-1000xm5</span></span></div>
+            <div class="mcard-head"><span class="favicon-sq" style="background:#e8663a">S</span><span style="min-width:0;flex:1"><input class="title-input" id="create-title" value="Sony WH-1000XM5 price" aria-label="Monitor name" /><span class="mcard-url">soundnest.com/audio/sony-wh-1000xm5</span></span></div>
             <div class="mvalue"><span class="now">$299</span><span class="from">found on this page just now</span></div>
+            <div class="mrow"><span class="lbl">Watching</span><span class="val">Main product price</span><span class="spacer"></span><a class="accent-link" href="#" id="smart-cursor">Point with Smart Cursor</a></div>
             <div class="field">
               <span class="field-label">Alert me when</span>
               <input class="field-input" id="create-cond" value="the price drops below $270" aria-label="Alert condition" />
@@ -986,13 +996,13 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             </div>
             <hr class="rule" />
             <div class="mrow"><span class="lbl">Check</span><span class="val">Daily</span></div>
-                                    <div class="mcard-actions"><span class="mono-dim">Runs on-device</span><span class="spacer"></span><button class="btn-ghost">Cancel</button><button class="btn-primary" id="start-monitoring">Start monitoring</button><span class="status-chip saved-flag"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Saved</span></div>
+                                    <div class="mcard-actions"><span class="mono-dim">Runs on-device</span><span class="spacer"></span><button class="btn-ghost">Cancel</button><button class="btn-primary" id="start-monitoring">Start monitoring</button></div>
           </div>
         </div>
 
         <!-- Step 4: started — the setup card locks in, the chat confirms -->
         <div data-show="4" class="anim-land" style="display:flex;flex-direction:column;gap:var(--space-medium)">
-          <div class="message-assistant">Watching <b>Sony WH-1000XM5 price</b>. You'll hear from me if it drops below $270 — it lives at <a href="#" onclick="return false">about:tools</a>.</div>
+          <div class="message-assistant">Watching <b>Sony WH-1000XM5 price</b>. You'll hear from me if it drops below $270. To view it or make edits, head to <a href="#" onclick="return false">about:tools</a>.</div>
         </div>
 
         <!-- Step 9: Open page — the card is pinned to THIS CHAT, plus change history -->
@@ -1146,6 +1156,9 @@ function render() {
   const savedState = step === 4;
   createCard.classList.toggle("saved", savedState);
   createCard.querySelectorAll("input, button").forEach(el => { el.disabled = savedState; });
+  document.getElementById("start-monitoring").innerHTML = savedState
+    ? '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> Saved'
+    : "Start monitoring";
   if (savedState) requestAnimationFrame(() => { const chat = document.querySelector(".sw-chat"); if (chat) chat.scrollTop = chat.scrollHeight; });
   if (step === 5 || step === 6) {
     document.querySelectorAll(".dash-item").forEach(item => {
@@ -1164,6 +1177,19 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape" && mstack.classList.contains("open")) { stackSet(false); return; }
   if (e.key === "ArrowRight") go(step + 1);
   if (e.key === "ArrowLeft") go(step - 1);
+});
+
+// Smart Cursor: point the monitor at the exact element on the page
+document.getElementById("smart-cursor").addEventListener("click", e => {
+  e.preventDefault();
+  e.stopPropagation();
+  const price = document.getElementById("stage-price");
+  if (!price) return;
+  price.classList.remove("sc-ring");
+  void price.offsetWidth;
+  price.classList.add("sc-ring");
+  e.currentTarget.textContent = "Locked: main product price";
+  setTimeout(() => price.classList.remove("sc-ring"), 2600);
 });
 
 // Story shortcuts
