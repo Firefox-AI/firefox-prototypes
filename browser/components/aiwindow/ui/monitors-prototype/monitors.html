@@ -151,7 +151,6 @@ h1,h2,h3,h4,p { margin: 0; }
 .page-action.attn { color: var(--smartwindow-icon-color-accent); }
 .page-action.danger { color: var(--text-color-error); }
 .page-action.danger:hover { background: var(--background-color-critical); }
-[data-act="delete"].armed { width: auto; padding: 0 12px; background: var(--background-color-critical); color: var(--text-color-error); font-size: 12px; font-weight: var(--font-weight-semibold); border: 1px solid var(--text-color-error); border-radius: var(--border-radius-circle); }
 .mcard-actions .page-action.danger { width: 36px; height: 36px; border: 1px solid var(--border-color); border-radius: var(--border-radius-circle); }
 .mcard-actions { margin-top: var(--space-xsmall); }
 .page-action .dot { position: absolute; top: 2px; right: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--icon-color-success); border: 1.5px solid var(--background-color-box); }
@@ -179,6 +178,8 @@ h1,h2,h3,h4,p { margin: 0; }
 .btn-primary { background: var(--color-accent-primary); color: light-dark(var(--color-white), var(--color-gray-70)); padding: 8px var(--space-large); border-radius: var(--border-radius-circle); font-weight: var(--font-weight-semibold); font-size: var(--font-size-small); }
 .btn-primary.lg { padding: 11px 22px; font-size: var(--font-size-root); }
 .btn-primary:hover { background: var(--color-accent-primary-hover); }
+.btn-destructive { background: var(--color-red-50); color: var(--color-white); padding: 8px var(--space-large); border-radius: var(--border-radius-circle); font-weight: var(--font-weight-semibold); font-size: var(--font-size-small); }
+.btn-destructive:hover { background: light-dark(#a92544, #d13a5e); }
 .btn-ghost { padding: 8px var(--space-large); border-radius: var(--border-radius-circle); font-weight: var(--font-weight-semibold); font-size: var(--font-size-small); color: var(--text-color); border: 1px solid var(--border-color); }
 .btn-ghost:hover { background: var(--background-color-box-info); }
 
@@ -245,6 +246,8 @@ h1,h2,h3,h4,p { margin: 0; }
 /* Create-monitor modal — dashboard container for the same create card (§4) */
 .modal-scrim { position: absolute; inset: 0; z-index: 70; background: light-dark(rgba(21,20,26,.42), rgba(0,0,0,.55)); display: grid; place-items: center; padding: var(--space-xlarge); }
 .modal-card { width: min(480px, 100%); box-shadow: var(--box-shadow-level-4); }
+.confirm-card { width: min(400px, 100%); }
+.confirm-card .mcard-name { font-size: var(--font-size-heading-small, 17px); }
 
 /* Loading skeleton */
 .skel { background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); padding: var(--space-medium) var(--space-large); margin-bottom: var(--space-small); display: flex; align-items: center; gap: var(--space-medium); }
@@ -1057,6 +1060,15 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
     </div>
   </div>
 
+  <!-- Delete confirm — the about:logins pattern: dialog first, undo after -->
+  <div class="modal-scrim" id="confirm-scrim" hidden>
+    <div class="mcard modal-card confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-body">
+      <span class="mcard-name" id="confirm-title">Delete this monitor?</span>
+      <p class="mon-sentence" id="confirm-body"><b id="confirm-name">This monitor</b> will stop watching its page. You can undo right after.</p>
+      <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost" id="confirm-cancel">Cancel</button><button class="btn-destructive" id="confirm-delete">Delete</button></div>
+    </div>
+  </div>
+
   <!-- Undo toast — delete is reversible (§2) -->
   <div class="undo-toast" id="undo-toast" hidden>
     <span>Monitor deleted.</span>
@@ -1128,6 +1140,8 @@ function go(n) { step = Math.max(1, Math.min(N, n)); history.replaceState(null, 
 document.getElementById("next").onclick = () => go(step + 1);
 document.getElementById("prev").onclick = () => go(step - 1);
 document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && !confirmScrim.hidden) { closeConfirm(); return; }
+  if (!confirmScrim.hidden) return;
   if (e.key === "Escape" && !scrim.hidden) { closeModal(); return; }
   if (!scrim.hidden) return;
   if (e.target.closest("input, textarea, [contenteditable]")) return;
@@ -1377,19 +1391,22 @@ function showUndo() { undoToast.hidden = false; clearTimeout(undoTimer); undoTim
 document.getElementById("undo-btn").onclick = () => { clearTimeout(undoTimer); undoToast.hidden = true; };
 document.getElementById("undo-x").onclick = () => { clearTimeout(undoTimer); undoToast.hidden = true; };
 
+const confirmScrim = document.getElementById("confirm-scrim");
+function closeConfirm() { confirmScrim.hidden = true; }
 document.querySelectorAll('[data-act="delete"]').forEach(el => {
-  const original = el.innerHTML;
-  let disarmTimer = null;
-  const disarm = () => { clearTimeout(disarmTimer); el.classList.remove("armed"); el.innerHTML = original; };
   el.addEventListener("click", e => {
     e.stopPropagation();
-    if (el.classList.contains("armed")) { disarm(); showUndo(); return; }
-    el.classList.add("armed");
-    el.textContent = "Sure?";
-    clearTimeout(disarmTimer);
-    disarmTimer = setTimeout(disarm, 3000);
+    const item = el.closest(".dash-item");
+    const name = item ? item.querySelector(".gname").textContent
+      : (el.closest(".mcard")?.querySelector(".mcard-name")?.textContent || "This monitor");
+    document.getElementById("confirm-name").textContent = name;
+    confirmScrim.hidden = false;
+    document.getElementById("confirm-delete").focus();
   });
 });
+document.getElementById("confirm-cancel").onclick = closeConfirm;
+confirmScrim.addEventListener("click", e => { if (e.target === confirmScrim) closeConfirm(); });
+document.getElementById("confirm-delete").onclick = () => { closeConfirm(); showUndo(); };
 
 function wireChips(container, input, map, onPick) {
   if (!container) return;
