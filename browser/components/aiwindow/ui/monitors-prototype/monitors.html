@@ -213,7 +213,7 @@ h1,h2,h3,h4,p { margin: 0; }
 .dash-item .mstack-expand-inner { padding-top: 0; }
 .dash-item .mstack-expand .mcard { border: 0; background: none; box-shadow: none; border-radius: 0; padding: 0 var(--space-large) var(--space-large); }
 .grow .gmain { min-width: 0; flex: 1; }
-.grow .gname { font-weight: var(--font-weight-semibold); display: inline-flex; align-items: center; min-height: 30px; }
+.grow .gname { font-weight: var(--font-weight-semibold); display: inline-flex; align-items: center; min-height: 32px; }
 .grow .gmeta { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
 .grow .gvalue { text-align: right; flex: none; }
 .grow .gvalue .now { font-weight: var(--font-weight-bold); font-size: var(--font-size-heading-medium); }
@@ -330,12 +330,12 @@ h1,h2,h3,h4,p { margin: 0; }
 /* In-place rename, the classic-window widget pattern: the title itself becomes the input.
    The input occupies the same 30px slot as the title and its text keeps the title's x —
    the ring extends left instead of pushing content. The swap is a fade, not a move. */
-.gname-edit { display: none; position: relative; align-items: center; min-height: 30px; width: min(100%, 360px); margin: 0 0 0 -10px; }
+.gname-edit { display: none; position: relative; align-items: center; min-height: 32px; width: min(100%, 380px); margin: 0 0 0 -14px; }
 .dash-item.editing .gname { display: none; }
 .dash-item.editing .gname-edit { display: inline-flex; animation: fadein var(--motion-dur-near) var(--motion-ease-edge); }
-.gname-input { font: inherit; font-weight: var(--font-weight-semibold); color: var(--text-color); width: 100%; height: 28px; background: var(--background-color-box); border: 2px solid var(--color-accent-primary); border-radius: var(--border-radius-medium); padding: 0 30px 0 8px; }
+.gname-input { font: inherit; font-weight: var(--font-weight-semibold); color: var(--text-color); width: 100%; height: 32px; background: var(--background-color-box); border: 2px solid var(--color-accent-primary); border-radius: var(--border-radius-medium); padding: 0 38px 0 12px; }
 .gname-input:focus-visible { outline: none; }
-.gname-x { position: absolute; right: 4px; top: 50%; translate: 0 -50%; width: 22px; height: 22px; display: grid; place-items: center; border-radius: var(--border-radius-circle); color: var(--text-color-deemphasized); font-size: 14px; line-height: 1; }
+.gname-x { position: absolute; right: 6px; top: 50%; translate: 0 -50%; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--border-radius-circle); color: var(--text-color-deemphasized); font-size: 15px; line-height: 1; }
 .gname-x:hover { color: var(--text-color); background: light-dark(rgba(0,0,0,.08), rgba(255,255,255,.12)); }
 @keyframes fadein { from { opacity: 0; } }
 /* Mode swap is one gesture: incoming content Lands while the surface height eases on the same curve */
