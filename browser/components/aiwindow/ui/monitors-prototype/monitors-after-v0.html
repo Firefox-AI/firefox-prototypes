@@ -324,6 +324,14 @@ h1,h2,h3,h4,p { margin: 0; }
 .mon-sentence { margin: 0; color: var(--text-color-deemphasized); line-height: 1.5; }
 .mon-sentence b { color: var(--text-color); font-weight: var(--font-weight-semibold); }
 .mon-eyebrow { font-size: 11px; font-weight: var(--font-weight-semibold); letter-spacing: .07em; text-transform: uppercase; color: var(--text-color-deemphasized); }
+/* In-place rename, the classic-window widget pattern: the title itself becomes the input */
+.gname-edit { display: none; position: relative; align-items: center; width: min(100%, 380px); margin: 2px 0 4px; }
+.dash-item.editing .gname { display: none; }
+.dash-item.editing .gname-edit { display: inline-flex; }
+.gname-input { font: inherit; font-weight: var(--font-weight-semibold); color: var(--text-color); width: 100%; background: var(--background-color-box); border: 2px solid var(--color-accent-primary); border-radius: var(--border-radius-medium); padding: 5px 34px 5px 10px; }
+.gname-input:focus-visible { outline: none; }
+.gname-x { position: absolute; right: 5px; top: 50%; translate: 0 -50%; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--border-radius-circle); color: var(--text-color-deemphasized); font-size: 15px; line-height: 1; }
+.gname-x:hover { color: var(--text-color); background: light-dark(rgba(0,0,0,.08), rgba(255,255,255,.12)); }
 
 /* Undo toast — delete is reversible (§2 guarded exception + undo) */
 .undo-toast { position: absolute; bottom: 76px; left: 50%; transform: translateX(-50%); z-index: 80; display: flex; align-items: center; gap: var(--space-medium); background: light-dark(#180e30, #f2f0f8); color: light-dark(#f2f0f8, #180e30); padding: 10px 12px 10px 16px; border-radius: var(--border-radius-circle); box-shadow: var(--box-shadow-level-4); font-size: var(--font-size-small); animation: toast-in var(--motion-dur-soft) var(--motion-ease-reach) both; }
@@ -709,7 +717,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <div class="grow" id="row-sony" role="button" tabindex="0" aria-expanded="false">
                 <span class="dot-status active"></span>
                 <span class="favicon-sq" style="background:#e8663a">S</span>
-                <span class="gmain"><span class="gname">Sony WH-1000XM5 price</span><br/><span class="gmeta truncate">soundnest.com · checked 3m ago</span></span>
+                <span class="gmain"><span class="gname">Sony WH-1000XM5 price</span><span class="gname-edit"><input class="gname-input" id="sony-title" value="Sony WH-1000XM5 price" aria-label="Monitor name" /><button class="gname-x" aria-label="Clear name">×</button></span><br/><span class="gmeta truncate">soundnest.com · checked 3m ago</span></span>
                 <span class="gvalue"><span class="now">$299</span><br/><span class="sub">watching for a drop</span></span>
               </div>
               <div class="mstack-expand"><div class="mstack-expand-inner">
@@ -724,10 +732,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                   <div class="mcard-actions"><button class="btn-ghost" id="sony-edit">Edit</button><button class="btn-ghost">Pause</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
                 </div>
                 <div class="edit-only">
-                  <div class="field">
-                    <span class="field-label">Name</span>
-                    <input class="field-input" id="sony-title" value="Sony WH-1000XM5 price" aria-label="Monitor name" />
-                  </div>
                   <div class="field">
                     <span class="field-label">Alert me when</span>
                     <input class="field-input" id="sony-cond" value="the price drops below $270" aria-label="Alert condition" />
@@ -1127,6 +1131,7 @@ document.getElementById("prev").onclick = () => go(step - 1);
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && !scrim.hidden) { closeModal(); return; }
   if (!scrim.hidden) return;
+  if (e.target.closest("input, textarea, [contenteditable]")) return;
   if (e.key === "ArrowRight") go(step + 1);
   if (e.key === "ArrowLeft") go(step - 1);
 });
@@ -1253,7 +1258,7 @@ document.querySelectorAll(".dash-item").forEach(item => {
     setExpand(body, !open);
     row.setAttribute("aria-expanded", String(!open));
   };
-  row.addEventListener("click", e => { if (e.target.closest("a, button, input, label")) return; toggle(); });
+  row.addEventListener("click", e => { if (item.classList.contains("editing")) return; if (e.target.closest("a, button, input, label")) return; toggle(); });
   row.addEventListener("keydown", e => { if (e.target !== row) return; if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
 });
 
@@ -1305,6 +1310,7 @@ function noteSaved(el, revert) {
   el._saveTimer = setTimeout(() => { el.classList.remove("saved"); el.textContent = revert; }, 4000);
 }
 const cardSony = document.getElementById("card-sony");
+const dashSony = document.getElementById("dash-sony");
 const sonyTitle = document.getElementById("sony-title");
 const sonyCond = document.getElementById("sony-cond");
 let sonyBefore = null;
@@ -1322,6 +1328,7 @@ document.getElementById("sony-edit").addEventListener("click", e => {
     pills: [...pagesRow.querySelectorAll(".page-pill")].map(pl => pl.outerHTML),
   };
   cardSony.classList.add("editing");
+  dashSony.classList.add("editing");
   sonyRemeasure();
   sonyTitle.focus();
   sonyTitle.select();
@@ -1332,6 +1339,7 @@ document.getElementById("sony-save").addEventListener("click", e => {
   const cond = sonyCond.value.trim();
   if (cond) document.getElementById("sony-cond-view").textContent = cond;
   cardSony.classList.remove("editing");
+  dashSony.classList.remove("editing");
   sonyRemeasure();
   noteSaved();
 });
@@ -1348,7 +1356,18 @@ document.getElementById("sony-cancel").addEventListener("click", e => {
   addInput.hidden = true; addInput.value = "";
   addBtn.hidden = pagesRow.querySelectorAll(".page-pill").length >= MAX_PAGES;
   cardSony.classList.remove("editing");
+  dashSony.classList.remove("editing");
   sonyRemeasure();
+});
+sonyTitle.addEventListener("keydown", e => {
+  e.stopPropagation();
+  if (e.key === "Enter") { e.preventDefault(); document.getElementById("sony-save").click(); }
+  if (e.key === "Escape") { document.getElementById("sony-cancel").click(); }
+});
+document.querySelector("#row-sony .gname-x").addEventListener("click", e => {
+  e.stopPropagation();
+  sonyTitle.value = "";
+  sonyTitle.focus();
 });
 document.getElementById("pin-cond").addEventListener("input", () => noteSaved(pinNote, ""));
 
