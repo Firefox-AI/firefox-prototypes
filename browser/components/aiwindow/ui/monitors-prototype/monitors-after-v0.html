@@ -317,6 +317,13 @@ h1,h2,h3,h4,p { margin: 0; }
 .save-note { display: inline-flex; align-items: center; gap: 5px; font-size: var(--font-size-small); color: var(--text-color-deemphasized); }
 .save-note svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .save-note.saved { color: var(--text-color-success); animation: land var(--motion-dur-near) var(--motion-ease-edge); }
+/* Editable dashboard card: read-only until Edit */
+.mcard.editable:not(.editing) .edit-only { display: none !important; }
+.mcard.editable.editing .view-only { display: none !important; }
+.mcard.editable:not(.editing) .chip-row:not(.pages-row) { display: none !important; }
+.mcard.editable:not(.editing) .page-add, .mcard.editable:not(.editing) .page-add-input, .mcard.editable:not(.editing) .page-pill .x { display: none !important; }
+.mcard.editable .field-input { transition: border-color var(--motion-dur-near) var(--motion-ease-edge), background-color var(--motion-dur-near) var(--motion-ease-edge); }
+.mcard.editable:not(.editing) .field-input { border-color: transparent; background: transparent; pointer-events: none; }
 
 /* Undo toast — delete is reversible (§2 guarded exception + undo) */
 .undo-toast { position: absolute; bottom: 76px; left: 50%; transform: translateX(-50%); z-index: 80; display: flex; align-items: center; gap: var(--space-medium); background: light-dark(#180e30, #f2f0f8); color: light-dark(#f2f0f8, #180e30); padding: 10px 12px 10px 16px; border-radius: var(--border-radius-circle); box-shadow: var(--box-shadow-level-4); font-size: var(--font-size-small); animation: toast-in var(--motion-dur-soft) var(--motion-ease-reach) both; }
@@ -727,8 +734,8 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <span class="gvalue"><span class="now">$299</span><br/><span class="sub">watching for a drop</span></span>
               </div>
               <div class="mstack-expand"><div class="mstack-expand-inner">
-              <div id="card-sony" class="mcard">
-                <div class="field">
+              <div id="card-sony" class="mcard editable">
+                <div class="field edit-only">
                   <span class="field-label">Name</span>
                   <input class="field-input" id="sony-title" value="Sony WH-1000XM5 price" aria-label="Monitor name" />
                 </div>
@@ -744,7 +751,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 </div>
                 <hr class="rule" />
                 <div class="mrow"><span class="lbl">Check</span><span class="val">Daily</span></div>
-                <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite">Saved automatically</span></div>
+                <div class="mcard-actions"><button class="page-action danger view-only" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost view-only">Pause</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite"></span><button class="btn-ghost view-only" id="sony-edit">Edit</button><button class="btn-ghost edit-only" id="sony-cancel">Cancel</button><button class="btn-primary edit-only" id="sony-save">Save</button></div>
                 <hr class="rule" />
                 <div class="section-toggle">Change history</div>
                 <div class="history">
@@ -1139,7 +1146,7 @@ const STEPS = [
   "Monitor — the create card",
   "Start monitoring — saved, confirmed in chat",
   "about:tools — every tool in one place",
-  "Edit inline — the row becomes the card",
+  "The row becomes the card — hit Edit to make changes",
   "A confident change fires a notification",
   "Open page — pinned to the chat + history",
   "Pinned to New Tab — hover the stack",
@@ -1386,13 +1393,13 @@ function wireMonitorCard(ids) {
 }
 const pinCardApi = wireMonitorCard({ card: "pin-card", expand: "pin-expand", edit: "pin-edit", read: "pin-cond-read", editor: "pin-cond-editor", input: "pin-cond", readText: "pin-cond-text" });
 
-// Inline save confirmation — the expanded card saves as you edit
+// Save confirmation — flashes after an explicit Save
 const saveNote = document.getElementById("save-note-sony");
 const pinNote = document.getElementById("save-note-pin");
 const SAVE_CHECK = '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>';
 function noteSaved(el, revert) {
   el = el || saveNote;
-  revert = revert === undefined ? "Saved automatically" : revert;
+  revert = revert === undefined ? "" : revert;
   if (!el) return;
   el.classList.remove("saved");
   void el.offsetWidth;
@@ -1402,13 +1409,41 @@ function noteSaved(el, revert) {
   el._saveTimer = setTimeout(() => { el.classList.remove("saved"); el.textContent = revert; }, 4000);
 }
 const cardSony = document.getElementById("card-sony");
-document.getElementById("sony-cond").addEventListener("input", () => noteSaved());
-document.getElementById("sony-title").addEventListener("input", e => {
-  document.querySelector("#row-sony .gname").textContent = e.target.value.trim() || "Untitled monitor";
+const sonyTitle = document.getElementById("sony-title");
+const sonyCond = document.getElementById("sony-cond");
+let sonyBefore = null;
+document.getElementById("sony-edit").addEventListener("click", e => {
+  e.stopPropagation();
+  const pagesRow = cardSony.querySelector(".pages-row");
+  sonyBefore = {
+    title: sonyTitle.value,
+    cond: sonyCond.value,
+    chip: [...document.querySelectorAll("#sony-chips .chip")].findIndex(c => c.classList.contains("selected")),
+    pills: [...pagesRow.querySelectorAll(".page-pill")].map(pl => pl.outerHTML),
+  };
+  cardSony.classList.add("editing");
+  sonyTitle.focus();
+  sonyTitle.select();
+});
+document.getElementById("sony-save").addEventListener("click", e => {
+  e.stopPropagation();
+  document.querySelector("#row-sony .gname").textContent = sonyTitle.value.trim() || "Untitled monitor";
+  cardSony.classList.remove("editing");
   noteSaved();
 });
-cardSony.addEventListener("click", e => {
-  if (e.target.closest(".chip:not(.page-add), .segmented button, .page-pill .x")) noteSaved();
+document.getElementById("sony-cancel").addEventListener("click", e => {
+  e.stopPropagation();
+  sonyTitle.value = sonyBefore.title;
+  sonyCond.value = sonyBefore.cond;
+  document.querySelectorAll("#sony-chips .chip").forEach((c, i) => c.classList.toggle("selected", i === sonyBefore.chip));
+  const pagesRow = cardSony.querySelector(".pages-row");
+  const addInput = pagesRow.querySelector(".page-add-input");
+  const addBtn = pagesRow.querySelector(".page-add");
+  pagesRow.querySelectorAll(".page-pill").forEach(pl => pl.remove());
+  sonyBefore.pills.forEach(h => addInput.insertAdjacentHTML("beforebegin", h));
+  addInput.hidden = true; addInput.value = "";
+  addBtn.hidden = pagesRow.querySelectorAll(".page-pill").length >= MAX_PAGES;
+  cardSony.classList.remove("editing");
 });
 document.getElementById("pin-cond").addEventListener("input", () => noteSaved(pinNote, ""));
 
@@ -1466,11 +1501,10 @@ document.querySelectorAll(".pages-row").forEach(row => {
   const btn = row.querySelector(".page-add");
   const input = row.querySelector(".page-add-input");
   const count = () => row.querySelectorAll(".page-pill").length;
-  const inSony = !!row.closest("#card-sony");
   btn.addEventListener("click", e => { e.stopPropagation(); btn.hidden = true; input.hidden = false; input.focus(); });
   function commit() {
     const v = input.value.trim();
-    if (v) { row.insertBefore(makePill(v), input); if (inSony) noteSaved(); }
+    if (v) { row.insertBefore(makePill(v), input); }
     input.value = ""; input.hidden = true;
     btn.hidden = count() >= MAX_PAGES;
   }
@@ -1484,7 +1518,6 @@ document.querySelectorAll(".pages-row").forEach(row => {
     ev.stopPropagation();
     x.closest(".page-pill").remove();
     btn.hidden = count() >= MAX_PAGES;
-    if (inSony) noteSaved();
   });
 });
 
