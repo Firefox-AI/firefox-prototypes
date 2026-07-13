@@ -302,7 +302,7 @@ h1,h2,h3,h4,p { margin: 0; }
 .mcard.saved #start-monitoring svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 
 /* Monitor title edits in place */
-.title-input { font: inherit; font-weight: var(--font-weight-semibold); color: var(--text-color); background: none; border: 0; border-bottom: 1px dashed transparent; padding: 0; width: 100%; min-width: 0; }
+.title-input { font: inherit; font-weight: var(--font-weight-semibold); color: var(--text-color); background: none; border: 0; border-bottom: 1px dashed var(--border-color-deemphasized); padding: 0; width: 100%; min-width: 0; }
 .title-input:hover { border-bottom-color: var(--border-color); }
 .title-input:focus-visible { outline: none; border-bottom: 1px solid var(--color-accent-primary); }
 
@@ -728,6 +728,10 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               </div>
               <div class="mstack-expand"><div class="mstack-expand-inner">
               <div id="card-sony" class="mcard">
+                <div class="field">
+                  <span class="field-label">Name</span>
+                  <input class="field-input" id="sony-title" value="Sony WH-1000XM5 price" aria-label="Monitor name" />
+                </div>
                 <div class="mvalue"><span class="now" style="font-size:24px">$299</span><span class="from">watching for a drop · checked 3m ago</span></div>
                 <div class="field">
                   <span class="field-label">Alert me when</span>
@@ -1399,6 +1403,10 @@ function noteSaved(el, revert) {
 }
 const cardSony = document.getElementById("card-sony");
 document.getElementById("sony-cond").addEventListener("input", () => noteSaved());
+document.getElementById("sony-title").addEventListener("input", e => {
+  document.querySelector("#row-sony .gname").textContent = e.target.value.trim() || "Untitled monitor";
+  noteSaved();
+});
 cardSony.addEventListener("click", e => {
   if (e.target.closest(".chip:not(.page-add), .segmented button, .page-pill .x")) noteSaved();
 });
