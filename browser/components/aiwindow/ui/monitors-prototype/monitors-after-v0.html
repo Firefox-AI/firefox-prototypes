@@ -291,6 +291,12 @@ h1,h2,h3,h4,p { margin: 0; }
 .mcard-actions .spacer { flex: 1; }
 .mono-dim { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
 
+/* Create card, saved: inputs lock, actions give way to the confirmation */
+.saved-flag { display: none; }
+.mcard.saved .field-input, .mcard.saved .chip, .mcard.saved .page-pill { opacity: .55; pointer-events: none; }
+.mcard.saved .mcard-actions .btn-ghost, .mcard.saved .mcard-actions .btn-primary { display: none; }
+.mcard.saved .saved-flag { display: inline-flex; }
+
 .btn-ghost:disabled { opacity: .55; cursor: default; }
 .btn-ghost:disabled:hover { background: none; }
 
@@ -949,8 +955,8 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         <!-- The command the user sent (via the / tool picker) -->
         <div class="message-user" data-show="3 4"><p><span class="cmd-tok">/monitor</span> watch this price</p></div>
 
-        <!-- Step 3: Monitor tool → create card -->
-        <div data-show="3" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
+        <!-- Step 3: Monitor tool → create card (locks into saved state on step 4) -->
+        <div data-show="3 4" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
           <div class="message-assistant">Looks like a product page — I've set this up to watch the price. Tweak anything, then start it.</div>
 
           <div class="mcard" id="create-card">
@@ -967,41 +973,13 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             </div>
             <hr class="rule" />
             <div class="mrow"><span class="lbl">Check</span><span class="val">Daily</span></div>
-                                    <div class="mcard-actions"><span class="mono-dim">Runs on-device</span><span class="spacer"></span><button class="btn-ghost">Cancel</button><button class="btn-primary" id="start-monitoring">Start monitoring</button></div>
+                                    <div class="mcard-actions"><span class="mono-dim">Runs on-device</span><span class="spacer"></span><button class="btn-ghost">Cancel</button><button class="btn-primary" id="start-monitoring">Start monitoring</button><span class="status-chip saved-flag"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Saved</span></div>
           </div>
         </div>
 
-        <!-- Step 4: Watching — the card sits in the chat, click to expand, updates live -->
+        <!-- Step 4: started — the setup card locks in, the chat confirms -->
         <div data-show="4" class="anim-land" style="display:flex;flex-direction:column;gap:var(--space-medium)">
           <div class="message-assistant">Watching <b>Sony WH-1000XM5 price</b>. You'll hear from me if it drops below $270 — it lives at <a href="#" onclick="return false">about:tools</a>.</div>
-
-          <div class="mcard chatcard live" id="watch-card" role="button" tabindex="0" aria-expanded="false">
-            <div class="mcard-head">
-              <span class="favicon-sq" style="background:#e8663a">S</span>
-              <span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url" id="watch-sub">Below $270 · Daily</span></span>
-              <span class="spacer"></span>
-              <span class="status-chip" id="watch-chip"><span class="pulse-dot"></span> Watching</span>
-              <button class="page-action" id="watch-edit" title="Edit monitor" aria-label="Edit monitor" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 5l4 4"/></svg></button>
-              <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
-            </div>
-            <div class="watch-expand" id="watch-expand" hidden>
-              <div class="mvalue" id="watch-val-row"><span class="now" id="watch-val">$299</span><span class="from" id="watch-meta">watching for a drop · checked just now</span></div>
-              <div class="mrow" id="watch-cond-read"><span class="lbl">Alert me when</span><span class="val" id="watch-cond-text">the price drops below $270</span></div>
-              <div class="field" id="watch-cond-editor" hidden>
-                <span class="field-label">Alert me when</span>
-                <input class="field-input" id="watch-cond" value="the price drops below $270" aria-label="Alert condition" />
-                <div class="chip-row" id="watch-chips"><button class="chip">Any drop</button><button class="chip selected">Below $270</button><button class="chip">Below $250</button><button class="chip">Back in stock</button></div>
-                <span class="save-note" id="save-note-watch" role="status" aria-live="polite"></span>
-              </div>
-              <div class="mrow"><span class="lbl">Check</span><span class="val">Daily</span></div>
-              <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-ghost" id="check-now">Check now</button></div>
-              <hr class="rule" />
-              <div class="section-toggle">Change history</div>
-              <div class="history" id="watch-hist">
-                <div class="hist-item"><span class="when">Now</span><span class="newv">$299</span><span class="deemphasized">first checked</span></div>
-              </div>
-            </div>
-          </div>
         </div>
 
         <!-- Step 9: Open page — the card is pinned to THIS CHAT, plus change history -->
@@ -1127,7 +1105,7 @@ const STEPS = [
   "On the page you're watching",
   "Type / to run a tool",
   "Monitor — the create card",
-  "Watching in chat — click to expand, updates live",
+  "Start monitoring — saved, confirmed in chat",
   "about:tools — every tool in one place",
   "Edit inline — the row becomes the card",
   "A confident change fires a notification",
@@ -1151,6 +1129,11 @@ function render() {
   document.getElementById("sidebar").style.width = step === 8 ? "452px" : "416px";
   if (step !== 9 && step !== 10) stackSet(false);
   document.getElementById("rail-monitors").classList.toggle("active", step === 10);
+  const createCard = document.getElementById("create-card");
+  const savedState = step === 4;
+  createCard.classList.toggle("saved", savedState);
+  createCard.querySelectorAll("input, button").forEach(el => { el.disabled = savedState; });
+  if (savedState) requestAnimationFrame(() => { const chat = document.querySelector(".sw-chat"); if (chat) chat.scrollTop = chat.scrollHeight; });
   if (step === 5 || step === 6) {
     document.querySelectorAll(".dash-item").forEach(item => {
       const open = step === 6 && item.querySelector("#row-sony");
@@ -1339,31 +1322,10 @@ function wireMonitorCard(ids) {
   input.addEventListener("input", () => { readText.textContent = input.value; });
   return { syncRead: () => { readText.textContent = input.value; } };
 }
-const watchCardApi = wireMonitorCard({ card: "watch-card", expand: "watch-expand", edit: "watch-edit", read: "watch-cond-read", editor: "watch-cond-editor", input: "watch-cond", readText: "watch-cond-text" });
 const pinCardApi = wireMonitorCard({ card: "pin-card", expand: "pin-expand", edit: "pin-edit", read: "pin-cond-read", editor: "pin-cond-editor", input: "pin-cond", readText: "pin-cond-text" });
-
-const prices = [299, 291, 284, 276];
-let pi = 0;
-document.getElementById("check-now").addEventListener("click", e => {
-  e.stopPropagation();
-  if (pi >= prices.length - 1) return;
-  const prev = prices[pi]; pi++; const now = prices[pi];
-  if (pi >= prices.length - 1) { const b = e.currentTarget; b.disabled = true; b.textContent = "Up to date"; }
-  const pct = Math.abs(Math.round((now - 299) / 299 * 100));
-  document.getElementById("watch-val").textContent = "$" + now;
-  document.getElementById("watch-meta").textContent = "checked just now · was $299";
-  document.getElementById("watch-sub").textContent = "Below $270 · Daily";
-  document.getElementById("watch-chip").innerHTML = "$" + now + " ▼ −" + pct + "%";
-  const hist = document.getElementById("watch-hist");
-  const row = document.createElement("div"); row.className = "hist-item";
-  row.innerHTML = '<span class="when">Just now</span><span class="oldv">$' + prev + '</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$' + now + '</span><span class="deemphasized">−' + pct + '%</span>';
-  hist.prepend(row);
-  const vr = document.getElementById("watch-val-row"); vr.classList.remove("flash"); void vr.offsetWidth; vr.classList.add("flash");
-});
 
 // Inline save confirmation — the expanded card saves as you edit
 const saveNote = document.getElementById("save-note-sony");
-const watchNote = document.getElementById("save-note-watch");
 const pinNote = document.getElementById("save-note-pin");
 const SAVE_CHECK = '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>';
 function noteSaved(el, revert) {
@@ -1382,7 +1344,6 @@ document.getElementById("sony-cond").addEventListener("input", () => noteSaved()
 cardSony.addEventListener("click", e => {
   if (e.target.closest(".chip:not(.page-add), .segmented button, .page-pill .x")) noteSaved();
 });
-document.getElementById("watch-cond").addEventListener("input", () => noteSaved(watchNote, ""));
 document.getElementById("pin-cond").addEventListener("input", () => noteSaved(pinNote, ""));
 
 // Undo toast (guarded, reversible delete)
@@ -1423,7 +1384,6 @@ const COND_MAP = {
 };
 wireChips(document.getElementById("create-chips"), document.getElementById("create-cond"), COND_MAP);
 wireChips(document.getElementById("sony-chips"), document.getElementById("sony-cond"), COND_MAP);
-wireChips(document.getElementById("watch-chips"), document.getElementById("watch-cond"), COND_MAP, () => { noteSaved(watchNote, ""); watchCardApi.syncRead(); });
 wireChips(document.getElementById("pin-chips"), document.getElementById("pin-cond"), COND_MAP, () => { noteSaved(pinNote, ""); pinCardApi.syncRead(); });
 // Pages: + Add page reveals an inline URL input; Enter adds a removable pill (up to 6)
 const MAX_PAGES = 6;
