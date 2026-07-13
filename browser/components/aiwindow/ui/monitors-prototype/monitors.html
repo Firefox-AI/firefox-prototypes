@@ -317,13 +317,13 @@ h1,h2,h3,h4,p { margin: 0; }
 .save-note { display: inline-flex; align-items: center; gap: 5px; font-size: var(--font-size-small); color: var(--text-color-deemphasized); }
 .save-note svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .save-note.saved { color: var(--text-color-success); animation: land var(--motion-dur-near) var(--motion-ease-edge); }
-/* Editable dashboard card: read-only until Edit */
+/* Dashboard card: at rest it reads as a promise + history; Edit swaps in the form */
 .mcard.editable:not(.editing) .edit-only { display: none !important; }
 .mcard.editable.editing .view-only { display: none !important; }
-.mcard.editable:not(.editing) .chip-row:not(.pages-row) { display: none !important; }
-.mcard.editable:not(.editing) .page-add, .mcard.editable:not(.editing) .page-add-input, .mcard.editable:not(.editing) .page-pill .x { display: none !important; }
-.mcard.editable .field-input { transition: border-color var(--motion-dur-near) var(--motion-ease-edge), background-color var(--motion-dur-near) var(--motion-ease-edge); }
-.mcard.editable:not(.editing) .field-input { border-color: transparent; background: transparent; pointer-events: none; }
+.mcard .view-only, .mcard .edit-only { display: flex; flex-direction: column; gap: var(--space-medium); }
+.mon-sentence { margin: 0; color: var(--text-color-deemphasized); line-height: 1.5; }
+.mon-sentence b { color: var(--text-color); font-weight: var(--font-weight-semibold); }
+.mon-eyebrow { font-size: 11px; font-weight: var(--font-weight-semibold); letter-spacing: .07em; text-transform: uppercase; color: var(--text-color-deemphasized); }
 
 /* Undo toast — delete is reversible (§2 guarded exception + undo) */
 .undo-toast { position: absolute; bottom: 76px; left: 50%; transform: translateX(-50%); z-index: 80; display: flex; align-items: center; gap: var(--space-medium); background: light-dark(#180e30, #f2f0f8); color: light-dark(#f2f0f8, #180e30); padding: 10px 12px 10px 16px; border-radius: var(--border-radius-circle); box-shadow: var(--box-shadow-level-4); font-size: var(--font-size-small); animation: toast-in var(--motion-dur-soft) var(--motion-ease-reach) both; }
@@ -585,7 +585,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
           </button>
           <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
-            <div class="mvalue"><span class="now" style="font-size:24px">$278</span><span class="from">checked 2:14 PM · was $299</span></div>
             <div class="history">
               <div class="hist-item"><span class="when">Today</span><span class="oldv">$299</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$278</span><span class="deemphasized">−7%</span></div>
               <div class="hist-item low"><span class="when">Jun 24</span><span class="hist-flag">possible change</span><span class="deemphasized">held</span></div>
@@ -618,7 +617,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
           </button>
           <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
-            <div class="mvalue"><span class="now" style="font-size:24px">3 new</span><span class="from">since yesterday · checked 12m ago</span></div>
             <div class="history">
               <div class="hist-item"><span class="when">Today</span><span class="newv" style="color:var(--text-color-success)">3 new listings</span></div>
               <div class="hist-item"><span class="when">Yesterday</span><span class="newv">2 new listings</span></div>
@@ -716,28 +714,31 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               </div>
               <div class="mstack-expand"><div class="mstack-expand-inner">
               <div id="card-sony" class="mcard editable">
-                <div class="field edit-only">
-                  <span class="field-label">Name</span>
-                  <input class="field-input" id="sony-title" value="Sony WH-1000XM5 price" aria-label="Monitor name" />
+                <div class="view-only">
+                  <p class="mon-sentence">Alerts you when <b id="sony-cond-view">the price drops below $270</b> · checks daily</p>
+                  <div class="history">
+                    <div class="mon-eyebrow">History</div>
+                    <div class="hist-item low"><span class="when">Jun 24</span><span class="hist-flag">possible change</span><span class="deemphasized">low confidence · held, no notification</span></div>
+                    <div class="hist-item"><span class="when">Jun 17</span><span class="oldv">$319</span><span class="arrow">→</span><span class="newv">$299</span><span class="deemphasized">first checked</span></div>
+                  </div>
+                  <div class="mcard-actions"><button class="btn-ghost" id="sony-edit">Edit</button><button class="btn-ghost">Pause</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
                 </div>
-                <div class="mvalue"><span class="now" style="font-size:24px">$299</span><span class="from">watching for a drop · checked 3m ago</span></div>
-                <div class="field">
-                  <span class="field-label">Alert me when</span>
-                  <input class="field-input" id="sony-cond" value="the price drops below $270" aria-label="Alert condition" />
-                  <div class="chip-row" id="sony-chips"><button class="chip">Any drop</button><button class="chip selected">Below $270</button><button class="chip">Below $250</button><button class="chip">Back in stock</button></div>
-                </div>
-                <div class="field">
-                  <span class="field-label">Pages</span>
-                  <div class="chip-row pages-row"><span class="page-pill"><span class="fav" style="background:#e8663a">S</span> soundnest.com/…/xm5 <button class="x" aria-label="Remove page">×</button></span><input class="field-input page-add-input" placeholder="Paste a URL" hidden aria-label="Add page URL" /><button class="chip page-add">+ Add page</button></div>
-                </div>
-                <hr class="rule" />
-                <div class="mrow"><span class="lbl">Check</span><span class="val">Daily</span></div>
-                <div class="mcard-actions"><button class="page-action danger view-only" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost view-only">Pause</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite"></span><button class="btn-ghost view-only" id="sony-edit">Edit</button><button class="btn-ghost edit-only" id="sony-cancel">Cancel</button><button class="btn-primary edit-only" id="sony-save">Save</button></div>
-                <hr class="rule" />
-                <div class="section-toggle">Change history</div>
-                <div class="history">
-                  <div class="hist-item low"><span class="when">Jun 24</span><span class="hist-flag">possible change</span><span class="deemphasized">low confidence · held, no notification</span></div>
-                  <div class="hist-item"><span class="when">Jun 17</span><span class="oldv">$319</span><span class="arrow">→</span><span class="newv">$299</span><span class="deemphasized">first checked</span></div>
+                <div class="edit-only">
+                  <div class="field">
+                    <span class="field-label">Name</span>
+                    <input class="field-input" id="sony-title" value="Sony WH-1000XM5 price" aria-label="Monitor name" />
+                  </div>
+                  <div class="field">
+                    <span class="field-label">Alert me when</span>
+                    <input class="field-input" id="sony-cond" value="the price drops below $270" aria-label="Alert condition" />
+                    <div class="chip-row" id="sony-chips"><button class="chip">Any drop</button><button class="chip selected">Below $270</button><button class="chip">Below $250</button><button class="chip">Back in stock</button></div>
+                  </div>
+                  <div class="field">
+                    <span class="field-label">Pages</span>
+                    <div class="chip-row pages-row"><span class="page-pill"><span class="fav" style="background:#e8663a">S</span> soundnest.com/…/xm5 <button class="x" aria-label="Remove page">×</button></span><input class="field-input page-add-input" placeholder="Paste a URL" hidden aria-label="Add page URL" /><button class="chip page-add">+ Add page</button></div>
+                  </div>
+                  <div class="mrow"><span class="lbl">Check</span><span class="val">Daily</span></div>
+                  <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost" id="sony-cancel">Cancel</button><button class="btn-primary" id="sony-save">Save</button></div>
                 </div>
               </div>
               </div></div>
@@ -752,12 +753,13 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               </div>
               <div class="mstack-expand"><div class="mstack-expand-inner">
               <div class="mcard">
-                <p class="small" style="margin:0">The page changed and the monitor can't find the price. Open the page and it will find it again.</p>
-                <div class="history" style="margin-top: var(--space-xsmall)">
+                <p class="mon-sentence">The page changed and the monitor <b>can't find the price</b>.</p>
+                <div class="history">
+                  <div class="mon-eyebrow">History</div>
                   <div class="hist-item"><span class="when">Jun 30</span><span class="hist-flag">value lost</span><span class="deemphasized">the page changed</span></div>
                   <div class="hist-item"><span class="when">Jun 12</span><span class="newv">$189</span><span class="deemphasized">first checked</span></div>
                 </div>
-                <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
+                <div class="mcard-actions"><button class="btn-primary" data-open-page>Open page</button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
               </div>
               </div></div>
             </div>
@@ -771,15 +773,14 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               </div>
               <div class="mstack-expand"><div class="mstack-expand-inner">
               <div class="mcard">
-                <div class="mvalue"><span class="now" style="font-size:24px">3 new</span><span class="from">since yesterday · checked 12m ago</span></div>
-                <div class="mrow"><span class="lbl">Alert me when</span><span class="val">a new listing matches my search</span></div>
-                <div class="mrow"><span class="lbl">Check</span><span class="val">Daily</span></div>
-                <div class="history" style="margin-top: var(--space-xsmall)">
+                <p class="mon-sentence">Alerts you when <b>a new listing matches my search</b> · checks daily</p>
+                <div class="history">
+                  <div class="mon-eyebrow">History</div>
                   <div class="hist-item"><span class="when">Today</span><span class="newv" style="color:var(--text-color-success)">3 new listings</span></div>
                   <div class="hist-item"><span class="when">Yesterday</span><span class="newv">2 new listings</span></div>
                   <div class="hist-item"><span class="when">Jun 28</span><span class="deemphasized">first checked · 41 listings</span></div>
                 </div>
-                <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
+                <div class="mcard-actions"><button class="btn-primary" data-open-page>Open page</button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
               </div>
               </div></div>
             </div>
@@ -794,14 +795,14 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               </div>
               <div class="mstack-expand"><div class="mstack-expand-inner">
               <div class="mcard">
-                <div class="mvalue"><span class="now" style="font-size:24px">$1,999</span><span class="from">last checked before pausing</span></div>
-                <div class="mrow"><span class="lbl">Alert me when</span><span class="val">the price drops below $1,800</span></div>
-                <div class="history" style="margin-top: var(--space-xsmall)">
+                <p class="mon-sentence">Alerts you when <b>the price drops below $1,800</b> · paused</p>
+                <div class="history">
+                  <div class="mon-eyebrow">History</div>
                   <div class="hist-item"><span class="when">Jun 25</span><span class="deemphasized">paused</span></div>
                   <div class="hist-item"><span class="when">Jun 20</span><span class="oldv">$2,099</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$1,999</span><span class="deemphasized">−5%</span></div>
                   <div class="hist-item"><span class="when">Jun 8</span><span class="deemphasized">first checked · $2,099</span></div>
                 </div>
-                <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Resume</button><span class="spacer"></span><button class="btn-primary" data-open-page>Open page</button></div>
+                <div class="mcard-actions"><button class="btn-primary">Resume</button><button class="btn-ghost" data-open-page>Open page</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
               </div>
               </div></div>
             </div>
@@ -1296,6 +1297,10 @@ const cardSony = document.getElementById("card-sony");
 const sonyTitle = document.getElementById("sony-title");
 const sonyCond = document.getElementById("sony-cond");
 let sonyBefore = null;
+function sonyRemeasure() {
+  const exp = document.querySelector("#dash-sony .mstack-expand");
+  if (exp && exp.classList.contains("exp-open")) setExpand(exp, true);
+}
 document.getElementById("sony-edit").addEventListener("click", e => {
   e.stopPropagation();
   const pagesRow = cardSony.querySelector(".pages-row");
@@ -1306,13 +1311,17 @@ document.getElementById("sony-edit").addEventListener("click", e => {
     pills: [...pagesRow.querySelectorAll(".page-pill")].map(pl => pl.outerHTML),
   };
   cardSony.classList.add("editing");
+  sonyRemeasure();
   sonyTitle.focus();
   sonyTitle.select();
 });
 document.getElementById("sony-save").addEventListener("click", e => {
   e.stopPropagation();
   document.querySelector("#row-sony .gname").textContent = sonyTitle.value.trim() || "Untitled monitor";
+  const cond = sonyCond.value.trim();
+  if (cond) document.getElementById("sony-cond-view").textContent = cond;
   cardSony.classList.remove("editing");
+  sonyRemeasure();
   noteSaved();
 });
 document.getElementById("sony-cancel").addEventListener("click", e => {
@@ -1328,6 +1337,7 @@ document.getElementById("sony-cancel").addEventListener("click", e => {
   addInput.hidden = true; addInput.value = "";
   addBtn.hidden = pagesRow.querySelectorAll(".page-pill").length >= MAX_PAGES;
   cardSony.classList.remove("editing");
+  sonyRemeasure();
 });
 document.getElementById("pin-cond").addEventListener("input", () => noteSaved(pinNote, ""));
 
