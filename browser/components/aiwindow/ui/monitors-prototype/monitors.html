@@ -1274,6 +1274,8 @@ document.getElementById("sony-save").addEventListener("click", e => {
   const pickedChip = document.querySelector("#sony-chips .chip.selected");
   const statusSub = document.querySelector("#row-sony .gvalue .sub");
   if (statusSub) statusSub.textContent = (pickedChip && SUBS[pickedChip.textContent]) || "custom alert";
+  const pageCount = cardSony.querySelectorAll(".pages-row .page-pill").length;
+  document.querySelector("#row-sony .gmeta").textContent = (pageCount > 1 ? pageCount + " pages" : "soundnest.com") + " · checked 3m ago";
   cardSony.classList.remove("editing");
   dashSony.classList.remove("editing");
   sonyRemeasure();
@@ -1382,11 +1384,11 @@ wireChips(document.getElementById("create-chips"), document.getElementById("crea
 wireChips(document.getElementById("sony-chips"), document.getElementById("sony-cond"), COND_MAP);
 // Pages: + Add page reveals an inline URL input; Enter adds a removable pill (up to 6)
 const MAX_PAGES = 6;
-function pageShort(u) { u = u.replace(/^https?:\/\//, "").replace(/\/$/, ""); return u.length > 28 ? u.slice(0, 18) + "…" + u.slice(-8) : u; }
+function pageShort(u) { u = u.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/$/, ""); return u.length > 28 ? u.slice(0, 18) + "…" + u.slice(-8) : u; }
 function makePill(u) {
   const pill = document.createElement("span");
   pill.className = "page-pill";
-  const fav = document.createElement("span"); fav.className = "fav"; fav.style.background = "#67666a"; fav.textContent = u.replace(/^https?:\/\//, "")[0].toUpperCase();
+  const fav = document.createElement("span"); fav.className = "fav"; fav.style.background = "#67666a"; fav.textContent = u.replace(/^https?:\/\//, "").replace(/^www\./, "")[0].toUpperCase();
   const x = document.createElement("button"); x.className = "x"; x.setAttribute("aria-label", "Remove page"); x.textContent = "×";
   pill.append(fav, " " + pageShort(u) + " ", x);
   return pill;
