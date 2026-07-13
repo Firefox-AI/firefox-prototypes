@@ -299,19 +299,15 @@ h1,h2,h3,h4,p { margin: 0; }
 .undo-pill:hover { background: light-dark(var(--color-violet-0), rgba(118,78,221,.18)); }
 
 /* Create card, saved: inputs lock and Start monitoring becomes the saved state */
-.mcard.saved .field-input, .mcard.saved .chip, .mcard.saved .page-pill, .mcard.saved .title-input { opacity: .55; pointer-events: none; }
+.mcard.saved .field-input, .mcard.saved .chip, .mcard.saved .page-pill, .mcard.saved .gname-input { opacity: .55; pointer-events: none; }
+.mcard.saved .gname-input { border-color: var(--border-color-deemphasized); }
+.mcard.saved .gname-x { display: none; }
 .mcard.saved .mcard-actions .btn-ghost { display: none; }
 .mcard.saved #start-monitoring { background: var(--background-color-success); color: var(--text-color-success); display: inline-flex; align-items: center; gap: 5px; }
 .mcard.saved #start-monitoring svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 
 /* Monitor title edits in place */
-.title-input { font: inherit; font-weight: var(--font-weight-semibold); color: var(--text-color); background: none; border: 0; border-bottom: 1px dashed var(--border-color-deemphasized); padding: 0; width: 100%; min-width: 0; }
-.title-input:hover { border-bottom-color: var(--border-color); }
-.title-input:focus-visible { outline: none; border-bottom: 1px solid var(--color-accent-primary); }
 
-/* Smart Cursor: the page element the monitor locked onto */
-.sc-ring { position: relative; border-radius: var(--border-radius-small); box-shadow: 0 0 0 2px var(--color-accent-primary), 0 0 18px rgba(118, 78, 221, .45); animation: sc-pulse 1.2s var(--motion-ease-edge) 2; }
-@keyframes sc-pulse { 50% { box-shadow: 0 0 0 4px var(--color-accent-primary), 0 0 26px rgba(118, 78, 221, .6); } }
 
 .btn-ghost:disabled { opacity: .55; cursor: default; }
 .btn-ghost:disabled:hover { background: none; }
@@ -331,6 +327,7 @@ h1,h2,h3,h4,p { margin: 0; }
    The input occupies the same 30px slot as the title and its text keeps the title's x —
    the ring extends left instead of pushing content. The swap is a fade, not a move. */
 .gname-edit { display: none; position: relative; align-items: center; min-height: 32px; width: min(100%, 380px); margin: 0 0 0 -14px; }
+.gname-edit.show { display: inline-flex; }
 .dash-item.editing .gname { display: none; }
 .dash-item.editing .gname-edit { display: inline-flex; animation: fadein var(--motion-dur-near) var(--motion-ease-edge); }
 .gname-input { font: inherit; font-weight: var(--font-weight-semibold); color: var(--text-color); width: 100%; height: 32px; background: var(--background-color-box); border: 2px solid var(--color-accent-primary); border-radius: var(--border-radius-medium); padding: 0 38px 0 12px; }
@@ -962,9 +959,8 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           <div class="message-assistant">Looks like a product page — I've set this up to watch the price. Tweak anything, then start it.</div>
 
           <div class="mcard" id="create-card">
-            <div class="mcard-head"><span class="favicon-sq" style="background:#e8663a">S</span><span style="min-width:0;flex:1"><input class="title-input" id="create-title" value="Sony WH-1000XM5 price" aria-label="Monitor name" /><span class="mcard-url">soundnest.com/audio/sony-wh-1000xm5</span></span></div>
+            <div class="mcard-head"><span class="favicon-sq" style="background:#e8663a">S</span><span style="min-width:0;flex:1"><span class="gname-edit show"><input class="gname-input" id="create-title" value="Sony WH-1000XM5 price" aria-label="Monitor name" /><button class="gname-x" aria-label="Clear name">×</button></span><span class="mcard-url">soundnest.com/audio/sony-wh-1000xm5</span></span></div>
             <div class="mvalue"><span class="now">$299</span><span class="from">found on this page just now</span></div>
-            <div class="mrow"><span class="lbl">Watching</span><span class="val">Main product price</span><span class="spacer"></span><a class="accent-link" href="#" id="smart-cursor">Point with Smart Cursor</a></div>
             <div class="field">
               <span class="field-label">Alert me when</span>
               <input class="field-input" id="create-cond" value="the price drops below $270" aria-label="Alert condition" />
@@ -1058,7 +1054,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       <div class="mcard modal-card" role="dialog" aria-modal="true" aria-label="New monitor">
         <div class="mcard-head">
           <span class="favicon-sq" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
-          <span style="flex:1; min-width:0"><input class="title-input" id="modal-title" placeholder="Name this monitor" aria-label="Monitor name" /><br/><span class="mcard-url">Monitors a page for changes</span></span>
+          <span style="flex:1; min-width:0"><span class="gname-edit show"><input class="gname-input" id="modal-title" placeholder="Name this monitor" aria-label="Monitor name" /><button class="gname-x" aria-label="Clear name">×</button></span><br/><span class="mcard-url">Monitors a page for changes</span></span>
           <span class="spacer"></span>
           <button class="page-action" id="modal-close" title="Close" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg></button>
         </div>
@@ -1166,19 +1162,6 @@ document.addEventListener("keydown", e => {
   if (e.target.closest("input, textarea, [contenteditable]")) return;
   if (e.key === "ArrowRight") go(step + 1);
   if (e.key === "ArrowLeft") go(step - 1);
-});
-
-// Smart Cursor: point the monitor at the exact element on the page
-document.getElementById("smart-cursor").addEventListener("click", e => {
-  e.preventDefault();
-  e.stopPropagation();
-  const price = document.getElementById("stage-price");
-  if (!price) return;
-  price.classList.remove("sc-ring");
-  void price.offsetWidth;
-  price.classList.add("sc-ring");
-  e.currentTarget.textContent = "Locked: main product price";
-  setTimeout(() => price.classList.remove("sc-ring"), 2600);
 });
 
 document.getElementById("undo-create").addEventListener("click", () => go(3));
@@ -1400,10 +1383,13 @@ sonyTitle.addEventListener("keydown", e => {
   if (e.key === "Enter") { e.preventDefault(); document.getElementById("sony-save").click(); }
   if (e.key === "Escape") { document.getElementById("sony-cancel").click(); }
 });
-document.querySelector("#row-sony .gname-x").addEventListener("click", e => {
-  e.stopPropagation();
-  sonyTitle.value = "";
-  sonyTitle.focus();
+document.querySelectorAll(".gname-edit").forEach(wrap => {
+  const inp = wrap.querySelector(".gname-input");
+  wrap.querySelector(".gname-x").addEventListener("click", e => {
+    e.stopPropagation();
+    inp.value = "";
+    inp.focus();
+  });
 });
 document.getElementById("pin-cond").addEventListener("input", () => noteSaved(pinNote, ""));
 
