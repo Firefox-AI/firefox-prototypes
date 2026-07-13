@@ -258,9 +258,7 @@ h1,h2,h3,h4,p { margin: 0; }
 
 /* ============ The monitor card — one component, three homes ============ */
 .mcard { background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); padding: var(--space-large); display: flex; flex-direction: column; gap: var(--space-medium); }
-.mcard.pinned { box-shadow: var(--card-box-shadow); }
 /* Live monitor card in chat — the violet ring marks it as pinned and updating */
-.mcard.live { border: 2px solid var(--color-accent-primary); }
 .mcard-head { display: flex; align-items: center; gap: var(--space-small); }
 .mcard-name { font-weight: var(--font-weight-semibold); }
 .mcard-url { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
@@ -359,8 +357,6 @@ h1,h2,h3,h4,p { margin: 0; }
 hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); margin: var(--space-small) 0 var(--space-xsmall); width: 100%; }
 
 /* Change history */
-.section-toggle { display: flex; align-items: center; gap: 6px; color: var(--text-color-deemphasized); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); }
-.section-toggle svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; }
 .history { display: flex; flex-direction: column; }
 .hist-item { display: flex; align-items: baseline; gap: var(--space-small); padding: var(--space-small) 0; border-top: 1px solid var(--border-color-deemphasized); font-size: var(--font-size-small); }
 .hist-item .when { color: var(--text-color-deemphasized); min-width: 84px; flex: none; }
@@ -389,14 +385,10 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 .status-chip .pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pulse 1.8s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .35; } }
 /* Eyebrow — a label, not a control */
-.pin-eyebrow { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: var(--font-weight-semibold); letter-spacing: .05em; text-transform: uppercase; color: var(--text-color-deemphasized); }
-.pin-eyebrow svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.chat-divider { display: flex; align-items: center; gap: var(--space-medium); font-size: 11px; font-weight: var(--font-weight-semibold); letter-spacing: .05em; text-transform: uppercase; color: var(--text-color-deemphasized); margin-top: var(--space-small); }
+.chat-divider::before, .chat-divider::after { content: ""; height: 1px; flex: 1; background: var(--border-color-deemphasized); }
 
 /* In-chat monitor card: click to expand, updates live */
-.chatcard { cursor: pointer; }
-.chatcard .chev { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--text-color-deemphasized); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: transform var(--motion-dur-near) var(--motion-ease-edge); }
-.chatcard[aria-expanded="true"] .chev { transform: rotate(180deg); }
-.watch-expand { display: flex; flex-direction: column; gap: var(--space-medium); }
 @keyframes flashbg { from { background: var(--background-color-success); } to { background: transparent; } }
 .flash { animation: flashbg 1.4s var(--motion-ease-edge); border-radius: var(--border-radius-small); }
 
@@ -952,10 +944,10 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
       <div class="sw-chat">
         <!-- The command the user sent (via the / tool picker) -->
-        <div class="message-user" data-show="3 4"><p><span class="cmd-tok">/monitor</span> watch this price</p></div>
+        <div class="message-user" data-show="3 4 8"><p><span class="cmd-tok">/monitor</span> watch this price</p></div>
 
-        <!-- Step 3: Monitor tool → create card (locks into saved state on step 4) -->
-        <div data-show="3 4" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
+        <!-- Step 3: Monitor tool → create card (locks into saved state on steps 4 and 8) -->
+        <div data-show="3 4 8" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
           <div class="message-assistant">Looks like a product page — I've set this up to watch the price. Tweak anything, then start it.</div>
 
           <div class="mcard" id="create-card">
@@ -976,44 +968,16 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </div>
         </div>
 
-        <!-- Step 4: started — the setup card locks in, the chat confirms -->
-        <div data-show="4" class="anim-land" style="display:flex;flex-direction:column;gap:var(--space-medium)">
+        <!-- Step 4: started — the setup card locks in, the chat confirms. Undo only right after creation. -->
+        <div data-show="4 8" class="anim-land" style="display:flex;flex-direction:column;gap:var(--space-medium)">
           <div class="message-assistant">Watching <b>Sony WH-1000XM5 price</b>. You'll hear from me if it drops below $270. To view it or make edits, head to <a href="#" onclick="return false">about:tools</a>.</div>
-          <div><button class="undo-pill" id="undo-create">Undo</button></div>
+          <div data-show="4"><button class="undo-pill" id="undo-create">Undo</button></div>
         </div>
 
-        <!-- Step 9: Open page — the card is pinned to THIS CHAT, plus change history -->
+        <!-- Step 8: Open page — the chat picks up where you left off; setup sits up in the scroll history -->
         <div data-show="8" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
-          <div class="pin-eyebrow"><svg viewBox="0 0 24 24"><path d="M12 17v5M8 3h8l-1 6 4 3H5l4-3z"/></svg> Pinned to chat</div>
-          <div class="mcard chatcard pinned live" id="pin-card" role="button" tabindex="0" aria-expanded="true">
-            <div class="mcard-head">
-              <span class="favicon-sq" style="background:#e8663a">S</span>
-              <span><span class="mcard-name">Sony WH-1000XM5 price</span><br/><span class="mcard-url">soundnest.com/audio/sony-wh-1000xm5</span></span>
-              <span class="spacer"></span>
-              <span class="status-chip">$278 ▼ −7%</span>
-              <button class="page-action" id="pin-edit" title="Edit monitor" aria-label="Edit monitor" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 5l4 4"/></svg></button>
-              <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
-            </div>
-            <div class="watch-expand" id="pin-expand">
-            <div class="mvalue"><span class="now">$278</span><span class="from">checked 2:14 PM · was $299</span></div>
-            <div class="mrow" id="pin-cond-read"><span class="lbl">Alert me when</span><span class="val" id="pin-cond-text">the price drops below $270</span></div>
-            <div class="field" id="pin-cond-editor" hidden>
-              <span class="field-label">Alert me when</span>
-              <input class="field-input" id="pin-cond" value="the price drops below $270" aria-label="Alert condition" />
-              <div class="chip-row" id="pin-chips"><button class="chip">Any drop</button><button class="chip selected">Below $270</button><button class="chip">Below $250</button><button class="chip">Back in stock</button></div>
-              <span class="save-note" id="save-note-pin" role="status" aria-live="polite"></span>
-            </div>
-            <div class="mrow"><span class="lbl">Check</span><span class="val">Daily</span></div>
-            <div class="mcard-actions"><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button><button class="btn-ghost">Snooze</button><button class="btn-ghost">Pause</button></div>
-            <hr class="rule" />
-            <div class="section-toggle">Change history</div>
-            <div class="history">
-              <div class="hist-item"><span class="when">Today 2:14 PM</span><span class="oldv">$299</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$278</span><span class="deemphasized">−7%</span></div>
-              <div class="hist-item low"><span class="when">Jun 24</span><span class="hist-flag">possible change</span><span class="deemphasized">low confidence · held here, no notification</span></div>
-              <div class="hist-item"><span class="when">Jun 17</span><span class="oldv">$319</span><span class="arrow">→</span><span class="newv">$299</span><span class="deemphasized">first checked</span></div>
-            </div>
-            </div>
-          </div>
+          <div class="chat-divider">Today · 2:14 PM</div>
+          <div class="message-assistant">Sony WH-1000XM5 dropped to <b>$278</b> — down 7% from $299, past your alert. To view or make changes, head to <a href="#" onclick="return false">about:tools</a>.</div>
         </div>
       </div>
 
@@ -1117,7 +1081,7 @@ const STEPS = [
   "about:tools — every tool in one place",
   "The row becomes the card — hit Edit to make changes",
   "A confident change fires a notification",
-  "Open page — pinned to the chat + history",
+  "Open page — the chat picks up where you left off",
   "Tools in the sidebar — Monitors at hand",
   "Day zero — the empty state",
 ];
@@ -1133,10 +1097,9 @@ function render() {
   document.getElementById("step-num").textContent = step + " / " + N;
   document.getElementById("step-text").textContent = STEPS[step - 1];
   [...dots.children].forEach((d, i) => d.classList.toggle("on", i < step));
-  document.getElementById("sidebar").style.width = step === 8 ? "452px" : "416px";
   document.getElementById("rail-monitors").classList.toggle("active", step === 9);
   const createCard = document.getElementById("create-card");
-  const savedState = step === 4;
+  const savedState = step === 4 || step === 8;
   createCard.classList.toggle("saved", savedState);
   createCard.querySelectorAll("input, button").forEach(el => { el.disabled = savedState; });
   document.getElementById("start-monitoring").innerHTML = savedState
@@ -1277,41 +1240,9 @@ document.querySelectorAll(".dash-item").forEach(item => {
   row.addEventListener("keydown", e => { if (e.target !== row) return; if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
 });
 
-// Monitor cards in chat: click to expand; the pencil expands into inline edit
-function wireMonitorCard(ids) {
-  const card = document.getElementById(ids.card);
-  const expand = document.getElementById(ids.expand);
-  const editBtn = document.getElementById(ids.edit);
-  const readRow = document.getElementById(ids.read);
-  const editor = document.getElementById(ids.editor);
-  const input = document.getElementById(ids.input);
-  const readText = document.getElementById(ids.readText);
-  function setMode(editing) {
-    editBtn.setAttribute("aria-pressed", String(editing));
-    editor.hidden = !editing;
-    readRow.hidden = editing;
-    if (editing) input.focus();
-  }
-  function setOpen(open) {
-    card.setAttribute("aria-expanded", String(open));
-    expand.hidden = !open;
-    if (!open) setMode(false);
-  }
-  card.addEventListener("click", e => { if (e.target.closest("button, a, input, label")) return; setOpen(card.getAttribute("aria-expanded") !== "true"); });
-  card.addEventListener("keydown", e => { if (e.target !== card) return; if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(card.getAttribute("aria-expanded") !== "true"); } });
-  editBtn.addEventListener("click", e => {
-    e.stopPropagation();
-    if (card.getAttribute("aria-expanded") !== "true") { setOpen(true); setMode(true); return; }
-    setMode(editBtn.getAttribute("aria-pressed") !== "true");
-  });
-  input.addEventListener("input", () => { readText.textContent = input.value; });
-  return { syncRead: () => { readText.textContent = input.value; } };
-}
-const pinCardApi = wireMonitorCard({ card: "pin-card", expand: "pin-expand", edit: "pin-edit", read: "pin-cond-read", editor: "pin-cond-editor", input: "pin-cond", readText: "pin-cond-text" });
 
 // Save confirmation — flashes after an explicit Save
 const saveNote = document.getElementById("save-note-sony");
-const pinNote = document.getElementById("save-note-pin");
 const SAVE_CHECK = '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>';
 function noteSaved(el, revert) {
   el = el || saveNote;
@@ -1391,7 +1322,6 @@ document.querySelectorAll(".gname-edit").forEach(wrap => {
     inp.focus();
   });
 });
-document.getElementById("pin-cond").addEventListener("input", () => noteSaved(pinNote, ""));
 
 // Deleted toast (delete confirms via dialog; not undoable)
 const undoToast = document.getElementById("undo-toast");
@@ -1433,7 +1363,6 @@ const COND_MAP = {
 };
 wireChips(document.getElementById("create-chips"), document.getElementById("create-cond"), COND_MAP);
 wireChips(document.getElementById("sony-chips"), document.getElementById("sony-cond"), COND_MAP);
-wireChips(document.getElementById("pin-chips"), document.getElementById("pin-cond"), COND_MAP, () => { noteSaved(pinNote, ""); pinCardApi.syncRead(); });
 // Pages: + Add page reveals an inline URL input; Enter adds a removable pill (up to 6)
 const MAX_PAGES = 6;
 function pageShort(u) { u = u.replace(/^https?:\/\//, "").replace(/\/$/, ""); return u.length > 28 ? u.slice(0, 18) + "…" + u.slice(-8) : u; }
