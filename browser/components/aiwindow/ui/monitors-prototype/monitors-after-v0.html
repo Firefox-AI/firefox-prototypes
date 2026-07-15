@@ -1050,8 +1050,12 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           <div class="message-assistant">Looks like a product page — I've set this up to watch the price. Tweak anything, then start it.</div>
 
           <div class="mcard" id="create-card">
-            <div class="mcard-head"><span class="favicon-sq" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span><span style="min-width:0;flex:1"><span class="gname-edit show"><input class="gname-input" id="create-title" value="Sony WH-1000XM5 price" aria-label="Monitor name" /><button class="gname-x" aria-label="Clear name">×</button></span><span class="mcard-url">bestbuy.com/site/sony-wh-1000xm5</span></span></div>
+            <div class="mcard-head"><span class="favicon-sq" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span><span style="min-width:0;flex:1"><span class="mcard-url">bestbuy.com/site/sony-wh-1000xm5</span></span></div>
             <div class="mvalue"><span class="now">$299</span><span class="from">found on this page just now</span></div>
+            <div class="field">
+              <span class="field-label">Name</span>
+              <input class="field-input" id="create-title" value="Sony WH-1000XM5 price" aria-label="Monitor name" />
+            </div>
             <div class="field">
               <span class="field-label">Alert me when</span>
               <input class="field-input" id="create-cond" value="the price drops below $270" aria-label="Alert condition" />
@@ -1117,9 +1121,13 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       <div class="mcard modal-card" role="dialog" aria-modal="true" aria-label="New monitor">
         <div class="mcard-head">
           <span class="favicon-sq" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
-          <span style="flex:1; min-width:0"><span class="gname-edit show"><input class="gname-input" id="modal-title" placeholder="Name this monitor" aria-label="Monitor name" /><button class="gname-x" aria-label="Clear name">×</button></span><br/><span class="mcard-url">Monitors a page for changes</span></span>
+          <span style="flex:1; min-width:0"><span class="mcard-name">New monitor</span><br/><span class="mcard-url">Monitors a page for changes</span></span>
           <span class="spacer"></span>
           <button class="page-action" id="modal-close" title="Close" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg></button>
+        </div>
+        <div class="field">
+          <span class="field-label">Name</span>
+          <input class="field-input" id="modal-title" placeholder="Name this monitor" aria-label="Monitor name" />
         </div>
         <div class="field">
           <span class="field-label">Alert me when</span>
