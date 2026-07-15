@@ -347,6 +347,10 @@ h1,h2,h3,h4,p { margin: 0; }
 
 .btn-ghost:disabled { opacity: .55; cursor: default; }
 .btn-ghost:disabled:hover { background: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+[data-check-now] svg { width: 13px; height: 13px; display: inline-block; vertical-align: -2px; margin-inline-end: 3px; fill: none; stroke: currentColor; }
+[data-check-now] .spin { animation: spin .8s linear infinite; }
+.btn-ghost.ok { opacity: 1; color: var(--text-color-success); border-color: var(--text-color-success); }
 
 /* Inline save confirmation — edits save as you make them */
 .save-note { display: inline-flex; align-items: center; gap: 5px; font-size: var(--font-size-small); color: var(--text-color-deemphasized); }
@@ -815,7 +819,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                     <div class="hist-item low"><span class="when">Jun 24</span><span>checked — didn't meet your alert</span></div>
                     <div class="hist-item"><span class="when">Jun 17</span><span class="deemphasized">first checked · $299</span></div>
                   </div>
-                  <div class="mcard-actions"><button class="btn-ghost" id="sony-edit">Edit</button><button class="btn-ghost">Pause</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+                  <div class="mcard-actions"><button class="btn-ghost" id="sony-edit">Edit</button><button class="btn-ghost">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
                 </div>
                 <div class="edit-only">
                   <div class="field">
@@ -848,7 +852,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                   <div class="hist-item"><span class="when">Jun 30</span><span class="hist-flag">value lost</span><span class="deemphasized">the page changed</span></div>
                   <div class="hist-item"><span class="when">Jun 12</span><span class="deemphasized">first checked · $189</span></div>
                 </div>
-                <div class="mcard-actions"><button class="btn-primary" data-open-page>Open page</button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+                <div class="mcard-actions"><button class="btn-primary" data-open-page>Open page</button><button class="btn-ghost">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
               </div>
               </div></div>
             </div>
@@ -869,7 +873,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                   <div class="hist-item"><span class="when">Yesterday</span><span class="newv">2 new listings</span></div>
                   <div class="hist-item"><span class="when">Jun 28</span><span class="deemphasized">first checked · 41 listings</span></div>
                 </div>
-                <div class="mcard-actions"><button class="btn-primary" data-open-page>Open page</button><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+                <div class="mcard-actions"><button class="btn-primary" data-open-page>Open page</button><button class="btn-ghost">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
               </div>
               </div></div>
             </div>
@@ -1451,6 +1455,26 @@ document.querySelectorAll('[data-act="delete"]').forEach(el => {
     document.getElementById("confirm-name").textContent = name;
     confirmScrim.hidden = false;
     document.getElementById("confirm-delete").focus();
+  });
+});
+const CHECK_SPIN = '<svg class="spin" viewBox="0 0 24 24" stroke-width="2.4" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 9 9"/></svg>';
+const CHECK_DONE = '<svg viewBox="0 0 24 24" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+document.querySelectorAll("[data-check-now]").forEach(btn => {
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    if (btn.dataset.busy) return;
+    btn.dataset.busy = "1";
+    btn.disabled = true;
+    const orig = btn.textContent;
+    btn.innerHTML = CHECK_SPIN + "Checking\u2026";
+    const item = btn.closest(".dash-item");
+    setTimeout(() => {
+      btn.innerHTML = CHECK_DONE + "Checked";
+      btn.classList.add("ok");
+      const meta = item && item.querySelector(".gmeta");
+      if (meta) meta.textContent = meta.textContent.split("\u00b7")[0].trim() + " \u00b7 checked just now";
+      setTimeout(() => { btn.textContent = orig; btn.classList.remove("ok"); btn.disabled = false; delete btn.dataset.busy; }, 1500);
+    }, 1300);
   });
 });
 function updateCounts() {
