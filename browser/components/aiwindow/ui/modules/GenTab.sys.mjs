@@ -84,6 +84,12 @@ const GENTAB_CONTENT_SCHEMA = {
     emoji: { type: "string", maxLength: 8 },
     // One-line stats under the title, e.g. "4 dinners planned · 10 grocery items".
     header_blurb: { type: "string", maxLength: 200 },
+    // Alternate intents the user could switch to for a different GenTab on the same sources.
+    intent_suggestions: {
+      type: "array",
+      maxItems: 6,
+      items: { type: "string", maxLength: 60 },
+    },
     key_facts: {
       type: "array",
       minItems: 1,
@@ -235,17 +241,18 @@ Never invent places, dishes, brands, or steps not present in the page text. Pref
    "4 dinners planned for this week. Grocery list has 10 items across 4 recipes."
    "3-day Osaka plan · 8 stops · 3 must-try foods."
    "Japan vs Italy trip ideas · 2 destinations from your tabs."
-5) key_facts (2–${MAX_KEY_FACTS}) — answers to the questions someone with this intent would ask first.
+5) intent_suggestions — 3–6 short alternate intents (phrase labels) that would produce a *different* useful GenTab from the same sources. Do not include the current intent. Examples: "dinner ideas", "travel plan", "grocery list", "weekend itinerary", "budget trip".
+6) key_facts (2–${MAX_KEY_FACTS}) — answers to the questions someone with this intent would ask first.
    Travel intent: when to go, safety, getting around.
    Dinner intent: time, servings, difficulty, make-ahead.
    Job intent: location, seniority, focus areas.
    Bad: heading "Overview" with pasted intro prose.
-6) plan — THE TIMELINE (required, primary). Object { "title", "subtitle"?, "items": [{ "heading", "body" }] }.
+7) plan — THE TIMELINE (required, primary). Object { "title", "subtitle"?, "items": [{ "heading", "body" }] }.
    3–${MAX_PLAN_ITEMS} ordered steps. heading = short step label; body = what to do / see / decide at that step.
    Prefer ordered sequences over flat dumps. For multi-destination vacation ideation, each item can be a trip concept in a compare order, not one hybrid day-by-day.
-7) focus_options (2–${MAX_OPTIONS}) — forks off the timeline (alternate path, simplify, go deeper). Not "Browse details".
-8) detail_sections (0–${MAX_DETAIL_SECTIONS}) — optional supporting lists (ingredients, tips, packing) as { "title", "items": [{ "heading", "body" }] }.
-9) sources — optional array of { "title", "url" }.
+8) focus_options (2–${MAX_OPTIONS}) — forks off the timeline (alternate path, simplify, go deeper). Not "Browse details".
+9) detail_sections (0–${MAX_DETAIL_SECTIONS}) — optional supporting lists (ingredients, tips, packing) as { "title", "items": [{ "heading", "body" }] }.
+10) sources — optional array of { "title", "url" }.
 
 ## Quality bar
 A good GenTab is a timeline you can follow without re-reading the tabs. Two different intents on the same tabs should produce clearly different timelines.`;
@@ -483,6 +490,13 @@ export function normalizeGenTabContent(raw) {
         .filter(s => s.title || s.url)
     : [];
 
+  const intent_suggestions = Array.isArray(content.intent_suggestions)
+    ? content.intent_suggestions
+        .map(s => clampString(s, 60))
+        .filter(Boolean)
+        .slice(0, 6)
+    : [];
+
   return {
     title: cleanArtifactTitle(clampString(content.title, 120) || "GenTab"),
     summary: clampString(content.summary, 500),
@@ -491,12 +505,75 @@ export function normalizeGenTabContent(raw) {
       content.header_blurb || content.headerBlurb || content.summary,
       200
     ),
+    intent_suggestions,
     key_facts,
     plan,
     focus_options,
     detail_sections,
     sources,
   };
+}
+
+/**
+ * Build a de-duped list of intent labels for the header switcher.
+ *
+ * @param {object} content normalized content
+ * @param {string} currentIntent
+ * @param {Array<{ title?: string }>} sources
+ * @returns {string[]}
+ */
+function buildIntentSuggestions(content, currentIntent, sources = []) {
+  const seen = new Set();
+  const out = [];
+  const add = label => {
+    const t = clampString(label, 60);
+    if (!t) {
+      return;
+    }
+    const key = t.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    out.push(t);
+  };
+
+  if (currentIntent) {
+    add(currentIntent);
+  }
+  for (const s of content.intent_suggestions || []) {
+    add(s);
+  }
+  for (const f of content.focus_options || []) {
+    add(f.label);
+  }
+
+  // Lightweight domain seeds from source titles when the model is thin.
+  const blob = sources
+    .map(s => s.title || "")
+    .join(" ")
+    .toLowerCase();
+  if (/recipe|lasagna|cook|food|meal/.test(blob)) {
+    add("dinner ideas");
+    add("grocery list");
+    add("meal prep");
+  }
+  if (/osaka|tokyo|travel|trip|guide|itinerary|japan|kyoto/.test(blob)) {
+    add("travel plan");
+    add("vacation idea");
+    add("3-day itinerary");
+  }
+  if (/job|career|counsel|hiring|greenhouse/.test(blob)) {
+    add("should I apply");
+    add("interview prep");
+  }
+
+  if (!out.length) {
+    add("overview");
+    add("action plan");
+  }
+
+  return out.slice(0, 8);
 }
 
 /**
@@ -1569,7 +1646,7 @@ function buildMultiSourceUserMessage(sources, options = {}) {
 
   header.push(
     "",
-    "Return only structured fields: title, summary, emoji, header_blurb, key_facts, plan, focus_options, detail_sections, sources.",
+    "Return only structured fields: title, summary, emoji, header_blurb, intent_suggestions, key_facts, plan, focus_options, detail_sections, sources.",
     sources.length > 1
       ? `sources[] must include exactly these ${sources.length} URLs: ${sources.map(s => s.url).join(" | ")}`
       : ""
@@ -1741,6 +1818,52 @@ export const GenTab = {
   },
 
   /**
+   * Re-run generation for an existing GenTab with a new intent, using the
+   * cached source snapshots from the first extract.
+   *
+   * @param {string} id
+   * @param {string} groupLabel
+   * @returns {Promise<object>} ready state
+   */
+  async regenerateWithIntent(id, groupLabel) {
+    const prev = gStates.get(id);
+    if (!prev?.sourceSnapshots?.length) {
+      throw new Error("Cannot regenerate: missing source snapshots.");
+    }
+    const intent = clampString(groupLabel, 120);
+    if (!intent) {
+      throw new Error("Intent is required to regenerate.");
+    }
+    setState(id, {
+      ...prev,
+      status: "loading",
+      config: null,
+      error: null,
+      intent,
+      title: prev.title,
+    });
+    // Reset waiters for a new ready signal.
+    gWaiters.delete(id);
+    try {
+      await runGenerationFromSources(id, prev.sourceSnapshots, {
+        groupLabel: intent,
+        // Preserve prior suggestions as seeds; model may refine them.
+        priorIntentSuggestions: prev.intentSuggestions || [],
+      });
+    } catch (error) {
+      setState(id, {
+        ...prev,
+        status: "error",
+        intent,
+        error: error?.message || "GenTab regeneration failed.",
+        config: null,
+      });
+      throw error;
+    }
+    return this.waitForState(id);
+  },
+
+  /**
    * Open a GenTab from the given content browser (page or tab context).
    *
    * @param {MozBrowser} browser
@@ -1863,7 +1986,20 @@ async function runGeneration(id, browsers, options = {}) {
   const start = ChromeUtils.now();
   const sources = await extractFromBrowsers(browsers, options);
   const extractMs = ChromeUtils.now() - start;
+  await runGenerationFromSources(id, sources, {
+    ...options,
+    extractMs,
+  });
+}
 
+/**
+ * Core generate path from already-extracted source snapshots.
+ *
+ * @param {string} id
+ * @param {Array<{ text: string, url: string, title: string }>} sources
+ * @param {{ groupLabel?: string, extractMs?: number, priorIntentSuggestions?: string[] }} [options]
+ */
+async function runGenerationFromSources(id, sources, options = {}) {
   const primaryMeta = {
     url: sources[0].url,
     title: options.groupLabel || sources[0].title,
@@ -1910,12 +2046,23 @@ async function runGeneration(id, browsers, options = {}) {
     content.summary ||
     `From ${sources.length} tab${sources.length === 1 ? "" : "s"}.`;
 
+  // Merge model suggestions with seeds (prior list, focus labels, domain defaults).
+  if (Array.isArray(options.priorIntentSuggestions)) {
+    content.intent_suggestions = [
+      ...(content.intent_suggestions || []),
+      ...options.priorIntentSuggestions,
+    ];
+  }
+  const intentSuggestions = buildIntentSuggestions(content, intent, sources);
+
   const config = mapContentToFeatureConfig(content, primaryMeta);
 
+  const extractMs = options.extractMs ?? 0;
   console.warn(
     `GenTab ready id=${id} tabs=${sources.length} intent=${intent} extract=${Math.round(extractMs)}ms llm=${Math.round(llmMs)}ms fallback=${usedFallback}`
   );
 
+  const prev = gStates.get(id) || {};
   setState(id, {
     status: "ready",
     sourceUrl: primaryMeta.url,
@@ -1925,13 +2072,22 @@ async function runGeneration(id, browsers, options = {}) {
     emoji: content.emoji,
     headerBlurb: content.header_blurb,
     intent,
+    intentSuggestions,
     tabs: sources.map(source => ({
       title: source.title,
       url: source.url,
+    })),
+    // Keep full text for intent-switch regenerate without re-extract.
+    sourceSnapshots: sources.map(source => ({
+      title: source.title,
+      url: source.url,
+      text: source.text,
     })),
     generatedAt: Date.now(),
     config,
     error: null,
     usedFallback,
+    // Preserve any extra prior fields we might need later.
+    ...("browsers" in prev ? {} : {}),
   });
 }

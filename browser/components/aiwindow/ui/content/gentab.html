@@ -56,18 +56,59 @@
           </div>
         </div>
         <div class="gentab-header-controls">
-          <!-- Intent: later becomes a combobox (suggested intents + free entry → regenerate). -->
-          <button
-            type="button"
-            id="gentab-intent-control"
-            class="gentab-chip gentab-chip-intent"
-            disabled
-            title="Intent editing coming soon — will regenerate GenTab"
-          >
-            <span class="gentab-chip-label">Intent</span>
-            <span id="gentab-intent-value" class="gentab-chip-value">—</span>
-            <span class="gentab-chip-caret" aria-hidden="true">▾</span>
-          </button>
+          <div class="gentab-intent-switcher">
+            <button
+              type="button"
+              id="gentab-intent-control"
+              class="gentab-chip gentab-chip-intent"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              aria-controls="gentab-intent-panel"
+            >
+              <span class="gentab-chip-label">Intent</span>
+              <span id="gentab-intent-value" class="gentab-chip-value">—</span>
+              <span class="gentab-chip-caret" aria-hidden="true">▾</span>
+            </button>
+            <div
+              id="gentab-intent-panel"
+              class="gentab-intent-panel"
+              hidden
+              role="dialog"
+              aria-label="Choose or enter intent"
+            >
+              <p class="gentab-intent-panel-title">Switch intent</p>
+              <ul
+                id="gentab-intent-suggestions"
+                class="gentab-intent-suggestions"
+                role="listbox"
+                aria-label="Suggested intents"
+              ></ul>
+              <div class="gentab-intent-custom">
+                <label
+                  class="gentab-intent-custom-label"
+                  for="gentab-intent-input"
+                  >Custom</label
+                >
+                <div class="gentab-intent-custom-row">
+                  <input
+                    id="gentab-intent-input"
+                    class="gentab-intent-input"
+                    type="text"
+                    maxlength="60"
+                    placeholder="Type an intent…"
+                    autocomplete="off"
+                  />
+                  <button
+                    type="button"
+                    id="gentab-intent-apply"
+                    class="gentab-intent-apply"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
           <!-- Tabs: later opens source picker to add/remove tabs → regenerate. -->
           <button
             type="button"

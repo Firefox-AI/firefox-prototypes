@@ -135,6 +135,17 @@ body {
   opacity: 0.85;
 }
 
+.gentab-chip-intent:not(:disabled) {
+  cursor: pointer;
+  opacity: 1;
+}
+
+.gentab-chip-intent:not(:disabled):hover,
+.gentab-chip-intent:not(:disabled):focus-visible {
+  border-color: var(--button-background-color-primary, #0060df);
+  outline: none;
+}
+
 .gentab-chip-label {
   font-weight: 600;
   color: light-dark(var(--color-gray-70, #5b5b66), var(--color-gray-40, #bfbfc9));
@@ -151,6 +162,150 @@ body {
 .gentab-chip-caret {
   font-size: 0.7rem;
   opacity: 0.7;
+}
+
+/* Intent switcher popover */
+.gentab-intent-switcher {
+  position: relative;
+}
+
+.gentab-intent-panel {
+  position: absolute;
+  z-index: 20;
+  inset-block-start: calc(100% + 6px);
+  inset-inline-start: 0;
+  min-width: min(320px, 90vw);
+  max-width: min(360px, 92vw);
+  padding: 12px;
+  border: 1px solid
+    light-dark(var(--color-gray-30, #cfcfd8), var(--color-gray-60, #5b5b66));
+  border-radius: 12px;
+  background: light-dark(
+    var(--color-white, #fff),
+    var(--color-gray-80, #2b2a33)
+  );
+  box-shadow: 0 8px 28px light-dark(rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.45));
+}
+
+.gentab-intent-panel[hidden] {
+  display: none;
+}
+
+.gentab-intent-panel-title {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: light-dark(var(--color-gray-60, #5b5b66), var(--color-gray-40, #bfbfc9));
+}
+
+.gentab-intent-suggestions {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  max-height: 220px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gentab-intent-option {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: start;
+  cursor: pointer;
+}
+
+.gentab-intent-option:hover,
+.gentab-intent-option:focus-visible {
+  background: light-dark(
+    var(--color-gray-10, #e0e0e6),
+    var(--color-gray-70, #3a3944)
+  );
+  outline: none;
+}
+
+.gentab-intent-option.selected {
+  border-color: color-mix(
+    in srgb,
+    var(--button-background-color-primary, #0060df) 45%,
+    transparent
+  );
+  background: color-mix(
+    in srgb,
+    var(--button-background-color-primary, #0060df) 12%,
+    transparent
+  );
+  font-weight: 600;
+}
+
+.gentab-intent-empty {
+  padding: 8px 4px;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.gentab-intent-custom-label {
+  display: block;
+  margin-block-end: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: light-dark(var(--color-gray-60, #5b5b66), var(--color-gray-40, #bfbfc9));
+}
+
+.gentab-intent-custom-row {
+  display: flex;
+  gap: 8px;
+}
+
+.gentab-intent-input {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid
+    light-dark(var(--color-gray-30, #cfcfd8), var(--color-gray-60, #5b5b66));
+  border-radius: 8px;
+  background: light-dark(
+    var(--color-gray-05, #f0f0f4),
+    var(--color-gray-70, #3a3944)
+  );
+  color: inherit;
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.gentab-intent-input:focus-visible {
+  outline: 2px solid var(--button-background-color-primary, #0060df);
+  outline-offset: 1px;
+}
+
+.gentab-intent-apply {
+  margin: 0;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--button-background-color-primary, #0060df);
+  color: var(--button-text-color-primary, #fff);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.gentab-intent-apply:hover {
+  filter: brightness(1.05);
 }
 
 /* ---- AboutWelcome body ---- */
