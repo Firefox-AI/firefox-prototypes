@@ -11,6 +11,8 @@ body {
 body {
   background: light-dark(var(--color-gray-05, #f0f0f4), var(--color-gray-90, #1c1b22));
   color: var(--text-color);
+  display: flex;
+  flex-direction: column;
 }
 
 .gentab-status {
@@ -33,8 +35,129 @@ body {
   margin: 0;
 }
 
+/* ---- Chrome header ---- */
+
+.gentab-header {
+  flex-shrink: 0;
+  border-block-end: 1px solid
+    light-dark(var(--color-gray-20, #e0e0e6), var(--color-gray-70, #52525e));
+  background: light-dark(
+    var(--color-white, #fff),
+    var(--color-gray-80, #2b2a33)
+  );
+}
+
+.gentab-header[hidden] {
+  display: none;
+}
+
+.gentab-header-inner {
+  max-width: 720px;
+  margin-inline: auto;
+  padding: var(--space-large, 24px) var(--space-large, 24px)
+    var(--space-medium, 16px);
+  box-sizing: border-box;
+}
+
+.gentab-header-top {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-medium, 16px);
+}
+
+.gentab-header-emoji {
+  font-size: 2.25rem;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-block-start: 2px;
+}
+
+.gentab-header-meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.gentab-header-generated {
+  margin: 0 0 4px;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  color: light-dark(var(--color-gray-60, #5b5b66), var(--color-gray-40, #bfbfc9));
+}
+
+.gentab-header-title {
+  margin: 0 0 6px;
+  font-size: 1.65rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.gentab-header-blurb {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: light-dark(var(--color-gray-70, #5b5b66), var(--color-gray-30, #cfcfd8));
+}
+
+.gentab-header-blurb[hidden] {
+  display: none;
+}
+
+.gentab-header-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-small, 8px);
+  margin-block-start: var(--space-medium, 16px);
+}
+
+.gentab-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 12px;
+  border: 1px solid
+    light-dark(var(--color-gray-30, #cfcfd8), var(--color-gray-60, #5b5b66));
+  border-radius: 999px;
+  background: light-dark(
+    var(--color-gray-05, #f0f0f4),
+    var(--color-gray-70, #3a3944)
+  );
+  color: inherit;
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1.2;
+  cursor: default;
+  opacity: 0.9;
+}
+
+.gentab-chip:disabled {
+  opacity: 0.85;
+}
+
+.gentab-chip-label {
+  font-weight: 600;
+  color: light-dark(var(--color-gray-70, #5b5b66), var(--color-gray-40, #bfbfc9));
+}
+
+.gentab-chip-value {
+  font-weight: 500;
+  max-width: 16em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gentab-chip-caret {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+/* ---- AboutWelcome body ---- */
+
 #multi-stage-message-root {
-  min-height: 100vh;
+  flex: 1;
+  min-height: 0;
 }
 
 #multi-stage-message-root .main-content,
@@ -42,6 +165,12 @@ body {
 #multi-stage-message-root .dialog-initial,
 #multi-stage-message-root .onboardingContainer {
   box-shadow: none;
+}
+
+/* Hide empty aboutwelcome title block when chrome header owns branding */
+#multi-stage-message-root .welcome-text:empty,
+#multi-stage-message-root h1.screen-title:empty {
+  display: none;
 }
 
 /* Single-page GenTab: stack sections with breathing room */

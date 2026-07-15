@@ -38,6 +38,50 @@
     <div id="gentab-status" class="gentab-status" hidden>
       <p id="gentab-status-message" class="gentab-status-message"></p>
     </div>
+    <header id="gentab-header" class="gentab-header" hidden>
+      <div class="gentab-header-inner">
+        <div class="gentab-header-top">
+          <span
+            id="gentab-header-emoji"
+            class="gentab-header-emoji"
+            aria-hidden="true"
+            >✨</span
+          >
+          <div class="gentab-header-meta">
+            <p id="gentab-header-generated" class="gentab-header-generated">
+              Generated just now
+            </p>
+            <h1 id="gentab-header-title" class="gentab-header-title">GenTab</h1>
+            <p id="gentab-header-blurb" class="gentab-header-blurb"></p>
+          </div>
+        </div>
+        <div class="gentab-header-controls">
+          <!-- Intent: later becomes a combobox (suggested intents + free entry → regenerate). -->
+          <button
+            type="button"
+            id="gentab-intent-control"
+            class="gentab-chip gentab-chip-intent"
+            disabled
+            title="Intent editing coming soon — will regenerate GenTab"
+          >
+            <span class="gentab-chip-label">Intent</span>
+            <span id="gentab-intent-value" class="gentab-chip-value">—</span>
+            <span class="gentab-chip-caret" aria-hidden="true">▾</span>
+          </button>
+          <!-- Tabs: later opens source picker to add/remove tabs → regenerate. -->
+          <button
+            type="button"
+            id="gentab-tabs-control"
+            class="gentab-chip gentab-chip-tabs"
+            disabled
+            title="Source tabs management coming soon — will regenerate GenTab"
+          >
+            <span class="gentab-chip-label">Tabs</span>
+            <span id="gentab-tabs-value" class="gentab-chip-value">›</span>
+          </button>
+        </div>
+      </div>
+    </header>
     <div
       id="multi-stage-message-root"
       class="welcome-container"

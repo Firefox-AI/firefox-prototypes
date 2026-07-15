@@ -70,6 +70,8 @@ const GENTAB_CONTENT_SCHEMA = {
   required: [
     "title",
     "summary",
+    "emoji",
+    "header_blurb",
     "key_facts",
     "plan",
     "focus_options",
@@ -78,6 +80,10 @@ const GENTAB_CONTENT_SCHEMA = {
   properties: {
     title: { type: "string", maxLength: 120 },
     summary: { type: "string", maxLength: 500 },
+    // Single emoji (or short emoji sequence) for the GenTab header.
+    emoji: { type: "string", maxLength: 8 },
+    // One-line stats under the title, e.g. "4 dinners planned · 10 grocery items".
+    header_blurb: { type: "string", maxLength: 200 },
     key_facts: {
       type: "array",
       minItems: 1,
@@ -224,17 +230,22 @@ Never invent places, dishes, brands, or steps not present in the page text. Pref
 ## Output fields
 1) title — short artifact title aligned with the intent (not necessarily the page SEO title). Drop site suffixes like "| U30X".
 2) summary — 1–2 sentences: who this helps + core value for the stated intent. No author bio.
-3) key_facts (2–${MAX_KEY_FACTS}) — answers to the questions someone with this intent would ask first.
+3) emoji — one emoji that matches the artifact (🍽 meal plan, ✈️ trip, 🧳 vacation idea, 🍳 recipe, 💼 job, 🛒 shopping). Prefer a single character.
+4) header_blurb — one scannable stats line under the title (counts, scope). Examples:
+   "4 dinners planned for this week. Grocery list has 10 items across 4 recipes."
+   "3-day Osaka plan · 8 stops · 3 must-try foods."
+   "Japan vs Italy trip ideas · 2 destinations from your tabs."
+5) key_facts (2–${MAX_KEY_FACTS}) — answers to the questions someone with this intent would ask first.
    Travel intent: when to go, safety, getting around.
    Dinner intent: time, servings, difficulty, make-ahead.
    Job intent: location, seniority, focus areas.
    Bad: heading "Overview" with pasted intro prose.
-4) plan — THE TIMELINE (required, primary). Object { "title", "subtitle"?, "items": [{ "heading", "body" }] }.
+6) plan — THE TIMELINE (required, primary). Object { "title", "subtitle"?, "items": [{ "heading", "body" }] }.
    3–${MAX_PLAN_ITEMS} ordered steps. heading = short step label; body = what to do / see / decide at that step.
    Prefer ordered sequences over flat dumps. For multi-destination vacation ideation, each item can be a trip concept in a compare order, not one hybrid day-by-day.
-5) focus_options (2–${MAX_OPTIONS}) — forks off the timeline (alternate path, simplify, go deeper). Not "Browse details".
-6) detail_sections (0–${MAX_DETAIL_SECTIONS}) — optional supporting lists (ingredients, tips, packing) as { "title", "items": [{ "heading", "body" }] }.
-7) sources — optional array of { "title", "url" }.
+7) focus_options (2–${MAX_OPTIONS}) — forks off the timeline (alternate path, simplify, go deeper). Not "Browse details".
+8) detail_sections (0–${MAX_DETAIL_SECTIONS}) — optional supporting lists (ingredients, tips, packing) as { "title", "items": [{ "heading", "body" }] }.
+9) sources — optional array of { "title", "url" }.
 
 ## Quality bar
 A good GenTab is a timeline you can follow without re-reading the tabs. Two different intents on the same tabs should produce clearly different timelines.`;
@@ -475,12 +486,63 @@ export function normalizeGenTabContent(raw) {
   return {
     title: cleanArtifactTitle(clampString(content.title, 120) || "GenTab"),
     summary: clampString(content.summary, 500),
+    emoji: normalizeEmoji(content.emoji),
+    header_blurb: clampString(
+      content.header_blurb || content.headerBlurb || content.summary,
+      200
+    ),
     key_facts,
     plan,
     focus_options,
     detail_sections,
     sources,
   };
+}
+
+/**
+ * Keep a short emoji-ish token for the header; fall back empty for caller defaults.
+ *
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeEmoji(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+  // Avoid long junk; allow a short emoji sequence.
+  return trimmed.length <= 8 ? trimmed : [...trimmed].slice(0, 2).join("");
+}
+
+/**
+ * Default header emoji from intent keywords when the model omits one.
+ *
+ * @param {string} [intent]
+ * @returns {string}
+ */
+function defaultEmojiForIntent(intent = "") {
+  const t = intent.toLowerCase();
+  if (/dinner|meal|food|recipe|cook|grocery|lasagna/.test(t)) {
+    return "🍴";
+  }
+  if (
+    /vacation|travel|trip|tour|itinerary|osaka|japan|italy|destination/.test(t)
+  ) {
+    return "✈️";
+  }
+  if (/job|career|hiring|interview/.test(t)) {
+    return "💼";
+  }
+  if (/shop|buy|product|compare/.test(t)) {
+    return "🛒";
+  }
+  if (/learn|study|course|curriculum/.test(t)) {
+    return "📚";
+  }
+  return "✨";
 }
 
 function checklistIcon() {
@@ -739,25 +801,10 @@ export function mapContentToFeatureConfig(content, sourceMeta = {}) {
         content: {
           position: "center",
           background: "transparent",
+          // Title / summary live in the GenTab chrome header, not aboutwelcome.
           screen_style: {
             width: "100%",
             overflow: "auto",
-          },
-          title: {
-            raw: normalized.title,
-            fontSize: "34px",
-            fontWeight: "350",
-            letterSpacing: 0,
-            lineHeight: "normal",
-            textAlign: "center",
-          },
-          subtitle: {
-            raw:
-              normalized.summary ||
-              "Structured from the page you selected — scroll for plan, focus, and details.",
-            fontSize: "17px",
-            fontWeight: 320,
-            width: "min(680px, 100%)",
           },
           tiles,
           tiles_container: {
@@ -963,6 +1010,14 @@ function heuristicContentFromSources(sources, options = {}) {
         500
       );
     }
+    single.emoji = single.emoji || defaultEmojiForIntent(groupLabel);
+    single.header_blurb =
+      single.header_blurb ||
+      clampString(
+        single.summary ||
+          `From ${sources.length} tab${sources.length === 1 ? "" : "s"}.`,
+        200
+      );
     return single;
   }
 
@@ -1040,6 +1095,13 @@ function heuristicContentFromSources(sources, options = {}) {
   return {
     title: offlineTitle,
     summary: offlineSummary,
+    emoji: defaultEmojiForIntent(groupLabel),
+    header_blurb: clampString(
+      `${sources.length} source tab${sources.length === 1 ? "" : "s"}${
+        groupLabel ? ` · intent “${groupLabel}”` : ""
+      }. Timeline has ${planItems.length || key_facts.length} steps.`,
+      200
+    ),
     key_facts,
     plan: {
       title: planTitle,
@@ -1274,9 +1336,17 @@ function heuristicContentFromSinglePage(pageText, sourceMeta) {
     );
   }
 
+  const stepCount = plan.items?.length || key_facts.length || 0;
   return {
     title,
     summary,
+    emoji: defaultEmojiForIntent(title),
+    header_blurb: clampString(
+      summary
+        ? summary
+        : `Timeline with ${stepCount} step${stepCount === 1 ? "" : "s"}.`,
+      200
+    ),
     key_facts,
     plan,
     focus_options: focus_options.slice(0, MAX_OPTIONS),
@@ -1499,7 +1569,7 @@ function buildMultiSourceUserMessage(sources, options = {}) {
 
   header.push(
     "",
-    "Return only structured fields: title, summary, key_facts, plan, focus_options, detail_sections, sources.",
+    "Return only structured fields: title, summary, emoji, header_blurb, key_facts, plan, focus_options, detail_sections, sources.",
     sources.length > 1
       ? `sources[] must include exactly these ${sources.length} URLs: ${sources.map(s => s.url).join(" | ")}`
       : ""
@@ -1831,21 +1901,35 @@ async function runGeneration(id, browsers, options = {}) {
   }
   content.sources = [...byUrl.values()];
 
+  // Ensure header fields exist even if the model omitted them.
+  const intent = options.groupLabel || "";
+  content.emoji =
+    content.emoji || defaultEmojiForIntent(intent || content.title);
+  content.header_blurb =
+    content.header_blurb ||
+    content.summary ||
+    `From ${sources.length} tab${sources.length === 1 ? "" : "s"}.`;
+
   const config = mapContentToFeatureConfig(content, primaryMeta);
-  if (usedFallback && config.screens?.[0]?.content?.title) {
-    const text = config.screens[0].content.title;
-    text.raw = `!!FALLBACK!! ${text.raw}`;
-  }
 
   console.warn(
-    `GenTab ready id=${id} tabs=${sources.length} intent=${options.groupLabel || ""} extract=${Math.round(extractMs)}ms llm=${Math.round(llmMs)}ms fallback=${usedFallback}`
+    `GenTab ready id=${id} tabs=${sources.length} intent=${intent} extract=${Math.round(extractMs)}ms llm=${Math.round(llmMs)}ms fallback=${usedFallback}`
   );
 
   setState(id, {
     status: "ready",
     sourceUrl: primaryMeta.url,
     sourceTitle: primaryMeta.title,
-    title: content.title,
+    title: usedFallback ? `!!FALLBACK!! ${content.title}` : content.title,
+    summary: content.summary || "",
+    emoji: content.emoji,
+    headerBlurb: content.header_blurb,
+    intent,
+    tabs: sources.map(source => ({
+      title: source.title,
+      url: source.url,
+    })),
+    generatedAt: Date.now(),
     config,
     error: null,
     usedFallback,
