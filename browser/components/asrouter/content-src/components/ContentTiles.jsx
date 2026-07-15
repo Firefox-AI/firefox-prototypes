@@ -19,6 +19,7 @@ import { EmbeddedBackupRestore } from "./EmbeddedBackupRestore";
 import { PinnableSitesList } from "./PinnableSitesList";
 import { ContentToggle } from "./ContentToggle";
 import { TextBoxTile } from "./TextBoxTile";
+import { TileList } from "./TileList";
 
 const HEADER_STYLES = [
   "backgroundColor",
@@ -394,6 +395,8 @@ export const ContentTiles = props => {
                 handleAction={props.handleAction}
               />
             )}
+            {(tile.type === "tile-list" || tile.type === "timeline") &&
+              tile.data && <TileList content={tile.data} />}
             {tile.type === "pinnable_sites" && tile.data && (
               <PinnableSitesList
                 tile={tile}

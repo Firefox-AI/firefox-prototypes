@@ -2452,6 +2452,98 @@ html {
     }
   }
 
+  // Standalone tile-list / timeline ContentTiles (GenTab and similar)
+  .tile-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-small);
+    margin-inline: auto;
+    width: min(680px, 100%);
+    text-align: start;
+
+    .tile-list-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-small);
+    }
+
+    .tile-list-icon-wrapper {
+      flex-shrink: 0;
+      display: flex;
+      justify-content: center;
+    }
+
+    .tile-list-icon {
+      width: 20px;
+      height: 20px;
+    }
+
+    .tile-list-step-num {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      font-size: 13px;
+      font-weight: var(--font-weight-bold, 600);
+      color: var(--button-text-color-primary, #fff);
+      background: var(
+        --button-background-color-primary,
+        light-dark(#0060df, #0df)
+      );
+    }
+
+    .tile-list-text {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .tile-list-heading {
+      font-weight: var(--font-weight-semibold, 600);
+      font-size: 15px;
+      line-height: 1.3;
+    }
+
+    .tile-list-subtext {
+      margin-block-start: 2px;
+      font-size: 14px;
+      line-height: 1.4;
+      opacity: 0.85;
+    }
+
+    &.tile-list-timeline {
+      position: relative;
+      gap: 0;
+      padding-inline-start: 4px;
+
+      .tile-list-timeline-item {
+        position: relative;
+        padding-block: var(--space-small);
+        padding-inline-start: var(--space-small);
+
+        // Vertical connector between step markers
+        &:not(:last-child)::before {
+          content: "";
+          position: absolute;
+          inset-inline-start: calc(14px + var(--space-small) / 2);
+          top: 36px;
+          bottom: 0;
+          width: 2px;
+          background: light-dark(
+            color-mix(in srgb, currentColor 18%, transparent),
+            color-mix(in srgb, currentColor 28%, transparent)
+          );
+        }
+      }
+
+      .tile-list-icon-wrapper {
+        padding-block-start: 0;
+        z-index: 1;
+      }
+    }
+  }
+
   .mobile-downloads {
     .qr-code-image {
       margin: var(--space-xlarge) 0 10px;

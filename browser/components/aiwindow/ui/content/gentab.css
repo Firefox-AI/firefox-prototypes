@@ -63,3 +63,15 @@ body {
   margin-block-end: var(--space-small, 8px);
   text-align: start;
 }
+
+/* Timeline hero emphasis for GenTab */
+#multi-stage-message-root .tile-list-timeline {
+  margin-block: var(--space-medium, 16px) var(--space-xlarge, 32px);
+}
+
+#multi-stage-message-root .tile-list-step-num {
+  box-shadow: 0 0 0 3px light-dark(
+    color-mix(in srgb, var(--button-background-color-primary, #0060df) 15%, transparent),
+    color-mix(in srgb, var(--button-background-color-primary, #0df) 20%, transparent)
+  );
+}

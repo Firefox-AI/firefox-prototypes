@@ -2766,10 +2766,12 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _PinnableSitesList__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(29);
 /* harmony import */ var _ContentToggle__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(30);
 /* harmony import */ var _TextBoxTile__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(31);
+/* harmony import */ var _TileList__WEBPACK_IMPORTED_MODULE_17__ = __webpack_require__(19);
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 
 
 
@@ -3057,6 +3059,8 @@ const ContentTiles = props => {
     }), tile.type === "confirmation-checklist" && tile.data && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_ConfirmationChecklist__WEBPACK_IMPORTED_MODULE_11__.ConfirmationChecklist, {
       content: tile.data,
       handleAction: props.handleAction
+    }), (tile.type === "tile-list" || tile.type === "timeline") && tile.data && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_TileList__WEBPACK_IMPORTED_MODULE_17__.TileList, {
+      content: tile.data
     }), tile.type === "pinnable_sites" && tile.data && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_PinnableSitesList__WEBPACK_IMPORTED_MODULE_14__.PinnableSitesList, {
       tile: tile,
       messageId: props.messageId,
@@ -3559,25 +3563,41 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
+
+/**
+ * Ordered or icon list of steps. Used inside single-select bodies and as a
+ * top-level ContentTiles type (`tile-list` / `timeline`).
+ *
+ * content.items[]: { icon?, text, subtext? }
+ * content.ordered / content.timeline: number steps instead of icons
+ * content.style: limited inline styles on the container
+ */
 const TileList = props => {
   const {
     content
   } = props;
-  if (!content) {
+  if (!content?.items?.length) {
     return null;
   }
   const CONFIGURABLE_STYLES = ["background", "borderRadius", "height", "marginBlock", "marginBlockStart", "marginBlockEnd", "marginInline", "paddingBlock", "paddingBlockStart", "paddingBlockEnd", "paddingInline", "paddingInlineStart", "paddingInlineEnd", "width"];
+  const ordered = !!(content.ordered || content.timeline);
+  const containerClass = ordered ? "tile-list-container tile-list-timeline" : "tile-list-container";
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
-    className: "tile-list-container"
+    className: containerClass,
+    style: _lib_multistage_utils_mjs__WEBPACK_IMPORTED_MODULE_1__.MultiStageUtils.getValidStyle(content.style, CONFIGURABLE_STYLES)
   }, content.items.map(({
     icon,
-    text
+    text,
+    subtext
   }, index) => /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
     key: index,
-    className: "tile-list-item"
+    className: ordered ? "tile-list-item tile-list-timeline-item" : "tile-list-item"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
     className: "tile-list-icon-wrapper"
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+  }, ordered ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+    className: "tile-list-step-num",
+    "aria-hidden": "true"
+  }, index + 1) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
     className: "tile-list-icon",
     style: _lib_multistage_utils_mjs__WEBPACK_IMPORTED_MODULE_1__.MultiStageUtils.getValidStyle(icon, CONFIGURABLE_STYLES)
   })), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
@@ -3585,8 +3605,12 @@ const TileList = props => {
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_MSLocalized__WEBPACK_IMPORTED_MODULE_2__.Localized, {
     text: text
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
-    className: "text body-text"
-  }))))));
+    className: "text body-text tile-list-heading"
+  })), subtext ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_MSLocalized__WEBPACK_IMPORTED_MODULE_2__.Localized, {
+    text: subtext
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+    className: "tile-list-subtext"
+  })) : null))));
 };
 
 /***/ }),

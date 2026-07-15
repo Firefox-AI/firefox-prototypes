@@ -44,9 +44,9 @@ const MAX_TOTAL_CHARS = 18000;
 /** Minimum share each tab should get when splitting the budget. */
 const MIN_CHARS_PER_TAB = 2500;
 const MAX_KEY_FACTS = 4;
-const MAX_PLAN_ITEMS = 5;
+const MAX_PLAN_ITEMS = 10;
 const MAX_OPTIONS = 3;
-const MAX_DETAIL_SECTIONS = 3;
+const MAX_DETAIL_SECTIONS = 2;
 const MAX_DETAIL_ITEMS = 5;
 
 const TILE_ICON_URLS = [
@@ -56,13 +56,13 @@ const TILE_ICON_URLS = [
 ];
 
 /**
- * Content model for a single-page GenTab (city guide / research deep-dive).
+ * Content model for a single-page GenTab centered on an ordered timeline.
  *
  * Maps to aboutwelcome as one screen with tiles[]:
- *  - confirmation-checklist  → key_facts
- *  - confirmation-checklist  → plan (itinerary / main structure)
- *  - single-select           → focus options
- *  - confirmation-checklist×N → detail_sections (food, day trips, transit…)
+ *  - timeline (tile-list ordered) → plan / main sequence (hero)
+ *  - confirmation-checklist       → key_facts (compact context)
+ *  - single-select                → focus options (optional forks)
+ *  - confirmation-checklist×N     → detail_sections / sources
  */
 const GENTAB_CONTENT_SCHEMA = {
   type: "object",
@@ -178,7 +178,20 @@ const GENTAB_CONTENT_SCHEMA = {
 const SYSTEM_PROMPT = `You are building a GenTab: a useful, scannable artifact someone keeps open while acting on what they have been browsing.
 
 ## Goal
-Synthesize page content into decisions, options, and concrete next moves. Do NOT restate or quote opening bios, marketing fluff, or table-of-contents lists.
+The centerpiece is an ordered **timeline** (sequence of steps, stops, or phases).
+Synthesize page content into that sequence plus short supporting context.
+Do NOT restate or quote opening bios, marketing fluff, or table-of-contents lists.
+
+## Timeline-first examples (good plan shapes)
+- Trip / vacation: cities or days in visit order (Tokyo → Kyoto → Osaka; or Day 1 / Day 2 / Day 3).
+- Recipe / cooking: prep → cook → assemble → bake → rest → serve.
+- Job application: review fit → tailor resume → apply → prep interview → negotiate.
+- Product buy decision: define needs → shortlist → compare → check price → purchase.
+- Learning path: concepts in order (foundations → practice → project).
+- Project / home task: phases (plan → materials → build → finish).
+- Event day-of: morning prep → transit → main event → wind-down.
+- Research deep-dive: question → sources → findings → decision.
+Bad timeline: vague "Part 1/Part 2", author bio, or dumping unrelated pages into one fake day-0 story.
 
 ## User intent (critical)
 When a tab group name / intent is provided, that name is the job to optimize for — not a decorative title and not permission to delete tabs.
@@ -216,18 +229,15 @@ Never invent places, dishes, brands, or steps not present in the page text. Pref
    Dinner intent: time, servings, difficulty, make-ahead.
    Job intent: location, seniority, focus areas.
    Bad: heading "Overview" with pasted intro prose.
-4) plan — object { "title", "subtitle"?, "items": [{ "heading", "body" }] } (not a bare array).
-   Shape matches intent: multi-destination trip sketches, itinerary days, recipe steps, booking sequence, etc.
-   For vacation ideation with multiple destination signals, use plan items as separate trip concepts (not one fused hybrid week).
-5) focus_options (2–${MAX_OPTIONS}) — real forks for this intent (not "Browse details" / "Return to source").
-   For vacation ideation: options should be choose/compare destinations or trip styles grounded in the tabs.
-   id = snake_case; label short; body says what you gain; subtitle optional chip.
-6) detail_sections (1–${MAX_DETAIL_SECTIONS}) — each { "title", "items": [{ "heading", "body" }] }
-   (items must be objects, not bare strings). Supporting lists for the intent.
+4) plan — THE TIMELINE (required, primary). Object { "title", "subtitle"?, "items": [{ "heading", "body" }] }.
+   3–${MAX_PLAN_ITEMS} ordered steps. heading = short step label; body = what to do / see / decide at that step.
+   Prefer ordered sequences over flat dumps. For multi-destination vacation ideation, each item can be a trip concept in a compare order, not one hybrid day-by-day.
+5) focus_options (2–${MAX_OPTIONS}) — forks off the timeline (alternate path, simplify, go deeper). Not "Browse details".
+6) detail_sections (0–${MAX_DETAIL_SECTIONS}) — optional supporting lists (ingredients, tips, packing) as { "title", "items": [{ "heading", "body" }] }.
 7) sources — optional array of { "title", "url" }.
 
 ## Quality bar
-A good GenTab lets someone act on their intent without re-reading the tabs. Two different intents on the same tabs should produce clearly different artifacts.`;
+A good GenTab is a timeline you can follow without re-reading the tabs. Two different intents on the same tabs should produce clearly different timelines.`;
 
 /** @type {Map<string, object>} */
 const gStates = new Map();
@@ -528,6 +538,56 @@ function checklistTile({ title, subtitle, items }) {
   return tile;
 }
 
+/**
+ * Ordered timeline tile (ContentTiles type "timeline" → TileList).
+ *
+ * @param {object} opts
+ * @param {string} opts.title
+ * @param {string} [opts.subtitle]
+ * @param {Array<{heading: string, body: string}>} opts.items
+ * @returns {object | null}
+ */
+function timelineTile({ title, subtitle, items }) {
+  if (!items?.length) {
+    return null;
+  }
+  const tile = {
+    type: "timeline",
+    title: {
+      raw: title || "Timeline",
+      fontSize: "20px",
+      fontWeight: "600",
+    },
+    data: {
+      timeline: true,
+      ordered: true,
+      items: items.map(item => {
+        const entry = {
+          text: {
+            raw: item.heading || " ",
+            fontWeight: "600",
+          },
+        };
+        if (item.body && item.body.trim() && item.body !== " ") {
+          entry.subtext = { raw: item.body };
+        }
+        return entry;
+      }),
+      style: {
+        width: "min(680px, 100%)",
+      },
+    },
+  };
+  if (subtitle) {
+    tile.subtitle = {
+      raw: subtitle,
+      fontSize: "14px",
+      fontWeight: 320,
+    };
+  }
+  return tile;
+}
+
 function tileIconBackground(index) {
   const url = TILE_ICON_URLS[index % TILE_ICON_URLS.length];
   return `var(--card-icon-bg, transparent) center / calc(100% - var(--space-medium, 16px)) calc(100% - var(--space-medium, 16px)) no-repeat url("${url}")`;
@@ -596,28 +656,31 @@ export function mapContentToFeatureConfig(content, sourceMeta = {}) {
     detailSections = detailSections.slice(0, MAX_DETAIL_SECTIONS + 1);
   }
 
+  // Timeline is the hero; supporting tiles stay secondary.
   const tiles = [
-    checklistTile({
-      title: "At a glance",
-      subtitle: "Quick orientation before the plan.",
-      items: keyFacts,
+    timelineTile({
+      title: normalized.plan.title || "Timeline",
+      subtitle:
+        normalized.plan.subtitle ||
+        "Follow these steps in order — grounded in your open tabs.",
+      items: planItems,
     }),
     checklistTile({
-      title: normalized.plan.title || "Plan",
-      subtitle: normalized.plan.subtitle,
-      items: planItems,
+      title: "At a glance",
+      subtitle: "Context for the timeline.",
+      items: keyFacts,
     }),
     {
       type: "single-select",
       selected: "none",
       autoTrigger: false,
       title: {
-        raw: "What do you want to focus on?",
+        raw: "Alternate paths",
         fontSize: "18px",
         fontWeight: "600",
       },
       subtitle: {
-        raw: "Pick a path — details below stay on this page for reference.",
+        raw: "Optional forks — the timeline above stays the default plan.",
         fontSize: "14px",
         fontWeight: 320,
       },
