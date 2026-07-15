@@ -894,7 +894,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                   <div class="hist-item"><span class="when">Jun 20</span><span class="oldv">$2,099</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$1,999</span><span class="deemphasized">−5%</span></div>
                   <div class="hist-item"><span class="when">Jun 8</span><span class="deemphasized">first checked · $2,099</span></div>
                 </div>
-                <div class="mcard-actions"><button class="btn-primary">Resume</button><button class="btn-ghost" data-open-page>Open page</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+                <div class="mcard-actions"><button class="btn-primary">Resume</button><button class="btn-ghost" data-open-page>Open page</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
               </div>
               </div></div>
             </div>
@@ -1071,7 +1071,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             </div>
             <hr class="rule" />
             <div class="mrow"><span class="lbl">Check</span><span class="val">Daily</span></div>
-                                    <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost">Cancel</button><button class="btn-cta" id="start-monitoring">Start monitoring</button></div>
+                                    <div class="mcard-actions"><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><button class="btn-ghost">Cancel</button><button class="btn-cta" id="start-monitoring">Start monitoring</button></div>
           </div>
         </div>
 
@@ -1478,12 +1478,14 @@ document.querySelectorAll("[data-check-now]").forEach(btn => {
     btn.disabled = true;
     const orig = btn.textContent;
     btn.innerHTML = CHECK_SPIN + "Checking\u2026";
-    const item = btn.closest(".dash-item");
+    const card = btn.closest(".dash-item") || btn.closest(".mcard");
     setTimeout(() => {
       btn.innerHTML = CHECK_DONE + "Checked";
       btn.classList.add("ok");
-      const meta = item && item.querySelector(".gmeta");
-      if (meta) meta.textContent = meta.textContent.split("\u00b7")[0].trim() + " \u00b7 checked just now";
+      const meta = card && card.querySelector(".gmeta");
+      const from = card && card.querySelector(".mvalue .from");
+      if (meta && /checked .*?ago/.test(meta.textContent)) meta.textContent = meta.textContent.replace(/checked .*?ago/, "checked just now");
+      else if (from) from.textContent = "found just now";
       setTimeout(() => { btn.textContent = orig; btn.classList.remove("ok"); btn.disabled = false; delete btn.dataset.busy; }, 1500);
     }, 1300);
   });
