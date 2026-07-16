@@ -51,7 +51,6 @@
   --color-accent-primary-hover: light-dark(var(--color-violet-60), var(--color-violet-30));
   --icon-color-warning: light-dark(var(--color-yellow-50), var(--color-yellow-20));
   --icon-color-success: light-dark(var(--color-green-50), var(--color-green-20));
-  --color-neutral-120: #1e1d20;
   --color-violet-110: oklch(20% 0.05 290);
   --color-orange-40: oklch(72% 0.19 50);
   --color-black-alpha-30: oklch(0 0 0 / 30%);
@@ -113,7 +112,7 @@ h1,h2,h3,h4,p { margin: 0; }
 
 /* ============ Firefox chrome shell ============ */
 .browser {
-  width: 1280px; height: 820px; max-width: calc(100vw - 48px);
+  width: 1280px; height: 820px; max-width: calc(100vw - 48px); max-height: calc(100vh - 116px);
   background: var(--background-color-canvas);
   border-radius: var(--border-radius-large);
   box-shadow: var(--box-shadow-level-4);
@@ -446,7 +445,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 .sw-chat { flex: 1; overflow: auto; padding: var(--space-large); display: flex; flex-direction: column; gap: var(--space-small); scroll-behavior: smooth; }
 
 /* Real chat message classes */
-.message-user { align-self: flex-end; max-width: 75%; width: fit-content; overflow-wrap: anywhere; line-height: 1.5; background: light-dark(var(--color-white), var(--color-neutral-120)); border: var(--border-width, 1px) solid light-dark(var(--color-violet-desaturated-10), var(--color-violet-desaturated-50)); border-radius: var(--space-medium); padding: var(--space-large) var(--space-large); }
+.message-user { align-self: flex-end; max-width: 75%; width: fit-content; overflow-wrap: anywhere; line-height: 1.5; background: light-dark(var(--color-white), var(--color-violet-110)); border-radius: var(--space-medium); padding: var(--space-large) var(--space-large); box-shadow: var(--box-shadow-level-2), inset 0 0 5px color-mix(in srgb, var(--color-violet-30) 12%, transparent); }
 .message-user p { margin: 0; }
 .message-user .cmd-tok { color: var(--smartwindow-text-color-accent-primary); font-weight: var(--font-weight-semibold); }
 .message-assistant { max-width: 100%; line-height: 1.5; color: light-dark(color-mix(in srgb, var(--color-violet-desaturated-90) 70%, transparent), color-mix(in srgb, var(--color-violet-desaturated-0) 70%, transparent)); }
