@@ -325,6 +325,7 @@ h1,h2,h3,h4,p { margin: 0; }
 .field-label { font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--text-color-deemphasized); }
 .field-input { border: 1px solid var(--border-color); border-radius: var(--border-radius-medium); padding: 9px var(--space-medium); background: var(--background-color-box); font-size: var(--font-size-small); color: var(--text-color); width: 100%; }
 .field-input:focus-visible { outline: var(--focus-outline); outline-offset: 1px; }
+.field-input::placeholder { color: var(--text-color-deemphasized); opacity: 1; }
 .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px var(--space-medium); border: 1px solid var(--border-color); border-radius: var(--border-radius-circle); font-size: var(--font-size-small); color: var(--text-color); background: var(--background-color-box); }
 .chip:hover { border-color: var(--color-accent-primary); color: var(--color-accent-primary); }
@@ -440,7 +441,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 .sw-chat { flex: 1; overflow: auto; padding: var(--space-large); display: flex; flex-direction: column; gap: var(--space-small); scroll-behavior: smooth; }
 
 /* Real chat message classes */
-.message-user { align-self: flex-end; max-width: 75%; width: fit-content; overflow-wrap: anywhere; line-height: 1.5; background: light-dark(var(--color-white), var(--color-neutral-120)); border: var(--border-width, 1px) solid light-dark(var(--color-violet-desaturated-10), var(--color-violet-desaturated-50)); border-radius: var(--space-medium); padding: var(--space-medium) var(--space-large); }
+.message-user { align-self: flex-end; max-width: 75%; width: fit-content; overflow-wrap: anywhere; line-height: 1.5; background: light-dark(var(--color-white), var(--color-neutral-120)); border: var(--border-width, 1px) solid light-dark(var(--color-violet-desaturated-10), var(--color-violet-desaturated-50)); border-radius: var(--space-medium); padding: var(--space-large) var(--space-large); }
 .message-user p { margin: 0; }
 .message-user .cmd-tok { color: var(--smartwindow-text-color-accent-primary); font-weight: var(--font-weight-semibold); }
 .message-assistant { max-width: 100%; line-height: 1.5; color: light-dark(color-mix(in srgb, var(--color-violet-desaturated-90) 70%, transparent), color-mix(in srgb, var(--color-violet-desaturated-0) 70%, transparent)); }
@@ -492,21 +493,30 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 .agent-item .ad { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
 .agent-item .cmd { margin-left: auto; color: var(--text-color-deemphasized); font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
-/* Smartbar composer — real gradient border + gradient split send (input-cta) */
+/* Smartbar composer — real COLUMN composer: editor row + right-aligned input-cta send */
 .smartbar-wrap { padding: 0 var(--space-large) var(--space-small); }
-.smartbar { --smartbar-bg: light-dark(var(--color-white), var(--color-violet-110)); --smartbar-ring: linear-gradient(172deg, #321bfd -18%, #cf30e2 53%, #ff9900 89%, #f5c451 109%); position: relative; border: 1px solid transparent; border-radius: var(--border-radius-xlarge); background: linear-gradient(var(--smartbar-bg), var(--smartbar-bg)) padding-box, var(--smartbar-ring) border-box; padding: var(--space-small) var(--space-small) var(--space-small) var(--space-large); display: flex; align-items: center; gap: var(--space-small); box-shadow: var(--box-shadow-level-2); }
-:root[data-theme="dark"] .smartbar { --smartbar-ring: linear-gradient(270deg, var(--color-orange-40) 0%, var(--color-violet-50) 105.15%); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .smartbar { --smartbar-ring: linear-gradient(270deg, var(--color-orange-40) 0%, var(--color-violet-50) 105.15%); } }
-.smartbar::before { content: ""; position: absolute; inset: 0; border-radius: inherit; filter: blur(30px); background: color-mix(in srgb, var(--color-violet-40) 30%, transparent); opacity: 0; transition: opacity 0.2s ease-out; z-index: -1; }
-.smartbar:hover::before, .smartbar:focus-within::before { opacity: 0.6; }
-.smartbar .ph { flex: 1; color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
-.smartbar .typed { flex: 1; color: var(--text-color); font-size: var(--font-size-small); }
+.smartbar { --smartbar-bg: light-dark(var(--color-white), var(--color-violet-110)); position: relative; display: flex; flex-direction: column; border-radius: var(--border-radius-large); background: color-mix(in srgb, var(--smartbar-bg) 60%, transparent); box-shadow: var(--box-shadow-level-2); cursor: text; }
+.smartbar-input { padding: var(--space-medium) var(--space-large) var(--space-xsmall); font-size: var(--font-size-root); }
+.smartbar-cta-row { display: flex; align-items: center; padding: var(--space-xsmall) var(--space-large) var(--space-medium); }
+.smartbar::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; background: linear-gradient(172deg, #321bfd -18%, #cf30e2 53%, #ff9900 89%, #f5c451 109%); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; padding: 1px; pointer-events: none; }
+.smartbar::before { content: ""; position: absolute; inset: 0; border-radius: inherit; filter: blur(30px); background-color: color-mix(in srgb, var(--color-violet-40) 30%, transparent); opacity: 0; transition: opacity .2s ease-out; z-index: -1; }
+.smartbar:focus-within::before, .smartbar:hover::before { opacity: .5; }
+:root[data-theme="dark"] .smartbar::before { background-image: linear-gradient(270deg, var(--color-orange-40), var(--color-violet-50)); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .smartbar::before { background-image: linear-gradient(270deg, var(--color-orange-40), var(--color-violet-50)); } }
+.smartbar .ph { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
+.smartbar .typed { color: var(--text-color); font-size: var(--font-size-small); }
 .smartbar .typed .caret { display: inline-block; width: 1.5px; height: 1em; background: var(--color-accent-primary); vertical-align: -2px; animation: caret 1s steps(1) infinite; }
 @keyframes caret { 50% { opacity: 0; } }
 .smartbar .mention { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--text-color-deemphasized); flex: none; }
 .smartbar .mention:hover { background: var(--background-color-box-info); }
 .smartbar .mention svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; }
-.smartbar .send { width: 34px; height: 34px; border-radius: var(--border-radius-circle); background: var(--aiwindow-gradient-button); color: #fff; display: grid; place-items: center; flex: none; }
+/* input-cta — the real gradient split SEND button (mirrors .btn-cta gradient) */
+.input-cta { margin-inline-start: auto; display: inline-flex; align-items: stretch; height: var(--size-item-large, 32px); border-radius: var(--border-radius-circle); color: #fff; background: light-dark(linear-gradient(235deg, #d6b4fd -57%, #8341ca 219%), linear-gradient(65deg, #4e2e9d -5%, #c1a9ff 135%)); box-shadow: inset 0 0 0 1px color-mix(in srgb, white 20%, transparent); cursor: pointer; }
+.input-cta .cta-main { display: grid; place-items: center; padding: 0 var(--space-xsmall) 0 var(--space-medium); }
+.input-cta .cta-chev { display: grid; place-items: center; padding: 0 var(--space-small); position: relative; }
+.input-cta .cta-chev::before { content: ""; position: absolute; inset-inline-start: 0; top: 50%; translate: 0 -50%; width: 1px; height: var(--size-item-small, 16px); background: color-mix(in srgb, white 60%, transparent); }
+.input-cta svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.input-cta:hover { filter: brightness(1.06); }
 .disclaimer { padding: 0 var(--space-large) var(--space-medium); color: light-dark(#3f3e42, #b7b6ba); font-size: 11px; text-align: center; }
 .disclaimer a { color: var(--smartwindow-text-color-accent-primary); }
 
@@ -1072,10 +1082,17 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       <!-- Smartbar composer — the real omni-smartbar (Ask, search, or type a URL) -->
       <div class="smartbar-wrap">
         <div class="smartbar">
-          <span class="typed" data-show="2">/<span class="caret"></span></span>
-          <span class="ph" data-show="3 4 8">Ask, search, or type a URL</span>
-          <button class="mention" title="Tag a tab or site" aria-label="Tag a tab or site"><svg viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/><path d="M16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-4 7.5"/></svg></button>
-          <button class="send" aria-label="Send"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+          <div class="smartbar-input">
+            <span class="typed" data-show="2">/<span class="caret"></span></span>
+            <span class="ph" data-show="3 4 8">Ask, search, or type a URL</span>
+          </div>
+          <div class="smartbar-cta-row">
+            <button class="mention" title="Tag a tab or site" aria-label="Tag a tab or site"><svg viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/><path d="M16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-4 7.5"/></svg></button>
+            <span class="input-cta" role="button" aria-label="Ask">
+              <span class="cta-main"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></span>
+              <span class="cta-chev"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
+            </span>
+          </div>
         </div>
       </div>
       <div class="disclaimer">AI can make mistakes. <a href="#" onclick="return false">Report any issues</a>.</div>
