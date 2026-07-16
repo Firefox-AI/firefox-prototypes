@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light dark" />
-<title>Monitors — Smart Window prototype</title>
+<title>Skills, Smart Window prototype</title>
 <style>
 /* ============================================================
    MONITORS — Smart Window prototype
@@ -671,7 +671,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
             <div class="history">
               <div class="hist-item"><span class="when">Today</span><span class="oldv">$299</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$278</span><span class="deemphasized">met your alert</span></div>
-              <div class="hist-item low"><span class="when">Jun 24</span><span>checked — no change</span></div>
+              <div class="hist-item low"><span class="when">Jun 24</span><span>checked, no change</span></div>
               <div class="hist-item"><span class="when">Jun 17</span><span class="deemphasized">first checked · $299</span></div>
             </div>
             <a class="accent-link" href="#5" data-open-tools="sony">See and edit on about:skills</a>
@@ -716,7 +716,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
           </button>
           <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
-            <div class="mrow"><span class="lbl">Best code</span><span class="val">SAVE12 — $12 off</span></div>
+            <div class="mrow"><span class="lbl">Best code</span><span class="val">SAVE12 · $12 off</span></div>
             <div class="mrow"><span class="lbl">Also found</span><span class="val">FREESHIP · WELCOME10</span></div>
             <a class="accent-link" href="#5" data-open-tools="scout">See on about:skills</a>
           </div></div></div>
@@ -814,7 +814,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                   <p class="mon-sentence">Alerts you when <b id="sony-cond-view">the price drops below $270</b> · checks daily</p>
                   <div class="history">
                     <div class="hist-head">Change history</div>
-                    <div class="hist-item low"><span class="when">Jun 24</span><span>checked — didn't meet your alert</span></div>
+                    <div class="hist-item low"><span class="when">Jun 24</span><span>checked, didn't meet your alert</span></div>
                     <div class="hist-item"><span class="when">Jun 17</span><span class="deemphasized">first checked · $299</span></div>
                   </div>
                   <div class="mcard-actions"><button class="btn-ghost" id="sony-edit">Edit</button><button class="btn-ghost">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete skill" aria-label="Delete skill"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
@@ -912,7 +912,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             </div>
             <div class="mstack-expand"><div class="mstack-expand-inner">
             <div class="mcard">
-              <div class="mrow"><span class="lbl">Best code</span><span class="val">SAVE12 — $12 off</span></div>
+              <div class="mrow"><span class="lbl">Best code</span><span class="val">SAVE12 · $12 off</span></div>
               <div class="mrow"><span class="lbl">Also found</span><span class="val">FREESHIP · WELCOME10</span></div>
               <div class="mrow"><span class="lbl">Ran</span><span class="val">2h ago on checkout</span></div>
             </div>
@@ -1001,7 +1001,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         <span class="app-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 11.5a4.5 4.5 0 0 1 4.5-4.5H16"/><path d="M12.5 3.5 16 7l-3.5 3.5"/><path d="M5 15.5h14"/><path d="M5 19.5h14"/></svg></span>
         <span>
           <div style="font-weight:var(--font-weight-semibold)">Firefox · Skills</div>
-          <div>Sony WH-1000XM5 dropped to <b>$278</b> — down 7% from $299.</div>
+          <div>Sony WH-1000XM5 dropped to <b>$278</b>, down 7% from $299</div>
         </span>
       </button>
       <div class="annot point-right" style="bottom:150px; right:24px" data-show="2">Type <b>/</b> to call a skill.</div>
@@ -1023,7 +1023,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
         <!-- Step 3: Monitor tool → create card (locks into saved state on steps 4 and 8) -->
         <div data-show="3 4 8" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
-          <div class="message-assistant">Looks like a product page — I've set up a skill to watch the price. Tweak anything, then start it.</div>
+          <div class="message-assistant">Looks like a product page. I've set up a skill to watch the price. Tweak anything, then start it.</div>
 
           <div class="mcard" id="create-card">
             <div class="mcard-head"><span class="favicon-sq" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span><span style="min-width:0;flex:1"><span class="mcard-url">bestbuy.com/site/sony-wh-1000xm5</span></span></div>
@@ -1056,7 +1056,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         <!-- Step 8: Open page — the chat picks up where you left off; setup sits up in the scroll history -->
         <div data-show="8" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
           <div class="chat-divider">Today · 2:14 PM</div>
-          <div class="message-assistant">Sony WH-1000XM5 dropped to <b>$278</b> — down 7% from $299, past your alert. To view or make changes, head to <a class="accent-link" href="#5" data-open-tools-page>about:skills</a>.</div>
+          <div class="message-assistant">Sony WH-1000XM5 dropped to <b>$278</b>, down 7% from $299, past your alert. To view or make changes, head to <a class="accent-link" href="#5" data-open-tools-page>about:skills</a>.</div>
         </div>
       </div>
 
@@ -1103,7 +1103,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           <span class="field-label">Pages</span>
           <div class="chip-row" id="modal-pages"></div>
           <input class="field-input" id="modal-url" placeholder="Paste a URL to watch" aria-label="Page URL" />
-          <span class="mono-dim">No page open here — paste one, press Enter, and I'll read its value. Up to 6 pages.</span>
+          <span class="mono-dim">No page open here. Paste one, press Enter, and I'll read its value. Up to 6 pages.</span>
         </div>
         <hr class="rule" />
         <div class="mrow"><span class="lbl">Check</span><span class="val">Daily</span></div>
@@ -1123,13 +1123,13 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
   <!-- Deleted toast — confirmation only; undo exists only on chat creation -->
   <div class="undo-toast" id="undo-toast" hidden>
-    <span>Monitor deleted.</span>
+    <span>Skill deleted</span>
     <button class="x" id="undo-x" aria-label="Dismiss"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg></button>
   </div>
 
   <!-- Started toast -->
   <div class="undo-toast" id="start-toast" hidden>
-    <span>Watching. You'll find it under Active.</span>
+    <span>Skill created, now watching</span>
     <button class="x" id="start-x" aria-label="Dismiss"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg></button>
   </div>
 </div>
@@ -1148,14 +1148,14 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 const STEPS = [
   "On the page you're watching",
   "Type / to run a skill",
-  "Monitor — the create card",
-  "Create skill — saved, confirmed in chat",
-  "about:skills — every skill in one place",
-  "The row becomes the card — hit Edit to make changes",
-  "The alert is met — a notification fires",
-  "Open page — the chat picks up where you left off",
-  "Skills in the sidebar — always at hand",
-  "Day zero — the empty state",
+  "Set up a skill",
+  "Saved and confirmed in the chat",
+  "about:skills, every skill in one place",
+  "The row becomes the card, hit Edit to change it",
+  "The alert is met, so a notification fires",
+  "Open page, and the chat picks up where you left off",
+  "Skills in the sidebar, always at hand",
+  "Day zero, the empty state",
 ];
 let step = Math.min(Math.max(parseInt(location.hash.slice(1), 10) || 1, 1), STEPS.length);
 const N = STEPS.length;
@@ -1449,7 +1449,7 @@ document.querySelectorAll("[data-check-now]").forEach(btn => {
       const hist = card && card.querySelector(".history");
       if (hist) {
         const sub = card.querySelector(".gvalue .sub");
-        const msg = (sub && /alert/i.test(sub.textContent)) ? "checked \u2014 didn't meet your alert" : "checked \u2014 no change";
+        const msg = (sub && /alert/i.test(sub.textContent)) ? "checked, didn't meet your alert" : "checked, no change";
         const row = document.createElement("div");
         row.className = "hist-item low";
         row.innerHTML = '<span class="when">Just now</span><span>' + msg + '</span>';
