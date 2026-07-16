@@ -289,6 +289,7 @@ h1,h2,h3,h4,p { margin: 0; }
 .empty-lead { text-align: center; margin-bottom: var(--space-xlarge); }
 .empty-lead h3 { font-size: var(--font-size-heading-large); font-weight: var(--font-weight-bold); margin-bottom: 4px; }
 .empty-lead p { color: var(--text-color-deemphasized); }
+.skills-sub { color: var(--text-color-deemphasized); font-size: var(--font-size-small); margin: -2px 0 var(--space-small); }
 .starter-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-medium); }
 .starter { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; padding: var(--space-large); background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); text-align: left; transition: border-color var(--motion-dur-near) var(--motion-ease-edge); }
 .starter:hover { border-color: var(--color-accent-primary); }
@@ -653,21 +654,13 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
     </nav>
 
     <!-- Monitors tool panel (step 11) -->
-    <aside class="rail-panel" data-show="9" aria-label="Monitors panel">
+    <aside class="rail-panel" data-show="9" aria-label="Skills panel">
       <div class="rail-panel-head">
         <span class="rail-panel-title">Skills</span>
         <span style="flex:1"></span>
-        <span class="add-new-wrap">
-          <button class="btn-primary" id="panel-new" aria-haspopup="menu" aria-expanded="false" style="display:inline-flex;align-items:center;gap:5px">Add new <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
-          <div class="add-menu" id="add-menu" hidden role="menu">
-            <button role="menuitem" data-new="monitor"><span class="mi" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 0 24 24"><path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5"/><path d="M12 12l5.5-3"/><circle cx="12" cy="12" r="1.5"/></svg></span> Monitor</button>
-            <button role="menuitem" data-new="scout"><span class="mi" style="background:linear-gradient(135deg,#db54bf,#f4682c)"><svg viewBox="0 0 24 24"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg></span> Scout</button>
-            <button role="menuitem" data-new="research"><span class="mi" style="background:linear-gradient(135deg,#455fe7,#10a4ca)"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg></span> Research</button>
-          </div>
-        </span>
+        <button class="btn-primary" id="panel-new" style="display:inline-flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Create a skill</button>
       </div>
       <div class="rail-panel-body" id="rail-list">
-        <div class="group-label" style="margin: 2px 4px 0">Monitors · 3 active</div>
         <div class="mcard mitem">
           <button class="mitem-head" aria-expanded="false">
             <span class="favicon-sq" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span>
@@ -715,7 +708,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <a class="accent-link" href="#5" data-open-tools="apt">See and edit on about:skills</a>
           </div></div></div>
         </div>
-        <div class="group-label" style="margin: 10px 4px 0">Scout</div>
         <div class="mcard mitem">
           <button class="mitem-head" aria-expanded="false">
             <span class="favicon-sq" style="background:linear-gradient(135deg,#db54bf,#f4682c)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg></span>
@@ -729,7 +721,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <a class="accent-link" href="#5" data-open-tools="scout">See on about:skills</a>
           </div></div></div>
         </div>
-        <div class="group-label" style="margin: 10px 4px 0">Research</div>
         <div class="mcard mitem">
           <button class="mitem-head" aria-expanded="false">
             <span class="favicon-sq" style="background:linear-gradient(135deg,#455fe7,#10a4ca)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg></span>
@@ -800,30 +791,16 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <span class="brandmark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l2-6 3 12 2.5-6H22"/></svg></span>
             <span class="title">Skills</span>
             <span class="spacer"></span>
-            <span class="add-new-wrap">
-              <button class="btn-primary" id="page-add-new" aria-haspopup="menu" aria-expanded="false" style="display:inline-flex;align-items:center;gap:5px">Add new <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
-              <div class="add-menu" id="page-add-menu" hidden role="menu">
-                <button role="menuitem" data-new="monitor"><span class="mi" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 0 24 24"><path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5"/><path d="M12 12l5.5-3"/><circle cx="12" cy="12" r="1.5"/></svg></span> Monitor</button>
-                <button role="menuitem" data-new="scout"><span class="mi" style="background:linear-gradient(135deg,#db54bf,#f4682c)"><svg viewBox="0 0 24 24"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg></span> Scout</button>
-                <button role="menuitem" data-new="research"><span class="mi" style="background:linear-gradient(135deg,#455fe7,#10a4ca)"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg></span> Research</button>
-              </div>
-            </span>
+            <button class="btn-primary" id="page-add-new" style="display:inline-flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Create a skill</button>
           </div>
-
-          <!-- Monitors -->
-          <div class="tool-sect" style="margin-top: var(--space-medium)">
-            <span class="ti" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 0 24 24"><path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5"/><path d="M12 12l5.5-3"/><circle cx="12" cy="12" r="1.5"/></svg></span>
-            <span class="tn">Monitors</span>
-            <span class="tc">watches a page for changes</span>
-          </div>
+          <div class="skills-sub" data-show="5 6"><span id="skills-count">6 skills</span></div>
 
           <!-- Empty-state lead (only when there are no monitors) -->
-          <div class="empty-lead" data-show="10"><h3>Watch any page for changes</h3><p>Open any page and type <b>/monitor</b> in Smart Window, or hit Add new.</p></div>
+          <div class="empty-lead" data-show="10"><h3>No skills yet</h3><p>Create a skill and Firefox will watch, find, or look into things for you.</p></div>
 
           <!-- Populated: running + paused monitors -->
           <div data-show="5 6">
-            <div class="group-label" id="mon-count-active">Active · 3</div>
-
+            
             <div class="dash-item" id="dash-sony">
               <div class="grow" id="row-sony" role="button" tabindex="0" aria-expanded="false">
                 <span class="favicon-sq" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span>
@@ -899,8 +876,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               </div></div>
             </div>
 
-            <div class="group-label" id="mon-count-paused">Paused · 1</div>
-            <div class="dash-item" id="dash-nikon">
+                        <div class="dash-item" id="dash-nikon">
               <div class="grow paused" role="button" tabindex="0" aria-expanded="false">
                 <span class="favicon-sq" style="background:#b8860b">N</span>
                 <span class="gmain"><span class="gname">Nikon Z6 III price</span><br/><span class="gmeta truncate">bhphotovideo.com · paused · last $1,999</span></span>
@@ -928,12 +904,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <div class="skel"><div class="sk circle"></div><div style="flex:1"><div class="sk line" style="width:38%;margin-bottom:7px"></div><div class="sk line" style="width:58%"></div></div><div class="sk line" style="width:54px;height:20px"></div></div>
           </div>
 
-          <!-- Scout -->
-          <div class="tool-sect">
-            <span class="ti" style="background:linear-gradient(135deg,#db54bf,#f4682c)"><svg viewBox="0 0 24 24"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg></span>
-            <span class="tn">Scout</span>
-            <span class="tc">finds deals and coupons</span>
-          </div>
           <div class="dash-item" data-show="5 6" id="dash-scout">
             <div class="grow" role="button" tabindex="0" aria-expanded="false">
               <span class="favicon-sq" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span>
@@ -948,14 +918,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             </div>
             </div></div>
           </div>
-          <p class="mono-dim" data-show="10" style="margin: 0 0 var(--space-small)">No scouts yet — call <b>/scout</b> on any checkout page.</p>
-
-          <!-- Research -->
-          <div class="tool-sect">
-            <span class="ti" style="background:linear-gradient(135deg,#455fe7,#10a4ca)"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg></span>
-            <span class="tn">Research</span>
-            <span class="tc">digs into a topic and reports back</span>
-          </div>
+          
           <div class="dash-item" data-show="5 6" id="dash-research">
             <div class="grow" role="button" tabindex="0" aria-expanded="false">
               <span class="favicon-sq" style="background:linear-gradient(135deg,#455fe7,#10a4ca)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg></span>
@@ -970,7 +933,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             </div>
             </div></div>
           </div>
-          <p class="mono-dim" data-show="10" style="margin: 0 0 var(--space-small)">No reports yet — ask <b>/research</b> to dig into anything.</p>
+          <!-- after-v0-prompts-anchor -->
         </div>
       </div>
 
@@ -1038,7 +1001,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       <button class="os-toast" id="toast" data-show="7">
         <span class="app-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5"/><path d="M12 12l5.5-3"/><circle cx="12" cy="12" r="1.5"/></svg></span>
         <span>
-          <div style="font-weight:var(--font-weight-semibold)">Firefox · Monitors</div>
+          <div style="font-weight:var(--font-weight-semibold)">Firefox · Skills</div>
           <div>Sony WH-1000XM5 dropped to <b>$278</b> — down 7% from $299.</div>
         </span>
       </button>
@@ -1057,11 +1020,11 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
       <div class="sw-chat">
         <!-- The command the user sent (via the / tool picker) -->
-        <div class="message-user" data-show="3 4 8"><p><span class="cmd-tok">/monitor</span> watch this price</p></div>
+        <div class="message-user" data-show="3 4 8"><p><span class="cmd-tok">/</span> watch this price</p></div>
 
         <!-- Step 3: Monitor tool → create card (locks into saved state on steps 4 and 8) -->
         <div data-show="3 4 8" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
-          <div class="message-assistant">Looks like a product page — I've set this up to watch the price. Tweak anything, then start it.</div>
+          <div class="message-assistant">Looks like a product page — I've set up a skill to watch the price. Tweak anything, then start it.</div>
 
           <div class="mcard" id="create-card">
             <div class="mcard-head"><span class="favicon-sq" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span><span style="min-width:0;flex:1"><span class="mcard-url">bestbuy.com/site/sony-wh-1000xm5</span></span></div>
@@ -1102,19 +1065,8 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       <div class="slash-menu" data-show="2">
         <div class="slash-head">Skills</div>
         <button class="agent-item sel" id="agent-monitor">
-          <span class="ai" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 0 24 24"><path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5"/><path d="M12 12l5.5-3"/><circle cx="12" cy="12" r="1.5"/></svg></span>
-          <span><span class="an">Monitor</span><br/><span class="ad">Watch a page for changes</span></span>
-          <span class="cmd">/monitor</span>
-        </button>
-        <button class="agent-item">
-          <span class="ai" style="background:linear-gradient(135deg,#db54bf,#f4682c)"><svg viewBox="0 0 24 24"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg></span>
-          <span><span class="an">Scout</span><br/><span class="ad">Find deals and coupons</span></span>
-          <span class="cmd">/scout</span>
-        </button>
-        <button class="agent-item">
-          <span class="ai" style="background:linear-gradient(135deg,#455fe7,#10a4ca)"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg></span>
-          <span><span class="an">Research</span><br/><span class="ad">Dig into a topic and report back</span></span>
-          <span class="cmd">/research</span>
+          <span class="ai" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+          <span><span class="an">Create a skill</span><br/><span class="ad">Tell Firefox what to watch, find, or look into</span></span>
         </button>
       </div>
 
@@ -1135,7 +1087,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       <div class="mcard modal-card" role="dialog" aria-modal="true" aria-label="New monitor">
         <div class="mcard-head">
           <span class="favicon-sq" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5"/><path d="M12 12l5.5-3"/><circle cx="12" cy="12" r="1.5"/></svg></span>
-          <span style="flex:1; min-width:0"><span class="mcard-name">New monitor</span><br/><span class="mcard-url">Monitors a page for changes</span></span>
+          <span style="flex:1; min-width:0"><span class="mcard-name">New skill</span><br/><span class="mcard-url">Firefox watches, finds, or looks into things for you</span></span>
           <span class="spacer"></span>
           <button class="page-action" id="modal-close" title="Close" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg></button>
         </div>
@@ -1203,7 +1155,7 @@ const STEPS = [
   "The row becomes the card — hit Edit to make changes",
   "The alert is met — a notification fires",
   "Open page — the chat picks up where you left off",
-  "Skills in the sidebar — Monitors at hand",
+  "Skills in the sidebar — always at hand",
   "Day zero — the empty state",
 ];
 let step = Math.min(Math.max(parseInt(location.hash.slice(1), 10) || 1, 1), STEPS.length);
@@ -1216,7 +1168,7 @@ function render() {
     el.classList.toggle("step-visible", el.getAttribute("data-show").split(/\s+/).includes(String(step)));
   });
   document.querySelectorAll(".dash-item").forEach(el => { el.hidden = false; });
-  if (document.getElementById("mon-count-active")) updateCounts();
+  updateCounts();
   document.getElementById("step-num").textContent = step + " / " + N;
   document.getElementById("step-text").textContent = STEPS[step - 1];
   [...dots.children].forEach((d, i) => d.classList.toggle("on", i < step));
@@ -1277,11 +1229,6 @@ function wireAddMenu(btnId, menuId) {
   const close = () => { menu.hidden = true; btn.setAttribute("aria-expanded", "false"); };
   btn.onclick = (e) => { e.stopPropagation(); const willOpen = menu.hidden; close(); if (willOpen) { menu.hidden = false; btn.setAttribute("aria-expanded", "true"); } };
   document.addEventListener("click", e => { if (!e.target.closest(".add-new-wrap")) close(); });
-  menu.querySelectorAll("[data-new]").forEach(b => b.addEventListener("click", e => {
-    e.stopPropagation();
-    close();
-    if (b.dataset.new === "monitor") openModal(null);
-  }));
 }
 document.querySelectorAll("[data-open-tools]").forEach(a => a.addEventListener("click", e => {
   e.preventDefault();
@@ -1295,8 +1242,8 @@ document.querySelectorAll("[data-open-tools]").forEach(a => a.addEventListener("
   requestAnimationFrame(() => item.scrollIntoView({ block: "center", behavior: "smooth" }));
 }));
 
-wireAddMenu("panel-new", "add-menu");
-wireAddMenu("page-add-new", "page-add-menu");
+document.getElementById("panel-new").onclick = () => openModal(null);
+document.getElementById("page-add-new").onclick = () => openModal(null);
 document.getElementById("panel-open-about").onclick = (e) => { e.preventDefault(); go(5); };
 document.querySelectorAll("[data-open-tools-page]").forEach(a => a.addEventListener("click", e => { e.preventDefault(); go(5); }));
 const railList = document.getElementById("rail-list");
@@ -1506,11 +1453,11 @@ document.querySelectorAll("[data-check-now]").forEach(btn => {
   });
 });
 function updateCounts() {
-  const vis = id => { const el = document.getElementById(id); return el && !el.hidden ? 1 : 0; };
-  const act = vis("dash-sony") + vis("dash-rei") + vis("dash-apt");
-  const paused = vis("dash-nikon");
-  document.getElementById("mon-count-active").textContent = "Active · " + act;
-  document.getElementById("mon-count-paused").textContent = "Paused · " + paused;
+  const el = document.getElementById("skills-count");
+  if (!el) return;
+  const n = ["dash-sony","dash-rei","dash-apt","dash-nikon","dash-scout","dash-research"]
+    .filter(id => { const e = document.getElementById(id); return e && !e.hidden; }).length;
+  el.textContent = n + (n === 1 ? " skill" : " skills");
 }
 document.getElementById("confirm-cancel").onclick = () => { confirmTarget = null; closeConfirm(); };
 confirmScrim.addEventListener("click", e => { if (e.target === confirmScrim) { confirmTarget = null; closeConfirm(); } });
