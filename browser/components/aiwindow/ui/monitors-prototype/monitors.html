@@ -1446,6 +1446,17 @@ document.querySelectorAll("[data-check-now]").forEach(btn => {
       const from = card && card.querySelector(".mvalue .from");
       if (meta && /checked .*?ago/.test(meta.textContent)) meta.textContent = meta.textContent.replace(/checked .*?ago/, "checked just now");
       else if (from) from.textContent = "found just now";
+      const hist = card && card.querySelector(".history");
+      if (hist) {
+        const sub = card.querySelector(".gvalue .sub");
+        const msg = (sub && /alert/i.test(sub.textContent)) ? "checked \u2014 didn't meet your alert" : "checked \u2014 no change";
+        const row = document.createElement("div");
+        row.className = "hist-item low";
+        row.innerHTML = '<span class="when">Just now</span><span>' + msg + '</span>';
+        hist.insertBefore(row, hist.querySelector(".hist-item"));
+        const exp = card.querySelector(".mstack-expand");
+        if (exp && exp.classList.contains("exp-open")) setExpand(exp, true);
+      }
       setTimeout(() => { btn.textContent = orig; btn.classList.remove("ok"); btn.disabled = false; delete btn.dataset.busy; }, 1500);
     }, 1300);
   });
