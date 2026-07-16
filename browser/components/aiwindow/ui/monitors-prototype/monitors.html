@@ -351,7 +351,7 @@ h1,h2,h3,h4,p { margin: 0; }
 .undo-pill { padding: 7px 18px; border-radius: var(--border-radius-circle); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--color-accent-primary); background: var(--background-color-box); border: 1px solid light-dark(rgba(118,78,221,.35), rgba(212,193,255,.4)); box-shadow: var(--box-shadow-level-1); }
 .undo-pill:hover { background: light-dark(var(--color-violet-0), rgba(118,78,221,.18)); }
 
-/* Create card, saved: inputs lock and Start monitoring becomes the saved state */
+/* Create card, saved: inputs lock and the create button becomes the saved state */
 .mcard.saved .field-input, .mcard.saved .chip, .mcard.saved .page-pill, .mcard.saved .gname-input { opacity: .55; pointer-events: none; }
 .mcard.saved .gname-x { display: none; }
 .mcard.saved .mcard-actions .btn-ghost { display: none; }
@@ -804,7 +804,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <div class="dash-item" id="dash-sony">
               <div class="grow" id="row-sony" role="button" tabindex="0" aria-expanded="false">
                 <span class="favicon-sq" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span>
-                <span class="gmain"><span class="gname">Sony WH-1000XM5 price</span><span class="gname-edit"><input class="gname-input" id="sony-title" value="Sony WH-1000XM5 price" aria-label="Monitor name" /><button class="gname-x" aria-label="Clear name">×</button></span><br/><span class="gmeta truncate">bestbuy.com · checked 3m ago</span></span>
+                <span class="gmain"><span class="gname">Sony WH-1000XM5 price</span><span class="gname-edit"><input class="gname-input" id="sony-title" value="Sony WH-1000XM5 price" aria-label="Skill name" /><button class="gname-x" aria-label="Clear name">×</button></span><br/><span class="gmeta truncate">bestbuy.com · checked 3m ago</span></span>
                 <svg class="spark spark-line" viewBox="0 0 60 20" aria-hidden="true"><polyline points="0,3 12,4.5 24,8 36,10.5 48,13.5 60,17"/></svg>
                 <span class="gvalue"><span class="now">$299 <span class="chg">▼ −6%</span></span><br/><span class="sub">alerts below $270</span></span>
               </div>
@@ -817,7 +817,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                     <div class="hist-item low"><span class="when">Jun 24</span><span>checked — didn't meet your alert</span></div>
                     <div class="hist-item"><span class="when">Jun 17</span><span class="deemphasized">first checked · $299</span></div>
                   </div>
-                  <div class="mcard-actions"><button class="btn-ghost" id="sony-edit">Edit</button><button class="btn-ghost">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+                  <div class="mcard-actions"><button class="btn-ghost" id="sony-edit">Edit</button><button class="btn-ghost">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete skill" aria-label="Delete skill"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
                 </div>
                 <div class="edit-only">
                   <div class="field">
@@ -850,7 +850,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                   <div class="hist-item"><span class="when">Jun 30</span><span class="hist-flag">value lost</span><span class="deemphasized">the page changed</span></div>
                   <div class="hist-item"><span class="when">Jun 12</span><span class="deemphasized">first checked · $189</span></div>
                 </div>
-                <div class="mcard-actions"><button class="btn-primary" data-open-page>Open page</button><button class="btn-ghost">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+                <div class="mcard-actions"><button class="btn-primary" data-open-page>Open page</button><button class="btn-ghost">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete skill" aria-label="Delete skill"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
               </div>
               </div></div>
             </div>
@@ -871,7 +871,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                   <div class="hist-item"><span class="when">Yesterday</span><span class="newv">2 new listings</span></div>
                   <div class="hist-item"><span class="when">Jun 28</span><span class="deemphasized">first checked · 41 listings</span></div>
                 </div>
-                <div class="mcard-actions"><button class="btn-primary" data-open-page>Open page</button><button class="btn-ghost">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+                <div class="mcard-actions"><button class="btn-primary" data-open-page>Open page</button><button class="btn-ghost">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete skill" aria-label="Delete skill"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
               </div>
               </div></div>
             </div>
@@ -891,7 +891,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                   <div class="hist-item"><span class="when">Jun 20</span><span class="oldv">$2,099</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$1,999</span><span class="deemphasized">−5%</span></div>
                   <div class="hist-item"><span class="when">Jun 8</span><span class="deemphasized">first checked · $2,099</span></div>
                 </div>
-                <div class="mcard-actions"><button class="btn-primary">Resume</button><button class="btn-ghost" data-open-page>Open page</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete monitor" aria-label="Delete monitor"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+                <div class="mcard-actions"><button class="btn-primary">Resume</button><button class="btn-ghost" data-open-page>Open page</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete skill" aria-label="Delete skill"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
               </div>
               </div></div>
             </div>
@@ -1031,7 +1031,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <div class="mvalue"><span class="now">$299</span><span class="from">found on this page just now</span></div>
             <div class="field">
               <span class="field-label">Name</span>
-              <input class="field-input" id="create-title" value="Sony WH-1000XM5 price" aria-label="Monitor name" />
+              <input class="field-input" id="create-title" value="Sony WH-1000XM5 price" aria-label="Skill name" />
             </div>
             <div class="field">
               <span class="field-label">Alert me when</span>
@@ -1044,7 +1044,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             </div>
             <hr class="rule" />
             <div class="mrow"><span class="lbl">Check</span><span class="val">Daily</span></div>
-                                    <div class="mcard-actions"><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><button class="btn-ghost">Cancel</button><button class="btn-cta" id="start-monitoring">Start monitoring</button></div>
+                                    <div class="mcard-actions"><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><button class="btn-ghost">Cancel</button><button class="btn-cta" id="start-monitoring">Create skill</button></div>
           </div>
         </div>
 
@@ -1084,7 +1084,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
     <!-- Create modal — the same create card, in the dashboard's container (§4). No page to read, so you paste a URL. -->
     <div class="modal-scrim" id="modal-scrim" hidden>
-      <div class="mcard modal-card" role="dialog" aria-modal="true" aria-label="New monitor">
+      <div class="mcard modal-card" role="dialog" aria-modal="true" aria-label="New skill">
         <div class="mcard-head">
           <span class="favicon-sq" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5"/><path d="M12 12l5.5-3"/><circle cx="12" cy="12" r="1.5"/></svg></span>
           <span style="flex:1; min-width:0"><span class="mcard-name">New skill</span><br/><span class="mcard-url">Firefox watches, finds, or looks into things for you</span></span>
@@ -1093,7 +1093,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         </div>
         <div class="field">
           <span class="field-label">Name</span>
-          <input class="field-input" id="modal-title" placeholder="Name this monitor" aria-label="Monitor name" />
+          <input class="field-input" id="modal-title" placeholder="Name this skill" aria-label="Skill name" />
         </div>
         <div class="field">
           <span class="field-label">Alert me when</span>
@@ -1108,7 +1108,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         </div>
         <hr class="rule" />
         <div class="mrow"><span class="lbl">Check</span><span class="val">Daily</span></div>
-                        <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost" id="modal-cancel">Cancel</button><button class="btn-cta" id="modal-start">Start monitoring</button></div>
+                        <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost" id="modal-cancel">Cancel</button><button class="btn-cta" id="modal-start">Create skill</button></div>
       </div>
     </div>
   </div>
@@ -1150,7 +1150,7 @@ const STEPS = [
   "On the page you're watching",
   "Type / to run a skill",
   "Monitor — the create card",
-  "Start monitoring — saved, confirmed in chat",
+  "Create skill — saved, confirmed in chat",
   "about:skills — every skill in one place",
   "The row becomes the card — hit Edit to make changes",
   "The alert is met — a notification fires",
@@ -1180,7 +1180,7 @@ function render() {
   createCard.querySelectorAll("input, button").forEach(el => { el.disabled = savedState; });
   document.getElementById("start-monitoring").innerHTML = savedState
     ? '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> Saved'
-    : "Start monitoring";
+    : "Create skill";
   if (savedState) requestAnimationFrame(() => { const chat = document.querySelector(".sw-chat"); if (chat) chat.scrollTop = chat.scrollHeight; });
   if (step === 5 || step === 6) {
     document.querySelectorAll(".dash-item").forEach(item => {
@@ -1256,7 +1256,7 @@ railList.querySelectorAll(".mitem-head").forEach(btn => {
   });
 });
 
-// New monitor opens the create card as a modal (no page to read here — you paste a URL). PROMPTS parked for after v0 — see monitors-after-v0.html
+// Create a skill opens the modal (no page to read here — you paste a URL). PROMPTS parked for after v0 — see monitors-after-v0.html
 const PROMPTS = {
   "Price drop": { cond: "the price drops", chips: [["Any drop", "the price drops at all"], ["Below a target", "the price drops below $—"], ["10% off or more", "the price drops 10% or more"]] },
   "Back in stock": { cond: "it's back in stock", chips: [["Any restock", "it's back in stock"], ["My size", "my size is back in stock"]] },
