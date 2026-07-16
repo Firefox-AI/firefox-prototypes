@@ -380,7 +380,7 @@ h1,h2,h3,h4,p { margin: 0; }
 .mcard .view-only, .mcard .edit-only { display: flex; flex-direction: column; gap: var(--space-medium); }
 .mon-sentence { margin: 0; color: var(--text-color-deemphasized); line-height: 1.5; }
 .mon-sentence b { color: var(--text-color); font-weight: var(--font-weight-semibold); }
-.mon-eyebrow { font-size: 11px; font-weight: var(--font-weight-semibold); letter-spacing: .07em; text-transform: uppercase; color: var(--text-color-deemphasized); }
+.hist-head { font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--text-color); margin-bottom: 2px; }
 /* In-place rename, the classic-window widget pattern: the title itself becomes the input.
    The input occupies the same 30px slot as the title and its text keeps the title's x —
    the ring extends left instead of pushing content. The swap is a fade, not a move. */
@@ -421,7 +421,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
 /* Change history */
 .history { display: flex; flex-direction: column; }
-.hist-item { display: flex; align-items: baseline; gap: var(--space-small); padding: 6px 0; font-size: var(--font-size-small); }
+.hist-item { display: flex; align-items: baseline; gap: var(--space-small); padding: 9px 0; border-top: 1px solid var(--border-color-deemphasized); font-size: var(--font-size-small); }
 .hist-item .when { color: var(--text-color-deemphasized); min-width: 84px; flex: none; }
 .hist-item .oldv { color: var(--text-color-deemphasized); text-decoration: line-through; }
 .hist-item .newv { font-weight: var(--font-weight-semibold); }
@@ -813,7 +813,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <div class="view-only">
                   <p class="mon-sentence">Alerts you when <b id="sony-cond-view">the price drops below $270</b> · checks daily</p>
                   <div class="history">
-                    <div class="mon-eyebrow">History</div>
+                    <div class="hist-head">Change history</div>
                     <div class="hist-item low"><span class="when">Jun 24</span><span>checked — didn't meet your alert</span></div>
                     <div class="hist-item"><span class="when">Jun 17</span><span class="deemphasized">first checked · $299</span></div>
                   </div>
@@ -846,7 +846,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <div class="mcard">
                 <p class="mon-sentence">The page changed and the monitor <b>can't find the price</b>.</p>
                 <div class="history">
-                  <div class="mon-eyebrow">History</div>
+                  <div class="hist-head">Change history</div>
                   <div class="hist-item"><span class="when">Jun 30</span><span class="hist-flag">value lost</span><span class="deemphasized">the page changed</span></div>
                   <div class="hist-item"><span class="when">Jun 12</span><span class="deemphasized">first checked · $189</span></div>
                 </div>
@@ -866,7 +866,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <div class="mcard">
                 <p class="mon-sentence">Alerts you when <b>a new listing matches my search</b> · checks daily</p>
                 <div class="history">
-                  <div class="mon-eyebrow">History</div>
+                  <div class="hist-head">Change history</div>
                   <div class="hist-item"><span class="when">Today</span><span class="newv" style="color:var(--text-color-success)">3 new listings</span></div>
                   <div class="hist-item"><span class="when">Yesterday</span><span class="newv">2 new listings</span></div>
                   <div class="hist-item"><span class="when">Jun 28</span><span class="deemphasized">first checked · 41 listings</span></div>
@@ -886,7 +886,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <div class="mcard">
                 <p class="mon-sentence">Alerts you when <b>the price drops below $1,800</b> · paused</p>
                 <div class="history">
-                  <div class="mon-eyebrow">History</div>
+                  <div class="hist-head">Change history</div>
                   <div class="hist-item"><span class="when">Jun 25</span><span class="deemphasized">paused</span></div>
                   <div class="hist-item"><span class="when">Jun 20</span><span class="oldv">$2,099</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$1,999</span><span class="deemphasized">−5%</span></div>
                   <div class="hist-item"><span class="when">Jun 8</span><span class="deemphasized">first checked · $2,099</span></div>
