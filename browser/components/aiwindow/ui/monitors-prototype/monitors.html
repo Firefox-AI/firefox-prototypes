@@ -153,6 +153,8 @@ h1,h2,h3,h4,p { margin: 0; }
 .page-action:hover { background: light-dark(color-mix(in srgb, var(--color-violet-60) 16%, transparent), color-mix(in srgb, var(--color-violet-30) 24%, transparent)); }
 .page-action svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .page-action.attn { color: var(--smartwindow-icon-color-accent); }
+.page-action.tb-btn { width: 30px; height: 30px; }
+.page-action.active { background: light-dark(color-mix(in srgb, var(--color-violet-60) 20%, transparent), color-mix(in srgb, var(--color-violet-30) 30%, transparent)); }
 .page-action.danger { color: var(--text-color-error); }
 .page-action.danger:hover { background: var(--background-color-critical); }
 .mcard-actions .page-action.danger { width: 36px; height: 36px; border: 1px solid var(--border-color); border-radius: var(--border-radius-circle); }
@@ -597,10 +599,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
     <div class="urlbar" data-show="1 2 3 4 7 8">
       <span class="lock"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
       <span class="address"><span class="domain">bestbuy.com</span>/site/sony-wh-1000xm5</span>
-      <button class="page-action attn" id="pa-monitor" title="Monitor this page" aria-label="Monitor this page">
-        <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
-        <span class="dot" data-show="4 7 8"></span>
-      </button>
     </div>
 
     <div class="urlbar" data-show="5 6 10">
@@ -613,6 +611,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       <span class="address" style="color:var(--text-color-deemphasized)">Search with Firefox or enter address</span>
     </div>
 
+    <button class="page-action attn tb-btn" id="tb-monitors" title="Monitors" aria-label="Open Monitors"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="dot" data-show="4 7 8"></span></button>
     <button class="page-action sw-toggle" title="Smart Window" aria-label="Toggle Smart Window"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>
   </div>
 
@@ -1200,6 +1199,7 @@ function render() {
   document.getElementById("step-text").textContent = STEPS[step - 1];
   [...dots.children].forEach((d, i) => d.classList.toggle("on", i < step));
   document.getElementById("rail-monitors").classList.toggle("active", step === 9);
+  document.getElementById("tb-monitors").classList.toggle("active", step === 5 || step === 6 || step === 10);
   const createCard = document.getElementById("create-card");
   const savedState = step === 4 || step === 8;
   createCard.classList.toggle("saved", savedState);
@@ -1232,7 +1232,7 @@ document.addEventListener("keydown", e => {
 document.getElementById("undo-create").addEventListener("click", () => go(3));
 
 // Story shortcuts
-document.getElementById("pa-monitor").onclick = () => { if (step === 1) go(2); };
+document.getElementById("tb-monitors").onclick = () => go(5);
 document.getElementById("agent-monitor").onclick = (e) => { e.stopPropagation(); go(3); };
 
 // One-card expansion: measured height so the surface animates reliably
