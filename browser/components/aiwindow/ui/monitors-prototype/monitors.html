@@ -529,20 +529,37 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 .input-cta:hover { filter: brightness(1.06); }
 .disclaimer { padding: 0 var(--space-large) var(--space-medium); color: light-dark(#3f3e42, #b7b6ba); font-size: 11px; text-align: center; }
 .disclaimer a { color: var(--smartwindow-text-color-accent-primary); }
-/* + smartbar menu: recent tabs + existing skills + create-a-skill entry */
+/* + smartbar menu: search / tabs / skills (+ create) / files -> chips in the input */
 .plus-menu { position: absolute; inset-inline-start: var(--space-large); inset-block-end: calc(100% - var(--space-small)); width: min(320px, calc(100% - var(--space-large) * 2)); background: light-dark(var(--color-white), #1d1830); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); box-shadow: var(--box-shadow-level-4); padding: var(--space-xsmall); z-index: 65; }
 .plus-menu[hidden] { display: none; }
-.plus-menu .pm-scroll { max-height: 330px; overflow-y: auto; }
-.plus-menu .pm-title { padding: var(--space-small) var(--space-small) var(--space-xxsmall); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--text-color-deemphasized); }
-.plus-menu .pm-title:not(:first-child) { margin-block-start: var(--space-xsmall); }
-.plus-menu .pm-item, .plus-menu .pm-create { display: flex; align-items: center; gap: var(--space-small); width: 100%; padding: var(--space-small); border-radius: var(--border-radius-medium); font-size: var(--font-size-small); color: var(--text-color); text-align: start; }
-.plus-menu .pm-item:hover, .plus-menu .pm-create:hover { background: var(--background-color-box-info); }
+.plus-menu .pm-search { display: flex; align-items: center; gap: var(--space-small); padding: 0 var(--space-small); margin: var(--space-xxsmall) var(--space-xxsmall) var(--space-xsmall); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-medium); background: light-dark(var(--color-gray-05), rgba(255,255,255,.04)); }
+.plus-menu .pm-search svg { width: 16px; height: 16px; fill: none; stroke: var(--text-color-deemphasized); stroke-width: 2; stroke-linecap: round; flex: none; }
+.plus-menu .pm-search input { flex: 1; min-width: 0; border: 0; background: none; padding: var(--space-small) 0; font: inherit; font-size: var(--font-size-small); color: var(--text-color); }
+.plus-menu .pm-search input:focus { outline: none; }
+.plus-menu .pm-search input::placeholder { color: var(--text-color-deemphasized); opacity: 1; }
+.plus-menu .pm-scroll { max-height: 388px; overflow-y: auto; }
+.plus-menu .pm-group[hidden] { display: none; }
+.plus-menu .pm-group + .pm-group { margin-block-start: var(--space-xsmall); padding-block-start: var(--space-xsmall); border-block-start: 1px solid var(--border-color-deemphasized); }
+.plus-menu .pm-title { padding: var(--space-xsmall) var(--space-small); font-size: 11px; font-weight: var(--font-weight-semibold); letter-spacing: .04em; text-transform: uppercase; color: var(--text-color-deemphasized); }
+.plus-menu .pm-item { display: flex; align-items: center; gap: var(--space-small); width: 100%; padding: var(--space-small); border-radius: var(--border-radius-medium); font-size: var(--font-size-small); color: var(--text-color); text-align: start; }
+.plus-menu .pm-item[hidden] { display: none; }
+.plus-menu .pm-item:hover { background: var(--background-color-box-info); }
 .plus-menu .pm-fav, .plus-menu .pm-plus { width: 22px; height: 22px; border-radius: var(--border-radius-small); flex: none; display: grid; place-items: center; overflow: hidden; }
+.plus-menu .pm-fileicon { background: none; }
+.plus-menu .pm-fileicon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .plus-menu .pm-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.plus-menu .pm-create { font-weight: var(--font-weight-semibold); color: var(--color-accent-primary); }
+.plus-menu .pm-create { color: var(--color-accent-primary); font-weight: var(--font-weight-semibold); }
 .plus-menu .pm-plus { background: light-dark(var(--color-violet-0), color-mix(in srgb, var(--color-violet-40) 20%, transparent)); }
 .plus-menu .pm-plus svg { width: 15px; height: 15px; fill: none; stroke: var(--color-accent-primary); stroke-width: 2.2; stroke-linecap: round; }
-.plus-menu .pm-sep { block-size: 1px; background: var(--border-color-deemphasized); margin: var(--space-xsmall) var(--space-small); }
+/* selected tab / skill / file -> chip in the smartbar input */
+.smartbar-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.smartbar-chips:not(:empty) { margin-block-end: var(--space-small); }
+.sb-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 210px; padding: 3px 5px; border-radius: 12px; background: light-dark(color-mix(in srgb, var(--color-violet-desaturated-10) 72%, transparent), #534577); font-size: var(--font-size-small); color: light-dark(var(--color-violet-desaturated-90), var(--color-violet-desaturated-0)); }
+.sb-chip-fav { width: 16px; height: 16px; border-radius: var(--border-radius-small); flex: none; display: grid; place-items: center; overflow: hidden; }
+.sb-chip-fav svg { display: block; }
+.sb-chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-chip-x { width: 16px; height: 16px; display: grid; place-items: center; border-radius: 50%; color: inherit; opacity: .7; flex: none; font-size: 14px; line-height: 1; }
+.sb-chip-x:hover { opacity: 1; background: color-mix(in srgb, currentColor 18%, transparent); }
 
 /* ============ New Tab + corner monitor stack ============ */
 .newtab { min-height: 100%; display: grid; place-items: center; position: relative; }
@@ -1110,6 +1127,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       <div class="smartbar-wrap">
         <div class="smartbar">
           <div class="smartbar-input">
+            <div class="smartbar-chips" id="smartbar-chips"></div>
             <span class="typed" data-show="2">/<span class="caret"></span></span>
             <span class="ph" data-show="3 4 8">Ask, search, or type a URL</span>
           </div>
@@ -1125,19 +1143,27 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           </div>
         </div>
         <div class="plus-menu" id="plus-menu" hidden role="menu" aria-label="Add to conversation">
+          <div class="pm-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg><input type="text" id="pm-search" placeholder="Search tabs, skills, files" aria-label="Search tabs, skills and files" autocomplete="off" /></div>
           <div class="pm-scroll">
-          <div class="pm-title">Recent tabs</div>
-          <button class="pm-item" role="menuitem"><span class="pm-fav" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span><span class="pm-label">Sony WH-1000XM5 — Best Buy</span></button>
-          <button class="pm-item" role="menuitem"><span class="pm-fav" style="background:#a4262c"><svg viewBox="0 0 24 24" width="72%" height="72%" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.6 2.6 2.6 15.4 0 18M12 3c-2.6 2.6-2.6 15.4 0 18"/></svg></span><span class="pm-label">XM5 vs Bose QuietComfort — RTINGS</span></button>
-          <button class="pm-item" role="menuitem"><span class="pm-fav" style="background:#2b2b31"><svg viewBox="0 0 24 24" width="72%" height="72%" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.6 2.6 2.6 15.4 0 18M12 3c-2.6 2.6-2.6 15.4 0 18"/></svg></span><span class="pm-label">Best ANC headphones 2026 — Wirecutter</span></button>
-          <button class="pm-item" role="menuitem"><span class="pm-fav" style="background:#ff4500"><svg viewBox="0 0 24 24" width="72%" height="72%" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.6 2.6 2.6 15.4 0 18M12 3c-2.6 2.6-2.6 15.4 0 18"/></svg></span><span class="pm-label">r/headphones — best under $300</span></button>
-          <div class="pm-title">Skills</div>
-          <button class="pm-item" role="menuitem"><span class="pm-fav" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span><span class="pm-label">Sony WH-1000XM5 price</span></button>
-          <button class="pm-item" role="menuitem"><span class="pm-fav" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span><span class="pm-label">Best Buy checkout codes</span></button>
-          <button class="pm-item" role="menuitem"><span class="pm-fav" style="background:#1a73e8"><svg viewBox="0 0 24 24" width="66%" height="66%" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9.5 12.5h5M9.5 16h5"/></svg></span><span class="pm-label">ANC headphones under $300</span></button>
+            <div class="pm-group">
+              <div class="pm-title">Tabs</div>
+              <button class="pm-item pm-select" role="menuitem"><span class="pm-fav" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span><span class="pm-label">Sony WH-1000XM5 — Best Buy</span></button>
+              <button class="pm-item pm-select" role="menuitem"><span class="pm-fav" style="background:#a4262c"><svg viewBox="0 0 24 24" width="72%" height="72%" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.6 2.6 2.6 15.4 0 18M12 3c-2.6 2.6-2.6 15.4 0 18"/></svg></span><span class="pm-label">XM5 vs Bose QuietComfort — RTINGS</span></button>
+              <button class="pm-item pm-select" role="menuitem"><span class="pm-fav" style="background:#2b2b31"><svg viewBox="0 0 24 24" width="72%" height="72%" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.6 2.6 2.6 15.4 0 18M12 3c-2.6 2.6-2.6 15.4 0 18"/></svg></span><span class="pm-label">Best ANC headphones 2026 — Wirecutter</span></button>
+            </div>
+            <div class="pm-group">
+              <div class="pm-title">Skills</div>
+              <button class="pm-item pm-select" role="menuitem"><span class="pm-fav" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span><span class="pm-label">Sony WH-1000XM5 price</span></button>
+              <button class="pm-item pm-select" role="menuitem"><span class="pm-fav" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span><span class="pm-label">Best Buy checkout codes</span></button>
+              <button class="pm-item pm-select" role="menuitem"><span class="pm-fav" style="background:#1a73e8"><svg viewBox="0 0 24 24" width="66%" height="66%" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9.5 12.5h5M9.5 16h5"/></svg></span><span class="pm-label">ANC headphones under $300</span></button>
+              <button class="pm-item pm-create" id="pm-create" role="menuitem"><span class="pm-plus"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="pm-label">Create a new skill</span></button>
+            </div>
+            <div class="pm-group">
+              <div class="pm-title">Files</div>
+              <button class="pm-item pm-upload" id="pm-upload" role="menuitem"><span class="pm-fav pm-fileicon"><svg viewBox="0 0 24 24"><path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9z"/><path d="M13 3v6h6"/><path d="M12 12.5v5M9.5 15h5"/></svg></span><span class="pm-label">Upload file from computer</span></button>
+            </div>
           </div>
-          <div class="pm-sep"></div>
-          <button class="pm-create" id="pm-create" role="menuitem"><span class="pm-plus"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>Create a new skill</button>
+          <input type="file" id="pm-file" hidden aria-hidden="true" />
         </div>
       </div>
       <div class="disclaimer">AI can make mistakes. <a href="#" onclick="return false">Report any issues</a>.</div>
@@ -1273,24 +1299,75 @@ document.getElementById("tb-monitors").onclick = () => openModal(null);
 const dhMonitor = document.getElementById("dh-monitor");
 document.getElementById("dh-cta").onclick = () => { dhMonitor.classList.add("dh-gone"); go(3); };
 
-// + smartbar menu: recent tabs + existing skills + "Create a new skill" -> conversational create flow
+// + smartbar menu: search / tabs / skills (+ create) / files -> selected items become chips
 const sbPlus = document.getElementById("sb-plus");
 const plusMenu = document.getElementById("plus-menu");
 if (sbPlus && plusMenu) {
+  const chipTray = document.getElementById("smartbar-chips");
+  const pmSearch = document.getElementById("pm-search");
+  const fileInput = document.getElementById("pm-file");
+
+  function filterMenu(q) {
+    q = (q || "").trim().toLowerCase();
+    plusMenu.querySelectorAll(".pm-group").forEach(group => {
+      let any = false;
+      group.querySelectorAll(".pm-item").forEach(it => {
+        if (it.classList.contains("pm-create")) { it.hidden = false; any = true; return; }
+        const match = !q || it.querySelector(".pm-label").textContent.toLowerCase().includes(q);
+        it.hidden = !match; if (match) any = true;
+      });
+      group.hidden = !any;
+    });
+  }
   const closePlusMenu = () => { plusMenu.hidden = true; sbPlus.setAttribute("aria-expanded", "false"); };
-  sbPlus.addEventListener("click", e => {
-    e.stopPropagation();
-    const willOpen = plusMenu.hidden;
-    plusMenu.hidden = !willOpen;
-    sbPlus.setAttribute("aria-expanded", String(willOpen));
-  });
-  document.addEventListener("click", e => {
-    if (!plusMenu.hidden && !plusMenu.contains(e.target) && !sbPlus.contains(e.target)) closePlusMenu();
-  });
+  const openPlusMenu = () => {
+    plusMenu.hidden = false; sbPlus.setAttribute("aria-expanded", "true");
+    if (pmSearch) { pmSearch.value = ""; filterMenu(""); pmSearch.focus(); }
+  };
+  sbPlus.addEventListener("click", e => { e.stopPropagation(); plusMenu.hidden ? openPlusMenu() : closePlusMenu(); });
+  document.addEventListener("click", e => { if (!plusMenu.hidden && !plusMenu.contains(e.target) && !sbPlus.contains(e.target)) closePlusMenu(); });
   document.addEventListener("keydown", e => { if (e.key === "Escape") closePlusMenu(); });
-  plusMenu.querySelectorAll(".pm-item").forEach(it => it.addEventListener("click", closePlusMenu));
+
+  function addChip(bg, svg, label) {
+    if (!chipTray) return;
+    const chip = document.createElement("span");
+    chip.className = "sb-chip";
+    const fav = document.createElement("span");
+    fav.className = "sb-chip-fav";
+    if (bg) fav.style.background = bg;
+    fav.innerHTML = svg;
+    const lbl = document.createElement("span");
+    lbl.className = "sb-chip-label";
+    lbl.textContent = label;
+    const x = document.createElement("button");
+    x.type = "button"; x.className = "sb-chip-x"; x.setAttribute("aria-label", "Remove"); x.textContent = "\u00d7";
+    x.addEventListener("click", ev => { ev.stopPropagation(); chip.remove(); });
+    chip.append(fav, lbl, x);
+    chipTray.appendChild(chip);
+  }
+
+  plusMenu.querySelectorAll(".pm-select").forEach(it => it.addEventListener("click", e => {
+    e.stopPropagation();
+    const favEl = it.querySelector(".pm-fav");
+    addChip(favEl ? favEl.style.background : "", favEl ? favEl.innerHTML : "", it.querySelector(".pm-label").textContent);
+    closePlusMenu();
+  }));
+
   const pmCreate = document.getElementById("pm-create");
   if (pmCreate) pmCreate.addEventListener("click", e => { e.stopPropagation(); closePlusMenu(); go(3); });
+
+  const pmUpload = document.getElementById("pm-upload");
+  if (pmUpload && fileInput) {
+    pmUpload.addEventListener("click", e => { e.stopPropagation(); fileInput.click(); });
+    fileInput.addEventListener("change", () => {
+      const f = fileInput.files && fileInput.files[0];
+      if (f) addChip("", '<svg viewBox="0 0 24 24" width="72%" height="72%" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9z"/><path d="M13 3v6h6"/></svg>', f.name);
+      fileInput.value = "";
+      closePlusMenu();
+    });
+  }
+
+  if (pmSearch) pmSearch.addEventListener("input", () => filterMenu(pmSearch.value));
 }
 document.getElementById("dh-dismiss").onclick = () => dhMonitor.classList.add("dh-gone");
 document.getElementById("dh-close").onclick = () => dhMonitor.classList.add("dh-gone");
