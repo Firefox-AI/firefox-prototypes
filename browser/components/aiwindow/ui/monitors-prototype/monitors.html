@@ -602,17 +602,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 /* Sandbox: Start over control */
 .dock .restart-btn { display: inline-flex; align-items: center; gap: var(--space-xsmall); width: auto; height: auto; padding: 6px 14px; border-radius: var(--border-radius-circle); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: inherit; }
 .dock .restart-btn:hover { background: light-dark(rgba(242,240,248,.15), rgba(24,14,48,.08)); }
-/* Net-zero legend: three doors */
-.nz-intro { display: flex; flex-direction: column; gap: var(--space-medium); }
-.nz-lead { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
-.nz-title { font-size: var(--font-size-large); font-weight: var(--font-weight-semibold); }
-.nz-doors { display: flex; flex-direction: column; gap: var(--space-small); }
-.nz-door { display: flex; align-items: flex-start; gap: var(--space-medium); width: 100%; text-align: start; padding: var(--space-medium); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); background: var(--background-color-box); color: var(--text-color); transition: border-color .15s ease, background .15s ease; }
-.nz-door:hover { border-color: var(--color-accent-primary); background: var(--background-color-box-info); }
-.nz-num { width: 22px; height: 22px; flex: none; border-radius: var(--border-radius-circle); display: grid; place-items: center; background: var(--color-accent-primary); color: light-dark(#fff, var(--color-violet-90)); font-size: 12px; font-weight: var(--font-weight-semibold); }
-.nz-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: var(--font-size-small); }
-.nz-text b { font-weight: var(--font-weight-semibold); }
-.nz-sub { color: var(--text-color-deemphasized); }
 /* Slash picker: shown when the smartbar is engaged (entry point 3) */
 .slash-menu { display: none; }
 .stage.slash-open .slash-menu { display: block; }
@@ -1087,17 +1076,8 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       </div>
 
       <div class="sw-chat">
-        <div class="nz-intro" data-show="zero">
-          <div class="nz-lead">I can watch a page, find something, or look into a question.</div>
-          <div class="nz-title">Start a skill, three ways</div>
-          <div class="nz-doors">
-            <button class="nz-door" data-door="offer"><span class="nz-num">1</span><span class="nz-text"><b>Firefox offers</b><span class="nz-sub">It spots the page and offers to watch it, from the Skills icon up top</span></span></button>
-            <button class="nz-door" data-door="add"><span class="nz-num">2</span><span class="nz-text"><b>You add it</b><span class="nz-sub">Open the + below and create a skill</span></span></button>
-            <button class="nz-door" data-door="type"><span class="nz-num">3</span><span class="nz-text"><b>You type it</b><span class="nz-sub">Type / in the bar to call up skills</span></span></button>
-          </div>
-        </div>
-        <!-- The command the user sent (via the / tool picker) -->
-        <div class="message-user" data-show="3 4 8"><p><span class="cmd-tok">/</span> watch this price</p></div>
+        <!-- Kickoff: the user turn, set by whichever entry point was used -->
+        <div class="message-user" id="kickoff" data-show="creating live"><p></p></div>
 
         <!-- Step 3: Monitor tool → create card (locks into saved state on steps 4 and 8) -->
         <div data-show="creating live" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
@@ -1267,6 +1247,7 @@ function render() {
     el.classList.toggle("step-visible", el.getAttribute("data-show").split(/\s+/).includes(state));
   });
   updateCounts();
+  dhMonitor.classList.toggle("dh-gone", state !== "zero");
   const createCard = document.getElementById("create-card");
   const saved = state === "live";
   createCard.classList.toggle("saved", saved);
@@ -1277,12 +1258,12 @@ function render() {
     : "Create skill";
   if (state !== "zero") requestAnimationFrame(() => { const chat = document.querySelector(".sw-chat"); if (chat) chat.scrollTop = chat.scrollHeight; });
 }
+function showKickoff(html) { const k = document.getElementById("kickoff"); if (k) { const pp = k.querySelector("p"); if (pp) pp.innerHTML = html; } }
 function go(s) {
   state = STATES.includes(s) ? s : "zero";
   history.replaceState(null, "", "#" + state);
   stageEl.classList.remove("slash-open");
   if (state === "zero") {
-    dhMonitor.classList.add("dh-gone");
     const ct = document.getElementById("smartbar-chips"); if (ct) ct.innerHTML = "";
   }
   render();
@@ -1299,7 +1280,7 @@ document.getElementById("undo-create").addEventListener("click", () => go("creat
 
 // Entry point 1 - Firefox offers: the toolbar Skills button reveals the doorhanger
 document.getElementById("tb-monitors").onclick = e => { e.stopPropagation(); dhMonitor.classList.toggle("dh-gone"); };
-document.getElementById("dh-cta").onclick = () => { dhMonitor.classList.add("dh-gone"); go("creating"); };
+document.getElementById("dh-cta").onclick = () => { dhMonitor.classList.add("dh-gone"); showKickoff("Watch this page"); go("creating"); };
 
 // Entry point 3 - You type: click the smartbar to bring up the / picker
 const smartbarInput = document.querySelector(".smartbar-input");
@@ -1308,13 +1289,6 @@ document.addEventListener("click", e => {
   if (stageEl.classList.contains("slash-open") && !e.target.closest(".smartbar-wrap") && !e.target.closest(".slash-menu")) stageEl.classList.remove("slash-open");
 });
 
-// The net-zero legend doors mirror the three real entry points
-document.querySelectorAll(".nz-door").forEach(d => d.addEventListener("click", () => {
-  const door = d.getAttribute("data-door");
-  if (door === "offer") dhMonitor.classList.remove("dh-gone");
-  else if (door === "add") { const pb = document.getElementById("sb-plus"); if (pb && document.getElementById("plus-menu").hidden) pb.click(); }
-  else if (door === "type") stageEl.classList.add("slash-open");
-}));
 
 // Start over
 document.getElementById("restart").onclick = () => go("zero");
@@ -1374,7 +1348,7 @@ if (sbPlus && plusMenu) {
   }));
 
   const pmCreate = document.getElementById("pm-create");
-  if (pmCreate) pmCreate.addEventListener("click", e => { e.stopPropagation(); closePlusMenu(); go("creating"); });
+  if (pmCreate) pmCreate.addEventListener("click", e => { e.stopPropagation(); closePlusMenu(); showKickoff("Watch this page"); go("creating"); });
 
   const pmUpload = document.getElementById("pm-upload");
   if (pmUpload && fileInput) {
@@ -1391,7 +1365,7 @@ if (sbPlus && plusMenu) {
 }
 document.getElementById("dh-dismiss").onclick = () => dhMonitor.classList.add("dh-gone");
 document.getElementById("dh-close").onclick = () => dhMonitor.classList.add("dh-gone");
-document.getElementById("agent-monitor").onclick = (e) => { e.stopPropagation(); go("creating"); };
+document.getElementById("agent-monitor").onclick = (e) => { e.stopPropagation(); showKickoff('<span class="cmd-tok">/</span> watch this price'); go("creating"); };
 
 // One-card expansion: measured height so the surface animates reliably
 function setExpand(body, open) {
