@@ -1264,7 +1264,6 @@ function render() {
     el.classList.toggle("step-visible", el.getAttribute("data-show").split(/\s+/).includes(state));
   });
   updateCounts();
-  dhMonitor.classList.toggle("dh-gone", state !== "zero");
   const createCard = document.getElementById("create-card");
   const saved = state === "live";
   createCard.classList.toggle("saved", saved);
@@ -1276,6 +1275,13 @@ function render() {
   if (state !== "zero") requestAnimationFrame(() => { const chat = document.querySelector(".sw-chat"); if (chat) chat.scrollTop = chat.scrollHeight; });
 }
 function showKickoff(html) { const k = document.getElementById("kickoff"); if (k) { const pp = k.querySelector("p"); if (pp) pp.innerHTML = html; } }
+let dhTimer = null;
+const DOORHANGER_DELAY = 30000;
+function armDoorhanger() {
+  clearTimeout(dhTimer);
+  dhMonitor.classList.add("dh-gone");
+  if (state === "zero") dhTimer = setTimeout(() => { if (state === "zero") dhMonitor.classList.remove("dh-gone"); }, DOORHANGER_DELAY);
+}
 function go(s) {
   state = STATES.includes(s) ? s : "zero";
   history.replaceState(null, "", "#" + state);
@@ -1283,6 +1289,7 @@ function go(s) {
   if (state === "zero") {
     const ct = document.getElementById("smartbar-chips"); if (ct) ct.innerHTML = "";
   }
+  armDoorhanger();
   render();
 }
 document.addEventListener("keydown", e => {
@@ -1744,6 +1751,7 @@ document.querySelectorAll(".segmented").forEach(seg => {
 });
 const root = document.documentElement;
 document.getElementById("theme").onclick = () => { root.setAttribute("data-theme", root.getAttribute("data-theme") === "dark" ? "light" : "dark"); };
+armDoorhanger();
 render();
 </script>
 </body>
