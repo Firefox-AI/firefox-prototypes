@@ -404,8 +404,8 @@ h1,h2,h3,h4,p { margin: 0; }
 .mcard.saved .field-input, .mcard.saved .chip, .mcard.saved .page-pill, .mcard.saved .gname-input { opacity: .55; pointer-events: none; }
 .mcard.saved .gname-x { display: none; }
 .mcard.saved .mcard-actions .btn-ghost { display: none; }
-.mcard.saved #start-monitoring { background: var(--background-color-success); color: var(--text-color-success); display: inline-flex; align-items: center; gap: 5px; }
-.mcard.saved #start-monitoring svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.mcard.saved #start-monitoring, .mcard.saved .dc-create { background: var(--background-color-success); color: var(--text-color-success); display: inline-flex; align-items: center; gap: 5px; }
+.mcard.saved #start-monitoring svg, .mcard.saved .dc-create svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 
 /* Monitor title edits in place */
 
@@ -659,8 +659,6 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
 /* Step visibility — only hide inactive steps; visible keep authored display */
 [data-show]:not(.step-visible) { display: none !important; }
-.sidebar.create-blank .ctx-only { display: none !important; }
-.sidebar:not(.create-blank) .blank-only { display: none !important; }
 
 .annot { position: absolute; z-index: 50; background: light-dark(#180e30, #f2f0f8); color: light-dark(#f2f0f8, #180e30); padding: 6px 12px; border-radius: var(--border-radius-medium); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); box-shadow: var(--box-shadow-level-4); max-width: 250px; }
 .annot::before { content: ""; position: absolute; width: 10px; height: 10px; background: inherit; transform: rotate(45deg); }
@@ -1137,67 +1135,10 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       </div>
 
       <div class="sw-chat">
-        <!-- Kickoff: the user turn, set by whichever entry point was used -->
-        <div class="message-user" id="kickoff" data-show="creating live"><p></p></div>
+        <!-- In-chat task creation is dynamic: startCreate() appends a user turn + an
+             editable card here; on Create the card locks in place and a confirmation
+             follows. Cards accumulate so you can create several tasks in one chat. -->
 
-        <!-- Context-free create (the + menu's "Create a new task"): Firefox asks first, assumes nothing -->
-        <div class="blank-only anim-reach" data-show="creating live">
-          <div class="mcard">
-            <div class="field">
-              <span class="field-label">Name</span>
-              <input class="field-input" placeholder="Name this task" aria-label="Task name" />
-            </div>
-            <div class="field">
-              <span class="field-label">Alert me when</span>
-              <input class="field-input" placeholder="Describe what to watch" aria-label="Alert condition" />
-            </div>
-            <div class="field">
-              <span class="field-label">Pages</span>
-              <input class="field-input" placeholder="Paste a URL to watch" aria-label="Add page URL" />
-              <span class="mono-dim">Add up to 6 pages. Paste a URL and press Enter.</span>
-            </div>
-            <hr class="rule" />
-            <div class="mrow2">
-              <div class="mfield"><span class="lbl">Check</span><span class="select-wrap"><select class="field-select" aria-label="How often to check"><option>Daily</option><option>Hourly</option><option>Weekly</option></select></span></div>
-              <div class="mfield"><span class="lbl">Time</span><span class="time-input">9:00 AM<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg></span></div>
-            </div>
-            <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost">Cancel</button><button class="btn-cta">Create task</button></div>
-          </div>
-        </div>
-
-        <!-- Step 3: Monitor tool → create card (locks into saved state on steps 4 and 8) -->
-        <div data-show="creating live" class="ctx-only anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
-          <div class="message-assistant">Looks like a product page. I've set up a task to watch the price. Tweak anything, then start it.</div>
-
-          <div class="mcard" id="create-card">
-            <div class="mcard-head"><span class="favicon-sq" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span><span style="min-width:0;flex:1"><span class="mcard-url">bestbuy.com/site/sony-wh-1000xm5</span></span></div>
-            <div class="mvalue"><span class="now">$299</span><span class="from">found on this page just now</span></div>
-            <div class="field">
-              <span class="field-label">Name</span>
-              <input class="field-input" id="create-title" value="Sony WH-1000XM5 price" aria-label="Task name" />
-            </div>
-            <div class="field">
-              <span class="field-label">Alert me when</span>
-              <input class="field-input" id="create-cond" value="the price drops below $270" aria-label="Alert condition" />
-            </div>
-            <div class="field">
-              <span class="field-label">Pages</span>
-              <div class="chip-row pages-row"><span class="page-pill"><span class="fav" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span> bestbuy.com/…/xm5 <button class="x" aria-label="Remove page">×</button></span><input class="field-input page-add-input" placeholder="Paste a URL" hidden aria-label="Add page URL" /><button class="chip page-add">+ Add page</button></div>
-            </div>
-            <hr class="rule" />
-            <div class="mrow2">
-              <div class="mfield"><span class="lbl">Check</span><span class="select-wrap"><select class="field-select" aria-label="How often to check"><option>Daily</option><option>Hourly</option><option>Weekly</option></select></span></div>
-              <div class="mfield"><span class="lbl">Time</span><span class="time-input">9:00 AM<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg></span></div>
-            </div>
-            <div class="mcard-actions"><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><button class="btn-ghost">Cancel</button><button class="btn-cta" id="start-monitoring">Create task</button></div>
-          </div>
-        </div>
-
-        <!-- Step 4: started — the setup card locks in, the chat confirms. Undo only right after creation. -->
-        <div data-show="live 8" class="anim-land" style="display:flex;flex-direction:column;gap:var(--space-medium)">
-          <div class="message-assistant">Watching <b>Sony WH-1000XM5 price</b>. You'll hear from me if it drops below $270. To view it or make edits, head to <a class="accent-link" href="#5" data-open-tools-page>about:smartwindowtasks</a>.</div>
-          <div data-show="live"><button class="undo-pill" id="undo-create">Undo</button></div>
-        </div>
 
         <!-- Step 8: Open page — the chat picks up where you left off; setup sits up in the scroll history -->
         <div data-show="8" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
@@ -1370,17 +1311,86 @@ function render() {
     el.classList.toggle("step-visible", el.getAttribute("data-show").split(/\s+/).includes(state));
   });
   updateCounts();
-  const createCard = document.getElementById("create-card");
-  const saved = state === "live";
-  createCard.classList.toggle("saved", saved);
-  createCard.querySelectorAll("input, button").forEach(el => { el.disabled = saved; });
-  const sm = document.getElementById("start-monitoring");
-  if (sm) sm.innerHTML = saved
-    ? '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> Saved'
-    : "Create task";
   if (state !== "zero") requestAnimationFrame(() => { const chat = document.querySelector(".sw-chat"); if (chat) chat.scrollTop = chat.scrollHeight; });
 }
-function showKickoff(html) { const k = document.getElementById("kickoff"); if (k) { const pp = k.querySelector("p"); if (pp) pp.innerHTML = html; } }
+// ---- Dynamic in-chat task creation --------------------------------------
+// Each create appends [user turn + editable card] to the chat. On Create the
+// card locks in place and a confirmation follows; cards accumulate so several
+// tasks can be created in one conversation without clearing what's there.
+const BB_FAV_SVG = '<svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg>';
+const SONY_PREFILL = { page: "bestbuy.com/site/sony-wh-1000xm5", pageShort: "bestbuy.com/…/xm5", value: "$299", name: "Sony WH-1000XM5 price", cond: "the price drops below $270" };
+function escSW(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function createCardMarkup(prefill) {
+  const p = prefill || {};
+  const head = p.value
+    ? '<div class="mcard-head"><span class="favicon-sq" style="background:#0046be">' + BB_FAV_SVG + '</span><span style="min-width:0;flex:1"><span class="mcard-url">' + escSW(p.page) + '</span></span></div>' +
+      '<div class="mvalue"><span class="now">' + escSW(p.value) + '</span><span class="from">found on this page just now</span></div>'
+    : "";
+  const pages = p.page
+    ? '<div class="field"><span class="field-label">Pages</span><div class="chip-row pages-row"><span class="page-pill"><span class="fav" style="background:#0046be">' + BB_FAV_SVG + '</span> ' + escSW(p.pageShort || p.page) + ' <button type="button" class="x" aria-label="Remove page">×</button></span><button type="button" class="chip page-add">+ Add page</button></div></div>'
+    : '<div class="field"><span class="field-label">Pages</span><input class="field-input" placeholder="Paste a URL to watch" aria-label="Add page URL" /><span class="mono-dim">Add up to 6 pages. Paste a URL and press Enter.</span></div>';
+  return '<div class="mcard dc-card">' + head +
+    '<div class="field"><span class="field-label">Name</span><input class="field-input dc-name" placeholder="Name this task" value="' + escSW(p.name) + '" aria-label="Task name" /></div>' +
+    '<div class="field"><span class="field-label">Alert me when</span><input class="field-input dc-cond" placeholder="Describe what to watch" value="' + escSW(p.cond) + '" aria-label="Alert condition" /></div>' +
+    pages +
+    '<hr class="rule" />' +
+    '<div class="mrow2"><div class="mfield"><span class="lbl">Check</span><span class="select-wrap"><select class="field-select" aria-label="How often to check"><option>Daily</option><option>Hourly</option><option>Weekly</option></select></span></div>' +
+    '<div class="mfield"><span class="lbl">Time</span><span class="time-input">9:00 AM<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg></span></div></div>' +
+    '<div class="mcard-actions"><span class="spacer"></span><button type="button" class="btn-ghost dc-cancel">Cancel</button><button type="button" class="btn-cta dc-create">Create task</button></div>' +
+    '</div>';
+}
+function ensureChatView() {
+  if (!["zero", "creating", "live"].includes(state)) go("creating");
+  const tc = document.getElementById("tab-chat");
+  if (tc && tc.getAttribute("aria-selected") !== "true") tc.click();
+}
+function startCreate(userText, prefill) {
+  const chat = document.querySelector(".sw-chat");
+  if (!chat) return;
+  ensureChatView();
+  const u = document.createElement("div");
+  u.className = "message-user dyn-msg";
+  u.innerHTML = "<p>" + escSW(userText) + "</p>";
+  const wrap = document.createElement("div");
+  wrap.className = "dyn-msg dc-block anim-reach";
+  wrap.style.cssText = "display:flex;flex-direction:column;gap:var(--space-medium)";
+  const intro = prefill
+    ? "Looks like a product page. I've set up a task from what's on it. Tweak anything, then create it."
+    : "Tell me what to watch, find, or look into. Fill in what you know and I'll take it from there.";
+  wrap.innerHTML = '<div class="message-assistant">' + intro + '</div>' + createCardMarkup(prefill);
+  chat.append(u, wrap);
+  const card = wrap.querySelector(".dc-card");
+  const cancel = card.querySelector(".dc-cancel");
+  if (cancel) cancel.addEventListener("click", () => { wrap.remove(); u.remove(); });
+  const create = card.querySelector(".dc-create");
+  if (create) create.addEventListener("click", () => finishCreate(card, wrap));
+  const px = card.querySelector(".page-pill .x");
+  if (px) px.addEventListener("click", () => { const pill = px.closest(".page-pill"); if (pill) pill.remove(); });
+  card.querySelectorAll(".dc-name, .dc-cond").forEach(inp => inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); if (create) create.click(); } }));
+  requestAnimationFrame(() => { chat.scrollTop = chat.scrollHeight; });
+  const nameInput = card.querySelector(".dc-name");
+  if (nameInput) nameInput.focus();
+}
+function finishCreate(card, wrap) {
+  if (card.classList.contains("saved")) return;
+  const nameEl = card.querySelector(".dc-name");
+  const condEl = card.querySelector(".dc-cond");
+  const name = ((nameEl && nameEl.value) || "").trim() || "Untitled task";
+  const cond = ((condEl && condEl.value) || "").trim() || "the page changes";
+  card.classList.add("saved");
+  card.querySelectorAll("input, select, button").forEach(el => { el.disabled = true; });
+  const btn = card.querySelector(".dc-create");
+  if (btn) btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> Task created';
+  const conf = document.createElement("div");
+  conf.className = "message-assistant anim-land";
+  conf.innerHTML = 'Watching <b>' + escSW(name) + '</b>. You\'ll hear from me if <b>' + escSW(cond) + '</b>. To view it or make edits, head to <a class="accent-link" href="#5" data-open-tools-page>about:smartwindowtasks</a>.';
+  wrap.appendChild(conf);
+  const link = conf.querySelector("[data-open-tools-page]");
+  if (link) link.addEventListener("click", ev => { ev.preventDefault(); go(5); });
+  addTask(name, cond);
+  const chat = document.querySelector(".sw-chat");
+  if (chat) requestAnimationFrame(() => { chat.scrollTop = chat.scrollHeight; });
+}
 function looksLikeQuestion(q) {
   return /\?|^\s*(how|hows|how's|what|whats|what's|when|where|why|who|is|are|am|do|does|did|has|have|any|show|tell|give|update|status|progress|going|check on)\b/i.test((q || "").trim());
 }
@@ -1436,8 +1446,6 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") { stageEl.classList.remove("slash-open"); dhMonitor.classList.add("dh-gone"); }
 });
 
-document.getElementById("undo-create").addEventListener("click", () => go("creating"));
-
 // Entry point 1 - Firefox offers: the toolbar Tasks button reveals the doorhanger
 document.getElementById("tb-tasks").onclick = e => { e.stopPropagation(); dhMonitor.classList.add("dh-gone"); openModal(null); };
 document.getElementById("tb-ask").onclick = e => { e.stopPropagation(); document.querySelectorAll(".dyn-msg").forEach(m => m.remove()); sidebarEl.classList.remove("create-blank"); go("zero"); const tc = document.getElementById("tab-chat"); if (tc) tc.click(); if (typeof sbField !== "undefined" && sbField) sbField.focus(); };
@@ -1468,7 +1476,7 @@ document.getElementById("tb-ask").onclick = e => { e.stopPropagation(); document
     }
   }));
 })();
-document.getElementById("dh-cta").onclick = () => { dhMonitor.classList.add("dh-gone"); showKickoff("Watch this page"); go("creating"); };
+document.getElementById("dh-cta").onclick = () => { dhMonitor.classList.add("dh-gone"); startCreate("Watch this page for me", SONY_PREFILL); };
 
 // Entry point 3 - You type: click the smartbar to bring up the / picker
 const smartbarInput = document.querySelector(".smartbar-input");
@@ -1487,9 +1495,8 @@ if (smartbarInput && sbField) {
     stageEl.classList.remove("slash-open");
     sbField.textContent = "";
     if (!txt.startsWith("/") && looksLikeQuestion(txt)) { askAbout(txt); return; }
-    const kickoff = txt.startsWith("/") ? '<span class="cmd-tok">/</span> ' + escHtml(txt.replace(/^\/+\s*/, "")) : escHtml(txt);
-    showKickoff(kickoff);
-    go("creating");
+    const label = txt.startsWith("/") ? txt.replace(/^\/+\s*/, "") : txt;
+    startCreate(label, SONY_PREFILL);
   });
 }
 document.addEventListener("click", e => {
@@ -1555,7 +1562,7 @@ if (sbPlus && plusMenu) {
   }));
 
   const pmCreate = document.getElementById("pm-create");
-  if (pmCreate) pmCreate.addEventListener("click", e => { e.stopPropagation(); closePlusMenu(); showKickoff("create a task"); go("creating"); sidebarEl.classList.add("create-blank"); });
+  if (pmCreate) pmCreate.addEventListener("click", e => { e.stopPropagation(); closePlusMenu(); startCreate("Create a task", null); });
 
   const pmUpload = document.getElementById("pm-upload");
   if (pmUpload && fileInput) {
@@ -1572,7 +1579,7 @@ if (sbPlus && plusMenu) {
 }
 document.getElementById("dh-dismiss").onclick = () => dhMonitor.classList.add("dh-gone");
 document.getElementById("dh-close").onclick = () => dhMonitor.classList.add("dh-gone");
-document.getElementById("agent-monitor").onclick = (e) => { e.stopPropagation(); if (sbField) sbField.textContent = ""; showKickoff("create a task"); go("creating"); sidebarEl.classList.add("create-blank"); };
+document.getElementById("agent-monitor").onclick = (e) => { e.stopPropagation(); if (sbField) sbField.textContent = ""; stageEl.classList.remove("slash-open"); startCreate("Create a task", null); };
 
 // One-card expansion: measured height so the surface animates reliably
 function setExpand(body, open) {
@@ -1662,24 +1669,7 @@ document.getElementById("modal-start").onclick = () => {
   clearTimeout(startTimer);
   startTimer = setTimeout(() => { startToast.hidden = true; }, 4000);
 };
-// Empty in-chat create card (the + menu / slash flow): Create adds a task, Cancel resets
-(() => {
-  const blankCard = document.querySelector(".blank-only .mcard");
-  if (!blankCard) return;
-  const resetBlank = () => { sidebarEl.classList.remove("create-blank"); go("zero"); };
-  const cancel = blankCard.querySelector(".btn-ghost");
-  if (cancel) cancel.addEventListener("click", resetBlank);
-  const create = blankCard.querySelector(".btn-cta");
-  if (create) create.addEventListener("click", () => {
-    const inputs = blankCard.querySelectorAll(".field-input");
-    addTask(inputs[0] && inputs[0].value, inputs[1] && inputs[1].value);
-    inputs.forEach(i => (i.value = ""));
-    resetBlank();
-    startToast.hidden = false; clearTimeout(startTimer); startTimer = setTimeout(() => { startToast.hidden = true; }, 4000);
-  });
-})();
 document.getElementById("start-x").onclick = () => { clearTimeout(startTimer); startToast.hidden = true; };
-document.getElementById("start-monitoring").onclick = () => go("live");
 document.getElementById("toast").onclick = () => go(8);
 // Dashboard rows: every row opens and closes in place, independently
 document.querySelectorAll(".dash-item").forEach(item => {
@@ -1779,8 +1769,7 @@ document.querySelectorAll(".gname-edit").forEach(wrap => {
   });
 });
 // Enter commits the surface's primary action, everywhere
-[["create-title", "start-monitoring"], ["create-cond", "start-monitoring"],
- ["modal-title", "modal-start"], ["modal-cond", "modal-start"],
+[["modal-title", "modal-start"], ["modal-cond", "modal-start"],
  ["sony-cond", "sony-save"]].forEach(([inputId, btnId]) => {
   document.getElementById(inputId).addEventListener("keydown", e => {
     if (e.key === "Enter") { e.preventDefault(); document.getElementById(btnId).click(); }
@@ -1869,12 +1858,14 @@ function addTask(name, cond) {
   name = (name || "").trim() || "Untitled task";
   cond = (cond || "").trim() || "the page changes";
   const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  const key = "new" + (addTask._n = (addTask._n || 0) + 1);
   const fav = '<span class="favicon-sq" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 -960 960 960" width="60%" height="60%" fill="#fff"><path d="' + NOTE_ICON + '"/></svg></span>';
   const del = '<button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>';
   const dashList = document.getElementById("dash-list");
   if (dashList) {
     const d = document.createElement("div");
     d.className = "dash-item";
+    d.id = "dash-" + key;
     d.innerHTML =
       '<div class="grow" role="button" tabindex="0" aria-expanded="false">' + fav +
       '<span class="gmain"><span class="gname">' + esc(name) + '</span><br/><span class="gmeta truncate">just now</span></span>' +
@@ -1899,6 +1890,28 @@ function addTask(name, cond) {
     railList.insertBefore(m, railList.firstChild);
     const head = m.querySelector(".mitem-head");
     head.addEventListener("click", () => { const b = m.querySelector(".mstack-expand"); const open = b.classList.contains("exp-open"); setExpand(b, !open); head.setAttribute("aria-expanded", String(!open)); });
+  }
+  const swTasks = document.getElementById("sw-tasks");
+  if (swTasks) {
+    const tqFav = '<span class="tq-fav" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 -960 960 960" width="58%" height="58%" fill="#fff"><path d="' + NOTE_ICON + '"/></svg></span>';
+    const t = document.createElement("button");
+    t.className = "tq-item"; t.type = "button";
+    t.innerHTML = tqFav + '<span class="tq-body"><span class="tq-name">' + esc(name) + '</span><span class="tq-status"><span class="run-dot"></span>Just now · watching this page</span></span><span class="tq-badge">Daily</span>';
+    const activeHead = swTasks.querySelector(".tq-group");
+    if (activeHead) activeHead.insertAdjacentElement("afterend", t);
+    else swTasks.insertBefore(t, swTasks.firstChild);
+    t.addEventListener("click", () => {
+      go(5);
+      const item = document.getElementById("dash-" + key);
+      if (item) {
+        const body = item.querySelector(".mstack-expand");
+        if (body) setExpand(body, true);
+        const grow = item.querySelector(".grow"); if (grow) grow.setAttribute("aria-expanded", "true");
+        requestAnimationFrame(() => item.scrollIntoView({ block: "center", behavior: "smooth" }));
+      }
+    });
+    const n = document.getElementById("sw-tab-n");
+    if (n) n.textContent = String((parseInt(n.textContent, 10) || 0) + 1);
   }
   updateCounts();
 }
