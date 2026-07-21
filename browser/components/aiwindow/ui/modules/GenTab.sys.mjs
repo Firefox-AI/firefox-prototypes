@@ -242,17 +242,26 @@ Pick template_kind and keep the plan shape inside that template:
 - project: phases (plan → materials → build → finish).
 - generic: ordered action steps only if nothing above fits.
 
-Timeline choices (timeline_choices) are one-click mutations *within* that template — not new freeform essays.
-Good choice labels (short, actionable):
-- trip: "More days", "Fewer days", "Replace Day 2 with Osaka", "Add a food day", "Drop the day trip"
-- recipe: "Use broccoli as main", "Simplify to 5 steps", "Make it vegetarian", "Double the batch"
-- compare: "Prioritize price", "Prioritize privacy", "Drop option B"
-Bad choices: "Make it better", "Regenerate", vague advice without a structural change.
-Each choice must be supportable from the source text (no inventing cities/ingredients not in the pages).
+## Intent vs timeline edits (do not mix these up)
+Two different controls — produce different kinds of strings:
+
+| Control | Field | Means | Good examples | Never put here |
+|---------|-------|--------|---------------|----------------|
+| **Intent** | intent_suggestions | *Different GenTab job* from the same tabs | "dinner ideas", "grocery list", "3-day itinerary", "vacation idea", "interview prep" | "More days", "Use broccoli", "Replace Day 2" |
+| **Timeline choices** | timeline_choices | *Edit this plan* while keeping the same job + template | "More days", "Fewer days", "Replace Day 2 with Osaka", "Use broccoli as main" | "dinner ideas", "travel plan", "make a meal plan" |
+
+Intent = *what artifact*. Timeline choice = *how to reshape the current timeline*.
+
+Timeline choices are one-click mutations *within* template_kind — short verb phrases about structure:
+- trip: "More days", "Fewer days", "Replace Day 2 with Osaka", "Add a food day"
+- recipe: "Use broccoli as main", "Simplify to 5 steps", "Make it vegetarian"
+- compare: "Prioritize price", "Drop option B"
+Bad timeline choices: job names ("travel plan"), "Make it better", "Regenerate".
+Each choice must be supportable from the source text.
 
 ## User intent (critical)
 When a tab group name / intent is provided, that name is the job to optimize for — not a decorative title and not permission to delete tabs.
-- Same sources can support many artifacts. Title, summary, plan shape, and focus_options follow the intent.
+- Same sources can support many artifacts. Title, summary, and plan shape follow the intent.
 - Multi-source hard rule: use every provided source. Never drop a source, never call one "irrelevant", and never leave it out of sources[].
   Every source must contribute at least one concrete named item in key_facts, plan, focus_options, or detail_sections (URL-only in sources[] is not enough).
 - Infer what each tab is *about* (destination, cuisine/region, product, job…), then map that meaning through the intent.
@@ -286,23 +295,26 @@ Never invent places, dishes, brands, or steps not present in the page text. Pref
    "4 dinners planned for this week. Grocery list has 10 items across 4 recipes."
    "3-day Osaka plan · 8 stops · 3 must-try foods."
    "Japan vs Italy trip ideas · 2 destinations from your tabs."
-5) intent_suggestions — 3–6 short alternate intents (phrase labels) that would produce a *different* useful GenTab from the same sources. Do not include the current intent. Examples: "dinner ideas", "travel plan", "grocery list", "weekend itinerary", "budget trip".
+5) intent_suggestions — 3–6 *different jobs* for the same tabs (noun-y product labels). Do not include the current intent.
+   Good: "dinner ideas", "grocery list", "meal prep", "travel plan", "vacation idea", "budget trip", "interview prep".
+   Bad (those are timeline edits): "More days", "Fewer steps", "Use broccoli", "Replace Day 2".
 6) key_facts (2–${MAX_KEY_FACTS}) — answers to the questions someone with this intent would ask first.
-   Travel intent: when to go, safety, getting around.
-   Dinner intent: time, servings, difficulty, make-ahead.
-   Job intent: location, seniority, focus areas.
-   Bad: heading "Overview" with pasted intro prose.
 7) plan — THE TIMELINE (required, primary). Object { "title", "subtitle"?, "items": [{ "heading", "body" }] }.
    3–${MAX_PLAN_ITEMS} ordered steps. heading = short step label; body = what to do / see / decide at that step.
-8) timeline_choices (2–${MAX_TIMELINE_CHOICES}) — template-locked edit chips: { id, label, body, kind, step_index? }.
+8) timeline_choices (2–${MAX_TIMELINE_CHOICES}) — template-locked *plan edits*: { id, label, body, kind, step_index? }.
    kind is one of more_steps, fewer_steps, replace_step, swap_detail, simplify, enrich, alternate_path.
-   label is what the user clicks; body is the edit instruction applied if chosen.
-9) focus_options (2–${MAX_OPTIONS}) — broader forks (not the same as timeline_choices).
+   label = short verb phrase the user clicks; body = edit instruction.
+   Good: "More days", "Replace Day 2 with Osaka", "Use broccoli as main".
+   Bad (those are intents): "dinner ideas", "travel plan", "weekly meal plan".
+9) focus_options (2–${MAX_OPTIONS}) — optional *emphasis* within the same plan (not a new job, not a structural edit).
+   Good: "Walkable stops only", "Kid-friendly pace", "Weeknight-fast version".
+   Bad: "More days", "dinner ideas". Prefer leaving weak focus_options over duplicating timeline_choices or intents.
 10) detail_sections (0–${MAX_DETAIL_SECTIONS}) — optional supporting lists as { "title", "items": [{ "heading", "body" }] }.
 11) sources — optional array of { "title", "url" }.
 
 ## Quality bar
-A good GenTab is a timeline you can follow without re-reading the tabs. Two different intents on the same tabs should produce clearly different timelines.`;
+A good GenTab is a timeline you can follow without re-reading the tabs.
+Intent switch = different artifact. Timeline choice = reshape this plan. Focus = soft emphasis only.`;
 
 /** @type {Map<string, object>} */
 const gStates = new Map();
@@ -800,7 +812,51 @@ function inferTemplateKind(content, intent, sources) {
 }
 
 /**
- * Build a de-duped list of intent labels for the header switcher.
+ * True if a string looks like a plan-structure edit (belongs in timeline_choices,
+ * not intent).
+ *
+ * @param {string} label
+ * @returns {boolean}
+ */
+function looksLikeTimelineEditLabel(label) {
+  const t = (label || "").trim().toLowerCase();
+  if (!t) {
+    return false;
+  }
+  return (
+    /^(more|fewer|less|add|drop|remove|replace|swap|change|simplify|expand|compress|double|halve)\b/.test(
+      t
+    ) ||
+    /\b(days?|steps?|batch)\b/.test(t) ||
+    /^use\b/.test(t) ||
+    /^make (it |this )?/.test(t) ||
+    /as main\b/.test(t) ||
+    /day\s*\d/.test(t)
+  );
+}
+
+/**
+ * True if a string looks like a GenTab *job* (intent), not a structural edit.
+ *
+ * @param {string} label
+ * @returns {boolean}
+ */
+function looksLikeIntentLabel(label) {
+  const t = (label || "").trim().toLowerCase();
+  if (!t || looksLikeTimelineEditLabel(t)) {
+    return false;
+  }
+  // Prefer short noun-phrase jobs over imperative plan edits.
+  return (
+    /\b(ideas?|plan|list|prep|itinerary|trip|vacation|budget|apply|interview|overview|compare|shopping|grocery|meal|dinner|travel|research)\b/.test(
+      t
+    ) || t.split(/\s+/).length <= 4
+  );
+}
+
+/**
+ * Build a de-duped list of *job-level* intent labels for the header switcher.
+ * Excludes timeline-edit phrasing and focus/path variants.
  *
  * @param {object} content normalized content
  * @param {string} currentIntent
@@ -812,7 +868,10 @@ function buildIntentSuggestions(content, currentIntent, sources = []) {
   const out = [];
   const add = label => {
     const t = clampString(label, 60);
-    if (!t) {
+    if (!t || looksLikeTimelineEditLabel(t)) {
+      return;
+    }
+    if (!looksLikeIntentLabel(t) && t !== currentIntent) {
       return;
     }
     const key = t.toLowerCase();
@@ -824,41 +883,78 @@ function buildIntentSuggestions(content, currentIntent, sources = []) {
   };
 
   if (currentIntent) {
-    add(currentIntent);
+    // Always keep current job even if filter is strict.
+    const t = clampString(currentIntent, 60);
+    if (t) {
+      seen.add(t.toLowerCase());
+      out.push(t);
+    }
   }
   for (const s of content.intent_suggestions || []) {
     add(s);
   }
-  for (const f of content.focus_options || []) {
-    add(f.label);
-  }
+  // Do NOT pull focus_options into intent — those are in-plan emphasis, not jobs.
 
-  // Lightweight domain seeds from source titles when the model is thin.
-  const blob = sources
-    .map(s => s.title || "")
+  // Domain seeds: alternate *jobs* for the same tabs (orthogonal to timeline edits).
+  const blob = [
+    currentIntent,
+    ...(sources || []).map(s => s.title || ""),
+    content.title || "",
+  ]
     .join(" ")
     .toLowerCase();
-  if (/recipe|lasagna|cook|food|meal/.test(blob)) {
+  if (/recipe|lasagna|cook|food|meal|dinner|grocery/.test(blob)) {
     add("dinner ideas");
     add("grocery list");
     add("meal prep");
+    add("weekly meal plan");
   }
-  if (/osaka|tokyo|travel|trip|guide|itinerary|japan|kyoto/.test(blob)) {
+  if (
+    /osaka|tokyo|travel|trip|guide|itinerary|japan|kyoto|vacation/.test(blob)
+  ) {
     add("travel plan");
     add("vacation idea");
     add("3-day itinerary");
+    add("budget trip");
   }
-  if (/job|career|counsel|hiring|greenhouse/.test(blob)) {
+  if (/job|career|counsel|hiring|greenhouse|interview/.test(blob)) {
     add("should I apply");
     add("interview prep");
+    add("negotiation prep");
   }
 
-  if (!out.length) {
+  if (out.length < 2) {
     add("overview");
     add("action plan");
   }
 
   return out.slice(0, 8);
+}
+
+/**
+ * Drop model timeline_choices that are really job/intent labels.
+ *
+ * @param {Array} choices
+ * @returns {Array}
+ */
+function filterTimelineChoices(choices) {
+  if (!Array.isArray(choices)) {
+    return [];
+  }
+  return choices.filter(c => {
+    if (!c?.label) {
+      return false;
+    }
+    // Prefer structure-edit phrasing; reject clear job names.
+    if (looksLikeTimelineEditLabel(c.label)) {
+      return true;
+    }
+    // Allow replace/swap style labels that include a place name without verb.
+    if (c.kind && c.kind !== "alternate_path") {
+      return !looksLikeIntentLabel(c.label) || c.kind === "replace_step";
+    }
+    return !looksLikeIntentLabel(c.label);
+  });
 }
 
 /**
@@ -1000,9 +1096,8 @@ export function buildTimelineModel(content, opts = {}) {
     opts.intent || "",
     opts.sources || []
   );
-  let choices = normalizeTimelineChoices(
-    normalized.timeline_choices,
-    steps.length
+  let choices = filterTimelineChoices(
+    normalizeTimelineChoices(normalized.timeline_choices, steps.length)
   );
   if (choices.length < 2) {
     choices = defaultTimelineChoices(templateKind, steps);
@@ -1012,7 +1107,7 @@ export function buildTimelineModel(content, opts = {}) {
     title: normalized.plan.title || "Timeline",
     subtitle:
       normalized.plan.subtitle ||
-      "Follow these steps in order — check off as you go. Use suggestions to reshape the plan.",
+      "Follow these steps in order — check off as you go.",
     templateKind,
     steps,
     choices,
@@ -1091,12 +1186,12 @@ export function mapContentToFeatureConfig(content, sourceMeta = {}) {
       selected: "none",
       autoTrigger: false,
       title: {
-        raw: "Alternate paths",
+        raw: "Emphasize (optional)",
         fontSize: "18px",
         fontWeight: "600",
       },
       subtitle: {
-        raw: "Optional forks — the checked timeline stays your progress.",
+        raw: "Soft preference within this plan — not a new GenTab job, and not a restructure. Use “Reshape plan” chips for structural edits.",
         fontSize: "14px",
         fontWeight: 320,
       },

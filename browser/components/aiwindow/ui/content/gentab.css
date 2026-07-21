@@ -192,11 +192,18 @@ body {
 }
 
 .gentab-intent-panel-title {
-  margin: 0 0 8px;
+  margin: 0 0 4px;
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  color: light-dark(var(--color-gray-60, #5b5b66), var(--color-gray-40, #bfbfc9));
+}
+
+.gentab-intent-panel-hint {
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  line-height: 1.35;
   color: light-dark(var(--color-gray-60, #5b5b66), var(--color-gray-40, #bfbfc9));
 }
 
@@ -467,11 +474,18 @@ body {
 }
 
 .gentab-timeline-choices-label {
-  margin: 0 0 8px;
+  margin: 0 0 4px;
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  color: light-dark(var(--color-gray-60, #5b5b66), var(--color-gray-40, #bfbfc9));
+}
+
+.gentab-timeline-choices-hint {
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  line-height: 1.35;
   color: light-dark(var(--color-gray-60, #5b5b66), var(--color-gray-40, #bfbfc9));
 }
 

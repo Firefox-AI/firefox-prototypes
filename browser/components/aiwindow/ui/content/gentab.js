@@ -418,10 +418,11 @@ function renderHeader(state) {
   intentControl.setAttribute(
     "aria-label",
     intent
-      ? `Intent: ${intent}. Activate to change.`
-      : "Intent: Auto. Activate to choose or type an intent."
+      ? `Make: ${intent}. Choose a different GenTab job from these tabs.`
+      : "Make: Auto. Choose what kind of GenTab to build from these tabs."
   );
-  intentControl.title = "Change intent and regenerate GenTab";
+  intentControl.title =
+    "What to make from these tabs (different job → new GenTab). Plan edits are under the timeline.";
 
   populateIntentSuggestions(suggestions, intent);
 
@@ -467,7 +468,8 @@ async function applyIntent(intent) {
   }
 
   closeIntentPanel();
-  showStatus(`Regenerating GenTab for “${next}”…`);
+  // Intent = new job → full GenTab rebuild is expected (unlike timeline reshape).
+  showStatus(`Making GenTab: “${next}”…`);
   document.getElementById("gentab-header").hidden = true;
   const main = document.getElementById("gentab-main");
   if (main) {
@@ -480,7 +482,7 @@ async function applyIntent(intent) {
     window.location.reload();
   } catch (error) {
     console.error(error);
-    showStatus(error?.message || "Could not regenerate GenTab.");
+    showStatus(error?.message || "Could not make GenTab.");
     document.getElementById("gentab-header").hidden = false;
     if (main) {
       main.hidden = false;

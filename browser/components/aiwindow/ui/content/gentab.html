@@ -65,7 +65,7 @@
               aria-expanded="false"
               aria-controls="gentab-intent-panel"
             >
-              <span class="gentab-chip-label">Intent</span>
+              <span class="gentab-chip-label">Make</span>
               <span id="gentab-intent-value" class="gentab-chip-value">—</span>
               <span class="gentab-chip-caret" aria-hidden="true">▾</span>
             </button>
@@ -74,20 +74,24 @@
               class="gentab-intent-panel"
               hidden
               role="dialog"
-              aria-label="Choose or enter intent"
+              aria-label="Choose what GenTab to make from these tabs"
             >
-              <p class="gentab-intent-panel-title">Switch intent</p>
+              <p class="gentab-intent-panel-title">What to make</p>
+              <p class="gentab-intent-panel-hint">
+                Different job from the same tabs (new GenTab). Plan edits live
+                under the timeline.
+              </p>
               <ul
                 id="gentab-intent-suggestions"
                 class="gentab-intent-suggestions"
                 role="listbox"
-                aria-label="Suggested intents"
+                aria-label="Suggested GenTab jobs"
               ></ul>
               <div class="gentab-intent-custom">
                 <label
                   class="gentab-intent-custom-label"
                   for="gentab-intent-input"
-                  >Custom</label
+                  >Custom job</label
                 >
                 <div class="gentab-intent-custom-row">
                   <input
@@ -95,7 +99,7 @@
                     class="gentab-intent-input"
                     type="text"
                     maxlength="60"
-                    placeholder="Type an intent…"
+                    placeholder="e.g. grocery list, budget trip…"
                     autocomplete="off"
                   />
                   <button
@@ -103,7 +107,7 @@
                     id="gentab-intent-apply"
                     class="gentab-intent-apply"
                   >
-                    Apply
+                    Make
                   </button>
                 </div>
               </div>
@@ -141,12 +145,16 @@
           class="gentab-timeline-choices"
           hidden
         >
-          <p class="gentab-timeline-choices-label">Suggested changes</p>
+          <p class="gentab-timeline-choices-label">Reshape this plan</p>
+          <p class="gentab-timeline-choices-hint">
+            Same job — change days, steps, or details. To make a different kind
+            of GenTab, use Make above.
+          </p>
           <div
             id="gentab-timeline-choices-list"
             class="gentab-timeline-choices-list"
             role="group"
-            aria-label="Template-locked timeline choices"
+            aria-label="Reshape this plan"
           ></div>
         </div>
       </section>
