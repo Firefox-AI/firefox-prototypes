@@ -364,6 +364,25 @@ h1,h2,h3,h4,p { margin: 0; }
 .time-input { display: inline-flex; align-items: center; gap: var(--space-small); width: 100%; border: 1px solid var(--border-color); border-radius: var(--border-radius-medium); padding: 6px var(--space-medium); background: var(--background-color-box); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--text-color); cursor: pointer; }
 .time-input svg { width: 15px; height: 15px; fill: none; stroke: var(--text-color-deemphasized); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; margin-inline-start: auto; }
 .note-icon { fill: currentColor !important; stroke: none !important; }
+/* Tasks monitoring queue — glanceable status objects (left sidepanel + about page) */
+.tq-group { font-size: 11px; font-weight: var(--font-weight-semibold); letter-spacing: .05em; text-transform: uppercase; color: var(--text-color-deemphasized); padding: var(--space-medium) var(--space-xsmall) var(--space-xxsmall); }
+.tq-group:first-child { padding-top: 2px; }
+.tq-item { display: flex; align-items: center; gap: var(--space-small); width: 100%; padding: var(--space-small); border-radius: var(--border-radius-medium); text-align: start; }
+.tq-item:hover { background: var(--background-color-box-info); }
+.tq-fav { width: 30px; height: 30px; border-radius: var(--border-radius-small); flex: none; display: grid; place-items: center; overflow: hidden; color: #fff; }
+.tq-fav.lt { font-weight: var(--font-weight-bold); font-size: var(--font-size-small); }
+.tq-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.tq-name { font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tq-status { font-size: var(--font-size-small); color: var(--text-color-deemphasized); display: flex; align-items: center; gap: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tq-status svg { width: 13px; height: 13px; flex: none; }
+.tq-status .ok { color: var(--text-color-success); }
+.tq-status .attn { color: var(--icon-color-warning); }
+.tq-status .val { color: var(--text-color-success); font-weight: var(--font-weight-semibold); }
+.tq-badge { margin-inline-start: auto; flex: none; font-size: 11px; font-weight: var(--font-weight-semibold); padding: 2px 8px; border-radius: var(--border-radius-circle); background: var(--background-color-box-info); color: var(--text-color-deemphasized); }
+.run-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent-primary); flex: none; animation: run-pulse 1.4s ease-in-out infinite; }
+@keyframes run-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .run-dot { animation: none; } }
+.rail-panel-body.tq-list { gap: 0; }
 .modal-hero { display: flex; flex-direction: column; gap: 4px; }
 .modal-desc { margin: 0; color: var(--text-color-deemphasized); font-size: var(--font-size-small); line-height: 1.5; }
 .select-wrap { position: relative; display: inline-flex; }
@@ -749,80 +768,35 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         <span style="flex:1"></span>
         <button class="btn-primary" id="panel-new" style="display:inline-flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Create a task</button>
       </div>
-      <div class="rail-panel-body" id="rail-list">
-        <div class="mcard mitem">
-          <button class="mitem-head" aria-expanded="false">
-            <span class="favicon-sq" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span>
-            <span class="mit"><span class="mcard-name">Sony WH-1000XM5 price</span><span class="mcard-url">Below $270 · Daily</span></span>
-            <span class="status-chip">$278 ▼ −7%</span>
-            <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
-            <div class="history">
-              <div class="hist-item"><span class="when">Today</span><span class="oldv">$299</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$278</span><span class="deemphasized">met your alert</span></div>
-              <div class="hist-item low"><span class="when">Jun 24</span><span>checked, no change</span></div>
-              <div class="hist-item"><span class="when">Jun 17</span><span class="deemphasized">first checked · $299</span></div>
-            </div>
-            <a class="accent-link" href="#5" data-open-tools="sony">See and edit on about:smartwindowtasks</a>
-          </div></div></div>
-        </div>
-        <div class="mcard mitem">
-          <button class="mitem-head" aria-expanded="false">
-            <span class="favicon-sq" style="background:#2f855a">R</span>
-            <span class="mit"><span class="mcard-name">REI Danner hiking boots</span><span class="mcard-url">rei.com · page changed</span></span>
-            <span class="flag-attn"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg> Needs a look</span>
-            <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
-            <p class="small" style="margin:0">The page changed and Firefox can't find the price.</p>
-            <div class="history">
-              <div class="hist-item"><span class="when">Jun 30</span><span class="hist-flag">value lost</span><span class="deemphasized">the page changed</span></div>
-              <div class="hist-item"><span class="when">Jun 12</span><span class="deemphasized">first checked · $189</span></div>
-            </div>
-            <a class="accent-link" href="#5" data-open-tools="rei">See and edit on about:smartwindowtasks</a>
-          </div></div></div>
-        </div>
-        <div class="mcard mitem">
-          <button class="mitem-head" aria-expanded="false">
-            <span class="favicon-sq" style="background:#3a7ae8">C</span>
-            <span class="mit"><span class="mcard-name">Apartment listings · Mission</span><span class="mcard-url">craigslist.org · checked 12m ago</span></span>
-            <span class="status-chip">3 new</span>
-            <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
-            <div class="history">
-              <div class="hist-item"><span class="when">Today</span><span class="newv" style="color:var(--text-color-success)">3 new listings</span></div>
-              <div class="hist-item"><span class="when">Yesterday</span><span class="newv">2 new listings</span></div>
-            </div>
-            <a class="accent-link" href="#5" data-open-tools="apt">See and edit on about:smartwindowtasks</a>
-          </div></div></div>
-        </div>
-        <div class="mcard mitem">
-          <button class="mitem-head" aria-expanded="false">
-            <span class="favicon-sq" style="background:linear-gradient(135deg,#db54bf,#f4682c)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg></span>
-            <span class="mit"><span class="mcard-name">Best Buy checkout codes</span><span class="mcard-url">3 codes found · ran 2h ago</span></span>
-            <span class="status-chip">Saves $12</span>
-            <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
-            <div class="mrow"><span class="lbl">Best code</span><span class="val">SAVE12 · $12 off</span></div>
-            <div class="mrow"><span class="lbl">Also found</span><span class="val">FREESHIP · WELCOME10</span></div>
-            <a class="accent-link" href="#5" data-open-tools="scout">See on about:smartwindowtasks</a>
-          </div></div></div>
-        </div>
-        <div class="mcard mitem">
-          <button class="mitem-head" aria-expanded="false">
-            <span class="favicon-sq" style="background:linear-gradient(135deg,#455fe7,#10a4ca)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg></span>
-            <span class="mit"><span class="mcard-name">ANC headphones under $300</span><span class="mcard-url">14 sources · finished yesterday</span></span>
-            <span class="status-chip">Report ready</span>
-            <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">
-            <div class="mrow"><span class="lbl">Top pick</span><span class="val">Sony WH-1000XM5 at $278</span></div>
-            <div class="mrow"><span class="lbl">Sources</span><span class="val">14 · finished yesterday</span></div>
-            <a class="accent-link" href="#5" data-open-tools="research">See on about:smartwindowtasks</a>
-          </div></div></div>
-        </div>
+      <div class="rail-panel-body tq-list" id="rail-list">
+        <div class="tq-group">Active</div>
+        <button class="tq-item" data-open-tools="stvincent">
+          <span class="tq-fav lt" style="background:#b3202a">S</span>
+          <span class="tq-body"><span class="tq-name">Find St. Vincent tickets</span><span class="tq-status"><span class="run-dot"></span>Working… · checking 6 sites</span></span>
+        </button>
+        <button class="tq-item" data-open-tools="sony">
+          <span class="tq-fav" style="background:#0046be"><svg viewBox="0 0 24 24" width="60%" height="60%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span>
+          <span class="tq-body"><span class="tq-name">Sony WH-1000XM5 price</span><span class="tq-status"><svg class="ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Checked 3m ago · <span class="val">dropped to $278</span></span></span>
+          <span class="tq-badge">Daily</span>
+        </button>
+        <button class="tq-item" data-open-tools="apt">
+          <span class="tq-fav lt" style="background:#3a7ae8">C</span>
+          <span class="tq-body"><span class="tq-name">Apartment listings · Mission</span><span class="tq-status"><span class="val">3 new</span> since yesterday</span></span>
+          <span class="tq-badge">Daily</span>
+        </button>
+        <button class="tq-item" data-open-tools="rei">
+          <span class="tq-fav lt" style="background:#2f855a">R</span>
+          <span class="tq-body"><span class="tq-name">REI Danner hiking boots</span><span class="tq-status"><svg class="attn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>Needs a look · the page changed</span></span>
+        </button>
+        <div class="tq-group">Recent</div>
+        <button class="tq-item" data-open-tools="scout">
+          <span class="tq-fav" style="background:linear-gradient(135deg,#db54bf,#f4682c)"><svg viewBox="0 0 24 24" width="58%" height="58%" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg></span>
+          <span class="tq-body"><span class="tq-name">Best Buy checkout codes</span><span class="tq-status"><svg class="ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="val">3 codes found</span> · 2h ago</span></span>
+        </button>
+        <button class="tq-item" data-open-tools="research">
+          <span class="tq-fav" style="background:linear-gradient(135deg,#455fe7,#10a4ca)"><svg viewBox="0 0 24 24" width="56%" height="56%" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg></span>
+          <span class="tq-body"><span class="tq-name">ANC headphones under $300</span><span class="tq-status"><svg class="ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Report ready · 1d ago</span></span>
+        </button>
       </div>
       <div class="rail-panel-foot"><a class="accent-link" href="#5" id="panel-open-about">Open about:smartwindowtasks</a></div>
     </aside>
@@ -882,13 +856,32 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <span class="spacer"></span>
             <button class="btn-primary" id="page-add-new" style="display:inline-flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Create a task</button>
           </div>
-          <div class="tasks-sub" data-show="5 6"><span id="tasks-count">6 tasks</span></div>
+          <div class="tasks-sub" data-show="5 6"><span id="tasks-count">7 tasks</span></div>
 
           <!-- Empty-state lead (only when there are no monitors) -->
           <div class="empty-lead" data-show="10"><h3>No tasks yet</h3><p>Create a task and Firefox will watch, find, or look into things for you.</p></div>
 
           <!-- Populated: running + paused monitors -->
+          <div class="group-label" data-show="5 6">Active</div>
           <div data-show="5 6" id="dash-list">
+            <div class="dash-item" id="dash-stvincent">
+              <div class="grow" role="button" tabindex="0" aria-expanded="false">
+                <span class="favicon-sq" style="background:#b3202a">S</span>
+                <span class="gmain"><span class="gname">Find St. Vincent tickets</span><br/><span class="gmeta truncate">checking 6 sites · started 2m ago</span></span>
+                <span class="gvalue"><span class="now" style="display:inline-flex;align-items:center;gap:6px"><span class="run-dot"></span>Working…</span><br/><span class="sub">2 under $120 · Oct 3</span></span>
+              </div>
+              <div class="mstack-expand"><div class="mstack-expand-inner">
+              <div class="mcard">
+                <p class="mon-sentence">Finding <b>2 tickets under $120</b> · St. Vincent · Oct 3 · Brooklyn Steel.</p>
+                <div class="history">
+                  <div class="hist-head">Progress</div>
+                  <div class="hist-item"><span class="when">Now</span><span class="deemphasized">checking StubHub, SeatGeek, AXS +3</span></div>
+                  <div class="hist-item"><span class="when">2m ago</span><span class="deemphasized">started</span></div>
+                </div>
+                <div class="mcard-actions"><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+              </div>
+              </div></div>
+            </div>
             
             <div class="dash-item" id="dash-sony">
               <div class="grow" id="row-sony" role="button" tabindex="0" aria-expanded="false">
@@ -993,6 +986,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <div class="skel"><div class="sk circle"></div><div style="flex:1"><div class="sk line" style="width:38%;margin-bottom:7px"></div><div class="sk line" style="width:58%"></div></div><div class="sk line" style="width:54px;height:20px"></div></div>
           </div>
 
+          <div class="group-label" data-show="5 6">Recent</div>
           <div class="dash-item" data-show="5 6" id="dash-scout">
             <div class="grow" role="button" tabindex="0" aria-expanded="false">
               <span class="favicon-sq" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span>
@@ -1789,17 +1783,22 @@ function addTask(name, cond) {
   }
   const railList = document.getElementById("rail-list");
   if (railList) {
-    const m = document.createElement("div");
-    m.className = "mcard mitem";
-    m.innerHTML =
-      '<button class="mitem-head" aria-expanded="false">' + fav +
-      '<span class="mit"><span class="mcard-name">' + esc(name) + '</span><span class="mcard-url">Daily</span></span>' +
-      '<span class="status-chip">Watching</span><svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>' +
-      '<div class="mstack-expand"><div class="mstack-expand-inner"><div class="mitem-body">' +
-      '<div class="history"><div class="hist-item"><span class="when">Just now</span><span class="deemphasized">created</span></div></div></div></div></div>';
-    railList.insertBefore(m, railList.firstChild);
-    const head = m.querySelector(".mitem-head");
-    head.addEventListener("click", () => { const b = m.querySelector(".mstack-expand"); const open = b.classList.contains("exp-open"); setExpand(b, !open); head.setAttribute("aria-expanded", String(!open)); });
+    const tqFav = '<span class="tq-fav" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 -960 960 960" width="58%" height="58%" fill="#fff"><path d="' + NOTE_ICON + '"/></svg></span>';
+    const t = document.createElement("button");
+    t.className = "tq-item"; t.type = "button";
+    t.innerHTML = tqFav + '<span class="tq-body"><span class="tq-name">' + esc(name) + '</span><span class="tq-status"><span class="run-dot"></span>Just now · watching</span></span><span class="tq-badge">Daily</span>';
+    const activeHead = railList.querySelector(".tq-group");
+    if (activeHead) activeHead.insertAdjacentElement("afterend", t);
+    else railList.insertBefore(t, railList.firstChild);
+    t.addEventListener("click", () => {
+      go(5);
+      const item = document.getElementById("dash-" + key);
+      if (item) {
+        const body = item.querySelector(".mstack-expand"); if (body) setExpand(body, true);
+        const grow = item.querySelector(".grow"); if (grow) grow.setAttribute("aria-expanded", "true");
+        requestAnimationFrame(() => item.scrollIntoView({ block: "center", behavior: "smooth" }));
+      }
+    });
   }
   updateCounts();
 }
