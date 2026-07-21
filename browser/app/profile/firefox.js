@@ -2326,6 +2326,8 @@ pref("browser.smartwindow.enabled", false);
 pref("browser.smartwindow.gentab.enabled", true);
 // Last single-select option id chosen on a GenTab (spike only)
 pref("browser.smartwindow.gentab.lastOption", "");
+// JSON array of learned preference signals from timeline choices (spike)
+pref("browser.smartwindow.gentab.preferenceMemory", "[]");
 // Default endpoint for preset models
 pref("browser.smartwindow.endpoint", "https://mlpa-prod-prod-mozilla.global.ssl.fastly.net/v1");
 pref("browser.smartwindow.memories.generateFromHistory", true);

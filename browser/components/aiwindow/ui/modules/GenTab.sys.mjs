@@ -49,6 +49,10 @@ const MAX_OPTIONS = 3;
 const MAX_DETAIL_SECTIONS = 2;
 const MAX_DETAIL_ITEMS = 5;
 const MAX_TIMELINE_CHOICES = 6;
+/** Durable taste/constraint signals from prior timeline choices. */
+const PREF_PREFERENCE_MEMORY = "browser.smartwindow.gentab.preferenceMemory";
+const MAX_PREFERENCE_MEMORY = 20;
+const MAX_PREFS_IN_PROMPT = 12;
 
 /** @typedef {"trip"|"recipe"|"compare"|"project"|"generic"} TimelineTemplateKind */
 
@@ -314,7 +318,13 @@ Never invent places, dishes, brands, or steps not present in the page text. Pref
 
 ## Quality bar
 A good GenTab is a timeline you can follow without re-reading the tabs.
-Intent switch = different artifact. Timeline choice = reshape this plan. Focus = soft emphasis only.`;
+Intent switch = different artifact. Timeline choice = reshape this plan. Focus = soft emphasis only.
+
+## Learned preferences
+When the user message includes HARD CONSTRAINTS FROM USER MEMORY, those are durable general preferences (e.g. signal "vegetarian"), not one-off edits to a single dish.
+- Honor them for this GenTab when domains match (food prefs on recipe/meal plans, etc.).
+- Apply generally — never keep them scoped to the original recipe/day that taught the preference.
+- Surface the preference in header_blurb and bake it into plan steps.`;
 
 /** @type {Map<string, object>} */
 const gStates = new Map();
@@ -1945,11 +1955,407 @@ function charsBudgetPerSource(sourceCount) {
   return Math.min(MAX_CHARS_PER_TAB, Math.max(MIN_CHARS_PER_TAB, fair));
 }
 
+/**
+ * Canonical taste/constraint extractors. Match label/text only (never dish-specific
+ * bodies like "lentils in the Bolognese") so prefs transfer across GenTabs.
+ */
+const PREFERENCE_SIGNAL_RULES = [
+  {
+    re: /\bvegetarian\b|\bno\s+meat\b|\bmeatless\b/i,
+    signal: "vegetarian",
+    domains: ["food", "recipe", "meal", "grocery"],
+  },
+  {
+    re: /\bvegan\b/i,
+    signal: "vegan",
+    domains: ["food", "recipe", "meal", "grocery"],
+  },
+  {
+    re: /\bgluten[- ]?free\b/i,
+    signal: "gluten-free",
+    domains: ["food", "recipe", "meal", "grocery"],
+  },
+  {
+    re: /\bdairy[- ]?free\b|\blactose\b/i,
+    signal: "dairy-free",
+    domains: ["food", "recipe", "meal", "grocery"],
+  },
+  {
+    re: /\bbudget\b|\bcheap\b|\baffordable\b|\blow[- ]?cost\b/i,
+    signal: "budget",
+    domains: ["trip", "compare", "project", "food"],
+  },
+  {
+    re: /\bkid[- ]?friendly\b|\bfamily[- ]?friendly\b|\bkids?\b/i,
+    signal: "kid-friendly",
+    domains: ["trip", "recipe", "meal", "project"],
+  },
+  {
+    re: /\bwalkable\b|\bwalking\b|\bno\s+car\b/i,
+    signal: "walkable",
+    domains: ["trip"],
+  },
+  {
+    re: /\bweeknight\b|\bquick\b|\bfast\b|\b30\s*min/i,
+    signal: "weeknight-fast",
+    domains: ["food", "recipe", "meal"],
+  },
+  {
+    re: /\bsimplif|\bfewer\s+ingredients\b|\bminimal\b/i,
+    signal: "simpler",
+    domains: ["food", "recipe", "project", "generic"],
+  },
+];
+
+const TEMPLATE_DOMAIN_MAP = {
+  recipe: ["food", "recipe", "meal", "grocery"],
+  trip: ["trip"],
+  compare: ["compare"],
+  project: ["project"],
+  generic: ["generic"],
+};
+
+/**
+ * @param {string} label
+ * @param {string} [templateKind]
+ * @returns {{ signal: string, domains: string[] }}
+ */
+function extractPreferenceSignal(label, templateKind = "generic") {
+  const text = (label || "").trim();
+  for (const rule of PREFERENCE_SIGNAL_RULES) {
+    if (rule.re.test(text)) {
+      return { signal: rule.signal, domains: [...rule.domains] };
+    }
+  }
+  // Fallback: short label itself, domains from template.
+  const domains = TEMPLATE_DOMAIN_MAP[templateKind] || ["generic"];
+  const signal = clampString(
+    text.replace(/^make\s+it\s+/i, "").trim() || text,
+    40
+  );
+  return { signal: signal.toLowerCase(), domains: [...domains] };
+}
+
+/**
+ * Normalize a stored or raw entry into a portable preference signal.
+ * Drops dish-specific bodies so "vegetarian for lasagna" becomes "vegetarian".
+ *
+ * @param {object} raw
+ * @returns {object | null}
+ */
+function normalizePreferenceEntry(raw) {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const label = clampString(raw.label || raw.text || "", 50);
+  if (!label) {
+    return null;
+  }
+  const templateKind = clampString(raw.templateKind || "generic", 20);
+  const extracted =
+    raw.signal && Array.isArray(raw.domains) && raw.domains.length
+      ? {
+          signal: clampString(raw.signal, 40),
+          domains: raw.domains.map(d => clampString(d, 20)).filter(Boolean),
+        }
+      : extractPreferenceSignal(label, templateKind);
+  if (!extracted.signal) {
+    return null;
+  }
+  return {
+    signal: extracted.signal,
+    text: label,
+    label,
+    domains: extracted.domains.length
+      ? extracted.domains
+      : TEMPLATE_DOMAIN_MAP[templateKind] || ["generic"],
+    templateKind,
+    intent: clampString(raw.intent || "", 60),
+    at: typeof raw.at === "number" ? raw.at : 0,
+  };
+}
+
+/**
+ * @returns {Array<{signal: string, text: string, label: string, domains: string[], templateKind: string, intent: string, at: number}>}
+ */
+function loadPreferenceMemory() {
+  try {
+    const raw = Services.prefs.getStringPref(PREF_PREFERENCE_MEMORY, "[]");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    const bySignal = new Map();
+    let needsRewrite = false;
+    for (const item of parsed) {
+      const entry = normalizePreferenceEntry(item);
+      if (!entry) {
+        needsRewrite = true;
+        continue;
+      }
+      // Old spike entries stored dish-specific bodies and no signal.
+      if (!item.signal || item.body) {
+        needsRewrite = true;
+      }
+      const key = entry.signal.toLowerCase();
+      if (
+        !bySignal.has(key) ||
+        (entry.at || 0) >= (bySignal.get(key).at || 0)
+      ) {
+        bySignal.set(key, entry);
+      }
+    }
+    const list = [...bySignal.values()].sort(
+      (a, b) => (b.at || 0) - (a.at || 0)
+    );
+    if (needsRewrite && list.length) {
+      // Persist portable form so about:config is readable and prompt stays general.
+      savePreferenceMemory(list);
+    }
+    return list;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * @param {Array<object>} entries
+ */
+function savePreferenceMemory(entries) {
+  try {
+    const trimmed = [];
+    const seen = new Set();
+    for (const raw of entries || []) {
+      const entry = normalizePreferenceEntry(raw);
+      if (!entry) {
+        continue;
+      }
+      const key = entry.signal.toLowerCase();
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      trimmed.push({
+        signal: entry.signal,
+        text: entry.text,
+        label: entry.label,
+        domains: entry.domains,
+        templateKind: entry.templateKind,
+        intent: entry.intent,
+        at: entry.at || Date.now(),
+      });
+      if (trimmed.length >= MAX_PREFERENCE_MEMORY) {
+        break;
+      }
+    }
+    Services.prefs.setStringPref(
+      PREF_PREFERENCE_MEMORY,
+      JSON.stringify(trimmed)
+    );
+  } catch (error) {
+    console.warn("GenTab: failed to save preference memory", error);
+  }
+}
+
+/**
+ * Pure length/count edits are plan-local; taste/constraint choices are durable.
+ * e.g. keep "Make it vegetarian", skip "More days" / "Fewer steps".
+ *
+ * @param {{ kind?: string }} choice
+ * @returns {boolean}
+ */
+function isDurablePreferenceChoice(choice) {
+  const kind = choice?.kind || "";
+  if (kind === "more_steps" || kind === "fewer_steps") {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Record a timeline choice as a portable preference signal for future GenTabs.
+ * Stores the generalized signal (e.g. "vegetarian"), not the dish-specific body.
+ *
+ * @param {{ id?: string, label?: string, body?: string, kind?: string }} choice
+ * @param {{ templateKind?: string, intent?: string }} [context]
+ * @returns {object | null} recorded entry
+ */
+function recordPreferenceFromChoice(choice, context = {}) {
+  if (!isDurablePreferenceChoice(choice)) {
+    return null;
+  }
+  const label = clampString(choice?.label || "", 50);
+  if (!label) {
+    return null;
+  }
+
+  const templateKind = clampString(context.templateKind || "generic", 20);
+  const entry = normalizePreferenceEntry({
+    label,
+    text: label,
+    templateKind,
+    intent: context.intent || "",
+    at: Date.now(),
+  });
+  if (!entry) {
+    return null;
+  }
+
+  const key = entry.signal.toLowerCase();
+  const existing = loadPreferenceMemory().filter(
+    e => (e.signal || "").toLowerCase() !== key
+  );
+  existing.unshift(entry);
+  savePreferenceMemory(existing);
+  console.warn(
+    `GenTab preference remembered: signal=${entry.signal} domains=${entry.domains.join(",")}`
+  );
+  return entry;
+}
+
+/**
+ * Infer topic domains for the current generation so we only inject relevant prefs.
+ *
+ * @param {Array<{ title?: string, text?: string }>} sources
+ * @param {{ groupLabel?: string, templateKind?: string }} [options]
+ * @returns {Set<string>}
+ */
+function inferContextDomains(sources, options = {}) {
+  const domains = new Set();
+  const templateKind = options.templateKind || "";
+  for (const d of TEMPLATE_DOMAIN_MAP[templateKind] || []) {
+    domains.add(d);
+  }
+
+  const blob = [
+    options.groupLabel || "",
+    ...(sources || []).map(
+      s => `${s.title || ""} ${(s.text || "").slice(0, 1200)}`
+    ),
+  ]
+    .join("\n")
+    .toLowerCase();
+
+  if (
+    /\b(recipe|cook|cooking|dinner|meal|food|ingredient|grocery|bolognese|pasta|lasagna|vegetarian|vegan|dish|kitchen|bake|sauce)\b/.test(
+      blob
+    )
+  ) {
+    domains.add("food");
+    domains.add("recipe");
+    domains.add("meal");
+    domains.add("grocery");
+  }
+  if (
+    /\b(trip|travel|itinerary|vacation|hotel|flight|city|day\s*1|osaka|tokyo|kyoto|destination)\b/.test(
+      blob
+    )
+  ) {
+    domains.add("trip");
+  }
+  if (/\b(compare|vs\.?|versus|tradeoff|option a|option b)\b/.test(blob)) {
+    domains.add("compare");
+  }
+  if (/\b(project|build|diy|materials|steps to)\b/.test(blob)) {
+    domains.add("project");
+  }
+  if (!domains.size) {
+    domains.add("generic");
+  }
+  return domains;
+}
+
+/**
+ * Prefs whose domains overlap the current context (or are generic enough).
+ *
+ * @param {Array<object>} entries
+ * @param {Set<string>} contextDomains
+ * @returns {Array<object>}
+ */
+function selectRelevantPreferences(entries, contextDomains) {
+  const list = entries || [];
+  if (!list.length) {
+    return [];
+  }
+  if (!contextDomains?.size) {
+    return list.slice(0, MAX_PREFS_IN_PROMPT);
+  }
+  const relevant = list.filter(entry => {
+    const domains = entry.domains || [];
+    if (!domains.length) {
+      return true;
+    }
+    return domains.some(d => contextDomains.has(d) || d === "generic");
+  });
+  // If domain filter drops everything but we have food-ish signals and no trip
+  // context, still surface them when blob looked non-food — skip that.
+  // Prefer relevant; if none, return empty so we don't force trip prefs on recipes.
+  return relevant.slice(0, MAX_PREFS_IN_PROMPT);
+}
+
+/**
+ * Prompt lines for preferences selected as relevant to this GenTab.
+ *
+ * @param {Array<object>} relevant
+ * @returns {string[]}
+ */
+function preferenceMemoryPromptLines(relevant) {
+  if (!relevant?.length) {
+    return [];
+  }
+  return [
+    "=== HARD CONSTRAINTS FROM USER MEMORY (must honor) ===",
+    "The user previously chose these as durable preferences across GenTabs.",
+    "They are GENERAL constraints (not tied to one dish/day). Apply them now:",
+    ...relevant.map(entry => {
+      const domains = (entry.domains || []).join(", ");
+      return `- PREFERENCE: ${entry.signal}${domains ? ` [domains: ${domains}]` : ""} — phrasing was “${entry.text}”`;
+    }),
+    "Rules:",
+    "- Bake each relevant preference into plan steps, key_facts, and header_blurb (mention it briefly, e.g. “vegetarian”).",
+    "- For food prefs (vegetarian/vegan/etc.): omit meat/fish (or other excluded items); substitute plant proteins when sources allow; do not re-offer meat as the default.",
+    "- Do NOT limit the preference to the original dish (e.g. Bolognese) — apply the general constraint to THIS GenTab.",
+    "- You may still list a timeline_choice to relax the preference if needed.",
+    "=== END MEMORY CONSTRAINTS ===",
+    "",
+  ];
+}
+
+/**
+ * Resolve which prefs to inject for this generation.
+ *
+ * @param {Array<{ title?: string, text?: string }>} sources
+ * @param {object} [options]
+ * @returns {{ all: object[], relevant: object[], domains: string[] }}
+ */
+function resolvePreferenceMemoryForPrompt(sources, options = {}) {
+  const all = options.preferenceMemory || loadPreferenceMemory();
+  const domainSet = inferContextDomains(sources, options);
+  // When applying a timeline edit mid-session, still pass full memory but
+  // relevance uses current template when known.
+  if (options.timelineEdit && options.templateKind) {
+    for (const d of TEMPLATE_DOMAIN_MAP[options.templateKind] || []) {
+      domainSet.add(d);
+    }
+  }
+  const relevant = selectRelevantPreferences(all, domainSet);
+  return {
+    all,
+    relevant,
+    domains: [...domainSet],
+  };
+}
+
 function buildMultiSourceUserMessage(sources, options = {}) {
   const groupLabel = clampString(options.groupLabel || "", 120);
   const sourceList = sources
     .map((source, index) => `${index + 1}. ${source.title} — ${source.url}`)
     .join("\n");
+
+  const prefResolved =
+    options.preferenceResolved ||
+    resolvePreferenceMemoryForPrompt(sources, options);
+  const prefBlock = preferenceMemoryPromptLines(prefResolved.relevant);
 
   const edit = options.timelineEdit;
   const prior = options.priorTimeline;
@@ -2016,6 +2422,8 @@ function buildMultiSourceUserMessage(sources, options = {}) {
   const header =
     sources.length === 1
       ? [
+          // Prefs first so the model sees constraints before long page text.
+          ...prefBlock,
           "Synthesize a useful GenTab JSON object from this untrusted page.",
           ...intentBlock,
           "Prioritize concrete places, days, foods, steps, transit, tradeoffs, or decision facts as appropriate for the intent.",
@@ -2030,6 +2438,7 @@ function buildMultiSourceUserMessage(sources, options = {}) {
           ">>>",
         ]
       : [
+          ...prefBlock,
           `Synthesize a useful GenTab JSON object from these ${sources.length} untrusted pages (open tab group).`,
           ...intentBlock,
           "Compose one coherent multi-source artifact for the intent.",
@@ -2065,12 +2474,26 @@ function buildMultiSourceUserMessage(sources, options = {}) {
 
 /**
  * @param {Array<{ text: string, url: string, title: string }>} sources
- * @param {{ groupLabel?: string }} [options]
+ * @param {{ groupLabel?: string, preferenceResolved?: object }} [options]
  * @returns {Promise<object>}
  */
 async function generateContentWithLLM(sources, options = {}) {
   const conversation = await lazy.buildConversation(MODEL_FEATURES.CHAT);
   conversation.setSystemMessage(SYSTEM_PROMPT);
+  if (!options.preferenceResolved) {
+    options.preferenceResolved = resolvePreferenceMemoryForPrompt(
+      sources,
+      options
+    );
+  }
+  if (options.preferenceResolved.relevant?.length) {
+    console.warn(
+      "GenTab injecting memory:",
+      options.preferenceResolved.relevant.map(p => p.signal).join(", "),
+      "domains=",
+      options.preferenceResolved.domains.join(",")
+    );
+  }
   conversation.addUserMessage(buildMultiSourceUserMessage(sources, options));
 
   let response;
@@ -2277,12 +2700,22 @@ export const GenTab = {
       throw new Error("Unknown timeline choice.");
     }
 
+    // Remember as a portable signal (e.g. "vegetarian"), not the dish body.
+    const remembered = recordPreferenceFromChoice(choice, {
+      templateKind: prev.timeline?.templateKind || "generic",
+      intent: prev.intent || "",
+    });
+
     setState(id, {
       ...prev,
       status: "loading",
       config: null,
       error: null,
       title: prev.title,
+      // Transient UI hint while reshape runs.
+      justRememberedPreference: remembered
+        ? { signal: remembered.signal, text: remembered.text }
+        : null,
     });
     gWaiters.delete(id);
     try {
@@ -2293,6 +2726,16 @@ export const GenTab = {
         priorTimeline: prev.timeline,
         templateKind: prev.timeline?.templateKind || "generic",
       });
+      const state = gStates.get(id);
+      if (state && remembered) {
+        setState(id, {
+          ...state,
+          justRememberedPreference: {
+            signal: remembered.signal,
+            text: remembered.text,
+          },
+        });
+      }
     } catch (error) {
       setState(id, {
         ...prev,
@@ -2303,6 +2746,23 @@ export const GenTab = {
       throw error;
     }
     return this.waitForState(id);
+  },
+
+  /**
+   * Learned preference signals from prior timeline choices (spike).
+   * Survives restarts via pref; used to bias future GenTab generations.
+   *
+   * @returns {Array<object>}
+   */
+  getPreferenceMemory() {
+    return loadPreferenceMemory();
+  },
+
+  /**
+   * Clear learned preference memory (debug / reset).
+   */
+  clearPreferenceMemory() {
+    savePreferenceMemory([]);
   },
 
   /**
@@ -2493,6 +2953,11 @@ async function runGenerationFromSources(id, sources, options = {}) {
     title: options.groupLabel || sources[0].title,
   };
 
+  const preferenceResolved =
+    options.preferenceResolved ||
+    resolvePreferenceMemoryForPrompt(sources, options);
+  options.preferenceResolved = preferenceResolved;
+
   let content;
   let usedFallback = false;
   const llmStart = ChromeUtils.now();
@@ -2573,9 +3038,33 @@ async function runGenerationFromSources(id, sources, options = {}) {
   }
 
   const extractMs = options.extractMs ?? 0;
+  const appliedPreferences = (preferenceResolved.relevant || []).map(entry => ({
+    signal: entry.signal,
+    text: entry.text,
+    domains: entry.domains || [],
+  }));
+  const rememberedPreferences = (preferenceResolved.all || []).map(entry => ({
+    signal: entry.signal,
+    text: entry.text,
+    domains: entry.domains || [],
+  }));
   console.warn(
-    `GenTab ready id=${id} tabs=${sources.length} intent=${intent} extract=${Math.round(extractMs)}ms llm=${Math.round(llmMs)}ms fallback=${usedFallback}`
+    `GenTab ready id=${id} tabs=${sources.length} intent=${intent} extract=${Math.round(extractMs)}ms llm=${Math.round(llmMs)}ms fallback=${usedFallback} memoryApplied=${appliedPreferences.map(p => p.signal).join("|") || "none"}`
   );
+
+  // Make applied memory obvious in the stats line when the model forgot.
+  if (appliedPreferences.length) {
+    const signals = appliedPreferences.map(p => p.signal).join(", ");
+    const blurb = content.header_blurb || "";
+    const alreadyMentions = appliedPreferences.some(p =>
+      blurb.toLowerCase().includes((p.signal || "").toLowerCase())
+    );
+    if (!alreadyMentions) {
+      content.header_blurb = blurb
+        ? `${blurb} · Using remembered: ${signals}`
+        : `Using remembered preferences: ${signals}`;
+    }
+  }
 
   setState(id, {
     status: "ready",
@@ -2598,6 +3087,9 @@ async function runGenerationFromSources(id, sources, options = {}) {
       text: source.text,
     })),
     timeline,
+    // Preference memory visibility for chrome UI.
+    appliedPreferences,
+    rememberedPreferences,
     generatedAt: Date.now(),
     config,
     error: null,

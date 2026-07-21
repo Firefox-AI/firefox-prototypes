@@ -383,6 +383,61 @@ async function applyTimelineChoice(choiceId) {
 }
 
 /**
+ * Show remembered / applied preference signals in the chrome header.
+ *
+ * @param {object} state
+ */
+function renderMemoryBanner(state) {
+  const banner = document.getElementById("gentab-memory-banner");
+  const message = document.getElementById("gentab-memory-message");
+  if (!banner || !message) {
+    return;
+  }
+
+  banner.classList.remove(
+    "gentab-memory-banner-applied",
+    "gentab-memory-banner-saved"
+  );
+
+  const just = state.justRememberedPreference;
+  const applied = Array.isArray(state.appliedPreferences)
+    ? state.appliedPreferences
+    : [];
+  const remembered = Array.isArray(state.rememberedPreferences)
+    ? state.rememberedPreferences
+    : [];
+
+  if (just?.signal) {
+    message.textContent = `Remembered for future GenTabs: ${just.signal} (“${just.text || just.signal}”)`;
+    banner.classList.add("gentab-memory-banner-saved");
+    banner.hidden = false;
+    return;
+  }
+
+  if (applied.length) {
+    const signals = applied.map(p => p.signal || p.text).filter(Boolean);
+    message.textContent = `Using remembered preference${signals.length === 1 ? "" : "s"}: ${signals.join(", ")}`;
+    banner.classList.add("gentab-memory-banner-applied");
+    banner.hidden = false;
+    return;
+  }
+
+  // Stored prefs exist but none matched this GenTab's topic domains.
+  if (remembered.length) {
+    const signals = remembered
+      .map(p => p.signal || p.text)
+      .filter(Boolean)
+      .slice(0, 4);
+    message.textContent = `Preferences on file (not applied here): ${signals.join(", ")}`;
+    banner.hidden = false;
+    return;
+  }
+
+  message.textContent = "";
+  banner.hidden = true;
+}
+
+/**
  * Populate the chrome header from GenTab state.
  *
  * @param {object} state
@@ -410,6 +465,8 @@ function renderHeader(state) {
   const blurbEl = document.getElementById("gentab-header-blurb");
   blurbEl.textContent = blurb;
   blurbEl.hidden = !blurb;
+
+  renderMemoryBanner(state);
 
   const intentValue = document.getElementById("gentab-intent-value");
   intentValue.textContent = intent || "Auto";

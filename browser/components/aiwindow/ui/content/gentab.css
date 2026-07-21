@@ -103,6 +103,52 @@ body {
   display: none;
 }
 
+.gentab-memory-banner {
+  margin-block-start: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid
+    color-mix(
+      in srgb,
+      var(--button-background-color-primary, #0060df) 35%,
+      transparent
+    );
+  background: color-mix(
+    in srgb,
+    var(--button-background-color-primary, #0060df) 12%,
+    light-dark(var(--color-white, #fff), var(--color-gray-80, #2b2a33))
+  );
+}
+
+.gentab-memory-banner[hidden] {
+  display: none;
+}
+
+.gentab-memory-banner.gentab-memory-banner-applied {
+  border-color: color-mix(
+    in srgb,
+    var(--button-background-color-primary, #0060df) 50%,
+    transparent
+  );
+}
+
+.gentab-memory-banner.gentab-memory-banner-saved {
+  border-color: color-mix(in srgb, #2ac3a2 55%, transparent);
+  background: color-mix(
+    in srgb,
+    #2ac3a2 14%,
+    light-dark(var(--color-white, #fff), var(--color-gray-80, #2b2a33))
+  );
+}
+
+.gentab-memory-message {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  font-weight: 500;
+  color: light-dark(var(--color-gray-80, #2b2a33), var(--color-gray-20, #e0e0e6));
+}
+
 .gentab-header-controls {
   display: flex;
   flex-wrap: wrap;
