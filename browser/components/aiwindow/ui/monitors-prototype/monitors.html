@@ -511,7 +511,10 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 /* Smartbar composer — real COLUMN composer: editor row + right-aligned input-cta send */
 .smartbar-wrap { position: relative; padding: 0 var(--space-large) var(--space-small); }
 .smartbar { --smartbar-bg: light-dark(var(--color-white), var(--color-violet-110)); position: relative; display: flex; flex-direction: column; border-radius: var(--border-radius-large); background: color-mix(in srgb, var(--smartbar-bg) 60%, transparent); box-shadow: var(--box-shadow-level-2); cursor: text; }
-.smartbar-input { padding: var(--space-medium) var(--space-large) var(--space-xsmall); font-size: var(--font-size-root); }
+.smartbar-input { padding: var(--space-medium) var(--space-large) var(--space-xsmall); font-size: var(--font-size-root); cursor: text; }
+.sb-field { outline: none; min-height: 1.45em; line-height: 1.45; color: var(--text-color); white-space: pre-wrap; overflow-wrap: anywhere; }
+.sb-field:empty::before { content: attr(data-placeholder); color: var(--text-color-deemphasized); pointer-events: none; }
+.sb-field .cmd-tok { color: var(--color-accent-primary); font-weight: var(--font-weight-semibold); }
 .smartbar-cta-row { display: flex; align-items: center; gap: var(--space-small); padding: var(--space-xsmall) var(--space-large) var(--space-medium); }
 .smartbar::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; background: linear-gradient(172deg, #321bfd -18%, #cf30e2 53%, #ff9900 89%, #f5c451 109%); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; padding: 1px; pointer-events: none; }
 .smartbar::before { content: ""; position: absolute; inset: 0; border-radius: inherit; filter: blur(30px); background-color: color-mix(in srgb, var(--color-violet-40) 30%, transparent); opacity: 0; transition: opacity .2s ease-out; z-index: -1; }
@@ -1149,8 +1152,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         <div class="smartbar">
           <div class="smartbar-input">
             <div class="smartbar-chips" id="smartbar-chips"></div>
-            <span class="typed">/<span class="caret"></span></span>
-            <span class="ph" data-show="zero creating live">Ask, search, or type a URL</span>
+            <div class="sb-field" id="sb-field" contenteditable="true" role="textbox" aria-label="Ask, search, or type a URL" data-placeholder="Ask, search, or type a URL"></div>
           </div>
           <div class="smartbar-cta-row">
             <button class="sb-icon" id="sb-plus" title="Add to conversation" aria-label="Add to conversation" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
@@ -1308,7 +1310,25 @@ document.getElementById("dh-cta").onclick = () => { dhMonitor.classList.add("dh-
 
 // Entry point 3 - You type: click the smartbar to bring up the / picker
 const smartbarInput = document.querySelector(".smartbar-input");
-if (smartbarInput) smartbarInput.addEventListener("click", () => { if (state === "zero") stageEl.classList.add("slash-open"); });
+const sbField = document.getElementById("sb-field");
+if (smartbarInput && sbField) {
+  const escHtml = s => s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  smartbarInput.addEventListener("click", e => { if (!e.target.closest(".sb-chip")) sbField.focus(); });
+  sbField.addEventListener("input", () => {
+    stageEl.classList.toggle("slash-open", sbField.textContent.trimStart().startsWith("/"));
+  });
+  sbField.addEventListener("keydown", e => {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    e.preventDefault();
+    const txt = sbField.textContent.trim();
+    if (!txt) return;
+    stageEl.classList.remove("slash-open");
+    sbField.textContent = "";
+    const kickoff = txt.startsWith("/") ? '<span class="cmd-tok">/</span> ' + escHtml(txt.replace(/^\/+\s*/, "")) : escHtml(txt);
+    showKickoff(kickoff);
+    go("creating");
+  });
+}
 document.addEventListener("click", e => {
   if (stageEl.classList.contains("slash-open") && !e.target.closest(".smartbar-wrap") && !e.target.closest(".slash-menu")) stageEl.classList.remove("slash-open");
 });
