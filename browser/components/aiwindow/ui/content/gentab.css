@@ -455,6 +455,78 @@ body {
   color: light-dark(var(--color-gray-60, #5b5b66), var(--color-gray-40, #bfbfc9));
 }
 
+.gentab-timeline-choices {
+  margin-block-start: var(--space-large, 24px);
+  padding-block-start: var(--space-medium, 16px);
+  border-block-start: 1px solid
+    light-dark(var(--color-gray-20, #e0e0e6), var(--color-gray-70, #52525e));
+}
+
+.gentab-timeline-choices[hidden] {
+  display: none;
+}
+
+.gentab-timeline-choices-label {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: light-dark(var(--color-gray-60, #5b5b66), var(--color-gray-40, #bfbfc9));
+}
+
+.gentab-timeline-choices-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.gentab-timeline-choice {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid
+    light-dark(var(--color-gray-30, #cfcfd8), var(--color-gray-60, #5b5b66));
+  border-radius: 999px;
+  background: light-dark(
+    var(--color-white, #fff),
+    var(--color-gray-70, #3a3944)
+  );
+  color: inherit;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  max-width: 100%;
+}
+
+.gentab-timeline-choice:hover,
+.gentab-timeline-choice:focus-visible {
+  border-color: var(--button-background-color-primary, #0060df);
+  outline: none;
+  box-shadow: 0 0 0 2px
+    color-mix(
+      in srgb,
+      var(--button-background-color-primary, #0060df) 20%,
+      transparent
+    );
+}
+
+.gentab-timeline-choice:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+/* Soft in-place update: keep structure, dim plan while regenerating */
+.gentab-timeline.is-updating .gentab-timeline-list {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.gentab-timeline.is-updating .gentab-timeline-progress {
+  color: var(--button-background-color-primary, #0060df);
+}
+
 /* ---- AboutWelcome body ---- */
 
 #multi-stage-message-root {

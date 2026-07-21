@@ -48,6 +48,9 @@ const MAX_PLAN_ITEMS = 10;
 const MAX_OPTIONS = 3;
 const MAX_DETAIL_SECTIONS = 2;
 const MAX_DETAIL_ITEMS = 5;
+const MAX_TIMELINE_CHOICES = 6;
+
+/** @typedef {"trip"|"recipe"|"compare"|"project"|"generic"} TimelineTemplateKind */
 
 const TILE_ICON_URLS = [
   "chrome://browser/content/aiwindow/assets/model-choice-1.svg",
@@ -72,8 +75,10 @@ const GENTAB_CONTENT_SCHEMA = {
     "summary",
     "emoji",
     "header_blurb",
+    "template_kind",
     "key_facts",
     "plan",
+    "timeline_choices",
     "focus_options",
     "detail_sections",
   ],
@@ -84,6 +89,11 @@ const GENTAB_CONTENT_SCHEMA = {
     emoji: { type: "string", maxLength: 8 },
     // One-line stats under the title, e.g. "4 dinners planned · 10 grocery items".
     header_blurb: { type: "string", maxLength: 200 },
+    // Locks timeline shape and which choices are valid.
+    template_kind: {
+      type: "string",
+      enum: ["trip", "recipe", "compare", "project", "generic"],
+    },
     // Alternate intents the user could switch to for a different GenTab on the same sources.
     intent_suggestions: {
       type: "array",
@@ -124,6 +134,36 @@ const GENTAB_CONTENT_SCHEMA = {
               body: { type: "string", maxLength: 500 },
             },
           },
+        },
+      },
+    },
+    // One-click template-locked mutations of the timeline (no free typing).
+    timeline_choices: {
+      type: "array",
+      minItems: 2,
+      maxItems: MAX_TIMELINE_CHOICES,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "label", "body", "kind"],
+        properties: {
+          id: { type: "string", maxLength: 40 },
+          label: { type: "string", maxLength: 50 },
+          body: { type: "string", maxLength: 180 },
+          kind: {
+            type: "string",
+            enum: [
+              "more_steps",
+              "fewer_steps",
+              "replace_step",
+              "swap_detail",
+              "simplify",
+              "enrich",
+              "alternate_path",
+            ],
+          },
+          // Optional step index (0-based) this choice targets, e.g. replace day 2.
+          step_index: { type: "integer", minimum: 0, maximum: 20 },
         },
       },
     },
@@ -194,16 +234,21 @@ The centerpiece is an ordered **timeline** (sequence of steps, stops, or phases)
 Synthesize page content into that sequence plus short supporting context.
 Do NOT restate or quote opening bios, marketing fluff, or table-of-contents lists.
 
-## Timeline-first examples (good plan shapes)
-- Trip / vacation: cities or days in visit order (Tokyo → Kyoto → Osaka; or Day 1 / Day 2 / Day 3).
-- Recipe / cooking: prep → cook → assemble → bake → rest → serve.
-- Job application: review fit → tailor resume → apply → prep interview → negotiate.
-- Product buy decision: define needs → shortlist → compare → check price → purchase.
-- Learning path: concepts in order (foundations → practice → project).
-- Project / home task: phases (plan → materials → build → finish).
-- Event day-of: morning prep → transit → main event → wind-down.
-- Research deep-dive: question → sources → findings → decision.
-Bad timeline: vague "Part 1/Part 2", author bio, or dumping unrelated pages into one fake day-0 story.
+## Timeline-first + template lock
+Pick template_kind and keep the plan shape inside that template:
+- trip: ordered days/cities/stops (Day 1… or Tokyo → Kyoto → Osaka).
+- recipe: cook steps (prep → sauce → assemble → bake → rest → serve).
+- compare: sequential decision steps (criteria → options → pick).
+- project: phases (plan → materials → build → finish).
+- generic: ordered action steps only if nothing above fits.
+
+Timeline choices (timeline_choices) are one-click mutations *within* that template — not new freeform essays.
+Good choice labels (short, actionable):
+- trip: "More days", "Fewer days", "Replace Day 2 with Osaka", "Add a food day", "Drop the day trip"
+- recipe: "Use broccoli as main", "Simplify to 5 steps", "Make it vegetarian", "Double the batch"
+- compare: "Prioritize price", "Prioritize privacy", "Drop option B"
+Bad choices: "Make it better", "Regenerate", vague advice without a structural change.
+Each choice must be supportable from the source text (no inventing cities/ingredients not in the pages).
 
 ## User intent (critical)
 When a tab group name / intent is provided, that name is the job to optimize for — not a decorative title and not permission to delete tabs.
@@ -249,10 +294,12 @@ Never invent places, dishes, brands, or steps not present in the page text. Pref
    Bad: heading "Overview" with pasted intro prose.
 7) plan — THE TIMELINE (required, primary). Object { "title", "subtitle"?, "items": [{ "heading", "body" }] }.
    3–${MAX_PLAN_ITEMS} ordered steps. heading = short step label; body = what to do / see / decide at that step.
-   Prefer ordered sequences over flat dumps. For multi-destination vacation ideation, each item can be a trip concept in a compare order, not one hybrid day-by-day.
-8) focus_options (2–${MAX_OPTIONS}) — forks off the timeline (alternate path, simplify, go deeper). Not "Browse details".
-9) detail_sections (0–${MAX_DETAIL_SECTIONS}) — optional supporting lists (ingredients, tips, packing) as { "title", "items": [{ "heading", "body" }] }.
-10) sources — optional array of { "title", "url" }.
+8) timeline_choices (2–${MAX_TIMELINE_CHOICES}) — template-locked edit chips: { id, label, body, kind, step_index? }.
+   kind is one of more_steps, fewer_steps, replace_step, swap_detail, simplify, enrich, alternate_path.
+   label is what the user clicks; body is the edit instruction applied if chosen.
+9) focus_options (2–${MAX_OPTIONS}) — broader forks (not the same as timeline_choices).
+10) detail_sections (0–${MAX_DETAIL_SECTIONS}) — optional supporting lists as { "title", "items": [{ "heading", "body" }] }.
+11) sources — optional array of { "title", "url" }.
 
 ## Quality bar
 A good GenTab is a timeline you can follow without re-reading the tabs. Two different intents on the same tabs should produce clearly different timelines.`;
@@ -497,6 +544,15 @@ export function normalizeGenTabContent(raw) {
         .slice(0, 6)
     : [];
 
+  const template_kind = normalizeTemplateKind(
+    content.template_kind || content.templateKind
+  );
+
+  const timeline_choices = normalizeTimelineChoices(
+    content.timeline_choices || content.timelineChoices,
+    plan.items.length
+  );
+
   return {
     title: cleanArtifactTitle(clampString(content.title, 120) || "GenTab"),
     summary: clampString(content.summary, 500),
@@ -505,13 +561,242 @@ export function normalizeGenTabContent(raw) {
       content.header_blurb || content.headerBlurb || content.summary,
       200
     ),
+    template_kind,
     intent_suggestions,
     key_facts,
     plan,
+    timeline_choices,
     focus_options,
     detail_sections,
     sources,
   };
+}
+
+/**
+ * @param {string} value
+ * @returns {TimelineTemplateKind}
+ */
+function normalizeTemplateKind(value) {
+  const allowed = new Set(["trip", "recipe", "compare", "project", "generic"]);
+  if (typeof value === "string" && allowed.has(value)) {
+    return value;
+  }
+  return "generic";
+}
+
+/**
+ * @param {Array} raw
+ * @param {number} stepCount
+ * @returns {Array<{id: string, label: string, body: string, kind: string, stepIndex: number|null}>}
+ */
+function normalizeTimelineChoices(raw, stepCount) {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const kinds = new Set([
+    "more_steps",
+    "fewer_steps",
+    "replace_step",
+    "swap_detail",
+    "simplify",
+    "enrich",
+    "alternate_path",
+  ]);
+  return raw
+    .slice(0, MAX_TIMELINE_CHOICES)
+    .map((choice, index) => {
+      if (!choice || typeof choice !== "object") {
+        return null;
+      }
+      const kind = kinds.has(choice.kind) ? choice.kind : "alternate_path";
+      let stepIndex = null;
+      if (
+        typeof choice.step_index === "number" &&
+        Number.isFinite(choice.step_index)
+      ) {
+        stepIndex = Math.max(
+          0,
+          Math.min(stepCount - 1, Math.floor(choice.step_index))
+        );
+      } else if (
+        typeof choice.stepIndex === "number" &&
+        Number.isFinite(choice.stepIndex)
+      ) {
+        stepIndex = Math.max(
+          0,
+          Math.min(stepCount - 1, Math.floor(choice.stepIndex))
+        );
+      }
+      return {
+        id: clampString(choice.id, 40) || `choice_${index + 1}`,
+        label: clampString(choice.label || choice.title, 50),
+        body: clampString(choice.body || choice.description, 180),
+        kind,
+        stepIndex,
+      };
+    })
+    .filter(c => c && (c.label || c.body));
+}
+
+/**
+ * Fallback chips when the model omits timeline_choices.
+ *
+ * @param {TimelineTemplateKind} kind
+ * @param {Array<{heading: string}>} steps
+ * @returns {Array}
+ */
+function defaultTimelineChoices(kind, steps = []) {
+  const n = steps.length;
+  const mid = n > 1 ? Math.min(n - 1, 1) : 0;
+  const midLabel = steps[mid]?.heading || `step ${mid + 1}`;
+
+  if (kind === "trip") {
+    return [
+      {
+        id: "more_days",
+        label: "More days",
+        body: "Expand the itinerary by one full day with concrete stops from the sources.",
+        kind: "more_steps",
+        stepIndex: null,
+      },
+      {
+        id: "fewer_days",
+        label: "Fewer days",
+        body: "Compress the itinerary by one day; keep only the highest-value stops.",
+        kind: "fewer_steps",
+        stepIndex: null,
+      },
+      {
+        id: "replace_mid",
+        label: `Replace “${clampString(midLabel, 28)}”`,
+        body: `Replace the timeline step “${midLabel}” with a different stop or city grounded in the sources.`,
+        kind: "replace_step",
+        stepIndex: mid,
+      },
+      {
+        id: "food_day",
+        label: "Add a food day",
+        body: "Insert or reshape a day focused on named local foods from the sources.",
+        kind: "enrich",
+        stepIndex: null,
+      },
+    ];
+  }
+  if (kind === "recipe") {
+    return [
+      {
+        id: "simplify",
+        label: "Fewer steps",
+        body: "Simplify the cook timeline to fewer, clearer steps without inventing ingredients.",
+        kind: "fewer_steps",
+        stepIndex: null,
+      },
+      {
+        id: "enrich",
+        label: "More detail",
+        body: "Expand critical steps with timing and technique from the recipe sources.",
+        kind: "more_steps",
+        stepIndex: null,
+      },
+      {
+        id: "swap_main",
+        label: "Swap the main",
+        body: "Change the main ingredient or protein using an alternative mentioned in the sources (e.g. broccoli as main if present).",
+        kind: "swap_detail",
+        stepIndex: null,
+      },
+      {
+        id: "veg",
+        label: "Make vegetarian",
+        body: "Adapt the timeline to a vegetarian version using only ingredients from the sources.",
+        kind: "alternate_path",
+        stepIndex: null,
+      },
+    ];
+  }
+  if (kind === "compare") {
+    return [
+      {
+        id: "prioritize_price",
+        label: "Prioritize price",
+        body: "Reorder decision steps to weight cost more heavily using facts from the sources.",
+        kind: "alternate_path",
+        stepIndex: null,
+      },
+      {
+        id: "fewer_options",
+        label: "Fewer options",
+        body: "Narrow the comparison to the top options supported by the sources.",
+        kind: "simplify",
+        stepIndex: null,
+      },
+    ];
+  }
+  return [
+    {
+      id: "more_detail",
+      label: "More detail",
+      body: "Add one more concrete step grounded in the sources.",
+      kind: "more_steps",
+      stepIndex: null,
+    },
+    {
+      id: "simplify",
+      label: "Simplify",
+      body: "Remove optional steps; keep the essential sequence only.",
+      kind: "fewer_steps",
+      stepIndex: null,
+    },
+    {
+      id: "replace_mid",
+      label: `Change “${clampString(midLabel, 28)}”`,
+      body: `Replace the step “${midLabel}” with an alternate grounded in the sources.`,
+      kind: "replace_step",
+      stepIndex: mid,
+    },
+  ];
+}
+
+/**
+ * Infer template when model omits template_kind.
+ *
+ * @param {object} content
+ * @param {string} intent
+ * @param {Array} sources
+ * @returns {TimelineTemplateKind}
+ */
+function inferTemplateKind(content, intent, sources) {
+  if (content.template_kind && content.template_kind !== "generic") {
+    return content.template_kind;
+  }
+  const blob = [
+    intent,
+    content.title,
+    content.summary,
+    ...(sources || []).map(s => s.title || ""),
+    ...(content.plan?.items || []).map(i => i.heading || ""),
+  ]
+    .join(" ")
+    .toLowerCase();
+  if (
+    /recipe|cook|ingredient|bake|lasagna|meal|dinner|grocery|prep/.test(blob)
+  ) {
+    return "recipe";
+  }
+  if (
+    /day 1|day 2|itinerary|osaka|tokyo|travel|trip|vacation|tour|city/.test(
+      blob
+    )
+  ) {
+    return "trip";
+  }
+  if (/compare|vs\.|versus|option a|shortlist|buy|laptop|phone/.test(blob)) {
+    return "compare";
+  }
+  if (/project|build|phase|renovate|checklist/.test(blob)) {
+    return "project";
+  }
+  return "generic";
 }
 
 /**
@@ -686,9 +971,10 @@ function tileIconBackground(index) {
  * Stable step list for the chrome timeline (check-off UI lives outside AW).
  *
  * @param {object} content normalized content
- * @returns {{ title: string, subtitle: string, steps: Array<{id: string, heading: string, body: string, done: boolean}> }}
+ * @param {{ intent?: string, sources?: Array }} [opts]
+ * @returns {{ title: string, subtitle: string, templateKind: string, steps: Array, choices: Array }}
  */
-export function buildTimelineModel(content) {
+export function buildTimelineModel(content, opts = {}) {
   const normalized = normalizeGenTabContent(content);
   const keyFacts = normalized.key_facts.length
     ? normalized.key_facts
@@ -702,17 +988,34 @@ export function buildTimelineModel(content) {
     ? normalized.plan.items
     : keyFacts.slice(0, 3);
 
+  const steps = planItems.map((item, index) => ({
+    id: `step-${index}`,
+    heading: item.heading || `Step ${index + 1}`,
+    body: item.body || "",
+    done: false,
+  }));
+
+  let templateKind = inferTemplateKind(
+    normalized,
+    opts.intent || "",
+    opts.sources || []
+  );
+  let choices = normalizeTimelineChoices(
+    normalized.timeline_choices,
+    steps.length
+  );
+  if (choices.length < 2) {
+    choices = defaultTimelineChoices(templateKind, steps);
+  }
+
   return {
     title: normalized.plan.title || "Timeline",
     subtitle:
       normalized.plan.subtitle ||
-      "Follow these steps in order — grounded in your open tabs.",
-    steps: planItems.map((item, index) => ({
-      id: `step-${index}`,
-      heading: item.heading || `Step ${index + 1}`,
-      body: item.body || "",
-      done: false,
-    })),
+      "Follow these steps in order — check off as you go. Use suggestions to reshape the plan.",
+    templateKind,
+    steps,
+    choices,
   };
 }
 
@@ -1553,6 +1856,39 @@ function buildMultiSourceUserMessage(sources, options = {}) {
     .map((source, index) => `${index + 1}. ${source.title} — ${source.url}`)
     .join("\n");
 
+  const edit = options.timelineEdit;
+  const prior = options.priorTimeline;
+  const editBlock = [];
+  if (edit) {
+    editBlock.push(
+      "TEMPLATE-LOCKED TIMELINE EDIT (required):",
+      `Keep template_kind="${options.templateKind || prior?.templateKind || "generic"}".`,
+      "This is a surgical plan edit, not a new GenTab. Keep the same intent, emoji, and overall title unless the edit forces a tiny rename.",
+      "Update plan (timeline) and timeline_choices heavily; only lightly refresh header_blurb/key_facts if the plan length or focus changed.",
+      "Do not switch to a different template. Mutate the plan timeline to apply this user choice:",
+      `- choice id: ${edit.id}`,
+      `- kind: ${edit.kind}`,
+      `- label: ${edit.label}`,
+      `- instruction: ${edit.body}`
+    );
+    if (edit.stepIndex != null) {
+      editBlock.push(`- target step index: ${edit.stepIndex}`);
+    }
+    if (prior?.steps?.length) {
+      editBlock.push("", "Current timeline (mutate from this):");
+      prior.steps.forEach((step, index) => {
+        editBlock.push(
+          `${index + 1}. [${step.done ? "done" : "todo"}] ${step.heading}: ${step.body || ""}`
+        );
+      });
+    }
+    editBlock.push(
+      "",
+      "Return a full GenTab JSON again with an updated plan and fresh timeline_choices for further edits.",
+      ""
+    );
+  }
+
   const intentBlock = groupLabel
     ? [
         `User intent (tab group name): "${groupLabel}"`,
@@ -1563,19 +1899,23 @@ function buildMultiSourceUserMessage(sources, options = {}) {
         'Example: Osaka city guide + Italian lasagna recipe + intent "vacation idea" → compare/sketch a Japan (Osaka) trip and an Italy food-led trip using only facts from each page. Do NOT invent "cook lasagna then fly to Osaka".',
         "If the intent is cooking/dinner, use the recipe as the spine and only food-relevant bits from other tabs.",
         "Do not invent dishes, places, or brands that do not appear in the source text.",
+        "Always set template_kind and 2–6 concrete timeline_choices (short clickable labels) for further template-locked edits.",
         "",
         "Required sources (use all):",
         sourceList,
         "",
+        ...editBlock,
       ]
     : [
         "No explicit group intent was provided; infer the best artifact type from the page content.",
         `Mandatory: use material from each of the ${sources.length} sources below.`,
         "If sources imply different destinations or topics, prefer a multi-option or compare structure over force-merging them into one timeline.",
+        "Always set template_kind and 2–6 concrete timeline_choices for further template-locked edits.",
         "",
         "Required sources (use all):",
         sourceList,
         "",
+        ...editBlock,
       ];
 
   const header =
@@ -1620,7 +1960,7 @@ function buildMultiSourceUserMessage(sources, options = {}) {
 
   header.push(
     "",
-    "Return only structured fields: title, summary, emoji, header_blurb, intent_suggestions, key_facts, plan, focus_options, detail_sections, sources.",
+    "Return only structured fields: title, summary, emoji, header_blurb, template_kind, intent_suggestions, key_facts, plan, timeline_choices, focus_options, detail_sections, sources.",
     sources.length > 1
       ? `sources[] must include exactly these ${sources.length} URLs: ${sources.map(s => s.url).join(" | ")}`
       : ""
@@ -1823,6 +2163,51 @@ export const GenTab = {
    */
   getTimeline(id) {
     return gStates.get(id)?.timeline ?? null;
+  },
+
+  /**
+   * Apply a template-locked timeline choice and regenerate from source snapshots.
+   *
+   * @param {string} id
+   * @param {string} choiceId
+   * @returns {Promise<object>} ready state
+   */
+  async applyTimelineChoice(id, choiceId) {
+    const prev = gStates.get(id);
+    if (!prev?.sourceSnapshots?.length) {
+      throw new Error("Cannot apply choice: missing source snapshots.");
+    }
+    const choice = (prev.timeline?.choices || []).find(c => c.id === choiceId);
+    if (!choice) {
+      throw new Error("Unknown timeline choice.");
+    }
+
+    setState(id, {
+      ...prev,
+      status: "loading",
+      config: null,
+      error: null,
+      title: prev.title,
+    });
+    gWaiters.delete(id);
+    try {
+      await runGenerationFromSources(id, prev.sourceSnapshots, {
+        groupLabel: prev.intent || "",
+        priorIntentSuggestions: prev.intentSuggestions || [],
+        timelineEdit: choice,
+        priorTimeline: prev.timeline,
+        templateKind: prev.timeline?.templateKind || "generic",
+      });
+    } catch (error) {
+      setState(id, {
+        ...prev,
+        status: "error",
+        error: error?.message || "Could not apply timeline choice.",
+        config: null,
+      });
+      throw error;
+    }
+    return this.waitForState(id);
   },
 
   /**
@@ -2063,10 +2448,21 @@ async function runGenerationFromSources(id, sources, options = {}) {
   }
   const intentSuggestions = buildIntentSuggestions(content, intent, sources);
 
-  const config = mapContentToFeatureConfig(content, primaryMeta);
-  const timeline = buildTimelineModel(content);
+  content.template_kind = inferTemplateKind(content, intent, sources);
+  if (!content.timeline_choices?.length) {
+    content.timeline_choices = defaultTimelineChoices(
+      content.template_kind,
+      content.plan?.items || []
+    );
+  }
 
-  // Best-effort: keep checkmarks across intent regen when headings match.
+  const config = mapContentToFeatureConfig(content, primaryMeta);
+  const timeline = buildTimelineModel(content, {
+    intent,
+    sources,
+  });
+
+  // Best-effort: keep checkmarks across intent/choice regen when headings match.
   const prev = gStates.get(id) || {};
   if (prev.timeline?.steps?.length) {
     const doneByHeading = new Map(
