@@ -364,6 +364,30 @@ h1,h2,h3,h4,p { margin: 0; }
 .time-input { display: inline-flex; align-items: center; gap: var(--space-small); width: 100%; border: 1px solid var(--border-color); border-radius: var(--border-radius-medium); padding: 6px var(--space-medium); background: var(--background-color-box); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--text-color); cursor: pointer; }
 .time-input svg { width: 15px; height: 15px; fill: none; stroke: var(--text-color-deemphasized); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; margin-inline-start: auto; }
 .note-icon { fill: currentColor !important; stroke: none !important; }
+/* Smart Window sidebar: Chat / Tasks views */
+.sw-tabs { display: flex; gap: var(--space-xsmall); padding: 2px var(--space-large) var(--space-xsmall); }
+.sw-tab { padding: 5px var(--space-medium); border-radius: var(--border-radius-circle); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--text-color-deemphasized); display: inline-flex; align-items: center; gap: 6px; }
+.sw-tab:hover { color: var(--text-color); }
+.sw-tab[aria-selected="true"] { background: var(--background-color-box-info); color: var(--text-color); }
+.sw-tab-n { font-size: 11px; font-weight: var(--font-weight-semibold); padding: 0 6px; border-radius: var(--border-radius-circle); background: color-mix(in srgb, var(--color-accent-primary) 22%, transparent); color: var(--color-accent-primary); }
+.sw-tasks { flex: 1; overflow: auto; padding: var(--space-xsmall) var(--space-medium) var(--space-large); display: flex; flex-direction: column; gap: 1px; }
+.sw-tasks[hidden] { display: none; }
+.tq-group { font-size: 11px; font-weight: var(--font-weight-semibold); letter-spacing: .05em; text-transform: uppercase; color: var(--text-color-deemphasized); padding: var(--space-medium) var(--space-small) var(--space-xxsmall); }
+.tq-group:first-child { padding-top: var(--space-xsmall); }
+.tq-item { display: flex; align-items: center; gap: var(--space-small); width: 100%; padding: var(--space-small); border-radius: var(--border-radius-medium); text-align: start; }
+.tq-item:hover { background: var(--background-color-box-info); }
+.tq-fav { width: 30px; height: 30px; border-radius: var(--border-radius-small); flex: none; display: grid; place-items: center; overflow: hidden; color: #fff; }
+.tq-fav.lt { font-weight: var(--font-weight-bold); font-size: var(--font-size-small); }
+.tq-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.tq-name { font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tq-status { font-size: var(--font-size-small); color: var(--text-color-deemphasized); display: flex; align-items: center; gap: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tq-status svg { width: 13px; height: 13px; flex: none; }
+.tq-status .ok { color: var(--text-color-success); }
+.tq-status .attn { color: var(--icon-color-warning); }
+.tq-status .val { color: var(--text-color-success); font-weight: var(--font-weight-semibold); }
+.tq-badge { margin-inline-start: auto; flex: none; font-size: 11px; font-weight: var(--font-weight-semibold); padding: 2px 8px; border-radius: var(--border-radius-circle); background: var(--background-color-box-info); color: var(--text-color-deemphasized); }
+.run-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent-primary); flex: none; animation: run-pulse 1.4s ease-in-out infinite; }
+@keyframes run-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
 .modal-hero { display: flex; flex-direction: column; gap: 4px; }
 .modal-desc { margin: 0; color: var(--text-color-deemphasized); font-size: var(--font-size-small); line-height: 1.5; }
 .select-wrap { position: relative; display: inline-flex; }
@@ -1107,6 +1131,10 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         <button class="page-action" title="New chat" aria-label="New chat"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
         <button class="page-action" title="Close" aria-label="Close Smart Window"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg></button>
       </div>
+      <div class="sw-tabs" role="tablist" aria-label="Smart Window views">
+        <button class="sw-tab" id="tab-chat" role="tab" aria-selected="true">Chat</button>
+        <button class="sw-tab" id="tab-tasks" role="tab" aria-selected="false">Tasks <span class="sw-tab-n" id="sw-tab-n">6</span></button>
+      </div>
 
       <div class="sw-chat">
         <!-- Kickoff: the user turn, set by whichever entry point was used -->
@@ -1176,6 +1204,38 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           <div class="chat-divider">Today · 2:14 PM</div>
           <div class="message-assistant">Sony WH-1000XM5 dropped to <b>$278</b>, down 7% from $299, past your alert. To view or make changes, head to <a class="accent-link" href="#5" data-open-tools-page>about:smartwindowtasks</a>.</div>
         </div>
+      </div>
+
+      <!-- Tasks view: a monitoring queue of ongoing / scheduled / recent agent work -->
+      <div class="sw-tasks" id="sw-tasks" hidden>
+        <div class="tq-group">Active</div>
+        <button class="tq-item" data-open-tools="">
+          <span class="tq-fav lt" style="background:#b3202a">S</span>
+          <span class="tq-body"><span class="tq-name">Find St. Vincent tickets</span><span class="tq-status"><span class="run-dot"></span>Working… · checking 6 sites</span></span>
+        </button>
+        <button class="tq-item" data-open-tools="sony">
+          <span class="tq-fav" style="background:#0046be"><svg viewBox="0 0 24 24" width="60%" height="60%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span>
+          <span class="tq-body"><span class="tq-name">Sony WH-1000XM5 price</span><span class="tq-status"><svg class="ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Checked 2d ago · <span class="val">dropped to $278</span></span></span>
+          <span class="tq-badge">Daily</span>
+        </button>
+        <button class="tq-item" data-open-tools="apt">
+          <span class="tq-fav lt" style="background:#5a4fcf">C</span>
+          <span class="tq-body"><span class="tq-name">Apartment listings · Mission</span><span class="tq-status"><span class="val">3 new</span> since yesterday</span></span>
+          <span class="tq-badge">Daily</span>
+        </button>
+        <button class="tq-item" data-open-tools="rei">
+          <span class="tq-fav lt" style="background:#2e7d32">R</span>
+          <span class="tq-body"><span class="tq-name">REI Danner hiking boots</span><span class="tq-status"><svg class="attn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>Needs a look · the page changed</span></span>
+        </button>
+        <div class="tq-group">Recent</div>
+        <button class="tq-item" data-open-tools="scout">
+          <span class="tq-fav" style="background:#0046be"><svg viewBox="0 0 24 24" width="60%" height="60%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span>
+          <span class="tq-body"><span class="tq-name">Best Buy checkout codes</span><span class="tq-status"><svg class="ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="val">3 codes found</span> · 2h ago</span></span>
+        </button>
+        <button class="tq-item" data-open-tools="research">
+          <span class="tq-fav" style="background:#1a73e8"><svg viewBox="0 0 24 24" width="58%" height="58%" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9.5 12.5h5M9.5 16h5"/></svg></span>
+          <span class="tq-body"><span class="tq-name">ANC headphones under $300</span><span class="tq-status"><svg class="ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Report ready · 1d ago</span></span>
+        </button>
       </div>
 
       <!-- Slash tool picker — appears when you type "/" in the smartbar -->
@@ -1380,7 +1440,34 @@ document.getElementById("undo-create").addEventListener("click", () => go("creat
 
 // Entry point 1 - Firefox offers: the toolbar Tasks button reveals the doorhanger
 document.getElementById("tb-tasks").onclick = e => { e.stopPropagation(); dhMonitor.classList.add("dh-gone"); openModal(null); };
-document.getElementById("tb-ask").onclick = e => { e.stopPropagation(); document.querySelectorAll(".dyn-msg").forEach(m => m.remove()); sidebarEl.classList.remove("create-blank"); go("zero"); if (typeof sbField !== "undefined" && sbField) sbField.focus(); };
+document.getElementById("tb-ask").onclick = e => { e.stopPropagation(); document.querySelectorAll(".dyn-msg").forEach(m => m.remove()); sidebarEl.classList.remove("create-blank"); go("zero"); const tc = document.getElementById("tab-chat"); if (tc) tc.click(); if (typeof sbField !== "undefined" && sbField) sbField.focus(); };
+// Sidebar Chat / Tasks view switch — Tasks is the monitoring queue of ongoing work
+(() => {
+  const tabChat = document.getElementById("tab-chat");
+  const tabTasks = document.getElementById("tab-tasks");
+  const swChat = document.querySelector(".sw-chat");
+  const swTasks = document.getElementById("sw-tasks");
+  if (!tabChat || !tabTasks || !swChat || !swTasks) return;
+  const showTasks = on => {
+    swChat.hidden = on; swTasks.hidden = !on;
+    tabChat.setAttribute("aria-selected", String(!on));
+    tabTasks.setAttribute("aria-selected", String(on));
+  };
+  tabChat.addEventListener("click", () => showTasks(false));
+  tabTasks.addEventListener("click", () => showTasks(true));
+  swTasks.querySelectorAll(".tq-item").forEach(it => it.addEventListener("click", () => {
+    const key = it.getAttribute("data-open-tools");
+    go(5);
+    if (key) {
+      const item = document.getElementById("dash-" + key);
+      if (item) {
+        const body = item.querySelector(".mstack-expand"); if (body) setExpand(body, true);
+        const grow = item.querySelector(".grow"); if (grow) grow.setAttribute("aria-expanded", "true");
+        requestAnimationFrame(() => item.scrollIntoView({ block: "center" }));
+      }
+    }
+  }));
+})();
 document.getElementById("dh-cta").onclick = () => { dhMonitor.classList.add("dh-gone"); showKickoff("Watch this page"); go("creating"); };
 
 // Entry point 3 - You type: click the smartbar to bring up the / picker
