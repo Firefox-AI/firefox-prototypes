@@ -286,8 +286,8 @@ h1,h2,h3,h4,p { margin: 0; }
 .grow .gvalue .sub { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
 .grow .gvalue .now.running { font-size: var(--font-size-root); font-weight: var(--font-weight-semibold); color: var(--color-accent-primary); display: inline-flex; align-items: center; gap: 6px; }
 .grow.paused { opacity: .72; }
-.favicon-sq { width: 28px; height: 28px; border-radius: var(--border-radius-small); flex: none; display: grid; place-items: center; background: light-dark(#f3f1f9, rgba(255,255,255,.06)); border: 1px solid var(--border-color-deemphasized); color: light-dark(var(--color-gray-70), var(--color-gray-30)); }
-.favicon-sq svg { width: 15px; height: 15px; }
+.favicon-sq { width: 28px; height: 28px; border-radius: var(--border-radius-small); flex: none; display: grid; place-items: center; overflow: hidden; color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.09); }
+.favicon-sq svg { width: 60%; height: 60%; }
 
 .flag-attn { display: inline-flex; align-items: center; gap: 5px; color: var(--text-color-warning); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); }
 .flag-attn svg { width: 13px; height: 13px; fill: none; stroke: var(--icon-color-warning); stroke-width: 2; }
@@ -774,30 +774,30 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
       <div class="rail-panel-body tq-list" id="rail-list">
         <div class="tq-group">Active</div>
         <button class="tq-item" data-open-tools="stvincent">
-          <span class="tq-fav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5V7.5A1.5 1.5 0 0 1 5.5 6h13A1.5 1.5 0 0 1 20 7.5v2a2 2 0 0 0 0 4v2A1.5 1.5 0 0 1 18.5 17h-13A1.5 1.5 0 0 1 4 15.5v-2a2 2 0 0 0 0-4z"/><path d="M13.5 6.5v11"/></svg></span>
+          <span class="tq-fav" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/></svg></span>
           <span class="tq-body"><span class="tq-name">Find St. Vincent tickets</span><span class="tq-status"><span class="run-dot"></span>Working… · checking 6 sites</span></span>
         </button>
         <button class="tq-item" data-open-tools="sony">
-          <span class="tq-fav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 3.5h7.6L20 12l-8 8-8.5-8.5z"/><circle cx="7.6" cy="7.6" r="1.4"/></svg></span>
+          <span class="tq-fav" style="background:#0046be"><svg viewBox="0 0 24 24" fill="#ffe000"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span>
           <span class="tq-body"><span class="tq-name">Sony WH-1000XM5 price</span><span class="tq-status"><svg class="ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Checked 3m ago · <span class="val">dropped to $278</span></span></span>
           <span class="tq-badge">Daily</span>
         </button>
         <button class="tq-item" data-open-tools="apt">
-          <span class="tq-fav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V6.5L11.5 3 19 6.5V21"/><path d="M9 21v-4.5h5V21"/><path d="M8 9.5h1.5M13.5 9.5H15M8 13h1.5M13.5 13H15"/></svg></span>
+          <span class="tq-fav" style="background:#5c2d91"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="11" r="7.5"/><path d="M12 3.5v15M12 11 6.7 16.3M12 11l5.3 5.3"/></svg></span>
           <span class="tq-body"><span class="tq-name">Apartment listings · Mission</span><span class="tq-status"><span class="val">3 new</span> since yesterday</span></span>
           <span class="tq-badge">Daily</span>
         </button>
         <button class="tq-item" data-open-tools="rei">
-          <span class="tq-fav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 3.5h7.6L20 12l-8 8-8.5-8.5z"/><circle cx="7.6" cy="7.6" r="1.4"/></svg></span>
+          <span class="tq-fav" style="background:#40682f"><svg viewBox="0 0 24 24" fill="#fff"><path d="M2 20h20L14.3 6.5l-3.4 5.8-2.2-3z"/></svg></span>
           <span class="tq-body"><span class="tq-name">REI Danner hiking boots</span><span class="tq-status"><svg class="attn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>Needs a look · the page changed</span></span>
         </button>
         <div class="tq-group">Recent</div>
         <button class="tq-item" data-open-tools="scout">
-          <span class="tq-fav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6.5v11M7.5 6.5v11M11 6.5v11M14.5 6.5v11M20 6.5v11"/></svg></span>
+          <span class="tq-fav" style="background:#0046be"><svg viewBox="0 0 24 24" fill="#ffe000"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span>
           <span class="tq-body"><span class="tq-name">Best Buy checkout codes</span><span class="tq-status"><svg class="ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="val">3 codes found</span> · 2h ago</span></span>
         </button>
         <button class="tq-item" data-open-tools="research">
-          <span class="tq-fav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3h7L18 7.5V21H6.5z"/><path d="M13 3.2V8h4.8"/><path d="M9.5 13h5M9.5 16.5h3.5"/></svg></span>
+          <span class="tq-fav" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/></svg></span>
           <span class="tq-body"><span class="tq-name">ANC headphones under $300</span><span class="tq-status"><svg class="ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Report ready · 1d ago</span></span>
         </button>
       </div>
@@ -869,7 +869,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           <div data-show="5 6" id="dash-list">
             <div class="dash-item" id="dash-stvincent">
               <div class="grow" role="button" tabindex="0" aria-expanded="false">
-                <span class="favicon-sq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5V7.5A1.5 1.5 0 0 1 5.5 6h13A1.5 1.5 0 0 1 20 7.5v2a2 2 0 0 0 0 4v2A1.5 1.5 0 0 1 18.5 17h-13A1.5 1.5 0 0 1 4 15.5v-2a2 2 0 0 0 0-4z"/><path d="M13.5 6.5v11"/></svg></span>
+                <span class="favicon-sq" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/></svg></span>
                 <span class="gmain"><span class="gname">Find St. Vincent tickets</span><br/><span class="gmeta truncate">checking 6 sites · started 2m ago</span></span>
                 <span class="gvalue"><span class="now running"><span class="run-dot"></span>Working…</span><br/><span class="sub">2 under $120 · Oct 3</span></span>
               </div>
@@ -888,7 +888,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             
             <div class="dash-item" id="dash-sony">
               <div class="grow" id="row-sony" role="button" tabindex="0" aria-expanded="false">
-                <span class="favicon-sq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 3.5h7.6L20 12l-8 8-8.5-8.5z"/><circle cx="7.6" cy="7.6" r="1.4"/></svg></span>
+                <span class="favicon-sq" style="background:#0046be"><svg viewBox="0 0 24 24" fill="#ffe000"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span>
                 <span class="gmain"><span class="gname">Sony WH-1000XM5 price</span><span class="gname-edit"><input class="gname-input" id="sony-title" value="Sony WH-1000XM5 price" aria-label="Task name" /><button class="gname-x" aria-label="Clear name">×</button></span><br/><span class="gmeta truncate">bestbuy.com · checked 3m ago</span></span>
                 <svg class="spark spark-line" viewBox="0 0 60 20" aria-hidden="true"><polyline points="0,3 12,4.5 24,8 36,10.5 48,13.5 60,17"/></svg>
                 <span class="gvalue"><span class="now">$299 <span class="chg">▼ −6%</span></span><br/><span class="sub">alerts below $270</span></span>
@@ -923,7 +923,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
             <div class="dash-item attn" id="dash-rei">
               <div class="grow attn" role="button" tabindex="0" aria-expanded="false">
-                <span class="favicon-sq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 3.5h7.6L20 12l-8 8-8.5-8.5z"/><circle cx="7.6" cy="7.6" r="1.4"/></svg></span>
+                <span class="favicon-sq" style="background:#40682f"><svg viewBox="0 0 24 24" fill="#fff"><path d="M2 20h20L14.3 6.5l-3.4 5.8-2.2-3z"/></svg></span>
                 <span class="gmain"><span class="gname">REI Danner hiking boots</span><br/><span class="gmeta truncate">rei.com · the page changed</span></span>
                 <span class="gvalue"><span class="flag-attn"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg> Needs a look</span><br/><span class="sub">last knew $189 · Jun 30</span></span>
               </div>
@@ -942,7 +942,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
             <div class="dash-item" id="dash-apt">
               <div class="grow" role="button" tabindex="0" aria-expanded="false">
-                <span class="favicon-sq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V6.5L11.5 3 19 6.5V21"/><path d="M9 21v-4.5h5V21"/><path d="M8 9.5h1.5M13.5 9.5H15M8 13h1.5M13.5 13H15"/></svg></span>
+                <span class="favicon-sq" style="background:#5c2d91"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="11" r="7.5"/><path d="M12 3.5v15M12 11 6.7 16.3M12 11l5.3 5.3"/></svg></span>
                 <span class="gmain"><span class="gname">Apartment listings · Mission</span><br/><span class="gmeta truncate">craigslist.org · checked 12m ago</span></span>
                 <svg class="spark spark-bars" viewBox="0 0 60 20" aria-hidden="true"><rect x="0" y="12.7" width="7" height="5.3" rx="1.5"/><rect x="10" y="17" width="7" height="1" rx="0.5"/><rect x="20" y="7.3" width="7" height="10.7" rx="1.5"/><rect x="30" y="12.7" width="7" height="5.3" rx="1.5"/><rect x="40" y="7.3" width="7" height="10.7" rx="1.5"/><rect x="50" y="2" width="7" height="16" rx="1.5"/></svg>
                 <span class="gvalue"><span class="now">3 new <span class="chg">▲ +1</span></span><br/><span class="sub">since yesterday</span></span>
@@ -963,7 +963,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
                         <div class="dash-item" id="dash-nikon">
               <div class="grow paused" role="button" tabindex="0" aria-expanded="false">
-                <span class="favicon-sq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 3.5h7.6L20 12l-8 8-8.5-8.5z"/><circle cx="7.6" cy="7.6" r="1.4"/></svg></span>
+                <span class="favicon-sq" style="background:#1b1b21"><svg viewBox="0 0 24 24" fill="none" stroke="#ffd200" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5h3.2L8.7 6h6.6l1.5 2.5H20V19H4z"/><circle cx="12" cy="13" r="3.2"/></svg></span>
                 <span class="gmain"><span class="gname">Nikon Z6 III price</span><br/><span class="gmeta truncate">bhphotovideo.com · paused · last $1,999</span></span>
                 <span class="gvalue"><span class="now">$1,999</span><br/><span class="sub">paused · <a class="accent-link" href="#" onclick="return false">Resume</a></span></span>
               </div>
@@ -992,7 +992,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           <div class="group-label" data-show="5 6">Recent</div>
           <div class="dash-item" data-show="5 6" id="dash-scout">
             <div class="grow" role="button" tabindex="0" aria-expanded="false">
-              <span class="favicon-sq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6.5v11M7.5 6.5v11M11 6.5v11M14.5 6.5v11M20 6.5v11"/></svg></span>
+              <span class="favicon-sq" style="background:#0046be"><svg viewBox="0 0 24 24" fill="#ffe000"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span>
               <span class="gmain"><span class="gname">Best Buy checkout codes</span><br/><span class="gmeta truncate">3 codes found · ran 2h ago</span></span>
               <span class="gvalue"><span class="status-chip">Saves $12</span></span>
             </div>
@@ -1007,7 +1007,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           
           <div class="dash-item" data-show="5 6" id="dash-research">
             <div class="grow" role="button" tabindex="0" aria-expanded="false">
-              <span class="favicon-sq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3h7L18 7.5V21H6.5z"/><path d="M13 3.2V8h4.8"/><path d="M9.5 13h5M9.5 16.5h3.5"/></svg></span>
+              <span class="favicon-sq" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/></svg></span>
               <span class="gmain"><span class="gname">ANC headphones under $300</span><br/><span class="gmeta truncate">14 sources · finished yesterday</span></span>
               <span class="gvalue"><span class="status-chip">Report ready</span></span>
             </div>
@@ -1766,7 +1766,7 @@ function addTask(name, cond) {
   cond = (cond || "").trim() || "the page changes";
   const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
   const key = "new" + (addTask._n = (addTask._n || 0) + 1);
-  const fav = '<span class="favicon-sq"><svg class="note-icon" viewBox="0 -960 960 960" fill="currentColor"><path d="' + NOTE_ICON + '"/></svg></span>';
+  const fav = '<span class="favicon-sq" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 -960 960 960" fill="#fff"><path d="' + NOTE_ICON + '"/></svg></span>';
   const del = '<button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>';
   const dashList = document.getElementById("dash-list");
   if (dashList) {
@@ -1786,7 +1786,7 @@ function addTask(name, cond) {
   }
   const railList = document.getElementById("rail-list");
   if (railList) {
-    const tqFav = '<span class="tq-fav"><svg class="note-icon" viewBox="0 -960 960 960" fill="currentColor"><path d="' + NOTE_ICON + '"/></svg></span>';
+    const tqFav = '<span class="tq-fav" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 -960 960 960" fill="#fff"><path d="' + NOTE_ICON + '"/></svg></span>';
     const t = document.createElement("button");
     t.className = "tq-item"; t.type = "button";
     t.innerHTML = tqFav + '<span class="tq-body"><span class="tq-name">' + esc(name) + '</span><span class="tq-status"><span class="run-dot"></span>Just now · watching</span></span><span class="tq-badge">Daily</span>';
