@@ -626,6 +626,9 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
 /* Step visibility — only hide inactive steps; visible keep authored display */
 [data-show]:not(.step-visible) { display: none !important; }
+.stage.create-blank .ctx-only { display: none !important; }
+.stage:not(.create-blank) .blank-only { display: none !important; }
+.stage.create-blank #kickoff { display: none !important; }
 
 .annot { position: absolute; z-index: 50; background: light-dark(#180e30, #f2f0f8); color: light-dark(#f2f0f8, #180e30); padding: 6px 12px; border-radius: var(--border-radius-medium); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); box-shadow: var(--box-shadow-level-4); max-width: 250px; }
 .annot::before { content: ""; position: absolute; width: 10px; height: 10px; background: inherit; transform: rotate(45deg); }
@@ -1099,8 +1102,13 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         <!-- Kickoff: the user turn, set by whichever entry point was used -->
         <div class="message-user" id="kickoff" data-show="creating live"><p></p></div>
 
+        <!-- Context-free create (the + menu's "Create a new skill"): Firefox asks first, assumes nothing -->
+        <div class="blank-only anim-reach" data-show="creating live">
+          <div class="message-assistant">What would you like me to do? I can watch a page, find something, or look into a question.</div>
+        </div>
+
         <!-- Step 3: Monitor tool → create card (locks into saved state on steps 4 and 8) -->
-        <div data-show="creating live" class="anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
+        <div data-show="creating live" class="ctx-only anim-reach" style="display:flex;flex-direction:column;gap:var(--space-medium)">
           <div class="message-assistant">Looks like a product page. I've set up a skill to watch the price. Tweak anything, then start it.</div>
 
           <div class="mcard" id="create-card">
@@ -1288,6 +1296,7 @@ function go(s) {
   state = STATES.includes(s) ? s : "zero";
   history.replaceState(null, "", "#" + state);
   stageEl.classList.remove("slash-open");
+  stageEl.classList.remove("create-blank");
   if (state === "zero") {
     const ct = document.getElementById("smartbar-chips"); if (ct) ct.innerHTML = "";
   }
@@ -1392,7 +1401,7 @@ if (sbPlus && plusMenu) {
   }));
 
   const pmCreate = document.getElementById("pm-create");
-  if (pmCreate) pmCreate.addEventListener("click", e => { e.stopPropagation(); closePlusMenu(); showKickoff("Watch this page"); go("creating"); });
+  if (pmCreate) pmCreate.addEventListener("click", e => { e.stopPropagation(); closePlusMenu(); showKickoff(""); go("creating"); stageEl.classList.add("create-blank"); if (sbField) sbField.focus(); });
 
   const pmUpload = document.getElementById("pm-upload");
   if (pmUpload && fileInput) {
