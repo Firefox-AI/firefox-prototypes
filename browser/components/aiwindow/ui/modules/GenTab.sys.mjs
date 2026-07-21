@@ -13,9 +13,11 @@
  */
 
 import { openAIEngine } from "moz-src:///browser/components/aiwindow/models/openAIEngine.sys.mjs";
-import { MODEL_FEATURES } from "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs";
+import {
+  MODEL_FEATURES,
+  parseAndExtractJSON,
+} from "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs";
 import { sanitizeUntrustedContent } from "moz-src:///browser/components/aiwindow/models/ChatUtils.sys.mjs";
-import { parseAndExtractJSON } from "moz-src:///browser/components/aiwindow/models/memories/Memories.sys.mjs";
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
 const lazy = {};
