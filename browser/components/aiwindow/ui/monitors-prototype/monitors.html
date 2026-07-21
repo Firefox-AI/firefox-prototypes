@@ -1134,9 +1134,9 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
         </div>
 
         <!-- Step 4: started — the setup card locks in, the chat confirms. Undo only right after creation. -->
-        <div data-show="4 8" class="anim-land" style="display:flex;flex-direction:column;gap:var(--space-medium)">
+        <div data-show="live 8" class="anim-land" style="display:flex;flex-direction:column;gap:var(--space-medium)">
           <div class="message-assistant">Watching <b>Sony WH-1000XM5 price</b>. You'll hear from me if it drops below $270. To view it or make edits, head to <a class="accent-link" href="#5" data-open-tools-page>about:skills</a>.</div>
-          <div data-show="4"><button class="undo-pill" id="undo-create">Undo</button></div>
+          <div data-show="live"><button class="undo-pill" id="undo-create">Undo</button></div>
         </div>
 
         <!-- Step 8: Open page — the chat picks up where you left off; setup sits up in the scroll history -->
@@ -1264,7 +1264,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 </div>
 
 <script>
-const STATES = ["zero", "creating", "live"];
+const STATES = ["zero", "creating", "live", "2", "4", "5", "6", "7", "8", "9", "10"];
 let state = STATES.includes(location.hash.slice(1)) ? location.hash.slice(1) : "zero";
 const stageEl = document.getElementById("stage");
 const dhMonitor = document.getElementById("dh-monitor");
@@ -1293,6 +1293,7 @@ function armDoorhanger() {
   if (state === "zero") dhTimer = setTimeout(() => { if (state === "zero") dhMonitor.classList.remove("dh-gone"); }, DOORHANGER_DELAY);
 }
 function go(s) {
+  s = String(s);
   state = STATES.includes(s) ? s : "zero";
   history.replaceState(null, "", "#" + state);
   stageEl.classList.remove("slash-open");
