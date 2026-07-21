@@ -139,6 +139,130 @@ function populateIntentSuggestions(suggestions, currentIntent) {
 }
 
 /**
+ * Render checkable timeline from GenTab module state (survives reloads).
+ *
+ * @param {object} state
+ */
+function renderTimeline(state) {
+  const section = document.getElementById("gentab-timeline");
+  const list = document.getElementById("gentab-timeline-list");
+  const titleEl = document.getElementById("gentab-timeline-title");
+  const subtitleEl = document.getElementById("gentab-timeline-subtitle");
+  const progressEl = document.getElementById("gentab-timeline-progress");
+  if (!section || !list) {
+    return;
+  }
+
+  const timeline = state.timeline;
+  if (!timeline?.steps?.length) {
+    section.hidden = true;
+    list.replaceChildren();
+    return;
+  }
+
+  titleEl.textContent = timeline.title || "Timeline";
+  if (timeline.subtitle) {
+    subtitleEl.textContent = timeline.subtitle;
+    subtitleEl.hidden = false;
+  } else {
+    subtitleEl.textContent = "";
+    subtitleEl.hidden = true;
+  }
+
+  list.replaceChildren();
+  let doneCount = 0;
+  timeline.steps.forEach((step, index) => {
+    if (step.done) {
+      doneCount += 1;
+    }
+    const li = document.createElement("li");
+    li.className = "gentab-timeline-item";
+    if (step.done) {
+      li.classList.add("done");
+    }
+    li.dataset.stepId = step.id;
+
+    const label = document.createElement("label");
+    label.className = "gentab-timeline-label";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "gentab-timeline-check";
+    checkbox.checked = !!step.done;
+    checkbox.dataset.stepId = step.id;
+    checkbox.setAttribute(
+      "aria-label",
+      step.done
+        ? `Mark incomplete: ${step.heading}`
+        : `Mark complete: ${step.heading}`
+    );
+
+    const num = document.createElement("span");
+    num.className = "gentab-timeline-num";
+    num.setAttribute("aria-hidden", "true");
+    num.textContent = String(index + 1);
+
+    const body = document.createElement("span");
+    body.className = "gentab-timeline-body";
+
+    const heading = document.createElement("span");
+    heading.className = "gentab-timeline-heading";
+    heading.textContent = step.heading || " ";
+
+    body.appendChild(heading);
+    if (step.body && step.body.trim() && step.body !== " ") {
+      const detail = document.createElement("span");
+      detail.className = "gentab-timeline-detail";
+      detail.textContent = step.body;
+      body.appendChild(detail);
+    }
+
+    label.appendChild(checkbox);
+    label.appendChild(num);
+    label.appendChild(body);
+    li.appendChild(label);
+    list.appendChild(li);
+  });
+
+  const total = timeline.steps.length;
+  progressEl.textContent = `${doneCount} of ${total} complete`;
+  progressEl.hidden = false;
+  section.hidden = false;
+}
+
+function bindTimelineChecks() {
+  const list = document.getElementById("gentab-timeline-list");
+  if (!list || list.dataset.bound === "1") {
+    return;
+  }
+  list.dataset.bound = "1";
+  list.addEventListener("change", event => {
+    const checkbox = event.target;
+    if (
+      !HTMLInputElement.isInstance(checkbox) ||
+      checkbox.type !== "checkbox"
+    ) {
+      return;
+    }
+    const stepId = checkbox.dataset.stepId;
+    const id = gGenerationId || getGenerationId();
+    if (!stepId || !id) {
+      return;
+    }
+    const timeline = lazy.GenTab.setStepDone(id, stepId, checkbox.checked);
+    if (!timeline) {
+      return;
+    }
+    // Refresh from module state so UI and progress stay in sync.
+    const state = lazy.GenTab.getState(id);
+    if (state) {
+      gHeaderState = state;
+      renderTimeline(state);
+    }
+  });
+}
+
+/**
  * Populate the chrome header from GenTab state.
  *
  * @param {object} state
@@ -225,7 +349,10 @@ async function applyIntent(intent) {
   closeIntentPanel();
   showStatus(`Regenerating GenTab for “${next}”…`);
   document.getElementById("gentab-header").hidden = true;
-  document.getElementById("multi-stage-message-root").hidden = true;
+  const main = document.getElementById("gentab-main");
+  if (main) {
+    main.hidden = true;
+  }
 
   try {
     await lazy.GenTab.regenerateWithIntent(id, next);
@@ -235,7 +362,9 @@ async function applyIntent(intent) {
     console.error(error);
     showStatus(error?.message || "Could not regenerate GenTab.");
     document.getElementById("gentab-header").hidden = false;
-    document.getElementById("multi-stage-message-root").hidden = false;
+    if (main) {
+      main.hidden = false;
+    }
   }
 }
 
@@ -349,8 +478,14 @@ async function renderGenTab() {
 
   document.title = state.title || "GenTab";
   hideStatus();
+  const main = document.getElementById("gentab-main");
+  if (main) {
+    main.hidden = false;
+  }
   document.getElementById("multi-stage-message-root").hidden = false;
   renderHeader(state);
+  renderTimeline(state);
+  bindTimelineChecks();
   mountAboutWelcome(state.config);
 }
 

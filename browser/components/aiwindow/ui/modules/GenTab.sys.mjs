@@ -677,63 +677,48 @@ function checklistTile({ title, subtitle, items }) {
   return tile;
 }
 
-/**
- * Ordered timeline tile (ContentTiles type "timeline" → TileList).
- *
- * @param {object} opts
- * @param {string} opts.title
- * @param {string} [opts.subtitle]
- * @param {Array<{heading: string, body: string}>} opts.items
- * @returns {object | null}
- */
-function timelineTile({ title, subtitle, items }) {
-  if (!items?.length) {
-    return null;
-  }
-  const tile = {
-    type: "timeline",
-    title: {
-      raw: title || "Timeline",
-      fontSize: "20px",
-      fontWeight: "600",
-    },
-    data: {
-      timeline: true,
-      ordered: true,
-      items: items.map(item => {
-        const entry = {
-          text: {
-            raw: item.heading || " ",
-            fontWeight: "600",
-          },
-        };
-        if (item.body && item.body.trim() && item.body !== " ") {
-          entry.subtext = { raw: item.body };
-        }
-        return entry;
-      }),
-      style: {
-        width: "min(680px, 100%)",
-      },
-    },
-  };
-  if (subtitle) {
-    tile.subtitle = {
-      raw: subtitle,
-      fontSize: "14px",
-      fontWeight: 320,
-    };
-  }
-  return tile;
-}
-
 function tileIconBackground(index) {
   const url = TILE_ICON_URLS[index % TILE_ICON_URLS.length];
   return `var(--card-icon-bg, transparent) center / calc(100% - var(--space-medium, 16px)) calc(100% - var(--space-medium, 16px)) no-repeat url("${url}")`;
 }
 
 /**
+ * Stable step list for the chrome timeline (check-off UI lives outside AW).
+ *
+ * @param {object} content normalized content
+ * @returns {{ title: string, subtitle: string, steps: Array<{id: string, heading: string, body: string, done: boolean}> }}
+ */
+export function buildTimelineModel(content) {
+  const normalized = normalizeGenTabContent(content);
+  const keyFacts = normalized.key_facts.length
+    ? normalized.key_facts
+    : [
+        {
+          heading: "Overview",
+          body: normalized.summary || "Generated from the selected page.",
+        },
+      ];
+  const planItems = normalized.plan.items.length
+    ? normalized.plan.items
+    : keyFacts.slice(0, 3);
+
+  return {
+    title: normalized.plan.title || "Timeline",
+    subtitle:
+      normalized.plan.subtitle ||
+      "Follow these steps in order — grounded in your open tabs.",
+    steps: planItems.map((item, index) => ({
+      id: `step-${index}`,
+      heading: item.heading || `Step ${index + 1}`,
+      body: item.body || "",
+      done: false,
+    })),
+  };
+}
+
+/**
  * Map structured content into a single-screen AboutWelcome feature config.
+ * Timeline is rendered in gentab chrome (checkable); AW gets supporting tiles.
  *
  * @param {object} content
  * @param {{ url?: string, title?: string }} [sourceMeta]
@@ -750,10 +735,6 @@ export function mapContentToFeatureConfig(content, sourceMeta = {}) {
           body: normalized.summary || "Generated from the selected page.",
         },
       ];
-
-  const planItems = normalized.plan.items.length
-    ? normalized.plan.items
-    : keyFacts.slice(0, 3);
 
   const focusOptions =
     normalized.focus_options.length >= 2
@@ -795,15 +776,8 @@ export function mapContentToFeatureConfig(content, sourceMeta = {}) {
     detailSections = detailSections.slice(0, MAX_DETAIL_SECTIONS + 1);
   }
 
-  // Timeline is the hero; supporting tiles stay secondary.
+  // Timeline is rendered in gentab chrome (check-off). AW = supporting tiles.
   const tiles = [
-    timelineTile({
-      title: normalized.plan.title || "Timeline",
-      subtitle:
-        normalized.plan.subtitle ||
-        "Follow these steps in order — grounded in your open tabs.",
-      items: planItems,
-    }),
     checklistTile({
       title: "At a glance",
       subtitle: "Context for the timeline.",
@@ -819,7 +793,7 @@ export function mapContentToFeatureConfig(content, sourceMeta = {}) {
         fontWeight: "600",
       },
       subtitle: {
-        raw: "Optional forks — the timeline above stays the default plan.",
+        raw: "Optional forks — the checked timeline stays your progress.",
         fontSize: "14px",
         fontWeight: 320,
       },
@@ -1818,6 +1792,40 @@ export const GenTab = {
   },
 
   /**
+   * Toggle a timeline step checked state. Survives content reloads in-session
+   * (module memory); not written to disk (lost on browser restart).
+   *
+   * @param {string} id generation id
+   * @param {string} stepId
+   * @param {boolean} [done] force value; omit to flip
+   * @returns {object | null} updated timeline, or null
+   */
+  setStepDone(id, stepId, done) {
+    const state = gStates.get(id);
+    if (!state?.timeline?.steps?.length) {
+      return null;
+    }
+    const steps = state.timeline.steps.map(step => {
+      if (step.id !== stepId) {
+        return step;
+      }
+      const nextDone = typeof done === "boolean" ? done : !step.done;
+      return { ...step, done: nextDone };
+    });
+    const timeline = { ...state.timeline, steps };
+    setState(id, { ...state, timeline });
+    return timeline;
+  },
+
+  /**
+   * @param {string} id
+   * @returns {object | null}
+   */
+  getTimeline(id) {
+    return gStates.get(id)?.timeline ?? null;
+  },
+
+  /**
    * Re-run generation for an existing GenTab with a new intent, using the
    * cached source snapshots from the first extract.
    *
@@ -2056,13 +2064,28 @@ async function runGenerationFromSources(id, sources, options = {}) {
   const intentSuggestions = buildIntentSuggestions(content, intent, sources);
 
   const config = mapContentToFeatureConfig(content, primaryMeta);
+  const timeline = buildTimelineModel(content);
+
+  // Best-effort: keep checkmarks across intent regen when headings match.
+  const prev = gStates.get(id) || {};
+  if (prev.timeline?.steps?.length) {
+    const doneByHeading = new Map(
+      prev.timeline.steps
+        .filter(s => s.done)
+        .map(s => [s.heading.trim().toLowerCase(), true])
+    );
+    for (const step of timeline.steps) {
+      if (doneByHeading.has(step.heading.trim().toLowerCase())) {
+        step.done = true;
+      }
+    }
+  }
 
   const extractMs = options.extractMs ?? 0;
   console.warn(
     `GenTab ready id=${id} tabs=${sources.length} intent=${intent} extract=${Math.round(extractMs)}ms llm=${Math.round(llmMs)}ms fallback=${usedFallback}`
   );
 
-  const prev = gStates.get(id) || {};
   setState(id, {
     status: "ready",
     sourceUrl: primaryMeta.url,
@@ -2083,11 +2106,10 @@ async function runGenerationFromSources(id, sources, options = {}) {
       url: source.url,
       text: source.text,
     })),
+    timeline,
     generatedAt: Date.now(),
     config,
     error: null,
     usedFallback,
-    // Preserve any extra prior fields we might need later.
-    ...("browsers" in prev ? {} : {}),
   });
 }

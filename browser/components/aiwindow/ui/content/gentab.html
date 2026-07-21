@@ -123,11 +123,26 @@
         </div>
       </div>
     </header>
-    <div
-      id="multi-stage-message-root"
-      class="welcome-container"
-      role="presentation"
-    ></div>
+    <main id="gentab-main" class="gentab-main" hidden>
+      <section
+        id="gentab-timeline"
+        class="gentab-timeline"
+        aria-label="Timeline"
+        hidden
+      >
+        <h2 id="gentab-timeline-title" class="gentab-timeline-title">
+          Timeline
+        </h2>
+        <p id="gentab-timeline-subtitle" class="gentab-timeline-subtitle"></p>
+        <ol id="gentab-timeline-list" class="gentab-timeline-list"></ol>
+        <p id="gentab-timeline-progress" class="gentab-timeline-progress"></p>
+      </section>
+      <div
+        id="multi-stage-message-root"
+        class="welcome-container"
+        role="presentation"
+      ></div>
+    </main>
     <script src="chrome://global/content/vendor/react.js"></script>
     <script src="chrome://global/content/vendor/react-dom.js"></script>
     <script src="chrome://browser/content/contentTheme.js"></script>
