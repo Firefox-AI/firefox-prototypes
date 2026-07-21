@@ -356,6 +356,13 @@ h1,h2,h3,h4,p { margin: 0; }
 .mcard-actions { display: flex; align-items: center; gap: var(--space-small); }
 .mcard-actions .spacer { flex: 1; }
 .mono-dim { color: var(--text-color-deemphasized); font-size: var(--font-size-small); }
+.mrow2 { display: flex; gap: var(--space-large); }
+.mrow2 .mfield { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+.mrow2 .mfield .lbl { font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--text-color-deemphasized); }
+.mrow2 .select-wrap { display: flex; }
+.mrow2 .field-select { width: 100%; }
+.time-input { display: inline-flex; align-items: center; gap: var(--space-small); width: 100%; border: 1px solid var(--border-color); border-radius: var(--border-radius-medium); padding: 6px var(--space-medium); background: var(--background-color-box); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--text-color); cursor: pointer; }
+.time-input svg { width: 15px; height: 15px; fill: none; stroke: var(--text-color-deemphasized); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; margin-inline-start: auto; }
 .modal-hero { display: flex; flex-direction: column; gap: 4px; }
 .modal-desc { margin: 0; color: var(--text-color-deemphasized); font-size: var(--font-size-small); line-height: 1.5; }
 .select-wrap { position: relative; display: inline-flex; }
@@ -627,9 +634,8 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
 /* Step visibility — only hide inactive steps; visible keep authored display */
 [data-show]:not(.step-visible) { display: none !important; }
-.stage.create-blank .ctx-only { display: none !important; }
-.stage:not(.create-blank) .blank-only { display: none !important; }
-.stage.create-blank #kickoff { display: none !important; }
+.sidebar.create-blank .ctx-only { display: none !important; }
+.sidebar:not(.create-blank) .blank-only { display: none !important; }
 
 .annot { position: absolute; z-index: 50; background: light-dark(#180e30, #f2f0f8); color: light-dark(#f2f0f8, #180e30); padding: 6px 12px; border-radius: var(--border-radius-medium); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); box-shadow: var(--box-shadow-level-4); max-width: 250px; }
 .annot::before { content: ""; position: absolute; width: 10px; height: 10px; background: inherit; transform: rotate(45deg); }
@@ -1107,7 +1113,27 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 
         <!-- Context-free create (the + menu's "Create a new task"): Firefox asks first, assumes nothing -->
         <div class="blank-only anim-reach" data-show="creating live">
-          <div class="message-assistant">What would you like me to do? I can watch a page, find something, or look into a question.</div>
+          <div class="mcard">
+            <div class="field">
+              <span class="field-label">Name</span>
+              <input class="field-input" placeholder="Name this task" aria-label="Task name" />
+            </div>
+            <div class="field">
+              <span class="field-label">Alert me when</span>
+              <input class="field-input" placeholder="Describe what to watch" aria-label="Alert condition" />
+            </div>
+            <div class="field">
+              <span class="field-label">Pages</span>
+              <input class="field-input" placeholder="Paste a URL to watch" aria-label="Add page URL" />
+              <span class="mono-dim">Add up to 6 pages. Paste a URL and press Enter.</span>
+            </div>
+            <hr class="rule" />
+            <div class="mrow2">
+              <div class="mfield"><span class="lbl">Check</span><span class="select-wrap"><select class="field-select" aria-label="How often to check"><option>Daily</option><option>Hourly</option><option>Weekly</option></select></span></div>
+              <div class="mfield"><span class="lbl">Time</span><span class="time-input">9:00 AM<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg></span></div>
+            </div>
+            <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost">Cancel</button><button class="btn-cta">Create task</button></div>
+          </div>
         </div>
 
         <!-- Step 3: Monitor tool → create card (locks into saved state on steps 4 and 8) -->
@@ -1124,15 +1150,17 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <div class="field">
               <span class="field-label">Alert me when</span>
               <input class="field-input" id="create-cond" value="the price drops below $270" aria-label="Alert condition" />
-              <div class="chip-row" id="create-chips"><button class="chip">Any drop</button><button class="chip selected">Below $270</button><button class="chip">Below $250</button><button class="chip">Back in stock</button></div>
             </div>
             <div class="field">
               <span class="field-label">Pages</span>
               <div class="chip-row pages-row"><span class="page-pill"><span class="fav" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span> bestbuy.com/…/xm5 <button class="x" aria-label="Remove page">×</button></span><input class="field-input page-add-input" placeholder="Paste a URL" hidden aria-label="Add page URL" /><button class="chip page-add">+ Add page</button></div>
             </div>
             <hr class="rule" />
-            <div class="mrow"><span class="lbl">Check</span><span class="val">Daily</span></div>
-                                    <div class="mcard-actions"><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><button class="btn-ghost">Cancel</button><button class="btn-cta" id="start-monitoring">Create task</button></div>
+            <div class="mrow2">
+              <div class="mfield"><span class="lbl">Check</span><span class="select-wrap"><select class="field-select" aria-label="How often to check"><option>Daily</option><option>Hourly</option><option>Weekly</option></select></span></div>
+              <div class="mfield"><span class="lbl">Time</span><span class="time-input">9:00 AM<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg></span></div>
+            </div>
+            <div class="mcard-actions"><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><button class="btn-ghost">Cancel</button><button class="btn-cta" id="start-monitoring">Create task</button></div>
           </div>
         </div>
 
@@ -1231,7 +1259,10 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           <span class="mono-dim">Add up to 6 pages. Paste a URL and press Enter.</span>
         </div>
         <hr class="rule" />
-        <div class="mrow"><span class="lbl">Check</span><span class="spacer"></span><span class="select-wrap"><select class="field-select" id="modal-freq" aria-label="How often to check"><option>Daily</option><option>Hourly</option><option>Weekly</option></select></span></div>
+        <div class="mrow2">
+          <div class="mfield"><span class="lbl">Check</span><span class="select-wrap"><select class="field-select" id="modal-freq" aria-label="How often to check"><option>Daily</option><option>Hourly</option><option>Weekly</option></select></span></div>
+          <div class="mfield"><span class="lbl">Time</span><span class="time-input">9:00 AM<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg></span></div>
+        </div>
         <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost" id="modal-cancel">Cancel</button><button class="btn-cta" id="modal-start">Create task</button></div>
       </div>
     </div>
@@ -1270,6 +1301,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 const STATES = ["zero", "creating", "live", "2", "4", "5", "6", "7", "8", "9", "10"];
 let state = STATES.includes(location.hash.slice(1)) ? location.hash.slice(1) : "zero";
 const stageEl = document.getElementById("stage");
+const sidebarEl = document.getElementById("sidebar");
 const dhMonitor = document.getElementById("dh-monitor");
 
 function render() {
@@ -1300,7 +1332,7 @@ function go(s) {
   state = STATES.includes(s) ? s : "zero";
   history.replaceState(null, "", "#" + state);
   stageEl.classList.remove("slash-open");
-  stageEl.classList.remove("create-blank");
+  sidebarEl.classList.remove("create-blank");
   if (state === "zero") {
     const ct = document.getElementById("smartbar-chips"); if (ct) ct.innerHTML = "";
   }
@@ -1318,7 +1350,7 @@ document.addEventListener("keydown", e => {
 document.getElementById("undo-create").addEventListener("click", () => go("creating"));
 
 // Entry point 1 - Firefox offers: the toolbar Tasks button reveals the doorhanger
-document.getElementById("tb-tasks").onclick = e => { e.stopPropagation(); dhMonitor.classList.toggle("dh-gone"); };
+document.getElementById("tb-tasks").onclick = e => { e.stopPropagation(); dhMonitor.classList.add("dh-gone"); openModal(null); };
 document.getElementById("tb-ask").onclick = e => { e.stopPropagation(); if (typeof sbField !== "undefined" && sbField) sbField.focus(); };
 document.getElementById("dh-cta").onclick = () => { dhMonitor.classList.add("dh-gone"); showKickoff("Watch this page"); go("creating"); };
 
@@ -1406,7 +1438,7 @@ if (sbPlus && plusMenu) {
   }));
 
   const pmCreate = document.getElementById("pm-create");
-  if (pmCreate) pmCreate.addEventListener("click", e => { e.stopPropagation(); closePlusMenu(); showKickoff(""); go("creating"); stageEl.classList.add("create-blank"); if (sbField) sbField.focus(); });
+  if (pmCreate) pmCreate.addEventListener("click", e => { e.stopPropagation(); closePlusMenu(); showKickoff("create a task"); go("creating"); sidebarEl.classList.add("create-blank"); });
 
   const pmUpload = document.getElementById("pm-upload");
   if (pmUpload && fileInput) {
@@ -1423,7 +1455,7 @@ if (sbPlus && plusMenu) {
 }
 document.getElementById("dh-dismiss").onclick = () => dhMonitor.classList.add("dh-gone");
 document.getElementById("dh-close").onclick = () => dhMonitor.classList.add("dh-gone");
-document.getElementById("agent-monitor").onclick = (e) => { e.stopPropagation(); showKickoff('<span class="cmd-tok">/</span> watch this price'); go("creating"); };
+document.getElementById("agent-monitor").onclick = (e) => { e.stopPropagation(); if (sbField) sbField.textContent = ""; showKickoff("create a task"); go("creating"); sidebarEl.classList.add("create-blank"); };
 
 // One-card expansion: measured height so the surface animates reliably
 function setExpand(body, open) {
