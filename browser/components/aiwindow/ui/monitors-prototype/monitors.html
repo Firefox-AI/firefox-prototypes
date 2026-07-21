@@ -156,9 +156,10 @@ h1,h2,h3,h4,p { margin: 0; }
 .page-action.tb-btn { width: 30px; height: 30px; }
 .page-action.active { background: light-dark(color-mix(in srgb, var(--color-violet-60) 20%, transparent), color-mix(in srgb, var(--color-violet-30) 30%, transparent)); }
 /* First-run doorhanger popping from the Monitors toolbar button */
-.doorhanger { position: absolute; top: calc(100% + 9px); right: 34px; z-index: 60; width: 272px; box-sizing: border-box; background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); box-shadow: var(--box-shadow-level-4); padding: var(--space-large); animation: dh-pop var(--motion-dur-soft) var(--motion-ease-reach) both; transform-origin: top right; }
+.tb-tasks-wrap { position: relative; display: inline-flex; }
+.doorhanger { position: absolute; top: calc(100% + 9px); right: -6px; z-index: 60; width: 272px; box-sizing: border-box; background: var(--background-color-box); border: 1px solid var(--border-color-deemphasized); border-radius: var(--border-radius-large); box-shadow: var(--box-shadow-level-4); padding: var(--space-large); animation: dh-pop var(--motion-dur-soft) var(--motion-ease-reach) both; transform-origin: top right; }
 .doorhanger.dh-gone { display: none; }
-.dh-beak { position: absolute; top: -7px; right: 26px; width: 13px; height: 13px; background: var(--background-color-box); border-left: 1px solid var(--border-color-deemphasized); border-top: 1px solid var(--border-color-deemphasized); transform: rotate(45deg); }
+.dh-beak { position: absolute; top: -7px; right: 15px; width: 13px; height: 13px; background: var(--background-color-box); border-left: 1px solid var(--border-color-deemphasized); border-top: 1px solid var(--border-color-deemphasized); transform: rotate(45deg); }
 .dh-close { position: absolute; top: 9px; right: 9px; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; color: var(--text-color-deemphasized); }
 .dh-close:hover { background: var(--background-color-box-info); color: var(--text-color); }
 .dh-close svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; }
@@ -708,15 +709,17 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
     <span class="tb-vpn" title="Mozilla VPN"><span class="vpn-dot"></span>VPN</span>
     <button class="page-action" title="Account" aria-label="Account"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.7"/><path d="M5.6 20a6.4 6.4 0 0 1 12.8 0"/></svg></button>
     <button class="page-action" title="Extensions" aria-label="Extensions"><svg viewBox="0 0 24 24"><path d="M4 8.5v-3a1 1 0 0 1 1-1h3a2 2 0 1 1 4 0h3a1 1 0 0 1 1 1v3a2 2 0 1 1 0 4v3a1 1 0 0 1-1 1h-3a2 2 0 1 0-4 0H5a1 1 0 0 1-1-1v-3a2 2 0 1 0 0-4z"/></svg></button>
-    <button class="tb-ask" id="tb-ask" title="Ask Smart Window" aria-label="Ask Smart Window"><span>Ask</span><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span class="dot" data-show="zero"></span></button>
-
-    <div class="doorhanger dh-gone" id="dh-monitor">
-      <div class="dh-beak"></div>
-      <button class="dh-close" id="dh-close" title="Dismiss" aria-label="Dismiss"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg></button>
-      <div class="dh-title">Watching for a price drop?</div>
-      <div class="dh-body">Firefox can keep an eye on this page for you and send word the moment the price changes.</div>
-      <div class="dh-actions"><button class="btn-cta" id="dh-cta">Watch this page</button><button class="btn-ghost" id="dh-dismiss">Not now</button></div>
-    </div>
+    <span class="tb-tasks-wrap">
+      <button class="page-action tb-btn" id="tb-tasks" title="Tasks" aria-label="Tasks"><svg viewBox="0 0 24 24"><path d="M4.5 11.5a4.5 4.5 0 0 1 4.5-4.5H16"/><path d="M12.5 3.5 16 7l-3.5 3.5"/><path d="M5 15.5h14"/><path d="M5 19.5h14"/></svg><span class="dot" data-show="zero"></span></button>
+      <div class="doorhanger dh-gone" id="dh-monitor">
+        <div class="dh-beak"></div>
+        <button class="dh-close" id="dh-close" title="Dismiss" aria-label="Dismiss"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></svg></button>
+        <div class="dh-title">Watching for a price drop?</div>
+        <div class="dh-body">Firefox can keep an eye on this page for you and send word the moment the price changes.</div>
+        <div class="dh-actions"><button class="btn-cta" id="dh-cta">Watch this page</button><button class="btn-ghost" id="dh-dismiss">Not now</button></div>
+      </div>
+    </span>
+    <button class="tb-ask" id="tb-ask" title="Ask Smart Window" aria-label="Ask Smart Window"><span>Ask</span><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
   </div>
 
   <!-- ===================== Content row ===================== -->
@@ -1315,7 +1318,8 @@ document.addEventListener("keydown", e => {
 document.getElementById("undo-create").addEventListener("click", () => go("creating"));
 
 // Entry point 1 - Firefox offers: the toolbar Tasks button reveals the doorhanger
-document.getElementById("tb-ask").onclick = e => { e.stopPropagation(); dhMonitor.classList.toggle("dh-gone"); };
+document.getElementById("tb-tasks").onclick = e => { e.stopPropagation(); dhMonitor.classList.toggle("dh-gone"); };
+document.getElementById("tb-ask").onclick = e => { e.stopPropagation(); if (typeof sbField !== "undefined" && sbField) sbField.focus(); };
 document.getElementById("dh-cta").onclick = () => { dhMonitor.classList.add("dh-gone"); showKickoff("Watch this page"); go("creating"); };
 
 // Entry point 3 - You type: click the smartbar to bring up the / picker
