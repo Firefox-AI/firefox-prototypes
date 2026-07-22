@@ -27,31 +27,34 @@
   --color-violet-30: #b89cff; --color-violet-40: #9871ff; --color-violet-50: #764edd;
   --color-violet-60: #5939a8; --color-violet-70: #3e2976; --color-violet-90: #161423;
   --color-violet-desaturated-0: #f2f0f8; --color-violet-desaturated-10: #e7e1f8;
-  --color-violet-desaturated-50: #75669f; --color-violet-desaturated-90: #180e30;
+  --color-violet-desaturated-50: #75669f; --color-violet-desaturated-60: #584a7d;
+  --color-violet-desaturated-70: #3e315f; --color-violet-desaturated-90: #180e30;
+  --color-orange-10: #ffdbc5; --color-orange-70: #701c07;
   --color-green-10: #c4f1e0; --color-green-20: #90e3c6; --color-green-40: #11ae84;
   --color-green-50: #008865; --color-green-70: #004933;
   --color-red-10: #ffd9df; --color-red-20: #ffb6bf; --color-red-50: #c52d4f; --color-red-70: #69172d;
   --color-yellow-10: #fde8b5; --color-yellow-20: #fbcc77; --color-yellow-50: #b26100; --color-yellow-70: #5f3100;
 
   /* ---- Semantic tokens (Nova) ---- */
-  --background-color-canvas: light-dark(#f5f3fc, #191324);
-  --toolbar-bg: light-dark(#f9f9fb, #2b2a33);
-  --tabstrip-bg: light-dark(#f0eff4, #1c1b22);
-  --toolbar-field-bg: light-dark(rgba(0,0,0,.05), rgba(0,0,0,.28));
+  --background-color-canvas: light-dark(#f5f3fc, #1d1f30);
+  --sw-window-gradient: linear-gradient(96deg, color-mix(in srgb, light-dark(#eaddff, #3e315f) 55%, transparent) 39.84%, color-mix(in srgb, light-dark(#ffe7d6, #701c07) 55%, transparent) 101.72%);
+  --toolbar-bg: light-dark(#f9f9fb, rgba(22,20,35,.82));
+  --tabstrip-bg: light-dark(#f0eff4, #161423);
+  --toolbar-field-bg: light-dark(rgba(0,0,0,.05), #252428);
   --smartwindow-brand-accent: light-dark(var(--color-violet-90), var(--color-violet-20));
   --background-color-box: light-dark(var(--color-white), var(--color-gray-70));
   --background-color-box-info: light-dark(var(--color-gray-15), var(--color-gray-60));
   --background-color-success: light-dark(var(--color-green-10), var(--color-green-70));
   --background-color-warning: light-dark(var(--color-yellow-10), var(--color-yellow-70));
   --background-color-critical: light-dark(var(--color-red-10), var(--color-red-70));
-  --border-color: light-dark(var(--color-gray-30), var(--color-gray-50));
-  --border-color-deemphasized: light-dark(var(--color-gray-20), var(--color-gray-60));
+  --border-color: light-dark(var(--color-gray-30), var(--color-violet-desaturated-60));
+  --border-color-deemphasized: light-dark(var(--color-gray-20), var(--color-violet-desaturated-70));
   --text-color: light-dark(var(--color-violet-desaturated-90), var(--color-violet-desaturated-0));
   --text-color-deemphasized: light-dark(rgba(20, 9, 43, .7), rgba(242, 240, 248, .7));
   --text-color-error: light-dark(var(--color-red-50), var(--color-red-20));
   --text-color-success: light-dark(var(--color-green-50), var(--color-green-20));
   --text-color-warning: light-dark(var(--color-yellow-50), var(--color-yellow-20));
-  --color-accent-primary: light-dark(var(--color-violet-50), var(--color-violet-20));
+  --color-accent-primary: light-dark(var(--color-violet-50), var(--color-violet-30));
   --color-accent-primary-hover: light-dark(var(--color-violet-60), var(--color-violet-30));
   --icon-color-warning: light-dark(var(--color-yellow-50), var(--color-yellow-20));
   --icon-color-success: light-dark(var(--color-green-50), var(--color-green-20));
@@ -118,7 +121,7 @@ h1,h2,h3,h4,p { margin: 0; }
 /* ============ Firefox chrome shell ============ */
 .browser {
   width: 1280px; height: 820px; max-width: calc(100vw - 48px); max-height: calc(100vh - 116px);
-  background: var(--background-color-canvas);
+  background: var(--sw-window-gradient), var(--background-color-canvas);
   border-radius: var(--border-radius-large);
   box-shadow: var(--box-shadow-level-4);
   display: flex; flex-direction: column; overflow: hidden;
@@ -188,7 +191,7 @@ h1,h2,h3,h4,p { margin: 0; }
 .tb-ask .dot { position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; border-radius: 50%; background: var(--icon-color-success); border: 1.5px solid var(--background-color-canvas); }
 :root[data-theme="light"] .tb-ask { background: linear-gradient(235deg, #d6b4fd -57%, #8341ca 219%); }
 .content-row { flex: 1; display: flex; min-height: 0; position: relative; }
-.stage { flex: 1; min-width: 0; overflow: auto; position: relative; background: var(--background-color-canvas); }
+.stage { flex: 1; min-width: 0; overflow: auto; position: relative; background: transparent; }
 
 /* ============ Mock product page ============ */
 .site { min-height: 100%; background: light-dark(#ffffff, #16151a); color: light-dark(#0d0d0f, #e9e8ec); font-size: 13px; }
@@ -254,7 +257,7 @@ h1,h2,h3,h4,p { margin: 0; }
 .btn-ghost:hover { background: light-dark(color-mix(in srgb, var(--color-violet-60) 16%, transparent), color-mix(in srgb, var(--color-violet-30) 24%, transparent)); }
 
 /* ============ about:smartwindowtasks — its own in-content surface ============ */
-.aboutpage { min-height: 100%; background: var(--background-color-canvas); padding: 56px 24px 72px; }
+.aboutpage { min-height: 100%; background: transparent; padding: 56px 24px 72px; }
 .aboutpage-inner { max-width: var(--page-main-content-width); margin: 0 auto; }
 .about-head { display: flex; align-items: center; gap: var(--space-medium); margin-bottom: var(--space-large); }
 .about-head .brandmark { width: 30px; height: 30px; border-radius: var(--border-radius-medium); background: var(--smartwindow-border-color-gradient); display: grid; place-items: center; flex: none; }
@@ -482,7 +485,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 .hist-flag { color: var(--text-color-warning); font-weight: var(--font-weight-semibold); }
 
 /* ============ Smart Window sidebar (real ai-window structure) ============ */
-.sidebar { width: 412px; flex: none; display: flex; flex-direction: column; background: var(--background-color-canvas); border-left: 1px solid var(--border-color-deemphasized); }
+.sidebar { width: 412px; flex: none; display: flex; flex-direction: column; background: transparent; border-left: 1px solid var(--border-color-deemphasized); }
 .sw-header { display: flex; align-items: center; gap: var(--space-small); padding: var(--space-medium) var(--space-large); }
 .sw-brand { width: 20px; height: 20px; border-radius: var(--border-radius-small); background: var(--smartwindow-border-color-gradient); flex: none; }
 .sw-title { font-weight: var(--font-weight-semibold); font-size: var(--font-size-small); }
@@ -521,7 +524,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 .rail-spacer { flex: 1; }
 
 /* Monitors tool panel, docked to the rail */
-.rail-panel { width: 320px; flex: none; display: flex; flex-direction: column; background: var(--background-color-canvas); border-right: 1px solid var(--border-color-deemphasized); }
+.rail-panel { width: 320px; flex: none; display: flex; flex-direction: column; background: transparent; border-right: 1px solid var(--border-color-deemphasized); }
 .rail-panel-head { display: flex; align-items: center; gap: var(--space-small); padding: var(--space-medium) var(--space-large); }
 .rail-panel-title { font-weight: var(--font-weight-semibold); }
 .rail-panel-body { flex: 1; overflow: auto; padding: 0 var(--space-medium) var(--space-medium); display: flex; flex-direction: column; gap: var(--space-small); }
