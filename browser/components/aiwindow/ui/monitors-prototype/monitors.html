@@ -896,7 +896,11 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 </div>
                 <div class="edit-only">
                   <div class="field"><span class="field-label">Find</span><input class="field-input" value="2 tickets under $120" aria-label="What to find" /></div>
-                  <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select" aria-label="How often to check"><option>Every few hours</option><option>Hourly</option><option>Daily</option></select></span></div>
+                  <div class="sched">
+                    <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select sched-freq" aria-label="How often to check"><option>Daily</option><option>Weekly</option></select></span></div>
+                    <div class="field sched-day" hidden><span class="field-label">On</span><span class="select-wrap"><select class="field-select" aria-label="Day of week"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></span></div>
+                    <div class="field"><span class="field-label">Time</span><span class="select-wrap"><select class="field-select" aria-label="Time of day"><option>8:00 AM</option><option selected>9:00 AM</option><option>12:00 PM</option><option>3:00 PM</option><option>6:00 PM</option><option>9:00 PM</option></select></span></div>
+                  </div>
                   <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost btn-cancel">Cancel</button><button class="btn-primary btn-save">Save</button></div>
                 </div>
               </div>
@@ -1060,7 +1064,11 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               </div>
               <div class="edit-only">
                 <div class="field"><span class="field-label">Find</span><input class="field-input" value="working checkout codes at Best Buy" aria-label="What to find" /></div>
-                <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select" aria-label="How often to check"><option>At checkout</option><option>Daily</option><option>Hourly</option></select></span></div>
+                <div class="sched">
+                  <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select sched-freq" aria-label="How often to check"><option>Daily</option><option>Weekly</option></select></span></div>
+                  <div class="field sched-day" hidden><span class="field-label">On</span><span class="select-wrap"><select class="field-select" aria-label="Day of week"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></span></div>
+                  <div class="field"><span class="field-label">Time</span><span class="select-wrap"><select class="field-select" aria-label="Time of day"><option>8:00 AM</option><option selected>9:00 AM</option><option>12:00 PM</option><option>3:00 PM</option><option>6:00 PM</option><option>9:00 PM</option></select></span></div>
+                </div>
                 <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost btn-cancel">Cancel</button><button class="btn-primary btn-save">Save</button></div>
               </div>
             </div>
@@ -1399,22 +1407,33 @@ function finishCreate(card, wrap) {
 function looksLikeQuestion(q) {
   return /\?|^\s*(how|hows|how's|what|whats|what's|when|where|why|who|is|are|am|do|does|did|has|have|any|show|tell|give|update|status|progress|going|check on)\b/i.test((q || "").trim());
 }
+const TASK_INFO = {
+  "Sony WH-1000XM5 price": { key: "sony", msg: 'Your <b>Sony WH-1000XM5 price</b> task is running. Latest check: it dropped to <b>$278</b>, down 7% from $299 — past your alert of $270.' },
+  "Best Buy checkout codes": { key: "scout", msg: 'Your <b>Best Buy checkout codes</b> task found <b>3 codes</b> so far. The best is <b>SAVE12</b> ($12 off); it last ran 2h ago at checkout.' },
+  "ANC headphones under $300": { key: "research", msg: 'Your <b>ANC headphones under $300</b> research is done — the report is ready. Top pick: <b>Sony WH-1000XM5 at $278</b>, from 14 sources.' },
+  "Apartment listings · Mission": { key: "apt", msg: 'Your <b>Apartment listings · Mission</b> task found <b>3 new listings</b> since yesterday.' },
+  "REI Danner hiking boots": { key: "rei", msg: 'Your <b>REI Danner hiking boots</b> task <b>needs a look</b> — the page changed, so I can\'t see the price right now.' },
+  "Find St. Vincent tickets": { key: "stvincent", msg: 'Your <b>Find St. Vincent tickets</b> task is still <b>working</b> — checking 6 sites for 2 tickets under $120.' },
+};
 function askAbout(query) {
   const chat = document.querySelector(".sw-chat");
   if (!chat) return;
-  if (state !== "creating" && state !== "live") go("zero");
+  if (!["zero", "creating", "live"].includes(state)) go("zero");
   sidebarEl.classList.remove("create-blank");
   const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  const chip = document.querySelector("#smartbar-chips .sb-chip-label");
+  const chipName = chip ? chip.textContent.trim() : "";
+  const info = TASK_INFO[chipName] || TASK_INFO["Sony WH-1000XM5 price"];
   const u = document.createElement("div"); u.className = "message-user dyn-msg";
   u.innerHTML = "<p>" + esc(query) + "</p>";
   const a = document.createElement("div"); a.className = "message-assistant dyn-msg anim-reach";
-  a.innerHTML = 'Your <b>Sony WH-1000XM5 price</b> task is running. Latest check: it dropped to <b>$278</b>, down 7% from $299, which is past your alert of $270. <a class="accent-link" href="#5" data-open-tools="sony">See the result on about:smartwindowtasks</a>';
+  a.innerHTML = info.msg + ' <a class="accent-link" href="#5" data-open-tools="' + info.key + '">See the result on about:smartwindowtasks</a>';
   chat.append(u, a);
   const link = a.querySelector("[data-open-tools]");
   if (link) link.addEventListener("click", ev => {
     ev.preventDefault();
     go(5);
-    const item = document.getElementById("dash-sony");
+    const item = document.getElementById("dash-" + info.key);
     if (item) {
       const body = item.querySelector(".mstack-expand");
       if (body) setExpand(body, true);
@@ -1472,7 +1491,8 @@ if (smartbarInput && sbField) {
     if (!txt) return;
     stageEl.classList.remove("slash-open");
     sbField.textContent = "";
-    if (!txt.startsWith("/") && looksLikeQuestion(txt)) { askAbout(txt); return; }
+    const hasChip = !!document.querySelector("#smartbar-chips .sb-chip");
+    if (!txt.startsWith("/") && (hasChip || looksLikeQuestion(txt))) { askAbout(txt); return; }
     const label = txt.startsWith("/") ? txt.replace(/^\/+\s*/, "") : txt;
     startCreate(label, SONY_PREFILL);
   });
@@ -1631,7 +1651,8 @@ function openModal(name) {
   });
   modalChips.hidden = !p;
   scrim.hidden = false;
-  modalCond.focus();
+  const mt = document.getElementById("modal-title");
+  mt.focus(); if (mt.select) mt.select();
 }
 function closeModal() { scrim.hidden = true; }
 document.querySelectorAll(".starter").forEach(s => s.addEventListener("click", () => openModal(s.querySelector(".st-name").textContent)));
@@ -1738,39 +1759,39 @@ sonyTitle.addEventListener("keydown", e => {
   if (e.key === "Enter") { e.preventDefault(); document.getElementById("sony-save").click(); }
   if (e.key === "Escape") { document.getElementById("sony-cancel").click(); }
 });
-// Generalized inline edit for every other task card (Sony keeps its richer handlers above)
-document.querySelectorAll(".dash-item .mcard.editable").forEach(card => {
-  const item = card.closest(".dash-item");
-  const editBtn = card.querySelector(".view-only .btn-edit");
-  if (!editBtn) return;
-  const save = card.querySelector(".edit-only .btn-save");
-  const cancel = card.querySelector(".edit-only .btn-cancel");
-  const inp = card.querySelector(".edit-only .field-input");
-  const exp = item && item.querySelector(".mstack-expand");
-  const remeasure = () => { if (exp && exp.classList.contains("exp-open")) setExpand(exp, true); };
-  const enter = () => { card.classList.add("editing"); if (item) item.classList.add("editing"); remeasure(); if (inp) setTimeout(() => { inp.focus({ preventScroll: true }); inp.select && inp.select(); }, 120); };
-  const leave = () => { card.classList.remove("editing"); if (item) item.classList.remove("editing"); remeasure(); };
-  editBtn.addEventListener("click", e => { e.stopPropagation(); enter(); });
-  if (cancel) cancel.addEventListener("click", e => { e.stopPropagation(); leave(); });
-  if (save) save.addEventListener("click", e => {
+// Generalized inline edit — delegated so dynamically-created cards work too (Sony keeps its own ID handlers above)
+function editRemeasure(card) { const exp = card.closest(".dash-item") && card.closest(".dash-item").querySelector(".mstack-expand"); if (exp && exp.classList.contains("exp-open")) setExpand(exp, true); }
+function editEnter(card) { if (!card) return; const item = card.closest(".dash-item"); card.classList.add("editing"); if (item) item.classList.add("editing"); editRemeasure(card); const inp = card.querySelector(".edit-only .field-input"); if (inp) setTimeout(() => { inp.focus({ preventScroll: true }); inp.select && inp.select(); }, 120); }
+function editLeave(card) { if (!card) return; const item = card.closest(".dash-item"); card.classList.remove("editing"); if (item) item.classList.remove("editing"); editRemeasure(card); }
+document.addEventListener("click", e => {
+  const editBtn = e.target.closest(".dash-item .view-only .btn-edit");
+  if (editBtn) { e.stopPropagation(); editEnter(editBtn.closest(".mcard.editable")); return; }
+  const cancelBtn = e.target.closest(".dash-item .edit-only .btn-cancel");
+  if (cancelBtn) { e.stopPropagation(); editLeave(cancelBtn.closest(".mcard.editable")); return; }
+  const saveBtn = e.target.closest(".dash-item .edit-only .btn-save");
+  if (saveBtn) {
     e.stopPropagation();
+    const card = saveBtn.closest(".mcard.editable");
+    const inp = card.querySelector(".edit-only .field-input");
     const tgt = card.querySelector(".view-only .edit-target");
     if (inp && tgt && inp.value.trim()) tgt.textContent = inp.value.trim();
-    leave();
+    editLeave(card);
     const note = card.querySelector(".view-only .save-note");
     if (note) { note.textContent = "Saved"; setTimeout(() => { note.textContent = ""; }, 1500); }
-  });
-  if (inp) inp.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") { e.preventDefault(); save && save.click(); } if (e.key === "Escape") { cancel && cancel.click(); } });
-});
-// Pause / Resume toggles the card's paused state everywhere
-document.querySelectorAll(".dash-item .btn-pause").forEach(btn => {
-  btn.addEventListener("click", e => {
+    return;
+  }
+  const pauseBtn = e.target.closest(".dash-item .btn-pause");
+  if (pauseBtn) {
     e.stopPropagation();
-    const grow = btn.closest(".dash-item").querySelector(".grow");
-    if (!grow) return;
-    const paused = grow.classList.toggle("paused");
-    btn.textContent = paused ? "Resume" : "Pause";
-  });
+    const grow = pauseBtn.closest(".dash-item").querySelector(".grow");
+    if (grow) { const paused = grow.classList.toggle("paused"); pauseBtn.textContent = paused ? "Resume" : "Pause"; }
+  }
+});
+document.addEventListener("keydown", e => {
+  if (!e.target.matches(".dash-item .edit-only .field-input")) return;
+  const card = e.target.closest(".mcard.editable");
+  if (e.key === "Enter") { e.preventDefault(); const s = card.querySelector(".edit-only .btn-save"); if (s) s.click(); }
+  if (e.key === "Escape") { const c = card.querySelector(".edit-only .btn-cancel"); if (c) c.click(); }
 });
 // Schedule: the day picker appears only for a weekly cadence; remeasure the open card
 document.addEventListener("change", e => {
@@ -1820,8 +1841,9 @@ document.querySelectorAll('[data-act="delete"]').forEach(el => {
 });
 const CHECK_SPIN = '<svg class="spin" viewBox="0 0 24 24" stroke-width="2.4" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 9 9"/></svg>';
 const CHECK_DONE = '<svg viewBox="0 0 24 24" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
-document.querySelectorAll("[data-check-now]").forEach(btn => {
-  btn.addEventListener("click", e => {
+document.addEventListener("click", e => {
+    const btn = e.target.closest("[data-check-now]");
+    if (!btn) return;
     e.stopPropagation();
     if (btn.dataset.busy) return;
     btn.dataset.busy = "1";
@@ -1849,7 +1871,6 @@ document.querySelectorAll("[data-check-now]").forEach(btn => {
       }
       setTimeout(() => { btn.textContent = orig; btn.classList.remove("ok"); btn.disabled = false; delete btn.dataset.busy; }, 1500);
     }, 1300);
-  });
 });
 function updateCounts() {
   const el = document.getElementById("tasks-count");
@@ -1875,6 +1896,9 @@ function wireRow(item) {
     document.getElementById("confirm-delete").focus();
   });
 }
+const SCHED_BLOCK = '<div class="sched"><div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select sched-freq" aria-label="How often to check"><option>Daily</option><option>Weekly</option></select></span></div>' +
+  '<div class="field sched-day" hidden><span class="field-label">On</span><span class="select-wrap"><select class="field-select" aria-label="Day of week"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></span></div>' +
+  '<div class="field"><span class="field-label">Time</span><span class="select-wrap"><select class="field-select" aria-label="Time of day"><option>8:00 AM</option><option selected>9:00 AM</option><option>12:00 PM</option><option>3:00 PM</option><option>6:00 PM</option><option>9:00 PM</option></select></span></div></div>';
 function addTask(name, cond) {
   name = (name || "").trim() || "Untitled task";
   cond = (cond || "").trim() || "the page changes";
@@ -1889,12 +1913,20 @@ function addTask(name, cond) {
     d.id = "dash-" + key;
     d.innerHTML =
       '<div class="grow" role="button" tabindex="0" aria-expanded="false">' + fav +
-      '<span class="gmain"><span class="gname">' + esc(name) + '</span><br/><span class="gmeta truncate">just now</span></span>' +
-      '<span class="gvalue"><span class="now" style="font-size:var(--font-size-root);color:var(--text-color-success)">Watching</span><br/><span class="sub">checks daily</span></span></div>' +
-      '<div class="mstack-expand"><div class="mstack-expand-inner"><div class="mcard"><div class="view-only">' +
-      '<p class="mon-sentence">Alerts you when <b>' + esc(cond) + '</b> · checks daily</p>' +
+      '<span class="gmain"><span class="gname">' + esc(name) + '</span><br/><span class="gmeta truncate">just now · checks daily</span></span>' +
+      '<span class="gvalue"><span class="now" style="font-size:var(--font-size-root);color:var(--text-color-success)">Watching</span><br/><span class="sub">next check 9:00 AM</span></span></div>' +
+      '<div class="mstack-expand"><div class="mstack-expand-inner"><div class="mcard editable">' +
+      '<div class="view-only">' +
+      '<p class="mon-sentence">Alerts you when <b class="edit-target">' + esc(cond) + '</b> · checks daily</p>' +
       '<div class="history"><div class="hist-head">Change history</div><div class="hist-item"><span class="when">Just now</span><span class="deemphasized">created</span></div></div>' +
-      '<div class="mcard-actions"><span class="spacer"></span>' + del + '</div></div></div></div></div>';
+      '<div class="mcard-actions"><button class="btn-ghost btn-edit">Edit</button><button class="btn-ghost btn-pause">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><span class="save-note" role="status" aria-live="polite"></span>' + del + '</div>' +
+      '</div>' +
+      '<div class="edit-only">' +
+      '<div class="field"><span class="field-label">Alert me when</span><input class="field-input" value="' + esc(cond) + '" aria-label="Alert condition" /></div>' +
+      SCHED_BLOCK +
+      '<div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost btn-cancel">Cancel</button><button class="btn-primary btn-save">Save</button></div>' +
+      '</div>' +
+      '</div></div></div>';
     dashList.insertBefore(d, dashList.firstChild);
     wireRow(d);
   }
@@ -1903,7 +1935,7 @@ function addTask(name, cond) {
     const tqFav = '<span class="tq-fav" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 -960 960 960" fill="#fff"><path d="' + NOTE_ICON + '"/></svg></span>';
     const t = document.createElement("button");
     t.className = "tq-item"; t.type = "button";
-    t.innerHTML = tqFav + '<span class="tq-body"><span class="tq-name">' + esc(name) + '</span><span class="tq-status"><span class="run-dot"></span>Just now · watching</span></span><span class="tq-badge">Daily</span>';
+    t.innerHTML = tqFav + '<span class="tq-body"><span class="tq-name">' + esc(name) + '</span><span class="tq-status">Watching · next check 9:00 AM</span></span><span class="tq-badge">Daily</span>';
     const activeHead = railList.querySelector(".tq-group");
     if (activeHead) activeHead.insertAdjacentElement("afterend", t);
     else railList.insertBefore(t, railList.firstChild);
