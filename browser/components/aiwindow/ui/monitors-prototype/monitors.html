@@ -432,7 +432,7 @@ h1,h2,h3,h4,p { margin: 0; }
    the ring extends left instead of pushing content. The swap is a fade, not a move. */
 .gname-edit { display: none; position: relative; align-items: center; min-height: 32px; width: min(100%, 380px); margin: 0 0 0 -10px; }
 .gname-edit.show { display: inline-flex; }
-.dash-item.editing .gname { display: none; }
+.dash-item.editing .gname:has(~ .gname-edit) { display: none; }
 .dash-item.editing .gname-edit { display: inline-flex; animation: fadein var(--motion-dur-near) var(--motion-ease-edge); }
 /* Quiet at rest — it reads as the title. Hover hints, focus brings the classic ring + clear. */
 .gname-input { font: inherit; font-weight: var(--font-weight-semibold); color: var(--text-color); width: 100%; height: 32px; background: transparent; border: 2px solid transparent; border-radius: var(--border-radius-medium); padding: 0 34px 0 8px; transition: background-color var(--motion-dur-near) var(--motion-ease-edge), border-color var(--motion-dur-near) var(--motion-ease-edge); }
@@ -874,14 +874,21 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <span class="gvalue"><span class="now running"><span class="run-dot"></span>Working…</span><br/><span class="sub">2 under $120 · Oct 3</span></span>
               </div>
               <div class="mstack-expand"><div class="mstack-expand-inner">
-              <div class="mcard">
-                <p class="mon-sentence">Finding <b>2 tickets under $120</b> · St. Vincent · Oct 3 · Brooklyn Steel.</p>
+              <div class="mcard editable">
+                <div class="view-only">
+                <p class="mon-sentence">Finding <b class="edit-target">2 tickets under $120</b> · St. Vincent · Oct 3 · Brooklyn Steel.</p>
                 <div class="history">
                   <div class="hist-head">Progress</div>
                   <div class="hist-item"><span class="when">Now</span><span class="deemphasized">checking StubHub, SeatGeek, AXS +3</span></div>
                   <div class="hist-item"><span class="when">2m ago</span><span class="deemphasized">started</span></div>
                 </div>
-                <div class="mcard-actions"><button class="btn-ghost">Pause</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+                <div class="mcard-actions"><button class="btn-ghost btn-edit">Edit</button><button class="btn-ghost btn-pause">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><span class="save-note" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+                </div>
+                <div class="edit-only">
+                  <div class="field"><span class="field-label">Find</span><input class="field-input" value="2 tickets under $120" aria-label="What to find" /></div>
+                  <div class="mrow"><span class="lbl">Check</span><span class="val">Every few hours</span></div>
+                  <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost btn-cancel">Cancel</button><button class="btn-primary btn-save">Save</button></div>
+                </div>
               </div>
               </div></div>
             </div>
@@ -902,7 +909,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                     <div class="hist-item low"><span class="when">Jun 24</span><span>checked, didn't meet your alert</span></div>
                     <div class="hist-item"><span class="when">Jun 17</span><span class="deemphasized">first checked · $299</span></div>
                   </div>
-                  <div class="mcard-actions"><button class="btn-ghost" id="sony-edit">Edit</button><button class="btn-ghost">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+                  <div class="mcard-actions"><button class="btn-ghost" id="sony-edit">Edit</button><button class="btn-ghost btn-pause">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
                 </div>
                 <div class="edit-only">
                   <div class="field">
@@ -928,14 +935,21 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <span class="gvalue"><span class="flag-attn"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg> Needs a look</span><br/><span class="sub">last knew $189 · Jun 30</span></span>
               </div>
               <div class="mstack-expand"><div class="mstack-expand-inner">
-              <div class="mcard">
-                <p class="mon-sentence">The page changed and Firefox <b>can't find the price</b>.</p>
+              <div class="mcard editable">
+                <div class="view-only">
+                <p class="mon-sentence">Alerts you when <b class="edit-target">the price drops below $180</b> · the page changed, so I can't see it right now.</p>
                 <div class="history">
                   <div class="hist-head">Change history</div>
                   <div class="hist-item"><span class="when">Jun 30</span><span class="hist-flag">value lost</span><span class="deemphasized">the page changed</span></div>
                   <div class="hist-item"><span class="when">Jun 12</span><span class="deemphasized">first checked · $189</span></div>
                 </div>
-                <div class="mcard-actions"><button class="btn-primary" data-open-page>Open page</button><button class="btn-ghost">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+                <div class="mcard-actions"><button class="btn-ghost btn-edit">Edit</button><button class="btn-ghost btn-pause">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><span class="save-note" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+                </div>
+                <div class="edit-only">
+                  <div class="field"><span class="field-label">Alert me when</span><input class="field-input" value="the price drops below $180" aria-label="Alert condition" /></div>
+                  <div class="mrow"><span class="lbl">Check</span><span class="val">Daily</span></div>
+                  <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost btn-cancel">Cancel</button><button class="btn-primary btn-save">Save</button></div>
+                </div>
               </div>
               </div></div>
             </div>
@@ -948,15 +962,22 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <span class="gvalue"><span class="now">3 new <span class="chg">▲ +1</span></span><br/><span class="sub">since yesterday</span></span>
               </div>
               <div class="mstack-expand"><div class="mstack-expand-inner">
-              <div class="mcard">
-                <p class="mon-sentence">Alerts you when <b>a new listing matches my search</b> · checks daily</p>
+              <div class="mcard editable">
+                <div class="view-only">
+                <p class="mon-sentence">Alerts you when <b class="edit-target">a new listing matches my search</b> · checks daily</p>
                 <div class="history">
                   <div class="hist-head">Change history</div>
                   <div class="hist-item"><span class="when">Today</span><span class="newv" style="color:var(--text-color-success)">3 new listings</span></div>
                   <div class="hist-item"><span class="when">Yesterday</span><span class="newv">2 new listings</span></div>
                   <div class="hist-item"><span class="when">Jun 28</span><span class="deemphasized">first checked · 41 listings</span></div>
                 </div>
-                <div class="mcard-actions"><button class="btn-primary" data-open-page>Open page</button><button class="btn-ghost">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+                <div class="mcard-actions"><button class="btn-ghost btn-edit">Edit</button><button class="btn-ghost btn-pause">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><span class="save-note" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+                </div>
+                <div class="edit-only">
+                  <div class="field"><span class="field-label">Alert me when</span><input class="field-input" value="a new listing matches my search" aria-label="Alert condition" /></div>
+                  <div class="mrow"><span class="lbl">Check</span><span class="val">Daily</span></div>
+                  <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost btn-cancel">Cancel</button><button class="btn-primary btn-save">Save</button></div>
+                </div>
               </div>
               </div></div>
             </div>
@@ -968,15 +989,22 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <span class="gvalue"><span class="now">$1,999</span><br/><span class="sub">paused · <a class="accent-link" href="#" onclick="return false">Resume</a></span></span>
               </div>
               <div class="mstack-expand"><div class="mstack-expand-inner">
-              <div class="mcard">
-                <p class="mon-sentence">Alerts you when <b>the price drops below $1,800</b> · paused</p>
+              <div class="mcard editable">
+                <div class="view-only">
+                <p class="mon-sentence">Alerts you when <b class="edit-target">the price drops below $1,800</b> · paused</p>
                 <div class="history">
                   <div class="hist-head">Change history</div>
                   <div class="hist-item"><span class="when">Jun 25</span><span class="deemphasized">paused</span></div>
                   <div class="hist-item"><span class="when">Jun 20</span><span class="oldv">$2,099</span><span class="arrow">→</span><span class="newv" style="color:var(--text-color-success)">$1,999</span><span class="deemphasized">−5%</span></div>
                   <div class="hist-item"><span class="when">Jun 8</span><span class="deemphasized">first checked · $2,099</span></div>
                 </div>
-                <div class="mcard-actions"><button class="btn-primary">Resume</button><button class="btn-ghost" data-open-page>Open page</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+                <div class="mcard-actions"><button class="btn-ghost btn-edit">Edit</button><button class="btn-ghost btn-pause">Resume</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><span class="save-note" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+                </div>
+                <div class="edit-only">
+                  <div class="field"><span class="field-label">Alert me when</span><input class="field-input" value="the price drops below $1,800" aria-label="Alert condition" /></div>
+                  <div class="mrow"><span class="lbl">Check</span><span class="val">Daily</span></div>
+                  <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost btn-cancel">Cancel</button><button class="btn-primary btn-save">Save</button></div>
+                </div>
               </div>
               </div></div>
             </div>
@@ -997,10 +1025,18 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <span class="gvalue"><span class="status-chip">Saves $12</span></span>
             </div>
             <div class="mstack-expand"><div class="mstack-expand-inner">
-            <div class="mcard">
+            <div class="mcard editable">
+              <div class="view-only">
               <div class="mrow"><span class="lbl">Best code</span><span class="val">SAVE12 · $12 off</span></div>
               <div class="mrow"><span class="lbl">Also found</span><span class="val">FREESHIP · WELCOME10</span></div>
               <div class="mrow"><span class="lbl">Ran</span><span class="val">2h ago on checkout</span></div>
+              <div class="mcard-actions"><button class="btn-ghost btn-edit">Edit</button><button class="btn-ghost btn-pause">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><span class="save-note" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+              </div>
+              <div class="edit-only">
+                <div class="field"><span class="field-label">Find</span><input class="field-input" value="working checkout codes at Best Buy" aria-label="What to find" /></div>
+                <div class="mrow"><span class="lbl">Check</span><span class="val">At checkout</span></div>
+                <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost btn-cancel">Cancel</button><button class="btn-primary btn-save">Save</button></div>
+              </div>
             </div>
             </div></div>
           </div>
@@ -1012,10 +1048,17 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <span class="gvalue"><span class="status-chip">Report ready</span></span>
             </div>
             <div class="mstack-expand"><div class="mstack-expand-inner">
-            <div class="mcard">
+            <div class="mcard editable">
+              <div class="view-only">
               <div class="mrow"><span class="lbl">Top pick</span><span class="val">Sony WH-1000XM5 at $278</span></div>
               <div class="mrow"><span class="lbl">Sources</span><span class="val">14 · finished yesterday</span></div>
-              <div class="mcard-actions"><span class="spacer"></span><a class="accent-link" href="#" onclick="return false">Open report</a></div>
+              <div class="mcard-actions"><button class="btn-ghost btn-edit">Edit</button><button class="btn-ghost btn-pause">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><a class="accent-link" href="#" onclick="return false">Open report</a><button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+              </div>
+              <div class="edit-only">
+                <div class="field"><span class="field-label">Research</span><input class="field-input" value="ANC headphones under $300" aria-label="Research topic" /></div>
+                <div class="mrow"><span class="lbl">Depth</span><span class="val">Up to 15 sources</span></div>
+                <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost btn-cancel">Cancel</button><button class="btn-primary btn-save">Save</button></div>
+              </div>
             </div>
             </div></div>
           </div>
@@ -1666,6 +1709,40 @@ sonyTitle.addEventListener("keydown", e => {
   e.stopPropagation();
   if (e.key === "Enter") { e.preventDefault(); document.getElementById("sony-save").click(); }
   if (e.key === "Escape") { document.getElementById("sony-cancel").click(); }
+});
+// Generalized inline edit for every other task card (Sony keeps its richer handlers above)
+document.querySelectorAll(".dash-item .mcard.editable").forEach(card => {
+  const item = card.closest(".dash-item");
+  const editBtn = card.querySelector(".view-only .btn-edit");
+  if (!editBtn) return;
+  const save = card.querySelector(".edit-only .btn-save");
+  const cancel = card.querySelector(".edit-only .btn-cancel");
+  const inp = card.querySelector(".edit-only .field-input");
+  const exp = item && item.querySelector(".mstack-expand");
+  const remeasure = () => { if (exp && exp.classList.contains("exp-open")) setExpand(exp, true); };
+  const enter = () => { card.classList.add("editing"); if (item) item.classList.add("editing"); remeasure(); if (inp) setTimeout(() => { inp.focus({ preventScroll: true }); inp.select && inp.select(); }, 120); };
+  const leave = () => { card.classList.remove("editing"); if (item) item.classList.remove("editing"); remeasure(); };
+  editBtn.addEventListener("click", e => { e.stopPropagation(); enter(); });
+  if (cancel) cancel.addEventListener("click", e => { e.stopPropagation(); leave(); });
+  if (save) save.addEventListener("click", e => {
+    e.stopPropagation();
+    const tgt = card.querySelector(".view-only .edit-target");
+    if (inp && tgt && inp.value.trim()) tgt.textContent = inp.value.trim();
+    leave();
+    const note = card.querySelector(".view-only .save-note");
+    if (note) { note.textContent = "Saved"; setTimeout(() => { note.textContent = ""; }, 1500); }
+  });
+  if (inp) inp.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") { e.preventDefault(); save && save.click(); } if (e.key === "Escape") { cancel && cancel.click(); } });
+});
+// Pause / Resume toggles the card's paused state everywhere
+document.querySelectorAll(".dash-item .btn-pause").forEach(btn => {
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    const grow = btn.closest(".dash-item").querySelector(".grow");
+    if (!grow) return;
+    const paused = grow.classList.toggle("paused");
+    btn.textContent = paused ? "Resume" : "Pause";
+  });
 });
 document.querySelectorAll(".gname-edit").forEach(wrap => {
   const inp = wrap.querySelector(".gname-input");
