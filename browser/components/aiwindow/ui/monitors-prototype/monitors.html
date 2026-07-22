@@ -557,7 +557,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
 .sb-field:empty::before { content: attr(data-placeholder); color: var(--text-color-deemphasized); pointer-events: none; }
 .sb-field .cmd-tok { color: var(--color-accent-primary); font-weight: var(--font-weight-semibold); }
 .smartbar-cta-row { display: flex; align-items: center; gap: var(--space-small); padding: var(--space-xsmall) var(--space-large) var(--space-medium); }
-.smartbar::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; background: linear-gradient(172deg, #321bfd -18%, #cf30e2 53%, #ff9900 89%, #f5c451 109%); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; padding: 1px; pointer-events: none; }
+.smartbar::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; background: var(--smartwindow-border-color-gradient); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; padding: 1px; pointer-events: none; }
 .smartbar::before { content: ""; position: absolute; inset: 0; border-radius: inherit; filter: blur(30px); background-color: color-mix(in srgb, var(--color-violet-40) 30%, transparent); opacity: 0; transition: opacity .2s ease-out; z-index: -1; }
 .smartbar:focus-within::before, .smartbar:hover::before { opacity: .5; }
 :root[data-theme="dark"] .smartbar::before { background-image: linear-gradient(270deg, var(--color-orange-40), var(--color-violet-50)); }
