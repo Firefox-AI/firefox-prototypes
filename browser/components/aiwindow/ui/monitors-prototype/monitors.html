@@ -443,12 +443,10 @@ h1,h2,h3,h4,p { margin: 0; }
    the ring extends left instead of pushing content. The swap is a fade, not a move. */
 .gname-edit { display: none; position: relative; align-items: center; min-height: 32px; width: min(100%, 380px); margin: 0 0 0 -10px; }
 .gname-edit.show { display: inline-flex; }
-.dash-item.editing .gname:has(~ .gname-edit) { display: none; }
-.dash-item.editing .gname-edit { display: inline-flex; animation: fadein var(--motion-dur-near) var(--motion-ease-edge); }
+/* Name is edited via a Name field in the edit form (like the create card), not inline in the header */
 /* Quiet at rest — it reads as the title. Hover hints, focus brings the classic ring + clear. */
 .gname-input { font: inherit; font-weight: var(--font-weight-semibold); color: var(--text-color); width: 100%; height: 32px; background: transparent; border: 2px solid transparent; border-radius: var(--border-radius-medium); padding: 0 34px 0 8px; transition: background-color var(--motion-dur-near) var(--motion-ease-edge), border-color var(--motion-dur-near) var(--motion-ease-edge); }
 .gname-input:hover { background: var(--background-color-box); }
-.dash-item.editing .gname-input { background: var(--background-color-box); border-color: var(--border-color-deemphasized); }
 .gname-input:focus, .gname-input:focus-visible { outline: none; background: var(--background-color-box); border-color: var(--color-accent-primary); }
 .gname-x { position: absolute; right: 6px; top: 50%; translate: 0 -50%; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--border-radius-circle); color: var(--text-color-deemphasized); font-size: 15px; line-height: 1; opacity: 0; pointer-events: none; transition: opacity var(--motion-dur-near) var(--motion-ease-edge); }
 .gname-edit:focus-within .gname-x { opacity: 1; pointer-events: auto; }
@@ -897,6 +895,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <div class="mcard-actions"><button class="btn-ghost btn-edit">Edit</button><button class="btn-ghost btn-pause">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><span class="save-note" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
                 </div>
                 <div class="edit-only">
+                  <div class="field"><span class="field-label">Name</span><input class="field-input edit-name" value="Find St. Vincent tickets" aria-label="Task name" /></div>
                   <div class="field"><span class="field-label">Find</span><input class="field-input" value="2 tickets under $120" aria-label="What to find" /></div>
                   <div class="field"><span class="field-label">Pages</span><div class="chip-row pages-row"><span class="page-pill"><span class="fav" style="background:#3f1d5e">S</span> stubhub.com <button class="x" type="button" aria-label="Remove page">×</button></span><span class="page-pill"><span class="fav" style="background:#eb2e4e">S</span> seatgeek.com <button class="x" type="button" aria-label="Remove page">×</button></span><span class="page-pill"><span class="fav" style="background:#0a4cc4">A</span> axs.com <button class="x" type="button" aria-label="Remove page">×</button></span><input class="field-input page-add-input" placeholder="Paste a URL" hidden aria-label="Add page URL" /><button class="chip page-add" type="button">+ Add page</button></div><span class="mono-dim">Checking 6 sites · add up to 6</span></div>
                   <div class="sched">
@@ -913,7 +912,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <div class="dash-item" id="dash-sony">
               <div class="grow" id="row-sony" role="button" tabindex="0" aria-expanded="false">
                 <span class="favicon-sq" style="background:#0046be"><svg viewBox="0 0 24 24" fill="#ffe000"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span>
-                <span class="gmain"><span class="gname">Sony WH-1000XM5 price</span><span class="gname-edit"><input class="gname-input" id="sony-title" value="Sony WH-1000XM5 price" aria-label="Task name" /><button class="gname-x" aria-label="Clear name">×</button></span><br/><span class="gmeta truncate">bestbuy.com · checked 3m ago</span></span>
+                <span class="gmain"><span class="gname">Sony WH-1000XM5 price</span><br/><span class="gmeta truncate">bestbuy.com · checked 3m ago</span></span>
                 <svg class="spark spark-line" viewBox="0 0 60 20" aria-hidden="true"><polyline points="0,3 12,4.5 24,8 36,10.5 48,13.5 60,17"/></svg>
                 <span class="gvalue"><span class="now">$268 <span class="chg">▼ 10%</span></span><br/><span class="sub">met your $270 alert · checks daily</span></span>
               </div>
@@ -929,6 +928,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                   <div class="mcard-actions"><button class="btn-ghost" id="sony-edit">Edit</button><button class="btn-ghost btn-pause">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><span class="save-note" id="save-note-sony" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
                 </div>
                 <div class="edit-only">
+                  <div class="field"><span class="field-label">Name</span><input class="field-input edit-name" id="sony-title" value="Sony WH-1000XM5 price" aria-label="Task name" /></div>
                   <div class="field">
                     <span class="field-label">Alert me when</span>
                     <input class="field-input" id="sony-cond" value="the price drops below $270" aria-label="Alert condition" />
@@ -967,6 +967,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <div class="mcard-actions"><button class="btn-ghost btn-edit">Edit</button><button class="btn-ghost btn-pause">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><span class="save-note" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
                 </div>
                 <div class="edit-only">
+                  <div class="field"><span class="field-label">Name</span><input class="field-input edit-name" value="REI Danner hiking boots" aria-label="Task name" /></div>
                   <div class="field"><span class="field-label">Alert me when</span><input class="field-input" value="the price drops below $180" aria-label="Alert condition" /></div>
                   <div class="sched">
                     <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select sched-freq" aria-label="How often to check"><option>Daily</option><option>Weekly</option></select></span></div>
@@ -999,6 +1000,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <div class="mcard-actions"><button class="btn-ghost btn-edit">Edit</button><button class="btn-ghost btn-pause">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><span class="save-note" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
                 </div>
                 <div class="edit-only">
+                  <div class="field"><span class="field-label">Name</span><input class="field-input edit-name" value="Apartment listings · Mission" aria-label="Task name" /></div>
                   <div class="field"><span class="field-label">Alert me when</span><input class="field-input" value="a new listing matches my search" aria-label="Alert condition" /></div>
                   <div class="sched">
                     <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select sched-freq" aria-label="How often to check"><option>Daily</option><option>Weekly</option></select></span></div>
@@ -1030,6 +1032,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 <div class="mcard-actions"><button class="btn-ghost btn-edit">Edit</button><button class="btn-ghost btn-pause">Resume</button><span class="spacer"></span><span class="save-note" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
                 </div>
                 <div class="edit-only">
+                  <div class="field"><span class="field-label">Name</span><input class="field-input edit-name" value="Nikon Z6 III price" aria-label="Task name" /></div>
                   <div class="field"><span class="field-label">Alert me when</span><input class="field-input" value="the price drops below $1,800" aria-label="Alert condition" /></div>
                   <div class="sched">
                     <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select sched-freq" aria-label="How often to check"><option>Daily</option><option>Weekly</option></select></span></div>
@@ -1066,6 +1069,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <div class="mcard-actions"><button class="btn-ghost btn-edit">Edit</button><button class="btn-ghost" data-check-now>Run again</button><span class="spacer"></span><span class="save-note" role="status" aria-live="polite"></span><button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
               </div>
               <div class="edit-only">
+                <div class="field"><span class="field-label">Name</span><input class="field-input edit-name" value="Best Buy checkout codes" aria-label="Task name" /></div>
                 <div class="field"><span class="field-label">Find</span><input class="field-input" value="working checkout codes at Best Buy" aria-label="What to find" /></div>
                 <div class="field"><span class="field-label">Pages</span><div class="chip-row pages-row"><span class="page-pill"><span class="fav" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span> bestbuy.com/checkout <button class="x" type="button" aria-label="Remove page">×</button></span><input class="field-input page-add-input" placeholder="Paste a URL" hidden aria-label="Add page URL" /><button class="chip page-add" type="button">+ Add page</button></div></div>
                 <div class="sched">
@@ -1093,6 +1097,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               <div class="mcard-actions"><button class="btn-ghost btn-edit">Edit</button><button class="btn-ghost" data-check-now>Run again</button><span class="spacer"></span><a class="accent-link" href="#" onclick="return false">Open report</a><button class="page-action danger" data-act="delete" title="Delete task" aria-label="Delete task"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
               </div>
               <div class="edit-only">
+                <div class="field"><span class="field-label">Name</span><input class="field-input edit-name" value="ANC headphones under $300" aria-label="Task name" /></div>
                 <div class="field"><span class="field-label">Research</span><input class="field-input" value="ANC headphones under $300" aria-label="Research topic" /></div>
                 <div class="mrow"><span class="lbl">Depth</span><span class="val">Up to 15 sources</span></div>
                 <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost btn-cancel">Cancel</button><button class="btn-primary btn-save">Save</button></div>
@@ -1772,13 +1777,13 @@ document.addEventListener("click", e => {
   if (saveBtn) {
     e.stopPropagation();
     const card = saveBtn.closest(".mcard.editable");
-    const inp = card.querySelector(".edit-only .field-input");
-    const tgt = card.querySelector(".view-only .edit-target");
-    if (inp && tgt && inp.value.trim()) tgt.textContent = inp.value.trim();
     const dItem = card.closest(".dash-item");
-    const nameInp = dItem && dItem.querySelector(".gname-input");
+    const nameInp = card.querySelector(".edit-only .edit-name");
     const nameView = dItem && dItem.querySelector(".gname");
     if (nameInp && nameView && nameInp.value.trim()) nameView.textContent = nameInp.value.trim();
+    const inp = card.querySelector(".edit-only .field-input:not(.edit-name)");
+    const tgt = card.querySelector(".view-only .edit-target");
+    if (inp && tgt && inp.value.trim()) tgt.textContent = inp.value.trim();
     editLeave(card);
     const note = card.querySelector(".view-only .save-note");
     if (note) { note.textContent = "Saved"; setTimeout(() => { note.textContent = ""; }, 1500); }
@@ -1926,6 +1931,7 @@ function addTask(name, cond) {
       '<div class="mcard-actions"><button class="btn-ghost btn-edit">Edit</button><button class="btn-ghost btn-pause">Pause</button><button class="btn-ghost" data-check-now>Check now</button><span class="spacer"></span><span class="save-note" role="status" aria-live="polite"></span>' + del + '</div>' +
       '</div>' +
       '<div class="edit-only">' +
+      '<div class="field"><span class="field-label">Name</span><input class="field-input edit-name" value="' + esc(name) + '" aria-label="Task name" /></div>' +
       '<div class="field"><span class="field-label">Alert me when</span><input class="field-input" value="' + esc(cond) + '" aria-label="Alert condition" /></div>' +
       SCHED_BLOCK +
       '<div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost btn-cancel">Cancel</button><button class="btn-primary btn-save">Save</button></div>' +
