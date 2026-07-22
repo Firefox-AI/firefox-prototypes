@@ -448,6 +448,7 @@ h1,h2,h3,h4,p { margin: 0; }
 /* Quiet at rest — it reads as the title. Hover hints, focus brings the classic ring + clear. */
 .gname-input { font: inherit; font-weight: var(--font-weight-semibold); color: var(--text-color); width: 100%; height: 32px; background: transparent; border: 2px solid transparent; border-radius: var(--border-radius-medium); padding: 0 34px 0 8px; transition: background-color var(--motion-dur-near) var(--motion-ease-edge), border-color var(--motion-dur-near) var(--motion-ease-edge); }
 .gname-input:hover { background: var(--background-color-box); }
+.dash-item.editing .gname-input { background: var(--background-color-box); border-color: var(--border-color-deemphasized); }
 .gname-input:focus, .gname-input:focus-visible { outline: none; background: var(--background-color-box); border-color: var(--color-accent-primary); }
 .gname-x { position: absolute; right: 6px; top: 50%; translate: 0 -50%; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--border-radius-circle); color: var(--text-color-deemphasized); font-size: 15px; line-height: 1; opacity: 0; pointer-events: none; transition: opacity var(--motion-dur-near) var(--motion-ease-edge); }
 .gname-edit:focus-within .gname-x { opacity: 1; pointer-events: auto; }
@@ -881,7 +882,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <div class="dash-item" id="dash-stvincent">
               <div class="grow" role="button" tabindex="0" aria-expanded="false">
                 <span class="favicon-sq" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/></svg></span>
-                <span class="gmain"><span class="gname">Find St. Vincent tickets</span><br/><span class="gmeta truncate">checking 6 sites · started 2m ago</span></span>
+                <span class="gmain"><span class="gname">Find St. Vincent tickets</span><span class="gname-edit"><input class="gname-input" value="Find St. Vincent tickets" aria-label="Task name" /><button class="gname-x" type="button" aria-label="Clear name">×</button></span><br/><span class="gmeta truncate">checking 6 sites · started 2m ago</span></span>
                 <span class="gvalue"><span class="now running"><span class="run-dot"></span>Working…</span><br/><span class="sub">2 under $120 · Oct 3</span></span>
               </div>
               <div class="mstack-expand"><div class="mstack-expand-inner">
@@ -951,7 +952,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <div class="dash-item attn" id="dash-rei">
               <div class="grow attn" role="button" tabindex="0" aria-expanded="false">
                 <span class="favicon-sq" style="background:#40682f"><svg viewBox="0 0 24 24" fill="#fff"><path d="M2 20h20L14.3 6.5l-3.4 5.8-2.2-3z"/></svg></span>
-                <span class="gmain"><span class="gname">REI Danner hiking boots</span><br/><span class="gmeta truncate">rei.com · the page changed</span></span>
+                <span class="gmain"><span class="gname">REI Danner hiking boots</span><span class="gname-edit"><input class="gname-input" value="REI Danner hiking boots" aria-label="Task name" /><button class="gname-x" type="button" aria-label="Clear name">×</button></span><br/><span class="gmeta truncate">rei.com · the page changed</span></span>
                 <span class="gvalue"><span class="flag-attn"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg> Needs a look</span><br/><span class="sub">last knew $189 · Jun 30</span></span>
               </div>
               <div class="mstack-expand"><div class="mstack-expand-inner">
@@ -981,7 +982,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
             <div class="dash-item" id="dash-apt">
               <div class="grow" role="button" tabindex="0" aria-expanded="false">
                 <span class="favicon-sq" style="background:#5c2d91"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="11" r="7.5"/><path d="M12 3.5v15M12 11 6.7 16.3M12 11l5.3 5.3"/></svg></span>
-                <span class="gmain"><span class="gname">Apartment listings · Mission</span><br/><span class="gmeta truncate">craigslist.org · checked 12m ago</span></span>
+                <span class="gmain"><span class="gname">Apartment listings · Mission</span><span class="gname-edit"><input class="gname-input" value="Apartment listings · Mission" aria-label="Task name" /><button class="gname-x" type="button" aria-label="Clear name">×</button></span><br/><span class="gmeta truncate">craigslist.org · checked 12m ago</span></span>
                 <svg class="spark spark-bars" viewBox="0 0 60 20" aria-hidden="true"><rect x="0" y="12.7" width="7" height="5.3" rx="1.5"/><rect x="10" y="17" width="7" height="1" rx="0.5"/><rect x="20" y="7.3" width="7" height="10.7" rx="1.5"/><rect x="30" y="12.7" width="7" height="5.3" rx="1.5"/><rect x="40" y="7.3" width="7" height="10.7" rx="1.5"/><rect x="50" y="2" width="7" height="16" rx="1.5"/></svg>
                 <span class="gvalue"><span class="now">3 new <span class="chg">▲ +1</span></span><br/><span class="sub">since yesterday</span></span>
               </div>
@@ -1013,7 +1014,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                         <div class="dash-item" id="dash-nikon">
               <div class="grow paused" role="button" tabindex="0" aria-expanded="false">
                 <span class="favicon-sq" style="background:#1b1b21"><svg viewBox="0 0 24 24" fill="none" stroke="#ffd200" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5h3.2L8.7 6h6.6l1.5 2.5H20V19H4z"/><circle cx="12" cy="13" r="3.2"/></svg></span>
-                <span class="gmain"><span class="gname">Nikon Z6 III price</span><br/><span class="gmeta truncate">bhphotovideo.com · paused · last $1,999</span></span>
+                <span class="gmain"><span class="gname">Nikon Z6 III price</span><span class="gname-edit"><input class="gname-input" value="Nikon Z6 III price" aria-label="Task name" /><button class="gname-x" type="button" aria-label="Clear name">×</button></span><br/><span class="gmeta truncate">bhphotovideo.com · paused · last $1,999</span></span>
                 <span class="gvalue"><span class="now">$1,999</span><br/><span class="sub">paused · <a class="accent-link" href="#" onclick="return false">Resume</a></span></span>
               </div>
               <div class="mstack-expand"><div class="mstack-expand-inner">
@@ -1053,7 +1054,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           <div class="dash-item" data-show="5 6" id="dash-scout">
             <div class="grow" role="button" tabindex="0" aria-expanded="false">
               <span class="favicon-sq" style="background:#0046be"><svg viewBox="0 0 24 24" fill="#ffe000"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span>
-              <span class="gmain"><span class="gname">Best Buy checkout codes</span><br/><span class="gmeta truncate">3 codes found · ran 2h ago</span></span>
+              <span class="gmain"><span class="gname">Best Buy checkout codes</span><span class="gname-edit"><input class="gname-input" value="Best Buy checkout codes" aria-label="Task name" /><button class="gname-x" type="button" aria-label="Clear name">×</button></span><br/><span class="gmeta truncate">3 codes found · ran 2h ago</span></span>
               <span class="gvalue"><span class="status-chip">Saves $12</span></span>
             </div>
             <div class="mstack-expand"><div class="mstack-expand-inner">
@@ -1081,7 +1082,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           <div class="dash-item" data-show="5 6" id="dash-research">
             <div class="grow" role="button" tabindex="0" aria-expanded="false">
               <span class="favicon-sq" style="background:var(--aiwindow-gradient-button)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/></svg></span>
-              <span class="gmain"><span class="gname">ANC headphones under $300</span><br/><span class="gmeta truncate">14 sources · finished yesterday</span></span>
+              <span class="gmain"><span class="gname">ANC headphones under $300</span><span class="gname-edit"><input class="gname-input" value="ANC headphones under $300" aria-label="Task name" /><button class="gname-x" type="button" aria-label="Clear name">×</button></span><br/><span class="gmeta truncate">14 sources · finished yesterday</span></span>
               <span class="gvalue"><span class="status-chip">Report ready</span></span>
             </div>
             <div class="mstack-expand"><div class="mstack-expand-inner">
@@ -1774,6 +1775,10 @@ document.addEventListener("click", e => {
     const inp = card.querySelector(".edit-only .field-input");
     const tgt = card.querySelector(".view-only .edit-target");
     if (inp && tgt && inp.value.trim()) tgt.textContent = inp.value.trim();
+    const dItem = card.closest(".dash-item");
+    const nameInp = dItem && dItem.querySelector(".gname-input");
+    const nameView = dItem && dItem.querySelector(".gname");
+    if (nameInp && nameView && nameInp.value.trim()) nameView.textContent = nameInp.value.trim();
     editLeave(card);
     const note = card.querySelector(".view-only .save-note");
     if (note) { note.textContent = "Saved"; setTimeout(() => { note.textContent = ""; }, 1500); }
@@ -1801,13 +1806,13 @@ document.addEventListener("change", e => {
   const exp = e.target.closest(".mstack-expand");
   if (exp && exp.classList.contains("exp-open")) setExpand(exp, true);
 });
-document.querySelectorAll(".gname-edit").forEach(wrap => {
-  const inp = wrap.querySelector(".gname-input");
-  wrap.querySelector(".gname-x").addEventListener("click", e => {
-    e.stopPropagation();
-    inp.value = "";
-    inp.focus();
-  });
+document.addEventListener("click", e => {
+  const x = e.target.closest(".gname-x");
+  if (!x) return;
+  e.stopPropagation();
+  const wrap = x.closest(".gname-edit");
+  const inp = wrap && wrap.querySelector(".gname-input");
+  if (inp) { inp.value = ""; inp.focus(); }
 });
 // Enter commits the surface's primary action, everywhere
 [["modal-title", "modal-start"], ["modal-cond", "modal-start"],
