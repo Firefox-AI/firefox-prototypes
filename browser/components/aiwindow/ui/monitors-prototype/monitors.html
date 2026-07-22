@@ -401,6 +401,7 @@ h1,h2,h3,h4,p { margin: 0; }
 .select-wrap::after { content: ""; position: absolute; right: 13px; top: 50%; width: 7px; height: 7px; border-right: 1.5px solid var(--text-color-deemphasized); border-bottom: 1.5px solid var(--text-color-deemphasized); transform: translateY(-70%) rotate(45deg); pointer-events: none; }
 .field .select-wrap { display: flex; }
 .field .field-select { width: 100%; }
+.sched { display: flex; flex-direction: column; gap: var(--space-medium); }
 
 /* Post-action undo, matching the group-tabs pattern */
 .undo-pill { padding: 7px 18px; border-radius: var(--border-radius-circle); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--color-accent-primary); background: var(--background-color-box); border: 1px solid light-dark(rgba(118,78,221,.35), rgba(212,193,255,.4)); box-shadow: var(--box-shadow-level-1); }
@@ -930,7 +931,11 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                     <span class="field-label">Pages</span>
                     <div class="chip-row pages-row"><span class="page-pill"><span class="fav" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span> bestbuy.com/…/xm5 <button class="x" aria-label="Remove page">×</button></span><input class="field-input page-add-input" placeholder="Paste a URL" hidden aria-label="Add page URL" /><button class="chip page-add">+ Add page</button></div>
                   </div>
-                  <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select" aria-label="How often to check"><option>Daily</option><option>Hourly</option><option>Weekly</option></select></span></div>
+                  <div class="sched">
+                    <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select sched-freq" aria-label="How often to check"><option>Daily</option><option>Weekly</option></select></span></div>
+                    <div class="field sched-day" hidden><span class="field-label">On</span><span class="select-wrap"><select class="field-select" aria-label="Day of week"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></span></div>
+                    <div class="field"><span class="field-label">Time</span><span class="select-wrap"><select class="field-select" aria-label="Time of day"><option>8:00 AM</option><option selected>9:00 AM</option><option>12:00 PM</option><option>3:00 PM</option><option>6:00 PM</option><option>9:00 PM</option></select></span></div>
+                  </div>
                   <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost" id="sony-cancel">Cancel</button><button class="btn-primary" id="sony-save">Save</button></div>
                 </div>
               </div>
@@ -956,7 +961,11 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 </div>
                 <div class="edit-only">
                   <div class="field"><span class="field-label">Alert me when</span><input class="field-input" value="the price drops below $180" aria-label="Alert condition" /></div>
-                  <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select" aria-label="How often to check"><option>Daily</option><option>Hourly</option><option>Weekly</option></select></span></div>
+                  <div class="sched">
+                    <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select sched-freq" aria-label="How often to check"><option>Daily</option><option>Weekly</option></select></span></div>
+                    <div class="field sched-day" hidden><span class="field-label">On</span><span class="select-wrap"><select class="field-select" aria-label="Day of week"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></span></div>
+                    <div class="field"><span class="field-label">Time</span><span class="select-wrap"><select class="field-select" aria-label="Time of day"><option>8:00 AM</option><option selected>9:00 AM</option><option>12:00 PM</option><option>3:00 PM</option><option>6:00 PM</option><option>9:00 PM</option></select></span></div>
+                  </div>
                   <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost btn-cancel">Cancel</button><button class="btn-primary btn-save">Save</button></div>
                 </div>
               </div>
@@ -984,7 +993,11 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 </div>
                 <div class="edit-only">
                   <div class="field"><span class="field-label">Alert me when</span><input class="field-input" value="a new listing matches my search" aria-label="Alert condition" /></div>
-                  <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select" aria-label="How often to check"><option>Daily</option><option>Hourly</option><option>Weekly</option></select></span></div>
+                  <div class="sched">
+                    <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select sched-freq" aria-label="How often to check"><option>Daily</option><option>Weekly</option></select></span></div>
+                    <div class="field sched-day" hidden><span class="field-label">On</span><span class="select-wrap"><select class="field-select" aria-label="Day of week"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></span></div>
+                    <div class="field"><span class="field-label">Time</span><span class="select-wrap"><select class="field-select" aria-label="Time of day"><option>8:00 AM</option><option selected>9:00 AM</option><option>12:00 PM</option><option>3:00 PM</option><option>6:00 PM</option><option>9:00 PM</option></select></span></div>
+                  </div>
                   <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost btn-cancel">Cancel</button><button class="btn-primary btn-save">Save</button></div>
                 </div>
               </div>
@@ -1011,7 +1024,11 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 </div>
                 <div class="edit-only">
                   <div class="field"><span class="field-label">Alert me when</span><input class="field-input" value="the price drops below $1,800" aria-label="Alert condition" /></div>
-                  <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select" aria-label="How often to check"><option>Daily</option><option>Hourly</option><option>Weekly</option></select></span></div>
+                  <div class="sched">
+                    <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select sched-freq" aria-label="How often to check"><option>Daily</option><option>Weekly</option></select></span></div>
+                    <div class="field sched-day" hidden><span class="field-label">On</span><span class="select-wrap"><select class="field-select" aria-label="Day of week"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></span></div>
+                    <div class="field"><span class="field-label">Time</span><span class="select-wrap"><select class="field-select" aria-label="Time of day"><option>8:00 AM</option><option selected>9:00 AM</option><option>12:00 PM</option><option>3:00 PM</option><option>6:00 PM</option><option>9:00 PM</option></select></span></div>
+                  </div>
                   <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost btn-cancel">Cancel</button><button class="btn-primary btn-save">Save</button></div>
                 </div>
               </div>
@@ -1249,9 +1266,10 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
           <span class="mono-dim">Add up to 6 pages. Paste a URL and press Enter.</span>
         </div>
         <hr class="rule" />
-        <div class="mrow2">
-          <div class="mfield"><span class="lbl">Check</span><span class="select-wrap"><select class="field-select" id="modal-freq" aria-label="How often to check"><option>Daily</option><option>Hourly</option><option>Weekly</option></select></span></div>
-          <div class="mfield"><span class="lbl">Time</span><span class="time-input">9:00 AM<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg></span></div>
+        <div class="sched">
+          <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select sched-freq" id="modal-freq" aria-label="How often to check"><option>Daily</option><option>Weekly</option></select></span></div>
+          <div class="field sched-day" hidden><span class="field-label">On</span><span class="select-wrap"><select class="field-select" aria-label="Day of week"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></span></div>
+          <div class="field"><span class="field-label">Time</span><span class="select-wrap"><select class="field-select" aria-label="Time of day"><option>8:00 AM</option><option selected>9:00 AM</option><option>12:00 PM</option><option>3:00 PM</option><option>6:00 PM</option><option>9:00 PM</option></select></span></div>
         </div>
         <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost" id="modal-cancel">Cancel</button><button class="btn-cta" id="modal-start">Create task</button></div>
       </div>
@@ -1322,8 +1340,9 @@ function createCardMarkup(prefill) {
     '<div class="field"><span class="field-label">Alert me when</span><input class="field-input dc-cond" placeholder="Describe what to watch" value="' + escSW(p.cond) + '" aria-label="Alert condition" /></div>' +
     pages +
     '<hr class="rule" />' +
-    '<div class="mrow2"><div class="mfield"><span class="lbl">Check</span><span class="select-wrap"><select class="field-select" aria-label="How often to check"><option>Daily</option><option>Hourly</option><option>Weekly</option></select></span></div>' +
-    '<div class="mfield"><span class="lbl">Time</span><span class="time-input">9:00 AM<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg></span></div></div>' +
+    '<div class="sched"><div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select sched-freq" aria-label="How often to check"><option>Daily</option><option>Weekly</option></select></span></div>' +
+    '<div class="field sched-day" hidden><span class="field-label">On</span><span class="select-wrap"><select class="field-select" aria-label="Day of week"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></span></div>' +
+    '<div class="field"><span class="field-label">Time</span><span class="select-wrap"><select class="field-select" aria-label="Time of day"><option>8:00 AM</option><option selected>9:00 AM</option><option>12:00 PM</option><option>3:00 PM</option><option>6:00 PM</option><option>9:00 PM</option></select></span></div></div>' +
     '<div class="mcard-actions"><span class="spacer"></span><button type="button" class="btn-ghost dc-cancel">Cancel</button><button type="button" class="btn-cta dc-create">Create task</button></div>' +
     '</div>';
 }
@@ -1752,6 +1771,15 @@ document.querySelectorAll(".dash-item .btn-pause").forEach(btn => {
     const paused = grow.classList.toggle("paused");
     btn.textContent = paused ? "Resume" : "Pause";
   });
+});
+// Schedule: the day picker appears only for a weekly cadence; remeasure the open card
+document.addEventListener("change", e => {
+  if (!e.target.matches(".sched-freq")) return;
+  const sched = e.target.closest(".sched");
+  const day = sched && sched.querySelector(".sched-day");
+  if (day) day.hidden = e.target.value !== "Weekly";
+  const exp = e.target.closest(".mstack-expand");
+  if (exp && exp.classList.contains("exp-open")) setExpand(exp, true);
 });
 document.querySelectorAll(".gname-edit").forEach(wrap => {
   const inp = wrap.querySelector(".gname-input");
