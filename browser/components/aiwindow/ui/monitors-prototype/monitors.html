@@ -392,6 +392,8 @@ h1,h2,h3,h4,p { margin: 0; }
 .field-select:hover { border-color: var(--color-accent-primary); }
 .field-select:focus-visible { outline: var(--focus-outline); outline-offset: 1px; }
 .select-wrap::after { content: ""; position: absolute; right: 13px; top: 50%; width: 7px; height: 7px; border-right: 1.5px solid var(--text-color-deemphasized); border-bottom: 1.5px solid var(--text-color-deemphasized); transform: translateY(-70%) rotate(45deg); pointer-events: none; }
+.field .select-wrap { display: flex; }
+.field .field-select { width: 100%; }
 
 /* Post-action undo, matching the group-tabs pattern */
 .undo-pill { padding: 7px 18px; border-radius: var(--border-radius-circle); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); color: var(--color-accent-primary); background: var(--background-color-box); border: 1px solid light-dark(rgba(118,78,221,.35), rgba(212,193,255,.4)); box-shadow: var(--box-shadow-level-1); }
@@ -886,7 +888,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 </div>
                 <div class="edit-only">
                   <div class="field"><span class="field-label">Find</span><input class="field-input" value="2 tickets under $120" aria-label="What to find" /></div>
-                  <div class="mrow"><span class="lbl">Check</span><span class="val">Every few hours</span></div>
+                  <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select" aria-label="How often to check"><option>Every few hours</option><option>Hourly</option><option>Daily</option></select></span></div>
                   <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost btn-cancel">Cancel</button><button class="btn-primary btn-save">Save</button></div>
                 </div>
               </div>
@@ -921,7 +923,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                     <span class="field-label">Pages</span>
                     <div class="chip-row pages-row"><span class="page-pill"><span class="fav" style="background:#0046be"><svg viewBox="0 0 24 24" width="62%" height="62%" fill="#fff200"><path d="M3 5a2 2 0 0 1 2-2h9l7 7-9 9-9-9V5z"/><circle cx="7" cy="7" r="1.6" fill="#0046be"/></svg></span> bestbuy.com/…/xm5 <button class="x" aria-label="Remove page">×</button></span><input class="field-input page-add-input" placeholder="Paste a URL" hidden aria-label="Add page URL" /><button class="chip page-add">+ Add page</button></div>
                   </div>
-                  <div class="mrow"><span class="lbl">Check</span><span class="val">Daily</span></div>
+                  <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select" aria-label="How often to check"><option>Daily</option><option>Hourly</option><option>Weekly</option></select></span></div>
                   <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost" id="sony-cancel">Cancel</button><button class="btn-primary" id="sony-save">Save</button></div>
                 </div>
               </div>
@@ -947,7 +949,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 </div>
                 <div class="edit-only">
                   <div class="field"><span class="field-label">Alert me when</span><input class="field-input" value="the price drops below $180" aria-label="Alert condition" /></div>
-                  <div class="mrow"><span class="lbl">Check</span><span class="val">Daily</span></div>
+                  <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select" aria-label="How often to check"><option>Daily</option><option>Hourly</option><option>Weekly</option></select></span></div>
                   <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost btn-cancel">Cancel</button><button class="btn-primary btn-save">Save</button></div>
                 </div>
               </div>
@@ -975,7 +977,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 </div>
                 <div class="edit-only">
                   <div class="field"><span class="field-label">Alert me when</span><input class="field-input" value="a new listing matches my search" aria-label="Alert condition" /></div>
-                  <div class="mrow"><span class="lbl">Check</span><span class="val">Daily</span></div>
+                  <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select" aria-label="How often to check"><option>Daily</option><option>Hourly</option><option>Weekly</option></select></span></div>
                   <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost btn-cancel">Cancel</button><button class="btn-primary btn-save">Save</button></div>
                 </div>
               </div>
@@ -1002,7 +1004,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
                 </div>
                 <div class="edit-only">
                   <div class="field"><span class="field-label">Alert me when</span><input class="field-input" value="the price drops below $1,800" aria-label="Alert condition" /></div>
-                  <div class="mrow"><span class="lbl">Check</span><span class="val">Daily</span></div>
+                  <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select" aria-label="How often to check"><option>Daily</option><option>Hourly</option><option>Weekly</option></select></span></div>
                   <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost btn-cancel">Cancel</button><button class="btn-primary btn-save">Save</button></div>
                 </div>
               </div>
@@ -1034,7 +1036,7 @@ hr.rule { border: 0; border-top: 1px solid var(--border-color-deemphasized); mar
               </div>
               <div class="edit-only">
                 <div class="field"><span class="field-label">Find</span><input class="field-input" value="working checkout codes at Best Buy" aria-label="What to find" /></div>
-                <div class="mrow"><span class="lbl">Check</span><span class="val">At checkout</span></div>
+                <div class="field"><span class="field-label">Check</span><span class="select-wrap"><select class="field-select" aria-label="How often to check"><option>At checkout</option><option>Daily</option><option>Hourly</option></select></span></div>
                 <div class="mcard-actions"><span class="spacer"></span><button class="btn-ghost btn-cancel">Cancel</button><button class="btn-primary btn-save">Save</button></div>
               </div>
             </div>
