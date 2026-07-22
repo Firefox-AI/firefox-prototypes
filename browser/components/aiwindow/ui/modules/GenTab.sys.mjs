@@ -1821,13 +1821,47 @@ function heuristicContentFromSinglePage(pageText, sourceMeta) {
   };
 }
 
+const DEFAULT_TAB_FAVICON = "chrome://global/skin/icons/defaultFavicon.svg";
+
+/**
+ * Resolve a CSP-safe favicon URL for a source tab.
+ * Prefer live tab icon when chrome/data/page-icon; else page-icon: from page URL.
+ *
+ * @param {string} [pageUrl]
+ * @param {string} [liveIcon]
+ * @returns {string}
+ */
+function resolveTabFavicon(pageUrl, liveIcon) {
+  if (
+    liveIcon &&
+    (liveIcon.startsWith("chrome:") ||
+      liveIcon.startsWith("data:") ||
+      liveIcon.startsWith("page-icon:"))
+  ) {
+    return liveIcon;
+  }
+  if (pageUrl && /^https?:/i.test(pageUrl)) {
+    return `page-icon:${pageUrl}`;
+  }
+  return DEFAULT_TAB_FAVICON;
+}
+
 /**
  * @param {MozBrowser} browser
- * @returns {Promise<{ text: string, url: string, title: string }>}
+ * @returns {string}
+ */
+function faviconForBrowser(browser) {
+  return resolveTabFavicon(browser?.currentURI?.spec, browser?.mIconURL || "");
+}
+
+/**
+ * @param {MozBrowser} browser
+ * @returns {Promise<{ text: string, url: string, title: string, favicon: string }>}
  */
 async function extractPageContent(browser) {
   const url = browser.currentURI?.spec || "";
   const title = browser.contentTitle || browser.currentURI?.displayHost || url;
+  const favicon = faviconForBrowser(browser);
   const currentWindowContext = browser.browsingContext?.currentWindowContext;
   if (!currentWindowContext) {
     throw new Error("Cannot access page content for this tab.");
@@ -1849,6 +1883,7 @@ async function extractPageContent(browser) {
     text: extraction.text.slice(0, MAX_PAGE_CHARS),
     url,
     title: sanitizeUntrustedContent(title, true),
+    favicon,
   };
 }
 
@@ -2573,6 +2608,63 @@ function getBrowserWindow(browser) {
   );
 }
 
+/**
+ * @returns {Window | null}
+ */
+function getMostRecentBrowserWindow() {
+  return Services.wm.getMostRecentWindow("navigator:browser");
+}
+
+/**
+ * Whether a URI is this GenTab chrome page (not a source candidate).
+ *
+ * @param {string} [spec]
+ * @returns {boolean}
+ */
+function isGenTabChromeUrl(spec) {
+  if (!spec) {
+    return false;
+  }
+  return (
+    spec === GENTAB_URL ||
+    spec.startsWith(`${GENTAB_URL}?`) ||
+    spec.startsWith("chrome://browser/content/aiwindow/gentab.html")
+  );
+}
+
+/**
+ * Resolve browsers in tab-bar order for the given browserId list.
+ *
+ * @param {Window} win
+ * @param {number[]} browserIds
+ * @returns {MozBrowser[]}
+ */
+function browsersForIds(win, browserIds) {
+  const wanted = new Set(
+    (browserIds || []).map(id => Number(id)).filter(id => Number.isFinite(id))
+  );
+  if (!wanted.size || !win?.gBrowser?.tabs) {
+    return [];
+  }
+  const byId = new Map();
+  for (const tab of win.gBrowser.tabs) {
+    const browser = tab.linkedBrowser;
+    if (!browser || !wanted.has(browser.browserId)) {
+      continue;
+    }
+    byId.set(browser.browserId, browser);
+  }
+  // Preserve caller selection order.
+  const ordered = [];
+  for (const id of browserIds) {
+    const browser = byId.get(Number(id));
+    if (browser && !ordered.includes(browser)) {
+      ordered.push(browser);
+    }
+  }
+  return ordered;
+}
+
 export const GenTab = {
   /**
    * Whether the GenTab spike entry points should be available.
@@ -2766,6 +2858,50 @@ export const GenTab = {
   },
 
   /**
+   * Open http(s) content tabs that can be GenTab sources, for the picker UI.
+   * Marks which URLs are already used by this generation.
+   *
+   * @param {string} [id] generation id
+   * @param {Window} [chromeWindow] browser window; defaults to most recent
+   * @returns {Array<{ browserId: number, url: string, title: string, selected: boolean }>}
+   */
+  listCandidateTabs(id, chromeWindow) {
+    const win = chromeWindow || getMostRecentBrowserWindow();
+    if (!win?.gBrowser?.tabs) {
+      return [];
+    }
+    const state = id ? gStates.get(id) : null;
+    const usedUrls = new Set(
+      (state?.sourceSnapshots || state?.tabs || [])
+        .map(t => t?.url)
+        .filter(Boolean)
+    );
+    const out = [];
+    for (const tab of win.gBrowser.tabs) {
+      const browser = tab.linkedBrowser;
+      if (!this.canCreateFromBrowser(browser)) {
+        continue;
+      }
+      const url = browser.currentURI?.spec || "";
+      if (isGenTabChromeUrl(url)) {
+        continue;
+      }
+      out.push({
+        browserId: browser.browserId,
+        url,
+        title:
+          tab.label ||
+          browser.contentTitle ||
+          browser.currentURI?.displayHost ||
+          url,
+        favicon: faviconForBrowser(browser),
+        selected: usedUrls.has(url),
+      });
+    }
+    return out;
+  },
+
+  /**
    * Re-run generation for an existing GenTab with a new intent, using the
    * cached source snapshots from the first extract.
    *
@@ -2804,6 +2940,73 @@ export const GenTab = {
         status: "error",
         intent,
         error: error?.message || "GenTab regeneration failed.",
+        config: null,
+      });
+      throw error;
+    }
+    return this.waitForState(id);
+  },
+
+  /**
+   * Replace GenTab source tabs (re-extract) and regenerate with the same intent.
+   *
+   * @param {string} id
+   * @param {number[]} browserIds selected open-tab browserIds (order preserved)
+   * @param {Window} [chromeWindow]
+   * @returns {Promise<object>} ready state
+   */
+  async regenerateWithBrowsers(id, browserIds, chromeWindow) {
+    const prev = gStates.get(id);
+    if (!prev) {
+      throw new Error("Unknown GenTab session.");
+    }
+    const win = chromeWindow || getMostRecentBrowserWindow();
+    if (!win) {
+      throw new Error("No browser window available for tab sources.");
+    }
+
+    const ids = (browserIds || [])
+      .map(n => Number(n))
+      .filter(n => Number.isFinite(n));
+    if (!ids.length) {
+      throw new Error("Select at least one tab.");
+    }
+
+    const browsers = browsersForIds(win, ids)
+      .filter(browser => this.canCreateFromBrowser(browser))
+      .slice(0, MAX_SOURCE_TABS);
+    if (!browsers.length) {
+      throw new Error("None of the selected tabs can be used as sources.");
+    }
+
+    setState(id, {
+      ...prev,
+      status: "loading",
+      config: null,
+      error: null,
+      title: prev.title,
+      tabs: browsers.map(browser => ({
+        title:
+          browser.contentTitle ||
+          browser.currentURI?.displayHost ||
+          browser.currentURI?.spec ||
+          "",
+        url: browser.currentURI?.spec || "",
+        favicon: faviconForBrowser(browser),
+      })),
+    });
+    gWaiters.delete(id);
+
+    try {
+      await runGeneration(id, browsers, {
+        groupLabel: prev.intent || "",
+        priorIntentSuggestions: prev.intentSuggestions || [],
+      });
+    } catch (error) {
+      setState(id, {
+        ...prev,
+        status: "error",
+        error: error?.message || "Could not update GenTab sources.",
         config: null,
       });
       throw error;
@@ -2921,6 +3124,7 @@ async function extractFromBrowsers(browsers, options = {}) {
   return raw.map(source => ({
     url: source.url,
     title: source.title,
+    favicon: source.favicon || resolveTabFavicon(source.url),
     text: trimSourceText(source.text, perTab, groupLabel),
   }));
 }
@@ -3079,11 +3283,13 @@ async function runGenerationFromSources(id, sources, options = {}) {
     tabs: sources.map(source => ({
       title: source.title,
       url: source.url,
+      favicon: source.favicon || resolveTabFavicon(source.url),
     })),
     // Keep full text for intent-switch regenerate without re-extract.
     sourceSnapshots: sources.map(source => ({
       title: source.title,
       url: source.url,
+      favicon: source.favicon || resolveTabFavicon(source.url),
       text: source.text,
     })),
     timeline,

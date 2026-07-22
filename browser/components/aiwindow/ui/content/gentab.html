@@ -9,7 +9,7 @@
     <meta name="color-scheme" content="light dark" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; object-src 'none'; script-src resource: chrome:; img-src chrome:; style-src resource: chrome:;"
+      content="default-src 'none'; object-src 'none'; script-src resource: chrome:; img-src chrome: page-icon: data:; style-src resource: chrome:;"
     />
     <title>GenTab</title>
     <link
@@ -116,17 +116,57 @@
               </div>
             </div>
           </div>
-          <!-- Tabs: later opens source picker to add/remove tabs → regenerate. -->
-          <button
-            type="button"
-            id="gentab-tabs-control"
-            class="gentab-chip gentab-chip-tabs"
-            disabled
-            title="Source tabs management coming soon — will regenerate GenTab"
-          >
-            <span class="gentab-chip-label">Tabs</span>
-            <span id="gentab-tabs-value" class="gentab-chip-value">›</span>
-          </button>
+          <div class="gentab-tabs-switcher">
+            <button
+              type="button"
+              id="gentab-tabs-control"
+              class="gentab-chip gentab-chip-tabs"
+              aria-haspopup="dialog"
+              aria-expanded="false"
+              aria-controls="gentab-tabs-panel"
+              title="Choose which open tabs ground this GenTab"
+            >
+              <span class="gentab-chip-label">Tabs</span>
+              <span
+                id="gentab-source-favicons"
+                class="gentab-source-favicons"
+                hidden
+                aria-hidden="true"
+              ></span>
+              <span id="gentab-tabs-value" class="gentab-chip-value">0</span>
+              <span class="gentab-chip-caret" aria-hidden="true">▾</span>
+            </button>
+            <div
+              id="gentab-tabs-panel"
+              class="gentab-tabs-panel"
+              hidden
+              role="dialog"
+              aria-label="Choose source tabs for this GenTab"
+            >
+              <p class="gentab-tabs-panel-title">Source tabs</p>
+              <p class="gentab-tabs-panel-hint">
+                Pick open pages to ground this GenTab, then rebuild. Max 8 tabs.
+              </p>
+              <ul
+                id="gentab-tabs-list"
+                class="gentab-tabs-list"
+                role="group"
+                aria-label="Open tabs"
+              ></ul>
+              <p id="gentab-tabs-empty" class="gentab-tabs-empty" hidden>
+                No open http(s) pages available.
+              </p>
+              <div class="gentab-tabs-actions">
+                <button
+                  type="button"
+                  id="gentab-tabs-apply"
+                  class="gentab-tabs-apply"
+                >
+                  Update GenTab
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </header>

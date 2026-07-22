@@ -437,6 +437,105 @@ function renderMemoryBanner(state) {
   banner.hidden = true;
 }
 
+const DEFAULT_TAB_FAVICON = "chrome://global/skin/icons/defaultFavicon.svg";
+/** Keep the Tabs chip compact; full set is in the picker. */
+const MAX_CHIP_FAVICONS = 4;
+
+/**
+ * @param {string} [pageUrl]
+ * @param {string} [storedIcon]
+ * @returns {string}
+ */
+function resolveDisplayFavicon(pageUrl, storedIcon) {
+  if (
+    storedIcon &&
+    (storedIcon.startsWith("chrome:") ||
+      storedIcon.startsWith("data:") ||
+      storedIcon.startsWith("page-icon:"))
+  ) {
+    return storedIcon;
+  }
+  // Prefer live tab icon when the source tab is still open.
+  try {
+    const gBrowser = topChromeWindow?.gBrowser;
+    if (gBrowser?.tabs && pageUrl) {
+      for (const tab of gBrowser.tabs) {
+        if (tab.linkedBrowser?.currentURI?.spec === pageUrl) {
+          const live = gBrowser.getIcon(tab);
+          if (
+            live &&
+            (live.startsWith("chrome:") ||
+              live.startsWith("data:") ||
+              live.startsWith("page-icon:"))
+          ) {
+            return live;
+          }
+          break;
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  if (pageUrl && /^https?:/i.test(pageUrl)) {
+    return `page-icon:${pageUrl}`;
+  }
+  return DEFAULT_TAB_FAVICON;
+}
+
+/**
+ * Stack selected source-tab favicons inside the Tabs chip (before the count).
+ *
+ * @param {Array<{ title?: string, url?: string, favicon?: string }>} tabs
+ */
+function renderSourceFavicons(tabs) {
+  const wrap = document.getElementById("gentab-source-favicons");
+  if (!wrap) {
+    return;
+  }
+  wrap.replaceChildren();
+  const list = Array.isArray(tabs) ? tabs.filter(t => t?.url || t?.title) : [];
+  if (!list.length) {
+    wrap.hidden = true;
+    return;
+  }
+
+  const visible = list.slice(0, MAX_CHIP_FAVICONS);
+  const overflow = list.length - visible.length;
+
+  for (const tab of visible) {
+    const item = document.createElement("span");
+    item.className = "gentab-source-favicon-wrap";
+
+    const img = document.createElement("img");
+    img.className = "gentab-source-favicon";
+    img.alt = "";
+    img.decoding = "async";
+    img.src = resolveDisplayFavicon(tab.url, tab.favicon);
+    img.addEventListener(
+      "error",
+      () => {
+        if (img.src !== DEFAULT_TAB_FAVICON) {
+          img.src = DEFAULT_TAB_FAVICON;
+        }
+      },
+      { once: true }
+    );
+
+    item.append(img);
+    wrap.append(item);
+  }
+
+  if (overflow > 0) {
+    const more = document.createElement("span");
+    more.className = "gentab-source-favicon-more";
+    more.textContent = `+${overflow}`;
+    wrap.append(more);
+  }
+
+  wrap.hidden = false;
+}
+
 /**
  * Populate the chrome header from GenTab state.
  *
@@ -466,6 +565,7 @@ function renderHeader(state) {
   blurbEl.textContent = blurb;
   blurbEl.hidden = !blurb;
 
+  renderSourceFavicons(tabs);
   renderMemoryBanner(state);
 
   const intentValue = document.getElementById("gentab-intent-value");
@@ -485,21 +585,22 @@ function renderHeader(state) {
 
   const tabsValue = document.getElementById("gentab-tabs-value");
   const tabCount = tabs.length;
-  tabsValue.textContent = tabCount > 0 ? `${tabCount} ›` : "›";
+  tabsValue.textContent = tabCount > 0 ? String(tabCount) : "0";
   const tabsControl = document.getElementById("gentab-tabs-control");
+  tabsControl.disabled = false;
   const tabTitles = tabs
     .map(t => t.title || t.url)
     .filter(Boolean)
     .slice(0, 6)
     .join(", ");
   tabsControl.title = tabTitles
-    ? `Sources: ${tabTitles}. Managing tabs coming soon.`
-    : "Source tabs management coming soon — will regenerate GenTab";
+    ? `Sources: ${tabTitles}. Click to add or remove tabs.`
+    : "Choose which open tabs ground this GenTab";
   tabsControl.setAttribute(
     "aria-label",
     tabCount
-      ? `${tabCount} source tabs. Managing tabs coming soon.`
-      : "Source tabs. Managing tabs coming soon."
+      ? `${tabCount} source tabs. Choose which open tabs ground this GenTab.`
+      : "Source tabs. Choose which open tabs ground this GenTab."
   );
 
   header.hidden = false;
@@ -558,6 +659,7 @@ function bindIntentSwitcher() {
 
   control.addEventListener("click", event => {
     event.stopPropagation();
+    closeTabsPanel();
     toggleIntentPanel();
   });
 
@@ -589,6 +691,267 @@ function bindIntentSwitcher() {
   document.addEventListener("keydown", event => {
     if (event.key === "Escape" && !panel.hidden) {
       closeIntentPanel();
+    }
+  });
+}
+
+const MAX_PICKER_TABS = 8;
+
+function closeTabsPanel() {
+  const panel = document.getElementById("gentab-tabs-panel");
+  const control = document.getElementById("gentab-tabs-control");
+  if (panel) {
+    panel.hidden = true;
+  }
+  if (control) {
+    control.setAttribute("aria-expanded", "false");
+  }
+}
+
+/**
+ * @returns {number[]}
+ */
+function getSelectedBrowserIdsFromPanel() {
+  const list = document.getElementById("gentab-tabs-list");
+  if (!list) {
+    return [];
+  }
+  const ids = [];
+  for (const input of list.querySelectorAll(
+    'input.gentab-tabs-check[type="checkbox"]:checked'
+  )) {
+    const id = Number(input.value);
+    if (Number.isFinite(id)) {
+      ids.push(id);
+    }
+  }
+  return ids;
+}
+
+function updateTabsApplyEnabled() {
+  const apply = document.getElementById("gentab-tabs-apply");
+  if (!apply) {
+    return;
+  }
+  const selected = getSelectedBrowserIdsFromPanel();
+  apply.disabled = selected.length === 0 || selected.length > MAX_PICKER_TABS;
+  if (selected.length > MAX_PICKER_TABS) {
+    apply.title = `Select at most ${MAX_PICKER_TABS} tabs`;
+  } else if (selected.length === 0) {
+    apply.title = "Select at least one tab";
+  } else {
+    const n = selected.length;
+    apply.title = `Rebuild GenTab from ${n} tab${n === 1 ? "" : "s"}`;
+  }
+}
+
+/**
+ * @param {Array<{ browserId: number, url: string, title: string, selected: boolean }>} candidates
+ */
+function populateTabsList(candidates) {
+  const list = document.getElementById("gentab-tabs-list");
+  const empty = document.getElementById("gentab-tabs-empty");
+  if (!list) {
+    return;
+  }
+  list.replaceChildren();
+
+  if (!candidates.length) {
+    if (empty) {
+      empty.hidden = false;
+    }
+    updateTabsApplyEnabled();
+    return;
+  }
+  if (empty) {
+    empty.hidden = true;
+  }
+
+  for (const tab of candidates) {
+    const li = document.createElement("li");
+    li.className = "gentab-tabs-item";
+
+    const label = document.createElement("label");
+    label.className = "gentab-tabs-label";
+
+    const check = document.createElement("input");
+    check.type = "checkbox";
+    check.className = "gentab-tabs-check";
+    check.value = String(tab.browserId);
+    check.checked = !!tab.selected;
+    check.addEventListener("change", () => {
+      // Soft-cap: if over max, uncheck the one just toggled on.
+      const selected = getSelectedBrowserIdsFromPanel();
+      if (selected.length > MAX_PICKER_TABS && check.checked) {
+        check.checked = false;
+      }
+      updateTabsApplyEnabled();
+    });
+
+    const fav = document.createElement("img");
+    fav.className = "gentab-tabs-item-favicon";
+    fav.alt = "";
+    fav.decoding = "async";
+    fav.src = resolveDisplayFavicon(tab.url, tab.favicon);
+    fav.addEventListener(
+      "error",
+      () => {
+        if (fav.src !== DEFAULT_TAB_FAVICON) {
+          fav.src = DEFAULT_TAB_FAVICON;
+        }
+      },
+      { once: true }
+    );
+
+    const meta = document.createElement("span");
+    meta.className = "gentab-tabs-meta";
+
+    const title = document.createElement("span");
+    title.className = "gentab-tabs-item-title";
+    title.textContent = tab.title || tab.url || "Untitled";
+
+    const url = document.createElement("span");
+    url.className = "gentab-tabs-item-url";
+    try {
+      url.textContent = new URL(tab.url).hostname || tab.url;
+    } catch {
+      url.textContent = tab.url || "";
+    }
+
+    meta.append(title, url);
+    label.append(check, fav, meta);
+    li.append(label);
+    list.append(li);
+  }
+
+  updateTabsApplyEnabled();
+}
+
+function openTabsPanel() {
+  const panel = document.getElementById("gentab-tabs-panel");
+  const control = document.getElementById("gentab-tabs-control");
+  if (!panel || !control) {
+    return;
+  }
+
+  closeIntentPanel();
+
+  const id = gGenerationId || getGenerationId();
+  let candidates = [];
+  try {
+    candidates = lazy.GenTab.listCandidateTabs(id, topChromeWindow) || [];
+  } catch (error) {
+    console.warn("GenTab: listCandidateTabs failed", error);
+  }
+  populateTabsList(candidates);
+
+  panel.hidden = false;
+  control.setAttribute("aria-expanded", "true");
+}
+
+function toggleTabsPanel() {
+  const panel = document.getElementById("gentab-tabs-panel");
+  if (!panel || panel.hidden) {
+    openTabsPanel();
+  } else {
+    closeTabsPanel();
+  }
+}
+
+/**
+ * Rebuild GenTab from the checked open tabs.
+ */
+async function applySourceTabs() {
+  const id = gGenerationId || getGenerationId();
+  if (!id) {
+    return;
+  }
+  const browserIds = getSelectedBrowserIdsFromPanel();
+  if (!browserIds.length) {
+    return;
+  }
+  if (browserIds.length > MAX_PICKER_TABS) {
+    return;
+  }
+
+  // Skip no-op if selection matches current sources by URL set and count.
+  const currentUrls = new Set(
+    (gHeaderState?.tabs || []).map(t => t.url).filter(Boolean)
+  );
+  let candidates = [];
+  try {
+    candidates = lazy.GenTab.listCandidateTabs(id, topChromeWindow) || [];
+  } catch {
+    /* ignore */
+  }
+  const selectedUrls = new Set(
+    candidates
+      .filter(c => browserIds.includes(c.browserId))
+      .map(c => c.url)
+      .filter(Boolean)
+  );
+  if (
+    selectedUrls.size === currentUrls.size &&
+    [...selectedUrls].every(url => currentUrls.has(url))
+  ) {
+    closeTabsPanel();
+    return;
+  }
+
+  closeTabsPanel();
+  showStatus(
+    `Updating GenTab from ${browserIds.length} tab${browserIds.length === 1 ? "" : "s"}…`
+  );
+  document.getElementById("gentab-header").hidden = true;
+  const main = document.getElementById("gentab-main");
+  if (main) {
+    main.hidden = true;
+  }
+
+  try {
+    await lazy.GenTab.regenerateWithBrowsers(id, browserIds, topChromeWindow);
+    window.location.reload();
+  } catch (error) {
+    console.error(error);
+    showStatus(error?.message || "Could not update source tabs.");
+    document.getElementById("gentab-header").hidden = false;
+    if (main) {
+      main.hidden = false;
+    }
+  }
+}
+
+function bindTabsSwitcher() {
+  const control = document.getElementById("gentab-tabs-control");
+  const panel = document.getElementById("gentab-tabs-panel");
+  const apply = document.getElementById("gentab-tabs-apply");
+  if (!control || !panel) {
+    return;
+  }
+
+  control.addEventListener("click", event => {
+    event.stopPropagation();
+    toggleTabsPanel();
+  });
+
+  apply?.addEventListener("click", () => {
+    applySourceTabs().catch(console.error);
+  });
+
+  document.addEventListener("click", event => {
+    if (panel.hidden) {
+      return;
+    }
+    const switcher = document.querySelector(".gentab-tabs-switcher");
+    if (switcher && !switcher.contains(event.target)) {
+      closeTabsPanel();
+    }
+  });
+
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && !panel.hidden) {
+      closeTabsPanel();
+      control.focus();
     }
   });
 }
@@ -744,6 +1107,7 @@ async function renderGenTab() {
 }
 
 bindIntentSwitcher();
+bindTabsSwitcher();
 
 if (document.readyState === "loading") {
   document.addEventListener(
