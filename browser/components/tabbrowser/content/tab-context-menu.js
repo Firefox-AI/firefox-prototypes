@@ -76,6 +76,7 @@ var TabContextMenu = {
             "#context_askChat",
             "#context_aiSeparator",
             "#context_askChatSummarize",
+            "#context_createGenTab",
           ],
         },
         {
@@ -235,6 +236,7 @@ var TabContextMenu = {
             ["#context_bookmarkSelectedTabs", "#context_bookmarkTab"],
             ["#context_addNote", "#context_editNote"],
             "#context_askChatSummarize",
+            "#context_createGenTab",
             "#context_tabToolsSeparator",
           ],
         },
@@ -862,6 +864,18 @@ var TabContextMenu = {
       );
     }
 
+    const createGenTabItem = document.getElementById("context_createGenTab");
+    if (createGenTabItem) {
+      try {
+        createGenTabItem.hidden = !TabContextMenu.GenTab.canCreateFromBrowser(
+          this.contextTab?.linkedBrowser
+        );
+      } catch (ex) {
+        console.error(ex);
+        createGenTabItem.hidden = true;
+      }
+    }
+
     // Move Tab items
     let contextMoveTabOptions = document.getElementById(
       "context_moveTabOptions"
@@ -1446,6 +1460,7 @@ var TabContextMenu = {
 
 ChromeUtils.defineESModuleGetters(TabContextMenu, {
   GenAI: "resource:///modules/GenAI.sys.mjs",
+  GenTab: "moz-src:///browser/components/aiwindow/ui/modules/GenTab.sys.mjs",
   MenuSectionLayout: "resource:///modules/MenuSectionLayout.sys.mjs",
   TabNotes: "moz-src:///browser/components/tabnotes/TabNotes.sys.mjs",
 });

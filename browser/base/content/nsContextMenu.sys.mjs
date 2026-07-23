@@ -16,6 +16,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   DevToolsShim: "chrome://devtools-startup/content/DevToolsShim.sys.mjs",
   E10SUtils: "resource://gre/modules/E10SUtils.sys.mjs",
   GenAI: "resource:///modules/GenAI.sys.mjs",
+  GenTab: "moz-src:///browser/components/aiwindow/ui/modules/GenTab.sys.mjs",
   LinkPreview: "moz-src:///browser/components/genai/LinkPreview.sys.mjs",
   LoginHelper: "resource://gre/modules/LoginHelper.sys.mjs",
   LoginManagerContextMenu:
@@ -913,6 +914,14 @@ export class nsContextMenu {
       source: "page",
     });
 
+    let showCreateGenTab = false;
+    try {
+      showCreateGenTab = lazy.GenTab.canCreateFromBrowser(this.browser);
+    } catch (ex) {
+      console.error(ex);
+    }
+    this.showItem("context-create-gentab", showCreateGenTab);
+
     // srcdoc cannot be opened separately due to concerns about web
     // content with about:srcdoc in location bar masquerading as trusted
     // chrome/addon content.
@@ -1609,6 +1618,10 @@ export class nsContextMenu {
       referrerInfo: this.contentData.frameReferrerInfo,
       triggeringPrincipal: this.browser.contentPrincipal,
     });
+  }
+
+  createGenTab() {
+    lazy.GenTab.createFromBrowser(this.browser);
   }
 
   takeScreenshot() {

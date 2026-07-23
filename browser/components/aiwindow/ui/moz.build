@@ -36,6 +36,7 @@ MOZ_SRC_FILES += [
     "modules/ChatStore.sys.mjs",
     "modules/ChatUtils.sys.mjs",
     "modules/FeedbackModal.sys.mjs",
+    "modules/GenTab.sys.mjs",
     "modules/SmartFormFillController.sys.mjs",
     "modules/SmartFormFillDocument.sys.mjs",
     "modules/SmartFormFillUtils.sys.mjs",

@@ -1,0 +1,316 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: light-dark(var(--color-gray-05, #f0f0f4), var(--color-gray-90, #1c1b22));
+  color: var(--text-color);
+  display: flex;
+  flex-direction: column;
+}
+
+.gentab-status {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: var(--space-large, 24px);
+  box-sizing: border-box;
+}
+
+.gentab-status[hidden] {
+  display: none;
+}
+
+.gentab-status-message {
+  max-width: 36em;
+  text-align: center;
+  font-size: 1.1rem;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.gentab-main {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.gentab-main[hidden] {
+  display: none;
+}
+
+.gentab-header {
+  flex-shrink: 0;
+  border-block-end: 1px solid
+    light-dark(var(--color-gray-20, #e0e0e6), var(--color-gray-70, #52525e));
+  background: light-dark(
+    var(--color-white, #fff),
+    var(--color-gray-80, #2b2a33)
+  );
+}
+
+.gentab-header-inner {
+  max-width: 720px;
+  margin-inline: auto;
+  padding: var(--space-large, 24px);
+  box-sizing: border-box;
+}
+
+.gentab-header-top {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-medium, 16px);
+}
+
+.gentab-header-emoji {
+  font-size: 2.25rem;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-block-start: 2px;
+}
+
+.gentab-header-meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.gentab-header-title {
+  margin: 0 0 6px;
+  font-size: 1.65rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.gentab-header-blurb {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: light-dark(var(--color-gray-70, #5b5b66), var(--color-gray-30, #cfcfd8));
+}
+
+.gentab-header-blurb[hidden] {
+  display: none;
+}
+
+.gentab-header-meta-line {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: light-dark(var(--color-gray-60, #5b5b66), var(--color-gray-40, #bfbfc9));
+}
+
+.gentab-header-meta-line[hidden] {
+  display: none;
+}
+
+.gentab-timeline {
+  max-width: 720px;
+  margin: var(--space-large, 24px) auto var(--space-xlarge, 32px);
+  padding-inline: var(--space-large, 24px);
+  box-sizing: border-box;
+}
+
+.gentab-timeline[hidden] {
+  display: none;
+}
+
+.gentab-timeline-title {
+  margin: 0 0 4px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.gentab-timeline-subtitle {
+  margin: 0 0 var(--space-medium, 16px);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: light-dark(var(--color-gray-70, #5b5b66), var(--color-gray-40, #bfbfc9));
+}
+
+.gentab-timeline-subtitle[hidden] {
+  display: none;
+}
+
+.gentab-timeline-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.gentab-timeline-item {
+  position: relative;
+  padding-block: 10px;
+}
+
+.gentab-timeline-item:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: calc(1.25rem + 10px + 14px);
+  top: 42px;
+  bottom: 0;
+  width: 2px;
+  background: light-dark(
+    color-mix(in srgb, currentColor 16%, transparent),
+    color-mix(in srgb, currentColor 28%, transparent)
+  );
+}
+
+.gentab-timeline-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  margin: 0;
+}
+
+.gentab-timeline-check {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-block-start: 5px;
+  accent-color: var(--button-background-color-primary, #0060df);
+  cursor: pointer;
+}
+
+.gentab-timeline-num {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--button-text-color-primary, #fff);
+  background: var(--button-background-color-primary, #0060df);
+  box-shadow: 0 0 0 3px
+    color-mix(
+      in srgb,
+      var(--button-background-color-primary, #0060df) 16%,
+      transparent
+    );
+  z-index: 1;
+}
+
+.gentab-timeline-item.done .gentab-timeline-num {
+  opacity: 0.55;
+}
+
+.gentab-timeline-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+  padding-block-start: 3px;
+}
+
+.gentab-timeline-heading {
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.gentab-timeline-item.done .gentab-timeline-heading {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.gentab-timeline-detail {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  opacity: 0.88;
+}
+
+.gentab-timeline-item.done .gentab-timeline-detail {
+  opacity: 0.55;
+}
+
+.gentab-timeline-progress {
+  margin: var(--space-medium, 16px) 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: light-dark(var(--color-gray-60, #5b5b66), var(--color-gray-40, #bfbfc9));
+}
+
+.gentab-timeline-choices {
+  margin-block-start: var(--space-large, 24px);
+  padding-block-start: var(--space-medium, 16px);
+  border-block-start: 1px solid
+    light-dark(var(--color-gray-20, #e0e0e6), var(--color-gray-70, #52525e));
+}
+
+.gentab-timeline-choices[hidden] {
+  display: none;
+}
+
+.gentab-timeline-choices-label {
+  margin: 0 0 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: light-dark(var(--color-gray-60, #5b5b66), var(--color-gray-40, #bfbfc9));
+}
+
+.gentab-timeline-choices-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.gentab-timeline-choice {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid
+    light-dark(var(--color-gray-30, #cfcfd8), var(--color-gray-60, #5b5b66));
+  border-radius: 999px;
+  background: light-dark(
+    var(--color-white, #fff),
+    var(--color-gray-70, #3a3944)
+  );
+  color: inherit;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  max-width: 100%;
+}
+
+.gentab-timeline-choice:hover,
+.gentab-timeline-choice:focus-visible {
+  border-color: var(--button-background-color-primary, #0060df);
+  outline: none;
+  box-shadow: 0 0 0 2px
+    color-mix(
+      in srgb,
+      var(--button-background-color-primary, #0060df) 20%,
+      transparent
+    );
+}
+
+.gentab-timeline-choice:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.gentab-timeline.is-updating .gentab-timeline-list {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.gentab-timeline.is-updating .gentab-timeline-progress {
+  color: var(--button-background-color-primary, #0060df);
+}
