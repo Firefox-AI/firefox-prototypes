@@ -149,12 +149,28 @@ function renderTimeline(state) {
       reason.textContent = step.doneReason;
       body.appendChild(reason);
     }
-    // researchQuery is stored for a future “search the web” control — not shown yet.
 
     label.appendChild(checkbox);
     label.appendChild(num);
     label.appendChild(body);
     li.appendChild(label);
+
+    // Research link outside the checkbox label so it does not toggle done.
+    const query = (step.researchQuery || "").trim();
+    if (query && !step.done) {
+      const research = document.createElement("a");
+      research.className = "gentab-timeline-research";
+      research.href = lazy.GenTab.googleSearchUrl(query);
+      research.textContent = `Search: ${query}`;
+      research.title = `Open Google search for “${query}”`;
+      research.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        lazy.GenTab.openWebSearch(query);
+      });
+      li.appendChild(research);
+    }
+
     list.appendChild(li);
   });
 

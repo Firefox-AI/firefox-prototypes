@@ -11,8 +11,8 @@
  * Lists are holistic (research → decide → act → follow-through), not only a
  * dump of page sections. Steps the open tabs already evidence start checked.
  *
- * Optional plan item field research_query is modeled for a future “search the
- * web for this step” affordance; not wired in UI yet.
+ * Optional plan item field research_query is shown as a “Search: …” link that
+ * opens a Google search tab via openWebSearch().
  */
 
 import { openAIEngine } from "moz-src:///browser/components/aiwindow/models/openAIEngine.sys.mjs";
@@ -160,9 +160,9 @@ Set done=true ONLY for discovery-style steps already evidenced by open tabs, e.g
 When done=true, set done_reason to a short evidence note (e.g. "2 related tabs open", "Recipe page open"). When done=false, leave done_reason empty.
 Do NOT invent progress counts in header_blurb that disagree with how many plan items have done=true. Prefer a stats line without "N of M already done" (the client recomputes that).
 
-## research_query (optional, for later search UI — still return when useful)
-When a step is not done and needs information the sources do not provide, set research_query to a short web-search string the user could run (e.g. "best time to visit Kyoto spring", "flight SFO to KIX June").
-Leave research_query empty when the step is doable from open tabs or is an offline action (pack bag, preheat oven).
+## research_query (shown as a clickable web search link on the step)
+When a step is not done and needs information the sources do not provide, set research_query to a short web-search query (e.g. "best time to visit Kyoto spring", "flight SFO to KIX June", "kid bike size chart by age").
+The UI turns this into a Search link that opens Google. Leave empty when the step is doable from open tabs or is an offline action (pack bag, preheat oven, mix batter).
 Do not invent destinations/products just to fill research_query.
 
 ## Timeline choices (one-click reshape chips)
@@ -1405,10 +1405,46 @@ function getBrowserWindow(browser) {
   );
 }
 
+function getMostRecentBrowserWindow() {
+  return Services.wm.getMostRecentWindow("navigator:browser");
+}
+
+/**
+ * @param {string} query
+ * @returns {string}
+ */
+export function googleSearchUrl(query) {
+  const q = clampString(query, 200);
+  return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+}
+
 export const GenTab = {
   isEnabled() {
     return lazy.gentabEnabled;
   },
+
+  /**
+   * Open a Google search for the given query in a new tab.
+   *
+   * @param {string} query
+   * @param {Window} [chromeWindow]
+   * @returns {boolean} true if a tab was opened
+   */
+  openWebSearch(query, chromeWindow) {
+    const q = clampString(query, 200);
+    if (!q) {
+      return false;
+    }
+    const win = chromeWindow || getMostRecentBrowserWindow();
+    if (!win) {
+      console.error("GenTab: no browser window for web search");
+      return false;
+    }
+    lazy.URILoadingHelper.openTrustedLinkIn(win, googleSearchUrl(q), "tab");
+    return true;
+  },
+
+  googleSearchUrl,
 
   /**
    * @param {MozBrowser} browser
