@@ -241,6 +241,27 @@ body {
   text-decoration: none;
 }
 
+.gentab-timeline-research {
+  display: inline-block;
+  margin-block-start: 4px;
+  margin-inline-start: calc(1.25rem + 10px + 28px + 10px);
+  font-size: 0.8rem;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.3;
+  color: var(--link-color, var(--button-background-color-primary, #0060df));
+  text-decoration: none;
+  max-width: calc(100% - 4rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gentab-timeline-research:hover,
+.gentab-timeline-research:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+
 .gentab-timeline-item.current {
   border-radius: 10px;
   background: color-mix(in srgb, var(--button-background-color-primary, #0060df) 8%, transparent);
