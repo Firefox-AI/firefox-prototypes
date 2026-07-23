@@ -92,14 +92,19 @@ function renderTimeline(state) {
 
   list.replaceChildren();
   let doneCount = 0;
+  let firstOpenIndex = -1;
   timeline.steps.forEach((step, index) => {
     if (step.done) {
       doneCount += 1;
+    } else if (firstOpenIndex < 0) {
+      firstOpenIndex = index;
     }
     const li = document.createElement("li");
     li.className = "gentab-timeline-item";
     if (step.done) {
       li.classList.add("done");
+    } else if (index === firstOpenIndex) {
+      li.classList.add("current");
     }
     li.dataset.stepId = step.id;
 
@@ -137,6 +142,14 @@ function renderTimeline(state) {
       detail.textContent = step.body;
       body.appendChild(detail);
     }
+    // Evidence note for steps pre-checked from open tabs.
+    if (step.done && step.doneReason) {
+      const reason = document.createElement("span");
+      reason.className = "gentab-timeline-done-reason";
+      reason.textContent = step.doneReason;
+      body.appendChild(reason);
+    }
+    // researchQuery is stored for a future “search the web” control — not shown yet.
 
     label.appendChild(checkbox);
     label.appendChild(num);
@@ -146,7 +159,15 @@ function renderTimeline(state) {
   });
 
   const total = timeline.steps.length;
-  progressEl.textContent = `${doneCount} of ${total} complete`;
+  const next =
+    firstOpenIndex >= 0 ? timeline.steps[firstOpenIndex]?.heading : "";
+  if (doneCount === total && total > 0) {
+    progressEl.textContent = `${doneCount} of ${total} complete`;
+  } else if (next) {
+    progressEl.textContent = `${doneCount} of ${total} complete · Next: ${next}`;
+  } else {
+    progressEl.textContent = `${doneCount} of ${total} complete`;
+  }
   progressEl.hidden = false;
 
   renderTimelineChoices(timeline.choices || []);
@@ -205,6 +226,8 @@ function bindTimelineChecks() {
     const state = lazy.GenTab.getState(id);
     if (state) {
       gHeaderState = state;
+      // Header blurb tracks the same done counts as the list.
+      renderHeader(state);
       renderTimeline(state);
     }
   });
