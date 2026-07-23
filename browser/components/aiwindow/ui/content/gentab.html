@@ -20,67 +20,67 @@
     <link rel="stylesheet" href="chrome://global/skin/in-content/common.css" />
     <link
       rel="stylesheet"
+      href="chrome://global/skin/design-system/tokens-brand.css"
+    />
+    <link
+      rel="stylesheet"
+      href="chrome://global/skin/design-system/text-and-typography.css"
+    />
+    <link
+      rel="stylesheet"
       href="chrome://browser/content/aiwindow/gentab.css"
     />
     <link rel="localization" href="browser/aiWindow.ftl" />
     <link rel="localization" href="branding/brand.ftl" />
     <link rel="localization" href="toolkit/branding/brandings.ftl" />
   </head>
-  <body>
+  <body class="gentab-page">
     <div id="gentab-status" class="gentab-status" hidden>
       <p id="gentab-status-message" class="gentab-status-message"></p>
     </div>
     <main id="gentab-main" class="gentab-main" hidden>
-      <header id="gentab-header" class="gentab-header">
-        <div class="gentab-header-inner">
-          <div class="gentab-header-top">
-            <span
-              id="gentab-header-emoji"
-              class="gentab-header-emoji"
-              aria-hidden="true"
-              >✨</span
-            >
-            <div class="gentab-header-meta">
-              <h1 id="gentab-header-title" class="gentab-header-title">
-                GenTab
-              </h1>
-              <p id="gentab-header-blurb" class="gentab-header-blurb"></p>
-              <p
-                id="gentab-header-meta-line"
-                class="gentab-header-meta-line"
-              ></p>
-            </div>
-          </div>
-        </div>
-      </header>
-      <section
-        id="gentab-timeline"
-        class="gentab-timeline"
-        aria-label="Checklist"
-        hidden
-      >
-        <h2 id="gentab-timeline-title" class="gentab-timeline-title">
-          Checklist
-        </h2>
-        <p id="gentab-timeline-subtitle" class="gentab-timeline-subtitle"></p>
-        <ol id="gentab-timeline-list" class="gentab-timeline-list"></ol>
-        <p id="gentab-timeline-progress" class="gentab-timeline-progress"></p>
-        <div
-          id="gentab-timeline-choices"
-          class="gentab-timeline-choices"
-          hidden
-        >
-          <p class="gentab-timeline-choices-label">Reshape</p>
+      <div class="gentab-page-inner">
+        <moz-page-header
+          id="gentab-page-header"
+          class="gentab-page-header"
+        ></moz-page-header>
+        <moz-card id="gentab-card" class="gentab-card" hidden>
+          <p
+            id="gentab-timeline-subtitle"
+            class="gentab-timeline-subtitle"
+            hidden
+          ></p>
+          <ol id="gentab-timeline-list" class="gentab-timeline-list"></ol>
+          <p id="gentab-timeline-progress" class="gentab-timeline-progress"></p>
           <div
-            id="gentab-timeline-choices-list"
-            class="gentab-timeline-choices-list"
-            role="group"
-            aria-label="Reshape this list"
-          ></div>
-        </div>
-      </section>
+            id="gentab-timeline-choices"
+            class="gentab-timeline-choices"
+            hidden
+          >
+            <p class="gentab-timeline-choices-label">Reshape</p>
+            <div
+              id="gentab-timeline-choices-list"
+              class="gentab-timeline-choices-list"
+              role="group"
+              aria-label="Reshape this list"
+            ></div>
+          </div>
+        </moz-card>
+      </div>
     </main>
     <script src="chrome://browser/content/contentTheme.js"></script>
+    <script
+      type="module"
+      src="chrome://global/content/elements/moz-button.mjs"
+    ></script>
+    <script
+      type="module"
+      src="chrome://global/content/elements/moz-page-header.mjs"
+    ></script>
+    <script
+      type="module"
+      src="chrome://global/content/elements/moz-card.mjs"
+    ></script>
     <script src="chrome://browser/content/aiwindow/gentab.js"></script>
   </body>
 </html>

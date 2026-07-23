@@ -37,51 +37,60 @@ function hideStatus() {
  */
 function renderHeader(state) {
   gHeaderState = state;
-  const emoji = state.emoji || "✨";
+  const header = document.getElementById("gentab-page-header");
+  if (!header) {
+    return;
+  }
+
+  const emoji = (state.emoji || "✨").trim();
   const title = state.title || "GenTab";
-  const blurb = state.headerBlurb || state.summary || "";
+  const blurb = (state.headerBlurb || state.summary || "").trim();
   const tabs = Array.isArray(state.tabs) ? state.tabs : [];
   const tabCount = tabs.length;
 
-  document.getElementById("gentab-header-emoji").textContent = emoji;
-  document.getElementById("gentab-header-title").textContent = title;
-  const blurbEl = document.getElementById("gentab-header-blurb");
-  blurbEl.textContent = blurb;
-  blurbEl.hidden = !blurb;
-
-  const meta = document.getElementById("gentab-header-meta-line");
-  const parts = [];
+  const metaParts = [];
   if (tabCount > 0) {
-    parts.push(`From ${tabCount} tab${tabCount === 1 ? "" : "s"}`);
+    metaParts.push(`From ${tabCount} tab${tabCount === 1 ? "" : "s"}`);
   }
   if (state.intent) {
-    parts.push(state.intent);
+    metaParts.push(state.intent);
   }
-  meta.textContent = parts.join(" · ");
-  meta.hidden = !parts.length;
+
+  // emoji + title in page-header heading (iconSrc expects an image URL).
+  header.heading = emoji ? `${emoji} ${title}` : title;
+  header.headingLevel = 1;
+
+  const descriptionParts = [];
+  if (blurb) {
+    descriptionParts.push(blurb);
+  }
+  if (metaParts.length) {
+    descriptionParts.push(metaParts.join(" · "));
+  }
+  header.description = descriptionParts.join(" · ");
 }
 
 /**
  * @param {object} state
  */
 function renderTimeline(state) {
-  const section = document.getElementById("gentab-timeline");
+  const card = document.getElementById("gentab-card");
   const list = document.getElementById("gentab-timeline-list");
-  const titleEl = document.getElementById("gentab-timeline-title");
   const subtitleEl = document.getElementById("gentab-timeline-subtitle");
   const progressEl = document.getElementById("gentab-timeline-progress");
-  if (!section || !list) {
+  if (!card || !list) {
     return;
   }
 
   const timeline = state.timeline;
   if (!timeline?.steps?.length) {
-    section.hidden = true;
+    card.hidden = true;
     list.replaceChildren();
     return;
   }
 
-  titleEl.textContent = timeline.title || "Checklist";
+  card.heading = timeline.title || "Checklist";
+  card.headingLevel = 2;
   if (timeline.subtitle) {
     subtitleEl.textContent = timeline.subtitle;
     subtitleEl.hidden = false;
@@ -155,14 +164,16 @@ function renderTimeline(state) {
     label.appendChild(body);
     li.appendChild(label);
 
-    // Research link outside the checkbox label so it does not toggle done.
+    // Research control outside the checkbox label so it does not toggle done.
     const query = (step.researchQuery || "").trim();
     if (query && !step.done) {
-      const research = document.createElement("a");
+      const research = document.createElement("moz-button");
       research.className = "gentab-timeline-research";
-      research.href = lazy.GenTab.googleSearchUrl(query);
-      research.textContent = `Search: ${query}`;
-      research.title = `Open Google search for “${query}”`;
+      research.type = "ghost";
+      research.size = "small";
+      research.iconSrc = "chrome://global/skin/icons/search-glass.svg";
+      research.label = query;
+      research.title = `Search Google for “${query}”`;
       research.addEventListener("click", event => {
         event.preventDefault();
         event.stopPropagation();
@@ -187,7 +198,7 @@ function renderTimeline(state) {
   progressEl.hidden = false;
 
   renderTimelineChoices(timeline.choices || []);
-  section.hidden = false;
+  card.hidden = false;
 }
 
 /**
@@ -205,12 +216,13 @@ function renderTimelineChoices(choices) {
     return;
   }
   for (const choice of choices) {
-    const btn = document.createElement("button");
-    btn.type = "button";
+    const btn = document.createElement("moz-button");
     btn.className = "gentab-timeline-choice";
+    btn.type = "ghost";
+    btn.size = "small";
+    btn.label = choice.label || choice.body || "Change plan";
+    btn.title = choice.body || choice.label || "";
     btn.dataset.choiceId = choice.id;
-    btn.title = choice.body || choice.label;
-    btn.textContent = choice.label || choice.body || "Change plan";
     list.appendChild(btn);
   }
   wrap.hidden = false;
@@ -256,8 +268,8 @@ function bindTimelineChoices() {
   }
   list.dataset.bound = "1";
   list.addEventListener("click", event => {
-    const btn = event.target.closest?.(".gentab-timeline-choice");
-    if (!btn) {
+    const btn = event.target.closest?.("moz-button.gentab-timeline-choice");
+    if (!btn || btn.disabled) {
       return;
     }
     const choiceId = btn.dataset.choiceId;
@@ -272,12 +284,12 @@ function bindTimelineChoices() {
  * @param {string} [label]
  */
 function setTimelineUpdating(updating, label = "") {
-  const section = document.getElementById("gentab-timeline");
+  const card = document.getElementById("gentab-card");
   const progressEl = document.getElementById("gentab-timeline-progress");
   const choicesList = document.getElementById("gentab-timeline-choices-list");
-  if (section) {
-    section.classList.toggle("is-updating", updating);
-    section.setAttribute("aria-busy", updating ? "true" : "false");
+  if (card) {
+    card.classList.toggle("is-updating", updating);
+    card.setAttribute("aria-busy", updating ? "true" : "false");
   }
   if (progressEl) {
     if (updating) {
@@ -292,7 +304,9 @@ function setTimelineUpdating(updating, label = "") {
     }
   }
   if (choicesList) {
-    for (const btn of choicesList.querySelectorAll(".gentab-timeline-choice")) {
+    for (const btn of choicesList.querySelectorAll(
+      "moz-button.gentab-timeline-choice"
+    )) {
       btn.disabled = updating;
     }
   }
