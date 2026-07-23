@@ -8,6 +8,14 @@ main-context-menu-open-link-new-smart-window =
     .label = Open Link in New { -smart-window-brand-name }
     .accesskey = S
 
+main-context-menu-create-gentab =
+    .label = Create GenTab
+    .accesskey = G
+
+tab-context-create-gentab =
+    .label = Create GenTab
+    .accesskey = G
+
 appmenuitem-new-ai-window =
     .label = New { -smart-window-brand-name }
     .value = New { -smart-window-brand-name }

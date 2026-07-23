@@ -1,0 +1,86 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this file,
+   - You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; object-src 'none'; script-src resource: chrome:; img-src chrome: page-icon: data:; style-src resource: chrome:;"
+    />
+    <title>GenTab</title>
+    <link
+      rel="icon"
+      type="image/png"
+      href="chrome://branding/content/icon32.png"
+    />
+    <link rel="stylesheet" href="chrome://global/skin/in-content/common.css" />
+    <link
+      rel="stylesheet"
+      href="chrome://browser/content/aiwindow/gentab.css"
+    />
+    <link rel="localization" href="browser/aiWindow.ftl" />
+    <link rel="localization" href="branding/brand.ftl" />
+    <link rel="localization" href="toolkit/branding/brandings.ftl" />
+  </head>
+  <body>
+    <div id="gentab-status" class="gentab-status" hidden>
+      <p id="gentab-status-message" class="gentab-status-message"></p>
+    </div>
+    <main id="gentab-main" class="gentab-main" hidden>
+      <header id="gentab-header" class="gentab-header">
+        <div class="gentab-header-inner">
+          <div class="gentab-header-top">
+            <span
+              id="gentab-header-emoji"
+              class="gentab-header-emoji"
+              aria-hidden="true"
+              >✨</span
+            >
+            <div class="gentab-header-meta">
+              <h1 id="gentab-header-title" class="gentab-header-title">
+                GenTab
+              </h1>
+              <p id="gentab-header-blurb" class="gentab-header-blurb"></p>
+              <p
+                id="gentab-header-meta-line"
+                class="gentab-header-meta-line"
+              ></p>
+            </div>
+          </div>
+        </div>
+      </header>
+      <section
+        id="gentab-timeline"
+        class="gentab-timeline"
+        aria-label="Checklist"
+        hidden
+      >
+        <h2 id="gentab-timeline-title" class="gentab-timeline-title">
+          Checklist
+        </h2>
+        <p id="gentab-timeline-subtitle" class="gentab-timeline-subtitle"></p>
+        <ol id="gentab-timeline-list" class="gentab-timeline-list"></ol>
+        <p id="gentab-timeline-progress" class="gentab-timeline-progress"></p>
+        <div
+          id="gentab-timeline-choices"
+          class="gentab-timeline-choices"
+          hidden
+        >
+          <p class="gentab-timeline-choices-label">Reshape</p>
+          <div
+            id="gentab-timeline-choices-list"
+            class="gentab-timeline-choices-list"
+            role="group"
+            aria-label="Reshape this list"
+          ></div>
+        </div>
+      </section>
+    </main>
+    <script src="chrome://browser/content/contentTheme.js"></script>
+    <script src="chrome://browser/content/aiwindow/gentab.js"></script>
+  </body>
+</html>

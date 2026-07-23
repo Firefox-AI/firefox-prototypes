@@ -189,6 +189,9 @@ document.addEventListener(
         case "context-take-screenshot":
           gContextMenu.takeScreenshot();
           break;
+        case "context-create-gentab":
+          gContextMenu.createGenTab();
+          break;
         case "context-add-engine":
           if (!gContextMenu) {
             throw new Error("Context menu doesn't seem to be open.");

@@ -2325,6 +2325,8 @@ pref("browser.ml.pageAssist.enabled", false);
 
 // Smart Window Feature
 pref("browser.smartwindow.enabled", false);
+// GenTab V0: page/tab/group menu → interactive checklist
+pref("browser.smartwindow.gentab.enabled", true);
 // Default endpoint for preset models
 pref("browser.smartwindow.endpoint", "https://mlpa-prod-prod-mozilla.global.ssl.fastly.net/v1");
 pref("browser.smartwindow.memories.generateFromHistory", true);

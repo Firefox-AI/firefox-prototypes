@@ -16,6 +16,9 @@
   const { ContentSharingUtils } = ChromeUtils.importESModule(
     "moz-src:///browser/components/contentsharing/ContentSharingUtils.sys.mjs"
   );
+  const { GenTab } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/aiwindow/ui/modules/GenTab.sys.mjs"
+  );
 
   ChromeUtils.importESModule(
     "chrome://browser/content/genai/content/model-optin.mjs",
@@ -99,6 +102,13 @@
           tabindex="0"
           id="tabGroupEditor_copyAllLinks"
           class="subviewbutton">
+        </toolbarbutton>
+        <toolbarbutton
+          tabindex="0"
+          id="tabGroupEditor_createGenTab"
+          class="subviewbutton"
+          data-l10n-id="tab-group-editor-action-create-gentab"
+          hidden="">
         </toolbarbutton>
         <toolbarbutton
           tabindex="0"
@@ -465,6 +475,7 @@
           "tabGroupEditor_moveGroupToNewWindow"
         ),
         copyAllLinks: document.getElementById("tabGroupEditor_copyAllLinks"),
+        createGenTab: document.getElementById("tabGroupEditor_createGenTab"),
         ungroupTabs: document.getElementById("tabGroupEditor_ungroupTabs"),
         saveAndCloseGroup: document.getElementById(
           "tabGroupEditor_saveAndCloseGroup"
@@ -494,6 +505,13 @@
           BrowserUtils.copyLinks(links);
         }
         Glean.tabgroup.groupInteractions.copy_all_links.add(1);
+        this.close();
+      });
+
+      this.#commandButtons.createGenTab.addEventListener("command", () => {
+        if (this.activeGroup) {
+          GenTab.createFromTabGroup(this.activeGroup);
+        }
         this.close();
       });
 
@@ -785,6 +803,9 @@
           : "tab-group-editor-title-edit"
       );
       this.#commandButtons.copyAllLinks.hidden = enableCreateMode;
+      if (this.#commandButtons.createGenTab) {
+        this.#commandButtons.createGenTab.hidden = enableCreateMode;
+      }
       this.#createMode = enableCreateMode;
     }
 
@@ -947,6 +968,7 @@
         { linkCount }
       );
       this.#commandButtons.copyAllLinks.disabled = !linkCount;
+      this.#updateCreateGenTabButton();
       this.#maybeDisableOrHideSaveButton();
     }
 
@@ -959,6 +981,31 @@
         this.#nameContainer.before(this.#swatchesContainer);
       } else {
         this.#tabGroupPropertiesActions.prepend(this.#swatchesContainer);
+      }
+    }
+
+    #updateCreateGenTabButton() {
+      const button = this.#commandButtons.createGenTab;
+      if (!button) {
+        return;
+      }
+      try {
+        const canCreate = GenTab.canCreateFromTabGroup(this.activeGroup);
+        button.hidden = !canCreate;
+        button.disabled = !canCreate;
+        if (canCreate && this.activeGroup?.tabs) {
+          const eligibleCount = this.activeGroup.tabs.filter(tab =>
+            GenTab.canCreateFromBrowser(tab.linkedBrowser)
+          ).length;
+          document.l10n.setAttributes(
+            button,
+            "tab-group-editor-action-create-gentab",
+            { tabCount: eligibleCount }
+          );
+        }
+      } catch (ex) {
+        console.error(ex);
+        button.hidden = true;
       }
     }
 

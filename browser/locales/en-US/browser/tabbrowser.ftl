@@ -354,6 +354,14 @@ tab-group-editor-action-copy-links =
             [1] Copy link in group
            *[other] Copy { $linkCount } links in group
         }
+# Variables:
+#  $tabCount (Number): the number of extractable tabs in the group for GenTab.
+tab-group-editor-action-create-gentab =
+    .label =
+        { $tabCount ->
+            [1] Create GenTab from tab
+           *[other] Create GenTab from { $tabCount } tabs
+        }
 tab-group-editor-action-save =
     .label = Save and close group
 tab-group-editor-action-ungroup =
