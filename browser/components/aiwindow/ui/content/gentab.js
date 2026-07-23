@@ -300,6 +300,11 @@ async function applyTimelineChoice(choiceId) {
   try {
     const state = await lazy.GenTab.applyTimelineChoice(id, choiceId);
     gHeaderState = state;
+    // Drop stashed "Updating…" restore text so progress comes from the new list.
+    const progressEl = document.getElementById("gentab-timeline-progress");
+    if (progressEl) {
+      delete progressEl.dataset.prevText;
+    }
     renderHeader(state);
     renderTimeline(state);
   } catch (error) {
