@@ -2341,11 +2341,12 @@ pref("browser.smartwindow.mistralRelease", true);
 // Semantic distance threshold for Smart Window history search only.
 pref("places.semanticHistory.smartwindow.distanceThreshold", "0.6");
 
-// Smart Window: AITab
-pref("browser.smartwindow.aitab.enabled", false);
-// Base URL of the external AITab viewer used for development prototyping.
-// The generate_aitab tool returns a link to this viewer with the page config in the URL hash.
-pref("browser.smartwindow.aitab.viewerURL", "");
+// Smart Window: AITab — model builds structured JSON; chat links to an
+// external viewer SPA with the page config in the URL hash.
+// viewerURL must be https; leave empty until you host a viewer.
+// Spike default: enabled + hosted viewer for quick dogfooding.
+pref("browser.smartwindow.aitab.enabled", true);
+pref("browser.smartwindow.aitab.viewerURL", "https://augment-aitab-viewer.quick.mozilla.cloud/aitab-viewer.html");
 
 // Smart Window: Auto Tab Grouping (bug 2054500).
 pref("browser.smartwindow.autoTabGrouping.enabled", false);
