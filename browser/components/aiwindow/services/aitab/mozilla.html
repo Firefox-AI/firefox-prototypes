@@ -1,0 +1,1287 @@
+<!doctype html>
+<html lang="en" data-skin="mozilla">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AITab · Mozilla</title>
+    <!--
+  ============================================================================
+  AITAB EXTERNAL VIEWER — mozilla skin
+  Marketing-site look inspired by mozilla.org (Zilla + black CTAs).
+  Host this file and set:
+    browser.smartwindow.aitab.viewerURL = https://your.host/path/mozilla.html
+  Hash protocol matches page.html (encodeURIComponent JSON).
+  ============================================================================
+-->
+    <script type="application/json" id="page-config">
+      {
+        "version": "1",
+        "theme": "firefox",
+        "header": {
+          "type": "header",
+          "icon": "🏨",
+          "title": "Hotels in Lisbon",
+          "subhead": "4 options gathered from your open tabs"
+        },
+        "blocks": [
+          {
+            "type": "info",
+            "size": "square",
+            "icon": "💰",
+            "heading": "Cheapest",
+            "value": "$72 / night",
+            "accent": true
+          },
+          {
+            "type": "info",
+            "size": "square",
+            "icon": "⭐",
+            "heading": "Top rated",
+            "value": "4.9 / 5"
+          },
+          {
+            "type": "info",
+            "size": "square",
+            "icon": "📍",
+            "heading": "Closest",
+            "value": "0.5 km"
+          },
+          {
+            "type": "info",
+            "size": "wide",
+            "icon": "🧭",
+            "heading": "At a glance",
+            "body": "All four options are within 2.2 km of the center; the two cheapest are also the closest."
+          },
+          {
+            "type": "list",
+            "title": "Compare",
+            "itemType": "Hotel",
+            "layout": "table",
+            "fields": [
+              {
+                "key": "name",
+                "label": "Name",
+                "type": "text",
+                "role": "title",
+                "property": "name"
+              },
+              {
+                "key": "price",
+                "label": "Price",
+                "type": "currency",
+                "role": "detail",
+                "suffix": " / night",
+                "property": "offers.price",
+                "goal": "min"
+              },
+              {
+                "key": "rating",
+                "label": "Rating",
+                "type": "rating",
+                "role": "detail",
+                "max": 5,
+                "property": "aggregateRating.ratingValue",
+                "goal": "max"
+              },
+              {
+                "key": "reviews",
+                "label": "Reviews",
+                "type": "number",
+                "role": "detail",
+                "property": "aggregateRating.reviewCount",
+                "goal": "max"
+              },
+              {
+                "key": "url",
+                "label": "Open tab",
+                "type": "url",
+                "role": "action",
+                "property": "url"
+              }
+            ],
+            "data": [
+              {
+                "name": "Budget Central Hostel",
+                "price": 72,
+                "rating": 4.0,
+                "reviews": 520,
+                "url": "https://www.airbnb.com"
+              },
+              {
+                "name": "Old Town Boutique Inn",
+                "price": 145,
+                "rating": 4.4,
+                "reviews": 890,
+                "url": "https://www.expedia.com"
+              },
+              {
+                "name": "The Riverside Grand",
+                "price": 182,
+                "rating": 4.6,
+                "reviews": 2140,
+                "url": "https://www.booking.com"
+              },
+              {
+                "name": "Skyline Suites",
+                "price": 268,
+                "rating": 4.9,
+                "reviews": 3410,
+                "url": "https://www.hotels.com"
+              }
+            ]
+          },
+          {
+            "type": "todo",
+            "title": "Before you book",
+            "items": [
+              {
+                "text": "Check the free-cancellation window",
+                "priority": "high"
+              },
+              {
+                "text": "Compare total price including taxes & fees",
+                "priority": "medium"
+              },
+              { "text": "Confirm the neighborhood on a map", "done": true }
+            ]
+          }
+        ],
+        "footer": {
+          "type": "footer",
+          "text": "Next steps",
+          "buttons": [
+            {
+              "text": "Book The Riverside Grand",
+              "href": "https://www.booking.com",
+              "variant": "primary"
+            },
+            { "text": "Plan the trip", "href": "app://views/trip" },
+            { "text": "Refine filters", "href": "app://views/refine" }
+          ]
+        }
+      }
+    </script>
+
+    <style>
+
+/* mozilla.org marketing skin — bold type, black CTAs, roomy layout */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Zilla+Slab:wght@500;600;700&display=swap");
+
+:root {
+  --bg: #ffffff;
+  --bg-alt: #f9f9fa;
+  --card: #ffffff;
+  --ink: #000000;
+  --ink-secondary: #42414d;
+  --muted: #5b5b66;
+  --line: #e0e0e6;
+  --accent: #000000;
+  --accent-soft: #f0f0f4;
+  --chip: #f0f0f4;
+  --good: #017a4c;
+  --link: #0060df;
+  --moz-red: #ff293b;
+  --radius: 4px;
+  --shadow: none;
+  --font: "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Zilla Slab", "Georgia", "Times New Roman", serif;
+  --max: 1080px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000;
+    --bg-alt: #1c1b22;
+    --card: #1c1b22;
+    --ink: #ffffff;
+    --ink-secondary: #cfcfd8;
+    --muted: #9e9ead;
+    --line: #3a3944;
+    --accent: #ffffff;
+    --accent-soft: #2b2a33;
+    --chip: #2b2a33;
+    --good: #54ffbd;
+    --link: #0df;
+    --moz-red: #ff6a75;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+.skin-chrome {
+  border-bottom: 1px solid var(--line);
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--bg);
+}
+.skin-chrome .wordmark {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-decoration: none;
+}
+.skin-chrome .wordmark span { color: var(--moz-red); }
+.skin-chrome .tag {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.wrap {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 48px 24px 96px;
+}
+
+/* Hero-style header like mozilla.org sections */
+.page-header {
+  display: block;
+  margin-bottom: 48px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--line);
+}
+.ph-icon {
+  font-size: 3rem;
+  line-height: 1;
+  margin-bottom: 16px;
+  display: block;
+}
+.page-header h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 5vw, 3.4rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  max-width: 18ch;
+}
+.ph-sub {
+  margin: 16px 0 0;
+  color: var(--ink-secondary);
+  font-size: 1.15rem;
+  max-width: 42ch;
+  line-height: 1.5;
+}
+
+.panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 40px;
+}
+.panel {
+  background: var(--bg-alt);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 24px 20px;
+  color: inherit;
+  text-decoration: none;
+  display: block;
+}
+a.panel { transition: background 0.15s, border-color 0.15s; }
+a.panel:hover { border-color: var(--ink); background: var(--card); }
+.panel-wide { grid-column: 1 / -1; }
+.panel.accent {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+.pi-icon { font-size: 1.5rem; }
+.pi-head {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-top: 12px;
+  font-weight: 600;
+}
+.panel.accent .pi-head { color: rgba(255,255,255,0.7); }
+@media (prefers-color-scheme: dark) {
+  .panel.accent .pi-head { color: rgba(0,0,0,0.55); }
+}
+.pi-val {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-top: 4px;
+  line-height: 1.15;
+}
+.pi-body { font-size: 1rem; margin-top: 10px; color: var(--ink-secondary); max-width: 60ch; }
+.panel.accent .pi-body { color: inherit; opacity: 0.9; }
+
+.block { margin-bottom: 48px; }
+.block-title {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0 0 12px;
+  letter-spacing: -0.02em;
+}
+.block-desc { color: var(--muted); margin: 0 0 20px; font-size: 1rem; max-width: 50ch; }
+
+.todo-prog { font-size: 0.85rem; color: var(--muted); margin: 0 0 16px; font-weight: 500; }
+.todo-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--line); }
+.todo-item {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  padding: 18px 4px;
+  box-shadow: none;
+}
+.todo-item label { display: flex; align-items: flex-start; gap: 14px; cursor: pointer; }
+.todo-item input { margin-top: 4px; width: 18px; height: 18px; accent-color: var(--ink); }
+.todo-item .tx { font-weight: 600; font-size: 1.05rem; }
+.todo-item.done .tx { text-decoration: line-through; color: var(--muted); }
+.todo-meta {
+  display: flex; gap: 12px; flex-wrap: wrap; margin: 8px 0 0 32px;
+  font-size: 0.85rem; color: var(--muted); align-items: center;
+}
+.todo-meta a { color: var(--link); }
+.pri {
+  font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 3px 8px; border-radius: 2px; background: var(--chip); color: var(--muted); font-weight: 700;
+}
+.pri.high { background: var(--ink); color: var(--bg); }
+
+.page-footer {
+  border-top: 2px solid var(--ink);
+  margin-top: 56px;
+  padding-top: 28px;
+}
+.pf-text {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.pf-buttons { display: flex; gap: 12px; flex-wrap: wrap; }
+
+.btn {
+  display: inline-block; text-decoration: none; white-space: nowrap;
+  font-size: 0.95rem; font-weight: 700; padding: 14px 28px;
+  border-radius: 100px; transition: transform 0.12s, background 0.12s, color 0.12s;
+  letter-spacing: 0.01em;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn.primary {
+  background: var(--ink); color: var(--bg); border: 2px solid var(--ink);
+}
+.btn.primary:hover { opacity: 0.88; }
+.btn.secondary {
+  background: transparent; color: var(--ink);
+  border: 2px solid var(--ink);
+}
+.btn.secondary:hover { background: var(--accent-soft); }
+
+.badge {
+  display: inline-block; font-size: 0.7rem; font-weight: 700;
+  padding: 4px 10px; border-radius: 2px;
+  background: var(--chip); color: var(--ink); text-transform: uppercase; letter-spacing: 0.04em;
+}
+.stars { color: var(--ink); letter-spacing: 1px; white-space: nowrap; }
+.stars .num { color: var(--muted); font-size: 0.8rem; margin-left: 4px; letter-spacing: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.chip {
+  font-size: 0.8rem; background: var(--chip); color: var(--ink);
+  padding: 4px 12px; border-radius: 100px; font-weight: 500;
+}
+.bool.yes { color: var(--good); font-weight: 700; }
+.bool.no { color: var(--muted); }
+.empty { text-align: center; color: var(--muted); padding: 48px 0; }
+.thumb { background: var(--chip); display: block; object-fit: cover; }
+.ribbon {
+  display: inline-block; font-size: 0.68rem; font-weight: 700;
+  padding: 3px 10px; border-radius: 2px; background: var(--moz-red); color: #fff;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.is-best { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+.summary { display: flex; flex-direction: column; gap: 20px; margin-bottom: 24px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.stat {
+  background: var(--bg-alt); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 18px 16px;
+}
+.stat .s-val {
+  font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em;
+}
+.stat .s-lab {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--muted); margin-top: 4px; font-weight: 600;
+}
+.stat .s-sub { font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
+.callouts { display: flex; flex-wrap: wrap; gap: 12px; }
+.callout {
+  display: flex; flex-direction: column; gap: 2px;
+  background: var(--bg-alt); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 12px 16px; min-width: 140px;
+}
+.callout .c-kick { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+.callout .c-name { font-weight: 700; font-size: 0.95rem; }
+.callout .c-val { font-size: 0.85rem; color: var(--muted); }
+.callout.best { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.callout.best .c-kick, .callout.best .c-val { color: inherit; opacity: 0.75; }
+
+.list.layout-cards { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--line); }
+.layout-cards .card {
+  display: grid; grid-template-columns: 140px 1fr auto; gap: 24px;
+  background: transparent; border: none; border-bottom: 1px solid var(--line);
+  border-radius: 0; box-shadow: none; padding: 28px 4px;
+}
+.layout-cards .card.no-image { grid-template-columns: 1fr auto; }
+.layout-cards .thumb { width: 140px; height: 140px; border-radius: var(--radius); }
+.layout-cards .titlerow { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.layout-cards .title {
+  font-family: var(--font-display); font-size: 1.35rem; font-weight: 700; margin: 0;
+  letter-spacing: -0.02em;
+}
+.layout-cards .subtitle { color: var(--muted); font-size: 0.95rem; margin: 4px 0 0; }
+.layout-cards .details {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px 20px; margin-top: 18px;
+}
+.layout-cards .k { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+.layout-cards .v { font-size: 0.95rem; font-weight: 600; }
+.layout-cards .detail.full { grid-column: 1 / -1; }
+.layout-cards .action { display: flex; align-items: center; }
+
+.list.layout-compact { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--line); }
+.layout-compact .row {
+  display: flex; align-items: center; gap: 16px;
+  background: transparent; border: none; border-bottom: 1px solid var(--line);
+  border-radius: 0; padding: 16px 4px; box-shadow: none;
+}
+.layout-compact .thumb { width: 48px; height: 48px; border-radius: 2px; flex: 0 0 auto; }
+.layout-compact .row-main { flex: 0 0 auto; min-width: 180px; max-width: 300px; }
+.layout-compact .title { font-weight: 700; font-size: 1rem; }
+.layout-compact .subtitle { color: var(--muted); font-size: 0.85rem; }
+.layout-compact .row-meta { display: flex; flex-wrap: wrap; gap: 8px 18px; flex: 1 1 auto; align-items: center; }
+.layout-compact .m { font-size: 0.9rem; }
+.layout-compact .m em {
+  color: var(--muted); font-style: normal; font-size: 0.68rem;
+  text-transform: uppercase; letter-spacing: 0.06em; margin-right: 6px; font-weight: 600;
+}
+
+.list.layout-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px;
+}
+.layout-grid .tile {
+  display: flex; flex-direction: column; background: var(--bg-alt);
+  border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: none; overflow: hidden;
+}
+.layout-grid .thumb { width: 100%; height: 160px; }
+.layout-grid .tile-body { padding: 18px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.layout-grid .titlerow { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.layout-grid .title { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; letter-spacing: -0.01em; }
+.layout-grid .subtitle { color: var(--muted); font-size: 0.85rem; }
+.layout-grid .details { display: grid; gap: 8px; margin-top: 6px; }
+.layout-grid .detail { display: flex; justify-content: space-between; gap: 10px; font-size: 0.9rem; }
+.layout-grid .k { color: var(--muted); }
+.layout-grid .detail.full { flex-direction: column; }
+.layout-grid .action { margin-top: auto; padding-top: 14px; }
+
+.list.layout-table { display: block; overflow-x: auto; }
+.layout-table .tbl {
+  width: 100%; border-collapse: collapse; border-spacing: 0;
+  background: transparent; border: none; border-radius: 0; overflow: visible; box-shadow: none;
+}
+.layout-table th, .layout-table td {
+  padding: 16px 12px; text-align: left; vertical-align: middle; font-size: 0.95rem;
+  border-bottom: 1px solid var(--line);
+}
+.layout-table thead th {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--muted); background: transparent; white-space: nowrap; font-weight: 700;
+  border-bottom: 2px solid var(--ink);
+}
+.layout-table td:first-child { font-weight: 700; }
+.layout-table .thumb { width: 40px; height: 40px; border-radius: 2px; }
+.layout-table .cell-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.layout-table tr.is-best td { background: var(--bg-alt); }
+
+@media (max-width: 600px) {
+  .layout-cards .card, .layout-cards .card.no-image { grid-template-columns: 1fr; }
+  .layout-cards .thumb { width: 100%; height: 180px; }
+  .wrap { padding: 32px 16px 72px; }
+}
+
+    </style>
+  </head>
+  <body>
+    <header class="skin-chrome" aria-label="Mozilla">
+      <div class="wordmark">moz<span>illa</span></div>
+      <div class="tag">Internet for people</div>
+    </header>
+    <main class="wrap" id="page"></main>
+
+    <script>
+      (function () {
+        "use strict";
+
+        /**
+         * Prefer page config from the URL hash (Firefox chat puts validated
+         * JSON there via encodeURIComponent). Fall back to the embedded
+         * #page-config demo block when no hash is present.
+         */
+        function loadPageConfig() {
+          var hash = (location.hash || "").replace(/^#/, "");
+          if (hash) {
+            try {
+              return JSON.parse(decodeURIComponent(hash));
+            } catch (e) {
+              // Some hosts or copy/paste paths may leave the hash unescaped.
+              try {
+                return JSON.parse(hash);
+              } catch (e2) {
+                throw new Error(
+                  "Could not parse AITab JSON from the URL hash."
+                );
+              }
+            }
+          }
+          var el = document.getElementById("page-config");
+          if (!el) {
+            throw new Error("No page config found.");
+          }
+          return JSON.parse(el.textContent);
+        }
+
+        var root = document.getElementById("page");
+        var PAGE;
+        try {
+          PAGE = loadPageConfig();
+        } catch (err) {
+          root.innerHTML =
+            '<p style="padding:2rem;font:message-box;color:#5b5b66">' +
+            String(err.message || err) +
+            "</p>";
+          return;
+        }
+
+        if (PAGE.header && PAGE.header.title) {
+          document.title = PAGE.header.title;
+        }
+
+        // theme comes from the page config; light/dark follows the OS
+        document.documentElement.setAttribute(
+          "data-theme",
+          PAGE.theme || "firefox"
+        );
+        document.documentElement.setAttribute(
+          "data-mode",
+          window.matchMedia &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light"
+        );
+
+        /* ---- shared helpers ---------------------------------------------------- */
+        function esc(s) {
+          return String(s).replace(/[&<>"']/g, function (c) {
+            return {
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            }[c];
+          });
+        }
+        function byRole(schema, role) {
+          return schema.fields.filter(function (f) {
+            return (f.role || "detail") === role;
+          });
+        }
+        function firstByRole(schema, role) {
+          return byRole(schema, role)[0] || null;
+        }
+        function has(row, f) {
+          if (!f) return false;
+          var v = row[f.key];
+          if (v === undefined || v === null || v === "") return false;
+          if (Array.isArray(v) && !v.length) return false;
+          return true;
+        }
+        function formatValue(field, value) {
+          var pre = field.prefix || "",
+            suf = field.suffix || "";
+          switch (field.type) {
+            case "currency":
+              return (
+                pre +
+                Number(value).toLocaleString(undefined, {
+                  style: "currency",
+                  currency: field.currency || "USD",
+                  maximumFractionDigits: 0,
+                }) +
+                suf
+              );
+            case "number":
+              return pre + Number(value).toLocaleString() + suf;
+            case "date":
+              var d = new Date(value);
+              return isNaN(d)
+                ? esc(value)
+                : d.toLocaleDateString(undefined, {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                  });
+            case "boolean":
+              return value
+                ? '<span class="bool yes">✓ Yes</span>'
+                : '<span class="bool no">✕ No</span>';
+            case "rating":
+              var max = field.max || 5,
+                full = Math.round(Number(value)),
+                s = "";
+              for (var i = 0; i < max; i++) s += i < full ? "★" : "☆";
+              return (
+                '<span class="stars">' +
+                s +
+                '<span class="num">' +
+                esc(value) +
+                "/" +
+                max +
+                "</span></span>"
+              );
+            case "tags":
+              return (
+                '<span class="chips">' +
+                (value || [])
+                  .map(function (t) {
+                    return '<span class="chip">' + esc(t) + "</span>";
+                  })
+                  .join("") +
+                "</span>"
+              );
+            default:
+              return pre + esc(value) + suf;
+          }
+        }
+        function thumb(schema, row) {
+          var f = firstByRole(schema, "image");
+          return has(row, f)
+            ? '<img class="thumb" loading="lazy" alt="" src="' +
+                esc(row[f.key]) +
+                '" onerror="this.style.visibility=\'hidden\'" />'
+            : "";
+        }
+        function badge(schema, row) {
+          var f = firstByRole(schema, "badge");
+          return has(row, f)
+            ? '<span class="badge">' + esc(row[f.key]) + "</span>"
+            : "";
+        }
+        function action(schema, row) {
+          var f = firstByRole(schema, "action");
+          return has(row, f)
+            ? '<a class="btn secondary" target="_blank" rel="noopener" href="' +
+                esc(row[f.key]) +
+                '">' +
+                esc(f.label || "Open") +
+                " ↗</a>"
+            : "";
+        }
+
+        /* ---- list superpowers: aggregates, best-value, JSON-LD ----------------- */
+        var NUMERIC = { number: 1, currency: 1, rating: 1 };
+        var currentBest = null;
+        function bestClass(row) {
+          return row === currentBest ? " is-best" : "";
+        }
+        function ribbon(row) {
+          return row === currentBest
+            ? '<span class="ribbon">★ Best value</span>'
+            : "";
+        }
+        function formatNum(field, value) {
+          var n = Number(value);
+          if (field.type === "currency")
+            return n.toLocaleString(undefined, {
+              style: "currency",
+              currency: field.currency || "USD",
+              maximumFractionDigits: 0,
+            });
+          if (field.type === "rating") return n.toFixed(1);
+          var r = Math.abs(n) >= 100 ? Math.round(n) : Math.round(n * 10) / 10;
+          return r.toLocaleString() + (field.suffix || "");
+        }
+        function aggregate(field, rows) {
+          var vals = [];
+          rows.forEach(function (r) {
+            var v = Number(r[field.key]);
+            if (!isNaN(v)) vals.push(v);
+          });
+          if (!vals.length) return null;
+          var sum = vals.reduce(function (a, b) {
+            return a + b;
+          }, 0);
+          return {
+            min: Math.min.apply(null, vals),
+            max: Math.max.apply(null, vals),
+            avg: sum / vals.length,
+          };
+        }
+        function computeBest(schema, rows) {
+          var usable = schema.fields
+            .filter(function (f) {
+              return f.goal && NUMERIC[f.type];
+            })
+            .map(function (f) {
+              var a = aggregate(f, rows);
+              return a && a.max !== a.min ? { f: f, a: a } : null;
+            })
+            .filter(Boolean);
+          if (usable.length < 2 || rows.length < 2) return null;
+          var best = null,
+            top = -1;
+          rows.forEach(function (row) {
+            var s = 0,
+              n = 0;
+            usable.forEach(function (u) {
+              var v = Number(row[u.f.key]);
+              if (isNaN(v)) return;
+              var norm = (v - u.a.min) / (u.a.max - u.a.min);
+              if (u.f.goal === "min") norm = 1 - norm;
+              s += norm;
+              n++;
+            });
+            if (n) {
+              var sc = s / n;
+              if (sc > top) {
+                top = sc;
+                best = row;
+              }
+            }
+          });
+          return best;
+        }
+        function summaryHtml(schema, rows) {
+          var numFields = schema.fields.filter(function (f) {
+            return NUMERIC[f.type];
+          });
+          if (!numFields.length || !rows.length) return "";
+          var nameF = firstByRole(schema, "title") || schema.fields[0];
+          var tiles =
+            '<div class="stat"><div class="s-val">' +
+            rows.length +
+            '</div><div class="s-lab">' +
+            (rows.length === 1 ? "option" : "options") +
+            "</div></div>";
+          numFields.forEach(function (f) {
+            var a = aggregate(f, rows);
+            if (!a) return;
+            tiles +=
+              '<div class="stat"><div class="s-val">' +
+              formatNum(f, a.avg) +
+              '</div><div class="s-lab">avg ' +
+              esc(f.label) +
+              '</div><div class="s-sub">' +
+              formatNum(f, a.min) +
+              " – " +
+              formatNum(f, a.max) +
+              "</div></div>";
+          });
+          var chips = "";
+          if (currentBest)
+            chips +=
+              '<div class="callout best"><span class="c-kick">★ Best value</span><span class="c-name">' +
+              esc(currentBest[nameF.key]) +
+              "</span></div>";
+          schema.fields
+            .filter(function (f) {
+              return f.goal && NUMERIC[f.type];
+            })
+            .forEach(function (f) {
+              var winner = null,
+                wv = null;
+              rows.forEach(function (r) {
+                var v = Number(r[f.key]);
+                if (isNaN(v)) return;
+                if (wv === null || (f.goal === "min" ? v < wv : v > wv)) {
+                  wv = v;
+                  winner = r;
+                }
+              });
+              if (!winner) return;
+              chips +=
+                '<div class="callout"><span class="c-kick">' +
+                esc((f.goal === "min" ? "Lowest " : "Highest ") + f.label) +
+                '</span><span class="c-name">' +
+                esc(winner[nameF.key]) +
+                '</span><span class="c-val">' +
+                formatValue(f, winner[f.key]) +
+                "</span></div>";
+            });
+          return (
+            '<div class="stats">' +
+            tiles +
+            "</div>" +
+            (chips ? '<div class="callouts">' + chips + "</div>" : "")
+          );
+        }
+        var CONTAINER_TYPES = {
+          offers: "Offer",
+          aggregateRating: "AggregateRating",
+          address: "PostalAddress",
+          geo: "GeoCoordinates",
+        };
+        function setPath(o, p, val) {
+          var ps = p.split("."),
+            c = o;
+          for (var i = 0; i < ps.length - 1; i++) {
+            var k = ps[i];
+            if (!c[k]) {
+              c[k] = {};
+              if (CONTAINER_TYPES[k]) c[k]["@type"] = CONTAINER_TYPES[k];
+            }
+            c = c[k];
+          }
+          c[ps[ps.length - 1]] = val;
+        }
+        function buildJsonLd(block) {
+          var mapped = block.fields.filter(function (f) {
+            return f.property;
+          });
+          return {
+            "@context": "https://schema.org",
+            "@type": "ItemList",
+            name: block.title || "",
+            numberOfItems: block.data.length,
+            itemListElement: block.data.map(function (row, i) {
+              var item = { "@type": block.itemType || "Thing" };
+              mapped.forEach(function (f) {
+                var v = row[f.key];
+                if (v === undefined || v === null || v === "") return;
+                var val = NUMERIC[f.type] ? Number(v) : v;
+                setPath(item, f.property, val);
+                if (f.type === "currency" && /\.price$/.test(f.property))
+                  setPath(
+                    item,
+                    f.property.replace(/price$/, "priceCurrency"),
+                    f.currency || "USD"
+                  );
+              });
+              return { "@type": "ListItem", position: i + 1, item: item };
+            }),
+          };
+        }
+        function emitJsonLd() {
+          var old = document.querySelectorAll("script.aitab-ld");
+          for (var i = 0; i < old.length; i++)
+            old[i].parentNode.removeChild(old[i]);
+          (PAGE.blocks || [])
+            .filter(function (b) {
+              return b.type === "list" && b.itemType;
+            })
+            .forEach(function (b) {
+              var s = document.createElement("script");
+              s.type = "application/ld+json";
+              s.className = "aitab-ld";
+              s.textContent = JSON.stringify(buildJsonLd(b), null, 2);
+              document.head.appendChild(s);
+            });
+        }
+
+        /* ---- list layout sub-registry ------------------------------------------ */
+        var LAYOUTS = {
+          cards: function (schema, rows) {
+            var titleF = firstByRole(schema, "title"),
+              subF = firstByRole(schema, "subtitle"),
+              details = byRole(schema, "detail");
+            return rows
+              .map(function (row) {
+                var img = thumb(schema, row),
+                  a = action(schema, row);
+                var h =
+                  '<div class="card' +
+                  (img ? "" : " no-image") +
+                  bestClass(row) +
+                  '">' +
+                  img +
+                  '<div class="body">';
+                h += '<div class="titlerow">';
+                if (titleF)
+                  h += '<h2 class="title">' + esc(row[titleF.key]) + "</h2>";
+                h += badge(schema, row) + ribbon(row) + "</div>";
+                if (has(row, subF))
+                  h += '<p class="subtitle">' + esc(row[subF.key]) + "</p>";
+                if (details.length) {
+                  h += '<div class="details">';
+                  details.forEach(function (f) {
+                    if (!has(row, f)) return;
+                    var full =
+                      f.type === "tags" || f.type === "long" ? " full" : "";
+                    h +=
+                      '<div class="detail' +
+                      full +
+                      '"><div class="k">' +
+                      esc(f.label) +
+                      '</div><div class="v">' +
+                      formatValue(f, row[f.key]) +
+                      "</div></div>";
+                  });
+                  h += "</div>";
+                }
+                h += "</div>"; // body
+                if (a) h += '<div class="action">' + a + "</div>";
+                return h + "</div>";
+              })
+              .join("");
+          },
+          compact: function (schema, rows) {
+            var titleF = firstByRole(schema, "title"),
+              subF = firstByRole(schema, "subtitle");
+            var details = byRole(schema, "detail").filter(function (f) {
+              return f.type !== "long";
+            });
+            return rows
+              .map(function (row) {
+                var img = thumb(schema, row),
+                  a = action(schema, row);
+                var h =
+                  '<div class="row' +
+                  bestClass(row) +
+                  '">' +
+                  img +
+                  '<div class="row-main">';
+                if (titleF)
+                  h += '<div class="title">' + esc(row[titleF.key]) + "</div>";
+                h += has(row, subF)
+                  ? '<div class="subtitle">' + esc(row[subF.key]) + "</div>"
+                  : "";
+                h += "</div>" + badge(schema, row) + ribbon(row);
+                h += '<div class="row-meta">';
+                details.forEach(function (f) {
+                  if (has(row, f))
+                    h +=
+                      '<span class="m"><em>' +
+                      esc(f.label) +
+                      "</em>" +
+                      formatValue(f, row[f.key]) +
+                      "</span>";
+                });
+                h += "</div>";
+                if (a) h += '<div class="action">' + a + "</div>";
+                return h + "</div>";
+              })
+              .join("");
+          },
+          grid: function (schema, rows) {
+            var titleF = firstByRole(schema, "title"),
+              subF = firstByRole(schema, "subtitle"),
+              details = byRole(schema, "detail");
+            return rows
+              .map(function (row) {
+                var h =
+                  '<div class="tile' +
+                  bestClass(row) +
+                  '">' +
+                  thumb(schema, row) +
+                  '<div class="tile-body">';
+                h += '<div class="titlerow">';
+                if (titleF)
+                  h +=
+                    '<span class="title">' + esc(row[titleF.key]) + "</span>";
+                h += badge(schema, row) + ribbon(row) + "</div>";
+                if (has(row, subF))
+                  h += '<div class="subtitle">' + esc(row[subF.key]) + "</div>";
+                if (details.length) {
+                  h += '<div class="details">';
+                  details.forEach(function (f) {
+                    if (!has(row, f)) return;
+                    var full =
+                      f.type === "tags" || f.type === "long" ? " full" : "";
+                    h +=
+                      '<div class="detail' +
+                      full +
+                      '"><span class="k">' +
+                      esc(f.label) +
+                      '</span><span class="v">' +
+                      formatValue(f, row[f.key]) +
+                      "</span></div>";
+                  });
+                  h += "</div>";
+                }
+                var a = action(schema, row);
+                if (a) h += '<div class="action">' + a + "</div>";
+                return h + "</div></div>";
+              })
+              .join("");
+          },
+          table: function (schema, rows) {
+            var titleF = firstByRole(schema, "title"),
+              imageF = firstByRole(schema, "image"),
+              badgeF = firstByRole(schema, "badge"),
+              actionF = firstByRole(schema, "action");
+            var cols = byRole(schema, "detail");
+            var head =
+              "<tr><th>" +
+              esc(titleF ? titleF.label || "Name" : "Name") +
+              "</th>";
+            if (badgeF)
+              head += "<th>" + esc(badgeF.label || "Status") + "</th>";
+            cols.forEach(function (f) {
+              head += "<th>" + esc(f.label) + "</th>";
+            });
+            if (actionF) head += "<th></th>";
+            head += "</tr>";
+            var body = rows
+              .map(function (row) {
+                var img =
+                  imageF && has(row, imageF)
+                    ? '<img class="thumb" loading="lazy" alt="" src="' +
+                      esc(row[imageF.key]) +
+                      '" onerror="this.style.display=\'none\'" />'
+                    : "";
+                var cls = bestClass(row).trim();
+                var r = "<tr" + (cls ? ' class="' + cls + '"' : "") + ">";
+                r +=
+                  '<td><div class="cell-title">' +
+                  img +
+                  "<span>" +
+                  esc(titleF ? row[titleF.key] : "") +
+                  "</span>" +
+                  ribbon(row) +
+                  "</div></td>";
+                if (badgeF) r += "<td>" + badge(schema, row) + "</td>";
+                cols.forEach(function (f) {
+                  r +=
+                    "<td>" +
+                    (has(row, f) ? formatValue(f, row[f.key]) : "—") +
+                    "</td>";
+                });
+                if (actionF) r += "<td>" + action(schema, row) + "</td>";
+                return r + "</tr>";
+              })
+              .join("");
+            return (
+              '<table class="tbl"><thead>' +
+              head +
+              "</thead><tbody>" +
+              body +
+              "</tbody></table>"
+            );
+          },
+        };
+
+        /* ==========================================================================
+     BLOCK RENDERER REGISTRY — one entry per component `type`.
+     Each returns an HTML string. This mirrors schemas/ 1:1.
+     ========================================================================== */
+        var RENDERERS = {
+          header: function (b) {
+            return (
+              '<header class="page-header">' +
+              (b.icon ? '<div class="ph-icon">' + esc(b.icon) + "</div>" : "") +
+              "<div><h1>" +
+              esc(b.title) +
+              "</h1>" +
+              (b.subhead
+                ? '<p class="ph-sub">' + esc(b.subhead) + "</p>"
+                : "") +
+              "</div></header>"
+            );
+          },
+          info: function (b) {
+            var inner = "";
+            if (b.icon)
+              inner += '<div class="pi-icon">' + esc(b.icon) + "</div>";
+            if (b.heading)
+              inner += '<div class="pi-head">' + esc(b.heading) + "</div>";
+            if (b.value)
+              inner += '<div class="pi-val">' + esc(b.value) + "</div>";
+            if (b.body)
+              inner += '<div class="pi-body">' + esc(b.body) + "</div>";
+            var cls =
+              "panel panel-" +
+              (b.size === "wide" ? "wide" : "square") +
+              (b.accent ? " accent" : "");
+            return b.href
+              ? '<a class="' +
+                  cls +
+                  '" href="' +
+                  esc(b.href) +
+                  '">' +
+                  inner +
+                  "</a>"
+              : '<div class="' + cls + '">' + inner + "</div>";
+          },
+          list: function (b) {
+            var layout = LAYOUTS[b.layout] ? b.layout : "cards";
+            var rows = b.data || [];
+            currentBest = computeBest(b, rows);
+            var summary = summaryHtml(b, rows);
+            var listHtml = rows.length
+              ? LAYOUTS[layout](b, rows)
+              : '<div class="empty">No items.</div>';
+            currentBest = null;
+            return (
+              '<section class="block list-block">' +
+              (b.title
+                ? '<h2 class="block-title">' + esc(b.title) + "</h2>"
+                : "") +
+              (b.description
+                ? '<p class="block-desc">' + esc(b.description) + "</p>"
+                : "") +
+              (summary ? '<div class="summary">' + summary + "</div>" : "") +
+              '<div class="list layout-' +
+              layout +
+              '">' +
+              listHtml +
+              "</div></section>"
+            );
+          },
+          todo: function (b, index) {
+            var items = b.items || [];
+            var done = items.filter(function (t) {
+              return t.done;
+            }).length;
+            var prog =
+              b.showProgress !== false
+                ? '<p class="todo-prog">' +
+                  done +
+                  " of " +
+                  items.length +
+                  " done</p>"
+                : "";
+            var lis = items
+              .map(function (t, i) {
+                var meta = "";
+                if (t.priority)
+                  meta +=
+                    '<span class="pri ' +
+                    esc(t.priority) +
+                    '">' +
+                    esc(t.priority) +
+                    "</span>";
+                if (t.due) meta += "<span>Due " + esc(t.due) + "</span>";
+                if (t.note) meta += "<span>" + esc(t.note) + "</span>";
+                if (t.href)
+                  meta +=
+                    '<a href="' +
+                    esc(t.href) +
+                    '" target="_blank" rel="noopener">Open ↗</a>';
+                return (
+                  '<li class="todo-item' +
+                  (t.done ? " done" : "") +
+                  '" data-idx="' +
+                  i +
+                  '">' +
+                  '<label><input type="checkbox" class="todo-cb"' +
+                  (t.done ? " checked" : "") +
+                  "/>" +
+                  '<span class="tx">' +
+                  esc(t.text) +
+                  "</span></label>" +
+                  (meta ? '<div class="todo-meta">' + meta + "</div>" : "") +
+                  "</li>"
+                );
+              })
+              .join("");
+            return (
+              '<section class="block todo" data-block="' +
+              index +
+              '">' +
+              (b.title
+                ? '<h2 class="block-title">' + esc(b.title) + "</h2>"
+                : "") +
+              prog +
+              '<ul class="todo-list">' +
+              lis +
+              "</ul></section>"
+            );
+          },
+          footer: function (b) {
+            var btns = (b.buttons || [])
+              .map(function (btn) {
+                return (
+                  '<a class="btn ' +
+                  (btn.variant === "primary" ? "primary" : "secondary") +
+                  '" href="' +
+                  esc(btn.href) +
+                  '">' +
+                  esc(btn.text) +
+                  "</a>"
+                );
+              })
+              .join("");
+            return (
+              '<footer class="page-footer">' +
+              (b.text ? '<div class="pf-text">' + esc(b.text) + "</div>" : "") +
+              '<div class="pf-buttons">' +
+              btns +
+              "</div></footer>"
+            );
+          },
+        };
+
+        /* ---- compose ----------------------------------------------------------- */
+        function renderBody(blocks) {
+          var out = "",
+            i = 0;
+          while (i < blocks.length) {
+            var b = blocks[i];
+            if (b.type === "info") {
+              // group consecutive info panels so they tile
+              var group = [];
+              while (i < blocks.length && blocks[i].type === "info") {
+                group.push(blocks[i]);
+                i++;
+              }
+              out +=
+                '<div class="panels">' +
+                group.map(RENDERERS.info).join("") +
+                "</div>";
+            } else {
+              out += RENDERERS[b.type] ? RENDERERS[b.type](b, i) : "";
+              i++;
+            }
+          }
+          return out;
+        }
+        function build() {
+          var html = "";
+          if (PAGE.header) html += RENDERERS.header(PAGE.header);
+          html += renderBody(PAGE.blocks || []);
+          if (PAGE.footer) html += RENDERERS.footer(PAGE.footer);
+          root.innerHTML = html;
+          emitJsonLd();
+        }
+
+        // interactive: toggling a todo checkbox updates state and rebuilds
+        root.addEventListener("change", function (e) {
+          if (!e.target.classList || !e.target.classList.contains("todo-cb"))
+            return;
+          var li = e.target.closest("[data-idx]"),
+            sec = e.target.closest("[data-block]");
+          if (!li || !sec) return;
+          var block = PAGE.blocks[+sec.getAttribute("data-block")];
+          if (block && block.items) {
+            block.items[+li.getAttribute("data-idx")].done = e.target.checked;
+            build();
+          }
+        });
+
+        build();
+      })();
+    </script>
+  </body>
+</html>
