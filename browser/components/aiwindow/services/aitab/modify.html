@@ -3,25 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Generated Page</title>
+    <title>AITab · Modify</title>
 
     <!--
   ============================================================================
-  AITAB EXTERNAL VIEWER (single-page app)
-  ----------------------------------------------------------------------------
-  Host this file (or nova.html / mozilla.html skins) on any static origin and set:
-    browser.smartwindow.aitab.viewerURL = https://your.host/path/page.html
-
-  Alternate skins (same hash protocol):
-    nova.html     — Firefox / Photon product chrome
-    mozilla.html  — mozilla.org marketing look
-    modify.html   — hover add/remove on lists, todos, panels, footer actions
-
-  Firefox generate_aitab appends the validated page config as:
-    # + encodeURIComponent(JSON.stringify(page))
-
-  This script reads location.hash first; with no hash it falls back to the
-  embedded #page-config demo below. The hash is never sent to the server.
+  AITAB EXTERNAL VIEWER — modify skin
+  Same chrome and hash protocol as page.html, with hover affordances to add
+  or remove items on:
+    · list rows (table / cards / compact / grid)
+    · todo checklist items
+    · info stat panels
+    · footer next-step buttons (max 3 per schema)
+  Host this file and set:
+    browser.smartwindow.aitab.viewerURL = https://your.host/path/modify.html
   ============================================================================
 -->
     <script type="application/json" id="page-config">
@@ -448,6 +442,18 @@
         display: flex;
         gap: 10px;
         flex-wrap: wrap;
+        align-items: center;
+      }
+      .pf-btn-wrap {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+      }
+      .pf-btn-wrap .mod-remove {
+        position: absolute;
+        inset-block-start: -10px;
+        inset-inline-end: -8px;
+        transform: none;
       }
 
       /* ---- shared value styles ---- */
@@ -852,6 +858,125 @@
           height: 160px;
         }
       }
+
+      /* ---- modify layer (hover add / remove) ---- */
+      [data-mod-scope] {
+        position: relative;
+      }
+      [data-mod-row] {
+        position: relative;
+      }
+      [data-mod-scope]:hover [data-mod-row]:hover,
+      [data-mod-scope] [data-mod-row]:focus-within {
+        background: color-mix(in srgb, var(--accent) 7%, transparent);
+      }
+      .mod-remove {
+        position: absolute;
+        inset-block-start: 50%;
+        inset-inline-end: 8px;
+        transform: translateY(-50%);
+        z-index: 2;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.12s;
+        margin: 0;
+        padding: 4px 9px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--card);
+        color: var(--muted);
+        font: inherit;
+        font-size: 0.75rem;
+        font-weight: 600;
+        line-height: 1.2;
+        cursor: pointer;
+        white-space: nowrap;
+        box-shadow: var(--shadow);
+      }
+      [data-mod-row]:hover .mod-remove,
+      [data-mod-row]:focus-within .mod-remove {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .mod-remove:hover,
+      .mod-remove:focus-visible {
+        border-color: #c50042;
+        background: #ffe8ee;
+        color: #c50042;
+        outline: none;
+      }
+      [data-mode="dark"] .mod-remove:hover,
+      [data-mode="dark"] .mod-remove:focus-visible {
+        background: #5a1a2a;
+        border-color: #ff9aa2;
+        color: #ff9aa2;
+      }
+      .layout-table td.mod-cell {
+        width: 1%;
+        white-space: nowrap;
+        padding-inline-end: 12px;
+        position: relative;
+      }
+      .layout-table .mod-remove {
+        position: static;
+        transform: none;
+        inset: auto;
+      }
+      .layout-cards .card,
+      .layout-compact .row,
+      .layout-grid .tile,
+      .todo-item,
+      .panel {
+        padding-inline-end: 5.5rem;
+      }
+      .mod-add-bar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 10px;
+        padding: 10px 12px;
+        border: 1px dashed var(--line);
+        border-radius: var(--radius);
+        background: transparent;
+        color: var(--muted);
+        font: inherit;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        width: 100%;
+        transition:
+          border-color 0.12s,
+          background 0.12s,
+          color 0.12s,
+          opacity 0.12s;
+        opacity: 0;
+        pointer-events: none;
+      }
+      [data-mod-scope]:hover > .mod-add-bar,
+      [data-mod-scope]:focus-within > .mod-add-bar,
+      .mod-add-bar:focus-visible {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .mod-add-bar:hover,
+      .mod-add-bar:focus-visible {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+        color: var(--accent);
+        outline: none;
+      }
+      .mod-add-bar .plus {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.25rem;
+        height: 1.25rem;
+        border-radius: 50%;
+        border: 1.5px solid currentColor;
+        font-size: 0.9rem;
+        line-height: 1;
+      }
     </style>
   </head>
   <body>
@@ -1227,21 +1352,69 @@
             });
         }
 
+        /* ---- modify chrome helpers -------------------------------------------- */
+        function itemLabelFor(block) {
+          if (block.itemLabel) return block.itemLabel;
+          if (block.itemType) {
+            return String(block.itemType)
+              .replace(/([a-z])([A-Z])/g, "$1 $2")
+              .toLowerCase();
+          }
+          if (block.type === "todo") return "task";
+          if (block.type === "info") return "stat";
+          return "item";
+        }
+        function removeBtn(label) {
+          return (
+            '<button type="button" class="mod-remove" data-mod-action="remove" title="Remove">' +
+            "Remove</button>"
+          );
+        }
+        function addBar(label) {
+          return (
+            '<button type="button" class="mod-add-bar" data-mod-action="add">' +
+            '<span class="plus" aria-hidden="true">+</span>' +
+            "<span>Add " +
+            esc(label) +
+            "</span></button>"
+          );
+        }
+        function wrapModScope(inner, blockIndex, label, extraAttrs) {
+          return (
+            '<div class="mod-scope" data-mod-scope data-mod-block="' +
+            blockIndex +
+            '" data-mod-label="' +
+            esc(label) +
+            '"' +
+            (extraAttrs || "") +
+            ">" +
+            inner +
+            addBar(label) +
+            "</div>"
+          );
+        }
+        function rowAttrs(i) {
+          return ' data-mod-row data-mod-index="' + i + '"';
+        }
+
         /* ---- list layout sub-registry ------------------------------------------ */
         var LAYOUTS = {
           cards: function (schema, rows) {
             var titleF = firstByRole(schema, "title"),
               subF = firstByRole(schema, "subtitle"),
               details = byRole(schema, "detail");
+            var label = itemLabelFor(schema);
             return rows
-              .map(function (row) {
+              .map(function (row, i) {
                 var img = thumb(schema, row),
                   a = action(schema, row);
                 var h =
                   '<div class="card' +
                   (img ? "" : " no-image") +
                   bestClass(row) +
-                  '">' +
+                  '"' +
+                  rowAttrs(i) +
+                  ">" +
                   img +
                   '<div class="body">';
                 h += '<div class="titlerow">';
@@ -1269,7 +1442,7 @@
                 }
                 h += "</div>"; // body
                 if (a) h += '<div class="action">' + a + "</div>";
-                return h + "</div>";
+                return h + removeBtn(label) + "</div>";
               })
               .join("");
           },
@@ -1279,14 +1452,17 @@
             var details = byRole(schema, "detail").filter(function (f) {
               return f.type !== "long";
             });
+            var label = itemLabelFor(schema);
             return rows
-              .map(function (row) {
+              .map(function (row, i) {
                 var img = thumb(schema, row),
                   a = action(schema, row);
                 var h =
                   '<div class="row' +
                   bestClass(row) +
-                  '">' +
+                  '"' +
+                  rowAttrs(i) +
+                  ">" +
                   img +
                   '<div class="row-main">';
                 if (titleF)
@@ -1307,7 +1483,7 @@
                 });
                 h += "</div>";
                 if (a) h += '<div class="action">' + a + "</div>";
-                return h + "</div>";
+                return h + removeBtn(label) + "</div>";
               })
               .join("");
           },
@@ -1315,12 +1491,15 @@
             var titleF = firstByRole(schema, "title"),
               subF = firstByRole(schema, "subtitle"),
               details = byRole(schema, "detail");
+            var label = itemLabelFor(schema);
             return rows
-              .map(function (row) {
+              .map(function (row, i) {
                 var h =
                   '<div class="tile' +
                   bestClass(row) +
-                  '">' +
+                  '"' +
+                  rowAttrs(i) +
+                  ">" +
                   thumb(schema, row) +
                   '<div class="tile-body">';
                 h += '<div class="titlerow">';
@@ -1349,7 +1528,7 @@
                 }
                 var a = action(schema, row);
                 if (a) h += '<div class="action">' + a + "</div>";
-                return h + "</div></div>";
+                return h + removeBtn(label) + "</div></div>";
               })
               .join("");
           },
@@ -1359,6 +1538,7 @@
               badgeF = firstByRole(schema, "badge"),
               actionF = firstByRole(schema, "action");
             var cols = byRole(schema, "detail");
+            var label = itemLabelFor(schema);
             var head =
               "<tr><th>" +
               esc(titleF ? titleF.label || "Name" : "Name") +
@@ -1369,9 +1549,9 @@
               head += "<th>" + esc(f.label) + "</th>";
             });
             if (actionF) head += "<th></th>";
-            head += "</tr>";
+            head += "<th></th></tr>";
             var body = rows
-              .map(function (row) {
+              .map(function (row, i) {
                 var img =
                   imageF && has(row, imageF)
                     ? '<img class="thumb" loading="lazy" alt="" src="' +
@@ -1379,7 +1559,11 @@
                       '" onerror="this.style.display=\'none\'" />'
                     : "";
                 var cls = bestClass(row).trim();
-                var r = "<tr" + (cls ? ' class="' + cls + '"' : "") + ">";
+                var r =
+                  "<tr" +
+                  (cls ? ' class="' + cls + '"' : "") +
+                  rowAttrs(i) +
+                  ">";
                 r +=
                   '<td><div class="cell-title">' +
                   img +
@@ -1396,7 +1580,8 @@
                     "</td>";
                 });
                 if (actionF) r += "<td>" + action(schema, row) + "</td>";
-                return r + "</tr>";
+                r += '<td class="mod-cell">' + removeBtn(label) + "</td></tr>";
+                return r;
               })
               .join("");
             return (
@@ -1451,9 +1636,10 @@
                   "</a>"
               : '<div class="' + cls + '">' + inner + "</div>";
           },
-          list: function (b) {
+          list: function (b, index) {
             var layout = LAYOUTS[b.layout] ? b.layout : "cards";
             var rows = b.data || [];
+            var label = itemLabelFor(b);
             currentBest = computeBest(b, rows);
             var summary = summaryHtml(b, rows);
             var listHtml = rows.length
@@ -1469,15 +1655,21 @@
                 ? '<p class="block-desc">' + esc(b.description) + "</p>"
                 : "") +
               (summary ? '<div class="summary">' + summary + "</div>" : "") +
-              '<div class="list layout-' +
-              layout +
-              '">' +
-              listHtml +
-              "</div></section>"
+              wrapModScope(
+                '<div class="list layout-' +
+                  layout +
+                  '">' +
+                  listHtml +
+                  "</div>",
+                index,
+                label
+              ) +
+              "</section>"
             );
           },
           todo: function (b, index) {
             var items = b.items || [];
+            var label = itemLabelFor(b);
             var done = items.filter(function (t) {
               return t.done;
             }).length;
@@ -1511,7 +1703,9 @@
                   (t.done ? " done" : "") +
                   '" data-idx="' +
                   i +
-                  '">' +
+                  '"' +
+                  rowAttrs(i) +
+                  ">" +
                   '<label><input type="checkbox" class="todo-cb"' +
                   (t.done ? " checked" : "") +
                   "/>" +
@@ -1519,6 +1713,7 @@
                   esc(t.text) +
                   "</span></label>" +
                   (meta ? '<div class="todo-meta">' + meta + "</div>" : "") +
+                  removeBtn(label) +
                   "</li>"
                 );
               })
@@ -1531,30 +1726,48 @@
                 ? '<h2 class="block-title">' + esc(b.title) + "</h2>"
                 : "") +
               prog +
-              '<ul class="todo-list">' +
-              lis +
-              "</ul></section>"
+              wrapModScope(
+                '<ul class="todo-list">' + lis + "</ul>",
+                index,
+                label
+              ) +
+              "</section>"
             );
           },
           footer: function (b) {
-            var btns = (b.buttons || [])
-              .map(function (btn) {
+            var buttons = b.buttons || [];
+            var label = "action";
+            var btns = buttons
+              .map(function (btn, i) {
                 return (
+                  '<span class="pf-btn-wrap"' +
+                  rowAttrs(i) +
+                  ">" +
                   '<a class="btn ' +
                   (btn.variant === "primary" ? "primary" : "secondary") +
                   '" href="' +
                   esc(btn.href) +
                   '">' +
                   esc(btn.text) +
-                  "</a>"
+                  "</a>" +
+                  removeBtn(label) +
+                  "</span>"
                 );
               })
               .join("");
+            // Schema allows up to 3 next-step buttons.
+            var atMax = buttons.length >= 3;
+            var add = atMax ? "" : addBar(label);
             return (
               '<footer class="page-footer">' +
               (b.text ? '<div class="pf-text">' + esc(b.text) + "</div>" : "") +
+              '<div class="mod-scope" data-mod-scope data-mod-kind="footer" data-mod-label="' +
+              esc(label) +
+              '">' +
               '<div class="pf-buttons">' +
               btns +
+              "</div>" +
+              add +
               "</div></footer>"
             );
           },
@@ -1567,16 +1780,47 @@
           while (i < blocks.length) {
             var b = blocks[i];
             if (b.type === "info") {
-              // group consecutive info panels so they tile
-              var group = [];
+              // group consecutive info panels so they tile; each panel maps
+              // to its own block index for remove; add inserts after group.
+              var start = i;
+              var groupHtml = "";
+              var g = 0;
               while (i < blocks.length && blocks[i].type === "info") {
-                group.push(blocks[i]);
+                var panel = blocks[i];
+                var inner = "";
+                if (panel.icon)
+                  inner += '<div class="pi-icon">' + esc(panel.icon) + "</div>";
+                if (panel.heading)
+                  inner +=
+                    '<div class="pi-head">' + esc(panel.heading) + "</div>";
+                if (panel.value)
+                  inner += '<div class="pi-val">' + esc(panel.value) + "</div>";
+                if (panel.body)
+                  inner += '<div class="pi-body">' + esc(panel.body) + "</div>";
+                var cls =
+                  "panel panel-" +
+                  (panel.size === "wide" ? "wide" : "square") +
+                  (panel.accent ? " accent" : "");
+                groupHtml +=
+                  '<div class="' +
+                  cls +
+                  '"' +
+                  rowAttrs(g) +
+                  ' data-mod-info-block="' +
+                  i +
+                  '">' +
+                  inner +
+                  removeBtn("stat") +
+                  "</div>";
+                g++;
                 i++;
               }
-              out +=
-                '<div class="panels">' +
-                group.map(RENDERERS.info).join("") +
-                "</div>";
+              out += wrapModScope(
+                '<div class="panels">' + groupHtml + "</div>",
+                start,
+                "stat",
+                ' data-mod-kind="info-group" data-mod-end="' + (i - 1) + '"'
+              );
             } else {
               out += RENDERERS[b.type] ? RENDERERS[b.type](b, i) : "";
               i++;
@@ -1593,6 +1837,24 @@
           emitJsonLd();
         }
 
+        function blankListRow(block) {
+          var row = {};
+          (block.fields || []).forEach(function (f, i) {
+            if (f.role === "title" || i === 0) {
+              row[f.key] = "New " + itemLabelFor(block);
+            } else if (f.type === "currency" || f.type === "number") {
+              row[f.key] = 0;
+            } else if (f.type === "rating") {
+              row[f.key] = 0;
+            } else if (f.type === "url") {
+              row[f.key] = "https://";
+            } else {
+              row[f.key] = "";
+            }
+          });
+          return row;
+        }
+
         // interactive: toggling a todo checkbox updates state and rebuilds
         root.addEventListener("change", function (e) {
           if (!e.target.classList || !e.target.classList.contains("todo-cb"))
@@ -1603,6 +1865,106 @@
           var block = PAGE.blocks[+sec.getAttribute("data-block")];
           if (block && block.items) {
             block.items[+li.getAttribute("data-idx")].done = e.target.checked;
+            build();
+          }
+        });
+
+        root.addEventListener("click", function (e) {
+          var btn = e.target.closest
+            ? e.target.closest("[data-mod-action]")
+            : null;
+          if (!btn) return;
+          e.preventDefault();
+          e.stopPropagation();
+          var scope = btn.closest("[data-mod-scope]");
+          if (!scope) return;
+          var action = btn.getAttribute("data-mod-action");
+          var kind = scope.getAttribute("data-mod-kind");
+          var blockIndex = +scope.getAttribute("data-mod-block");
+
+          if (kind === "info-group") {
+            if (action === "add") {
+              var end = +scope.getAttribute("data-mod-end");
+              PAGE.blocks.splice(end + 1, 0, {
+                type: "info",
+                size: "square",
+                icon: "✨",
+                heading: "New stat",
+                value: "—",
+              });
+              build();
+              return;
+            }
+            if (action === "remove") {
+              var row = btn.closest("[data-mod-row]");
+              if (!row) return;
+              var infoIdx = +row.getAttribute("data-mod-info-block");
+              if (isNaN(infoIdx)) return;
+              PAGE.blocks.splice(infoIdx, 1);
+              build();
+              return;
+            }
+          }
+
+          if (kind === "footer") {
+            if (!PAGE.footer) {
+              PAGE.footer = { type: "footer", text: "Next steps", buttons: [] };
+            }
+            if (!PAGE.footer.buttons) PAGE.footer.buttons = [];
+            if (action === "add") {
+              if (PAGE.footer.buttons.length >= 3) return;
+              PAGE.footer.buttons.push({
+                text: "New action",
+                href: "https://",
+                variant:
+                  PAGE.footer.buttons.length === 0 ? "primary" : "secondary",
+              });
+              build();
+              return;
+            }
+            if (action === "remove") {
+              var fRow = btn.closest("[data-mod-row]");
+              if (!fRow) return;
+              var fIdx = +fRow.getAttribute("data-mod-index");
+              if (isNaN(fIdx)) return;
+              PAGE.footer.buttons.splice(fIdx, 1);
+              build();
+              return;
+            }
+          }
+
+          var block = PAGE.blocks[blockIndex];
+          if (!block) return;
+
+          if (action === "add") {
+            if (block.type === "list") {
+              if (!block.data) block.data = [];
+              block.data.push(blankListRow(block));
+            } else if (block.type === "todo") {
+              if (!block.items) block.items = [];
+              block.items.push({
+                text: "New " + itemLabelFor(block),
+                done: false,
+              });
+            } else {
+              return;
+            }
+            build();
+            return;
+          }
+
+          if (action === "remove") {
+            var modRow = btn.closest("[data-mod-row]");
+            if (!modRow) return;
+            var idx = +modRow.getAttribute("data-mod-index");
+            if (isNaN(idx)) return;
+            if (block.type === "list" && block.data) {
+              block.data.splice(idx, 1);
+            } else if (block.type === "todo" && block.items) {
+              block.items.splice(idx, 1);
+            } else {
+              return;
+            }
             build();
           }
         });
