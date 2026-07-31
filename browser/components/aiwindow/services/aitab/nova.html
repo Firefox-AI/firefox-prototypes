@@ -5,556 +5,827 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AITab · Firefox</title>
     <!--
-  ============================================================================
   AITAB EXTERNAL VIEWER — nova skin
-  Photon / Protocol–inspired product UI (Nova-adjacent).
-  Host this file and set:
-    browser.smartwindow.aitab.viewerURL = https://your.host/path/nova.html
-  Hash protocol matches page.html (encodeURIComponent JSON).
-  ============================================================================
--->
-    <script type="application/json" id="page-config">
-      {
-        "version": "1",
-        "theme": "firefox",
-        "header": {
-          "type": "header",
-          "icon": "🏨",
-          "title": "Hotels in Lisbon",
-          "subhead": "4 options gathered from your open tabs"
-        },
-        "blocks": [
-          {
-            "type": "info",
-            "size": "square",
-            "icon": "💰",
-            "heading": "Cheapest",
-            "value": "$72 / night",
-            "accent": true
-          },
-          {
-            "type": "info",
-            "size": "square",
-            "icon": "⭐",
-            "heading": "Top rated",
-            "value": "4.9 / 5"
-          },
-          {
-            "type": "info",
-            "size": "square",
-            "icon": "📍",
-            "heading": "Closest",
-            "value": "0.5 km"
-          },
-          {
-            "type": "info",
-            "size": "wide",
-            "icon": "🧭",
-            "heading": "At a glance",
-            "body": "All four options are within 2.2 km of the center; the two cheapest are also the closest."
-          },
-          {
-            "type": "list",
-            "title": "Compare",
-            "itemType": "Hotel",
-            "layout": "table",
-            "fields": [
-              {
-                "key": "name",
-                "label": "Name",
-                "type": "text",
-                "role": "title",
-                "property": "name"
-              },
-              {
-                "key": "price",
-                "label": "Price",
-                "type": "currency",
-                "role": "detail",
-                "suffix": " / night",
-                "property": "offers.price",
-                "goal": "min"
-              },
-              {
-                "key": "rating",
-                "label": "Rating",
-                "type": "rating",
-                "role": "detail",
-                "max": 5,
-                "property": "aggregateRating.ratingValue",
-                "goal": "max"
-              },
-              {
-                "key": "reviews",
-                "label": "Reviews",
-                "type": "number",
-                "role": "detail",
-                "property": "aggregateRating.reviewCount",
-                "goal": "max"
-              },
-              {
-                "key": "url",
-                "label": "Open tab",
-                "type": "url",
-                "role": "action",
-                "property": "url"
-              }
-            ],
-            "data": [
-              {
-                "name": "Budget Central Hostel",
-                "price": 72,
-                "rating": 4.0,
-                "reviews": 520,
-                "url": "https://www.airbnb.com"
-              },
-              {
-                "name": "Old Town Boutique Inn",
-                "price": 145,
-                "rating": 4.4,
-                "reviews": 890,
-                "url": "https://www.expedia.com"
-              },
-              {
-                "name": "The Riverside Grand",
-                "price": 182,
-                "rating": 4.6,
-                "reviews": 2140,
-                "url": "https://www.booking.com"
-              },
-              {
-                "name": "Skyline Suites",
-                "price": 268,
-                "rating": 4.9,
-                "reviews": 3410,
-                "url": "https://www.hotels.com"
-              }
-            ]
-          },
-          {
-            "type": "todo",
-            "title": "Before you book",
-            "items": [
-              {
-                "text": "Check the free-cancellation window",
-                "priority": "high"
-              },
-              {
-                "text": "Compare total price including taxes & fees",
-                "priority": "medium"
-              },
-              { "text": "Confirm the neighborhood on a map", "done": true }
-            ]
-          }
-        ],
-        "footer": {
-          "type": "footer",
-          "text": "Next steps",
-          "buttons": [
-            {
-              "text": "Book The Riverside Grand",
-              "href": "https://www.booking.com",
-              "variant": "primary"
-            },
-            { "text": "Plan the trip", "href": "app://views/trip" },
-            { "text": "Refine filters", "href": "app://views/refine" }
-          ]
+  Photon / violet product chrome.
+  Shared: aitab-viewer.css + aitab-viewer.js
+  Skin overrides: inline <style> (after the link — cascade wins via
+  html[data-skin="nova"] specificity).
+    -->
+    <link rel="stylesheet" href="aitab-viewer.css" />
+    <style>
+      /* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+      /**
+ * Nova skin — load AFTER aitab-viewer.css (link then this block).
+ * Scoped under html[data-skin="nova"] so tokens/components beat shared
+ * [data-theme] rules. Dark uses [data-mode="dark"] (set by runtime) for
+ * specificity over [data-theme][data-mode="dark"].
+ */
+
+      html[data-skin="nova"] {
+        /* color/violet scale */
+        --bg: #f2f0f8;
+        --bg-elevated: #ffffff;
+        --card: #ffffff;
+        --ink: #161423;
+        --ink-secondary: #584a7d;
+        --muted: #75669f;
+        --line: #d2c8ec;
+        --line-soft: #e7e1f8;
+        --accent: #764edd;
+        --accent-hover: #5939a8;
+        --accent-soft: #eaddff;
+        --accent-glow: #9871ff;
+        --chip: #f5ecff;
+        --good: #2ac3a2;
+        --warning: #ffa436;
+        --danger: #e22850;
+        --radius: 8px;
+        --radius-lg: 12px;
+        --shadow:
+          0 1px 2px rgba(62, 41, 118, 0.08), 0 2px 10px rgba(118, 78, 221, 0.08);
+        --font: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+        --font-display:
+          "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+        --topbar-h: 56px;
+      }
+
+      /* Beat shared [data-theme="…"][data-mode="dark"] (0,2,0) with (0,2,1) */
+      html[data-skin="nova"][data-mode="dark"] {
+        --bg: #161423;
+        --bg-elevated: #271c48;
+        --card: #271c48;
+        --ink: #f5ecff;
+        --ink-secondary: #d4c1ff;
+        --muted: #b89cff;
+        --line: #584a7d;
+        --line-soft: #3e2976;
+        --accent: #b89cff;
+        --accent-hover: #d4c1ff;
+        --accent-soft: #3e2976;
+        --accent-glow: #9871ff;
+        --chip: #3e2976;
+        --good: #54ffbd;
+        --shadow:
+          0 1px 2px rgba(0, 0, 0, 0.45), 0 4px 18px rgba(118, 78, 221, 0.2);
+      }
+
+      /* Before JS sets data-mode, honor OS preference */
+      @media (prefers-color-scheme: dark) {
+        html[data-skin="nova"]:not([data-mode="light"]) {
+          --bg: #161423;
+          --bg-elevated: #271c48;
+          --card: #271c48;
+          --ink: #f5ecff;
+          --ink-secondary: #d4c1ff;
+          --muted: #b89cff;
+          --line: #584a7d;
+          --line-soft: #3e2976;
+          --accent: #b89cff;
+          --accent-hover: #d4c1ff;
+          --accent-soft: #3e2976;
+          --accent-glow: #9871ff;
+          --chip: #3e2976;
+          --good: #54ffbd;
+          --shadow:
+            0 1px 2px rgba(0, 0, 0, 0.45), 0 4px 18px rgba(118, 78, 221, 0.2);
         }
       }
-    </script>
 
-    <style>
+      html[data-skin="nova"],
+      html[data-skin="nova"] body {
+        margin: 0;
+        min-height: 100%;
+      }
+      html[data-skin="nova"] body {
+        font-family: var(--font);
+        background: var(--bg);
+        color: var(--ink);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
 
-/* Firefox / Nova product skin — Nova violet scale (design-system tokens) */
-:root {
-  /* color/violet: 0 #F5ECFF … 50 #764EDD … 90 #161423 */
-  --bg: #f2f0f8; /* violet-desaturated/0 */
-  --bg-elevated: #ffffff;
-  --card: #ffffff;
-  --ink: #161423; /* violet/90 */
-  --ink-secondary: #584a7d; /* violet-desaturated/60 */
-  --muted: #75669f; /* violet-desaturated/50 */
-  --line: #d2c8ec; /* violet-desaturated/20 */
-  --line-soft: #e7e1f8; /* violet-desaturated/10 */
-  --accent: #764edd; /* violet/50 */
-  --accent-hover: #5939a8; /* violet/60 */
-  --accent-soft: #eaddff; /* violet/10 */
-  --accent-glow: #9871ff; /* violet/40 */
-  --chip: #f5ecff; /* violet/0 */
-  --good: #2ac3a2;
-  --warning: #ffa436;
-  --danger: #e22850;
-  --radius: 8px;
-  --radius-lg: 12px;
-  --shadow: 0 1px 2px rgba(62, 41, 118, 0.08), 0 2px 10px rgba(118, 78, 221, 0.08);
-  --font: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --font-display: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --topbar-h: 56px;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #161423; /* violet/90 */
-    --bg-elevated: #271c48; /* violet/80 */
-    --card: #271c48;
-    --ink: #f5ecff; /* violet/0 */
-    --ink-secondary: #d4c1ff; /* violet/20 */
-    --muted: #b89cff; /* violet/30 */
-    --line: #584a7d;
-    --line-soft: #3e2976; /* violet/70 */
-    --accent: #b89cff; /* violet/30 */
-    --accent-hover: #d4c1ff; /* violet/20 */
-    --accent-soft: #3e2976; /* violet/70 */
-    --accent-glow: #9871ff; /* violet/40 */
-    --chip: #3e2976;
-    --good: #54ffbd;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 4px 18px rgba(118, 78, 221, 0.2);
-  }
-}
-* { box-sizing: border-box; }
-html, body { margin: 0; min-height: 100%; }
-body {
-  font-family: var(--font);
-  background: var(--bg);
-  color: var(--ink);
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-}
-/* Top chrome bar — Nova violet toolbar */
-.skin-chrome {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  height: var(--topbar-h);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 20px;
-  background:
-    linear-gradient(
-      105deg,
-      rgba(118, 78, 221, 0.14) 0%,
-      rgba(245, 236, 255, 0.9) 42%,
-      var(--bg-elevated) 100%
-    );
-  border-bottom: 1px solid var(--line-soft);
-  box-shadow: 0 1px 0 rgba(118, 78, 221, 0.08);
-}
-.skin-chrome::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 2px;
-  background: linear-gradient(
-    90deg,
-    #764edd 0%,
-    #9871ff 40%,
-    #b89cff 70%,
-    transparent 100%
-  );
-  pointer-events: none;
-}
-@media (prefers-color-scheme: dark) {
-  .skin-chrome {
-    background: linear-gradient(
-      105deg,
-      rgba(118, 78, 221, 0.45) 0%,
-      #271c48 55%,
-      var(--bg-elevated) 100%
-    );
-  }
-}
-.skin-chrome .mark {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #9871ff 0%, #764edd 50%, #5939a8 100%);
-  box-shadow: 0 0 0 2px rgba(118, 78, 221, 0.25);
-  flex: 0 0 auto;
-}
-.skin-chrome .brand {
-  font-weight: 600;
-  font-size: 0.95rem;
-  letter-spacing: -0.01em;
-  color: var(--accent-hover);
-}
-@media (prefers-color-scheme: dark) {
-  .skin-chrome .brand {
-    color: var(--accent);
-  }
-}
-.skin-chrome .pill {
-  margin-left: auto;
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #fff;
-  background: linear-gradient(135deg, #9871ff, #764edd);
-  padding: 4px 10px;
-  border-radius: 999px;
-  box-shadow: 0 1px 3px rgba(89, 57, 168, 0.35);
-}
-.wrap {
-  max-width: 920px;
-  margin: 0 auto;
-  padding: 28px 20px 72px;
-}
-.page-header {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
-  margin-bottom: 28px;
-  padding: 20px 22px;
-  background:
-    linear-gradient(135deg, var(--accent-soft) 0%, var(--card) 55%);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
-  border-left: 4px solid var(--accent);
-}
-.ph-icon { font-size: 2.4rem; line-height: 1; margin-top: 2px; }
-.page-header h1 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 1.55rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--ink);
-}
-.ph-sub { margin: 6px 0 0; color: var(--muted); font-size: 0.95rem; }
+      /* Top chrome bar — Nova violet toolbar */
+      html[data-skin="nova"] .skin-chrome {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        height: var(--topbar-h);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 20px;
+        background: linear-gradient(
+          105deg,
+          rgba(118, 78, 221, 0.14) 0%,
+          rgba(245, 236, 255, 0.9) 42%,
+          var(--bg-elevated) 100%
+        );
+        border-bottom: 1px solid var(--line-soft);
+        box-shadow: 0 1px 0 rgba(118, 78, 221, 0.08);
+      }
+      html[data-skin="nova"] .skin-chrome::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 2px;
+        background: linear-gradient(
+          90deg,
+          #764edd 0%,
+          #9871ff 40%,
+          #b89cff 70%,
+          transparent 100%
+        );
+        pointer-events: none;
+      }
+      html[data-skin="nova"][data-mode="dark"] .skin-chrome,
+      html[data-skin="nova"]:not([data-mode="light"]) .skin-chrome {
+        /* dark chrome filled via tokens; explicit gradient for dark */
+      }
+      html[data-skin="nova"][data-mode="dark"] .skin-chrome {
+        background: linear-gradient(
+          105deg,
+          rgba(118, 78, 221, 0.45) 0%,
+          #271c48 55%,
+          var(--bg-elevated) 100%
+        );
+      }
+      @media (prefers-color-scheme: dark) {
+        html[data-skin="nova"]:not([data-mode="light"]) .skin-chrome {
+          background: linear-gradient(
+            105deg,
+            rgba(118, 78, 221, 0.45) 0%,
+            #271c48 55%,
+            var(--bg-elevated) 100%
+          );
+        }
+      }
+      html[data-skin="nova"] .skin-chrome .mark {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: linear-gradient(
+          135deg,
+          #9871ff 0%,
+          #764edd 50%,
+          #5939a8 100%
+        );
+        box-shadow: 0 0 0 2px rgba(118, 78, 221, 0.25);
+        flex: 0 0 auto;
+      }
+      html[data-skin="nova"] .skin-chrome .brand {
+        font-weight: 600;
+        font-size: 0.95rem;
+        letter-spacing: -0.01em;
+        color: var(--accent-hover);
+      }
+      html[data-skin="nova"][data-mode="dark"] .skin-chrome .brand {
+        color: var(--accent);
+      }
+      html[data-skin="nova"] .skin-chrome .pill {
+        margin-left: auto;
+        font-size: 0.72rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #fff;
+        background: linear-gradient(135deg, #9871ff, #764edd);
+        padding: 4px 10px;
+        border-radius: 999px;
+        box-shadow: 0 1px 3px rgba(89, 57, 168, 0.35);
+      }
 
-.panels {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 12px;
-  margin-bottom: 24px;
-}
-.panel {
-  background: var(--card);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius);
-  padding: 14px 16px;
-  box-shadow: var(--shadow);
-  color: inherit;
-  text-decoration: none;
-  display: block;
-}
-a.panel { transition: border-color 0.12s, box-shadow 0.12s; }
-a.panel:hover {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent), var(--shadow);
-}
-.panel-wide { grid-column: 1 / -1; }
-.panel.accent {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-.pi-icon { font-size: 1.25rem; }
-.pi-head {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-  margin-top: 6px;
-  font-weight: 600;
-}
-.panel.accent .pi-head { color: rgba(255,255,255,0.85); }
-.pi-val {
-  font-size: 1.45rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  margin-top: 2px;
-  font-variant-numeric: tabular-nums;
-}
-.pi-body { font-size: 0.92rem; margin-top: 6px; color: var(--ink-secondary); }
-.panel.accent .pi-body { color: rgba(255,255,255,0.92); }
+      html[data-skin="nova"] .wrap {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 28px 20px 72px;
+      }
+      html[data-skin="nova"] .page-header {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+        margin-bottom: 28px;
+        padding: 20px 22px;
+        background: linear-gradient(
+          135deg,
+          var(--accent-soft) 0%,
+          var(--card) 55%
+        );
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow);
+        border-left: 4px solid var(--accent);
+      }
+      html[data-skin="nova"] .ph-icon {
+        font-size: 2.4rem;
+        line-height: 1;
+        margin-top: 2px;
+      }
+      html[data-skin="nova"] .page-header h1 {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 1.55rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: var(--ink);
+      }
+      html[data-skin="nova"] .ph-sub {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
 
-.block { margin-bottom: 28px; }
-.block-title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  margin: 0 0 8px;
-  letter-spacing: -0.01em;
-}
-.block-desc { color: var(--muted); margin: 0 0 12px; font-size: 0.92rem; }
+      html[data-skin="nova"] .panels {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 12px;
+        margin-bottom: 24px;
+      }
+      html[data-skin="nova"] .panel {
+        background: var(--card);
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius);
+        padding: 14px 16px;
+        box-shadow: var(--shadow);
+        color: inherit;
+        text-decoration: none;
+        display: block;
+      }
+      html[data-skin="nova"] a.panel {
+        transition:
+          border-color 0.12s,
+          box-shadow 0.12s;
+      }
+      html[data-skin="nova"] a.panel:hover {
+        border-color: var(--accent);
+        box-shadow:
+          0 0 0 1px var(--accent),
+          var(--shadow);
+      }
+      html[data-skin="nova"] .panel-wide {
+        grid-column: 1 / -1;
+      }
+      html[data-skin="nova"] .panel.accent {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+      html[data-skin="nova"] .pi-icon {
+        font-size: 1.25rem;
+      }
+      html[data-skin="nova"] .pi-head {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        margin-top: 6px;
+        font-weight: 600;
+      }
+      html[data-skin="nova"] .panel.accent .pi-head {
+        color: rgba(255, 255, 255, 0.85);
+      }
+      html[data-skin="nova"] .pi-val {
+        font-size: 1.45rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        margin-top: 2px;
+        font-variant-numeric: tabular-nums;
+      }
+      html[data-skin="nova"] .pi-body {
+        font-size: 0.92rem;
+        margin-top: 6px;
+        color: var(--ink-secondary);
+      }
+      html[data-skin="nova"] .panel.accent .pi-body {
+        color: rgba(255, 255, 255, 0.92);
+      }
 
-.todo-prog { font-size: 0.8rem; color: var(--muted); margin: 0 0 12px; }
-.todo-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.todo-item {
-  background: var(--card);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius);
-  padding: 12px 14px;
-  box-shadow: var(--shadow);
-}
-.todo-item label { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
-.todo-item input { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--accent); }
-.todo-item .tx { font-weight: 600; }
-.todo-item.done .tx { text-decoration: line-through; color: var(--muted); }
-.todo-meta {
-  display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 0 26px;
-  font-size: 0.8rem; color: var(--muted); align-items: center;
-}
-.todo-meta a { color: var(--accent); }
-.pri {
-  font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em;
-  padding: 2px 8px; border-radius: 999px; background: var(--chip); color: var(--muted); font-weight: 600;
-}
-.pri.high { background: var(--accent-soft); color: var(--accent); }
+      html[data-skin="nova"] .block {
+        margin-bottom: 28px;
+      }
+      html[data-skin="nova"] .block-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin: 0 0 8px;
+        letter-spacing: -0.01em;
+      }
+      html[data-skin="nova"] .block-desc {
+        color: var(--muted);
+        margin: 0 0 12px;
+        font-size: 0.92rem;
+      }
 
-.page-footer {
-  border-top: 1px solid var(--line-soft);
-  margin-top: 40px;
-  padding-top: 20px;
-}
-.pf-text { color: var(--muted); font-size: 0.88rem; margin-bottom: 12px; }
-.pf-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+      html[data-skin="nova"] .todo-prog {
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin: 0 0 12px;
+      }
+      html[data-skin="nova"] .todo-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      html[data-skin="nova"] .todo-item {
+        background: var(--card);
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius);
+        padding: 12px 14px;
+        box-shadow: var(--shadow);
+      }
+      html[data-skin="nova"] .todo-item label {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        cursor: pointer;
+      }
+      html[data-skin="nova"] .todo-item input {
+        margin-top: 3px;
+        width: 16px;
+        height: 16px;
+        accent-color: var(--accent);
+      }
+      html[data-skin="nova"] .todo-item .tx {
+        font-weight: 600;
+      }
+      html[data-skin="nova"] .todo-item.done .tx {
+        text-decoration: line-through;
+        color: var(--muted);
+      }
+      html[data-skin="nova"] .todo-meta {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 6px 0 0 26px;
+        font-size: 0.8rem;
+        color: var(--muted);
+        align-items: center;
+      }
+      html[data-skin="nova"] .todo-meta a {
+        color: var(--accent);
+      }
+      html[data-skin="nova"] .pri {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--chip);
+        color: var(--muted);
+        font-weight: 600;
+      }
+      html[data-skin="nova"] .pri.high {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
 
-.btn {
-  display: inline-block; text-decoration: none; white-space: nowrap;
-  font-size: 0.875rem; font-weight: 600; padding: 10px 16px;
-  border-radius: var(--radius); transition: background 0.12s, color 0.12s, border-color 0.12s;
-}
-.btn.primary {
-  background: linear-gradient(135deg, var(--accent-glow), var(--accent));
-  color: #fff;
-  border: 1px solid transparent;
-  box-shadow: 0 1px 4px rgba(118, 78, 221, 0.35);
-}
-.btn.primary:hover { background: var(--accent-hover); }
-.btn.secondary {
-  background: var(--card); color: var(--ink);
-  border: 1px solid var(--line);
-}
-.btn.secondary:hover { border-color: var(--accent); color: var(--accent); }
+      html[data-skin="nova"] .page-footer {
+        border-top: 1px solid var(--line-soft);
+        margin-top: 40px;
+        padding-top: 20px;
+      }
+      html[data-skin="nova"] .pf-text {
+        color: var(--muted);
+        font-size: 0.88rem;
+        margin-bottom: 12px;
+      }
+      html[data-skin="nova"] .pf-buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
 
-.badge {
-  display: inline-block; font-size: 0.7rem; font-weight: 700;
-  padding: 3px 9px; border-radius: 999px;
-  background: var(--accent-soft); color: var(--accent);
-}
-.stars { color: #ffa436; letter-spacing: 1px; white-space: nowrap; }
-.stars .num { color: var(--muted); font-size: 0.8rem; margin-left: 4px; letter-spacing: 0; }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
-.chip {
-  font-size: 0.78rem; background: var(--chip); color: var(--ink);
-  padding: 3px 10px; border-radius: 999px; font-weight: 500;
-}
-.bool.yes { color: var(--good); font-weight: 600; }
-.bool.no { color: var(--muted); }
-.empty { text-align: center; color: var(--muted); padding: 32px 0; }
-.thumb { background: var(--chip); display: block; object-fit: cover; }
-.ribbon {
-  display: inline-block; font-size: 0.68rem; font-weight: 700;
-  padding: 2px 8px; border-radius: 999px; background: var(--accent); color: #fff;
-}
-.is-best { outline: 2px solid var(--accent); outline-offset: -1px; }
+      html[data-skin="nova"] .btn {
+        display: inline-block;
+        text-decoration: none;
+        white-space: nowrap;
+        font-size: 0.875rem;
+        font-weight: 600;
+        padding: 10px 16px;
+        border-radius: var(--radius);
+        transition:
+          background 0.12s,
+          color 0.12s,
+          border-color 0.12s;
+        border: 1px solid transparent;
+        cursor: pointer;
+        font: inherit;
+      }
+      html[data-skin="nova"] .btn.primary {
+        background: linear-gradient(135deg, var(--accent-glow), var(--accent));
+        color: #fff;
+        box-shadow: 0 1px 4px rgba(118, 78, 221, 0.35);
+      }
+      html[data-skin="nova"] .btn.primary:hover {
+        background: var(--accent-hover);
+      }
+      html[data-skin="nova"] .btn.secondary {
+        background: var(--card);
+        color: var(--ink);
+        border: 1px solid var(--line);
+      }
+      html[data-skin="nova"] .btn.secondary:hover,
+      html[data-skin="nova"] .btn.reshape:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
 
-.summary { display: flex; flex-direction: column; gap: 14px; margin-bottom: 16px; }
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
-.stat {
-  background: var(--card); border: 1px solid var(--line-soft);
-  border-radius: var(--radius); padding: 12px 14px; box-shadow: var(--shadow);
-}
-.stat .s-val { font-size: 1.3rem; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.stat .s-lab { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-top: 2px; font-weight: 600; }
-.stat .s-sub { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
-.callouts { display: flex; flex-wrap: wrap; gap: 10px; }
-.callout {
-  display: flex; flex-direction: column; gap: 1px;
-  background: var(--card); border: 1px solid var(--line-soft);
-  border-radius: var(--radius); padding: 9px 14px; box-shadow: var(--shadow);
-}
-.callout .c-kick { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
-.callout .c-name { font-weight: 650; font-size: 0.9rem; }
-.callout .c-val { font-size: 0.8rem; color: var(--muted); }
-.callout.best { background: var(--accent); border-color: var(--accent); color: #fff; }
-.callout.best .c-kick, .callout.best .c-val { color: rgba(255,255,255,0.85); }
+      html[data-skin="nova"] .badge {
+        display: inline-block;
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 3px 9px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      html[data-skin="nova"] .stars {
+        color: #ffa436;
+        letter-spacing: 1px;
+        white-space: nowrap;
+      }
+      html[data-skin="nova"] .stars .num {
+        color: var(--muted);
+        font-size: 0.8rem;
+        margin-left: 4px;
+        letter-spacing: 0;
+      }
+      html[data-skin="nova"] .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 2px;
+      }
+      html[data-skin="nova"] .chip {
+        font-size: 0.78rem;
+        background: var(--chip);
+        color: var(--ink);
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-weight: 500;
+      }
+      html[data-skin="nova"] .bool.yes {
+        color: var(--good);
+        font-weight: 600;
+      }
+      html[data-skin="nova"] .bool.no {
+        color: var(--muted);
+      }
+      html[data-skin="nova"] .empty {
+        text-align: center;
+        color: var(--muted);
+        padding: 32px 0;
+      }
+      html[data-skin="nova"] .thumb {
+        background: var(--chip);
+        display: block;
+        object-fit: cover;
+      }
+      html[data-skin="nova"] .ribbon {
+        display: inline-block;
+        font-size: 0.68rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #fff;
+      }
+      html[data-skin="nova"] .is-best {
+        outline: 2px solid var(--accent);
+        outline-offset: -1px;
+      }
 
-.list.layout-cards { display: flex; flex-direction: column; gap: 12px; }
-.layout-cards .card {
-  display: grid; grid-template-columns: 120px 1fr auto; gap: 18px;
-  background: var(--card); border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 16px;
-}
-.layout-cards .card.no-image { grid-template-columns: 1fr auto; }
-.layout-cards .thumb { width: 120px; height: 120px; border-radius: var(--radius); }
-.layout-cards .titlerow { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.layout-cards .title { font-size: 1.1rem; font-weight: 700; margin: 0; }
-.layout-cards .subtitle { color: var(--muted); font-size: 0.85rem; margin: 2px 0 0; }
-.layout-cards .details {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 10px 18px; margin-top: 14px;
-}
-.layout-cards .k { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
-.layout-cards .v { font-size: 0.92rem; font-weight: 600; }
-.layout-cards .detail.full { grid-column: 1 / -1; }
-.layout-cards .action { display: flex; align-items: center; }
+      html[data-skin="nova"] .summary {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        margin-bottom: 16px;
+      }
+      html[data-skin="nova"] .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 10px;
+      }
+      html[data-skin="nova"] .stat {
+        background: var(--card);
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius);
+        padding: 12px 14px;
+        box-shadow: var(--shadow);
+      }
+      html[data-skin="nova"] .stat .s-val {
+        font-size: 1.3rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        font-variant-numeric: tabular-nums;
+      }
+      html[data-skin="nova"] .stat .s-lab {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        margin-top: 2px;
+        font-weight: 600;
+      }
+      html[data-skin="nova"] .stat .s-sub {
+        font-size: 0.78rem;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+      html[data-skin="nova"] .callouts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      html[data-skin="nova"] .callout {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        background: var(--card);
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius);
+        padding: 9px 14px;
+        box-shadow: var(--shadow);
+      }
+      html[data-skin="nova"] .callout .c-kick {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+        font-weight: 600;
+      }
+      html[data-skin="nova"] .callout .c-name {
+        font-weight: 650;
+        font-size: 0.9rem;
+      }
+      html[data-skin="nova"] .callout .c-val {
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+      html[data-skin="nova"] .callout.best {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+      html[data-skin="nova"] .callout.best .c-kick,
+      html[data-skin="nova"] .callout.best .c-val {
+        color: rgba(255, 255, 255, 0.85);
+      }
 
-.list.layout-compact { display: flex; flex-direction: column; gap: 8px; }
-.layout-compact .row {
-  display: flex; align-items: center; gap: 14px;
-  background: var(--card); border: 1px solid var(--line-soft);
-  border-radius: var(--radius); padding: 10px 14px; box-shadow: var(--shadow);
-}
-.layout-compact .thumb { width: 44px; height: 44px; border-radius: 6px; flex: 0 0 auto; }
-.layout-compact .row-main { flex: 0 0 auto; min-width: 180px; max-width: 280px; }
-.layout-compact .title { font-weight: 700; font-size: 0.98rem; }
-.layout-compact .subtitle { color: var(--muted); font-size: 0.8rem; }
-.layout-compact .row-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; flex: 1 1 auto; align-items: center; }
-.layout-compact .m { font-size: 0.85rem; }
-.layout-compact .m em {
-  color: var(--muted); font-style: normal; font-size: 0.68rem;
-  text-transform: uppercase; letter-spacing: 0.04em; margin-right: 5px; font-weight: 600;
-}
+      html[data-skin="nova"] .list.layout-cards {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      html[data-skin="nova"] .layout-cards .card {
+        display: grid;
+        grid-template-columns: 120px 1fr auto;
+        gap: 18px;
+        background: var(--card);
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow);
+        padding: 16px;
+      }
+      html[data-skin="nova"] .layout-cards .card.no-image {
+        grid-template-columns: 1fr auto;
+      }
+      html[data-skin="nova"] .layout-cards .thumb {
+        width: 120px;
+        height: 120px;
+        border-radius: var(--radius);
+      }
+      html[data-skin="nova"] .layout-cards .titlerow {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      html[data-skin="nova"] .layout-cards .title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin: 0;
+      }
+      html[data-skin="nova"] .layout-cards .subtitle {
+        color: var(--muted);
+        font-size: 0.85rem;
+        margin: 2px 0 0;
+      }
+      html[data-skin="nova"] .layout-cards .details {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 10px 18px;
+        margin-top: 14px;
+      }
+      html[data-skin="nova"] .layout-cards .k {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+        font-weight: 600;
+      }
+      html[data-skin="nova"] .layout-cards .v {
+        font-size: 0.92rem;
+        font-weight: 600;
+      }
+      html[data-skin="nova"] .layout-cards .detail.full {
+        grid-column: 1 / -1;
+      }
+      html[data-skin="nova"] .layout-cards .action {
+        display: flex;
+        align-items: center;
+      }
 
-.list.layout-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px;
-}
-.layout-grid .tile {
-  display: flex; flex-direction: column; background: var(--card);
-  border: 1px solid var(--line-soft); border-radius: var(--radius-lg);
-  box-shadow: var(--shadow); overflow: hidden;
-}
-.layout-grid .thumb { width: 100%; height: 150px; }
-.layout-grid .tile-body { padding: 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
-.layout-grid .titlerow { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.layout-grid .title { font-weight: 700; font-size: 1.02rem; }
-.layout-grid .subtitle { color: var(--muted); font-size: 0.8rem; }
-.layout-grid .details { display: grid; gap: 6px; margin-top: 4px; }
-.layout-grid .detail { display: flex; justify-content: space-between; gap: 10px; font-size: 0.85rem; }
-.layout-grid .k { color: var(--muted); }
-.layout-grid .detail.full { flex-direction: column; }
-.layout-grid .action { margin-top: auto; padding-top: 10px; }
+      html[data-skin="nova"] .list.layout-compact {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      html[data-skin="nova"] .layout-compact .row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        background: var(--card);
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius);
+        padding: 10px 14px;
+        box-shadow: var(--shadow);
+      }
+      html[data-skin="nova"] .layout-compact .thumb {
+        width: 44px;
+        height: 44px;
+        border-radius: 6px;
+        flex: 0 0 auto;
+      }
+      html[data-skin="nova"] .layout-compact .row-main {
+        flex: 0 0 auto;
+        min-width: 180px;
+        max-width: 280px;
+      }
+      html[data-skin="nova"] .layout-compact .title {
+        font-weight: 700;
+        font-size: 0.98rem;
+      }
+      html[data-skin="nova"] .layout-compact .subtitle {
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+      html[data-skin="nova"] .layout-compact .row-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 16px;
+        flex: 1 1 auto;
+        align-items: center;
+      }
+      html[data-skin="nova"] .layout-compact .m {
+        font-size: 0.85rem;
+      }
+      html[data-skin="nova"] .layout-compact .m em {
+        color: var(--muted);
+        font-style: normal;
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-right: 5px;
+        font-weight: 600;
+      }
 
-.list.layout-table { display: block; overflow-x: auto; }
-.layout-table .tbl {
-  width: 100%; border-collapse: separate; border-spacing: 0;
-  background: var(--card); border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow);
-}
-.layout-table th, .layout-table td {
-  padding: 12px 14px; text-align: left; vertical-align: middle; font-size: 0.9rem;
-}
-.layout-table thead th {
-  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;
-  color: var(--muted); background: var(--chip); white-space: nowrap; font-weight: 700;
-}
-.layout-table tbody tr { border-top: 1px solid var(--line-soft); }
-.layout-table tbody tr + tr td { border-top: 1px solid var(--line-soft); }
-.layout-table td:first-child { font-weight: 600; }
-.layout-table .thumb { width: 40px; height: 40px; border-radius: 6px; }
-.layout-table .cell-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.layout-table tr.is-best td { background: var(--accent-soft); }
+      html[data-skin="nova"] .list.layout-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 14px;
+      }
+      html[data-skin="nova"] .layout-grid .tile {
+        display: flex;
+        flex-direction: column;
+        background: var(--card);
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+      html[data-skin="nova"] .layout-grid .thumb {
+        width: 100%;
+        height: 150px;
+      }
+      html[data-skin="nova"] .layout-grid .tile-body {
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        flex: 1;
+      }
+      html[data-skin="nova"] .layout-grid .titlerow {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      html[data-skin="nova"] .layout-grid .title {
+        font-weight: 700;
+        font-size: 1.02rem;
+      }
+      html[data-skin="nova"] .layout-grid .subtitle {
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+      html[data-skin="nova"] .layout-grid .details {
+        display: grid;
+        gap: 6px;
+        margin-top: 4px;
+      }
+      html[data-skin="nova"] .layout-grid .detail {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        font-size: 0.85rem;
+      }
+      html[data-skin="nova"] .layout-grid .k {
+        color: var(--muted);
+      }
+      html[data-skin="nova"] .layout-grid .detail.full {
+        flex-direction: column;
+      }
+      html[data-skin="nova"] .layout-grid .action {
+        margin-top: auto;
+        padding-top: 10px;
+      }
 
-@media (max-width: 600px) {
-  .layout-cards .card, .layout-cards .card.no-image { grid-template-columns: 1fr; }
-  .layout-cards .thumb { width: 100%; height: 160px; }
-}
+      html[data-skin="nova"] .list.layout-table {
+        display: block;
+        overflow-x: auto;
+      }
+      html[data-skin="nova"] .layout-table .tbl {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        background: var(--card);
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        box-shadow: var(--shadow);
+      }
+      html[data-skin="nova"] .layout-table th,
+      html[data-skin="nova"] .layout-table td {
+        padding: 12px 14px;
+        text-align: left;
+        vertical-align: middle;
+        font-size: 0.9rem;
+      }
+      html[data-skin="nova"] .layout-table thead th {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        background: var(--chip);
+        white-space: nowrap;
+        font-weight: 700;
+      }
+      html[data-skin="nova"] .layout-table tbody tr + tr td {
+        border-top: 1px solid var(--line-soft);
+      }
+      html[data-skin="nova"] .layout-table td:first-child {
+        font-weight: 600;
+      }
+      html[data-skin="nova"] .layout-table .thumb {
+        width: 40px;
+        height: 40px;
+        border-radius: 6px;
+      }
+      html[data-skin="nova"] .layout-table .cell-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      html[data-skin="nova"] .layout-table tr.is-best td {
+        background: var(--accent-soft);
+      }
 
+      /* Modify affordances use skin accent */
+      html[data-skin="nova"] .mod-add-bar:hover,
+      html[data-skin="nova"] .mod-add-bar:focus-visible {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      @media (max-width: 600px) {
+        html[data-skin="nova"] .layout-cards .card,
+        html[data-skin="nova"] .layout-cards .card.no-image {
+          grid-template-columns: 1fr;
+        }
+        html[data-skin="nova"] .layout-cards .thumb {
+          width: 100%;
+          height: 160px;
+        }
+      }
     </style>
   </head>
   <body>
@@ -564,759 +835,6 @@ a.panel:hover {
       <div class="pill">Smart page</div>
     </header>
     <main class="wrap" id="page"></main>
-
-    <script>
-      (function () {
-        "use strict";
-
-        /**
-         * Prefer page config from the URL hash (Firefox chat puts validated
-         * JSON there via encodeURIComponent). Fall back to the embedded
-         * #page-config demo block when no hash is present.
-         */
-        function loadPageConfig() {
-          var hash = (location.hash || "").replace(/^#/, "");
-          if (hash) {
-            try {
-              return JSON.parse(decodeURIComponent(hash));
-            } catch (e) {
-              // Some hosts or copy/paste paths may leave the hash unescaped.
-              try {
-                return JSON.parse(hash);
-              } catch (e2) {
-                throw new Error(
-                  "Could not parse AITab JSON from the URL hash."
-                );
-              }
-            }
-          }
-          var el = document.getElementById("page-config");
-          if (!el) {
-            throw new Error("No page config found.");
-          }
-          return JSON.parse(el.textContent);
-        }
-
-        var root = document.getElementById("page");
-        var PAGE;
-        try {
-          PAGE = loadPageConfig();
-        } catch (err) {
-          root.innerHTML =
-            '<p style="padding:2rem;font:message-box;color:#5b5b66">' +
-            String(err.message || err) +
-            "</p>";
-          return;
-        }
-
-        if (PAGE.header && PAGE.header.title) {
-          document.title = PAGE.header.title;
-        }
-
-        // theme comes from the page config; light/dark follows the OS
-        document.documentElement.setAttribute(
-          "data-theme",
-          PAGE.theme || "firefox"
-        );
-        document.documentElement.setAttribute(
-          "data-mode",
-          window.matchMedia &&
-            window.matchMedia("(prefers-color-scheme: dark)").matches
-            ? "dark"
-            : "light"
-        );
-
-        /* ---- shared helpers ---------------------------------------------------- */
-        function esc(s) {
-          return String(s).replace(/[&<>"']/g, function (c) {
-            return {
-              "&": "&amp;",
-              "<": "&lt;",
-              ">": "&gt;",
-              '"': "&quot;",
-              "'": "&#39;",
-            }[c];
-          });
-        }
-        function byRole(schema, role) {
-          return schema.fields.filter(function (f) {
-            return (f.role || "detail") === role;
-          });
-        }
-        function firstByRole(schema, role) {
-          return byRole(schema, role)[0] || null;
-        }
-        function has(row, f) {
-          if (!f) return false;
-          var v = row[f.key];
-          if (v === undefined || v === null || v === "") return false;
-          if (Array.isArray(v) && !v.length) return false;
-          return true;
-        }
-        function formatValue(field, value) {
-          var pre = field.prefix || "",
-            suf = field.suffix || "";
-          switch (field.type) {
-            case "currency":
-              return (
-                pre +
-                Number(value).toLocaleString(undefined, {
-                  style: "currency",
-                  currency: field.currency || "USD",
-                  maximumFractionDigits: 0,
-                }) +
-                suf
-              );
-            case "number":
-              return pre + Number(value).toLocaleString() + suf;
-            case "date":
-              var d = new Date(value);
-              return isNaN(d)
-                ? esc(value)
-                : d.toLocaleDateString(undefined, {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                  });
-            case "boolean":
-              return value
-                ? '<span class="bool yes">✓ Yes</span>'
-                : '<span class="bool no">✕ No</span>';
-            case "rating":
-              var max = field.max || 5,
-                full = Math.round(Number(value)),
-                s = "";
-              for (var i = 0; i < max; i++) s += i < full ? "★" : "☆";
-              return (
-                '<span class="stars">' +
-                s +
-                '<span class="num">' +
-                esc(value) +
-                "/" +
-                max +
-                "</span></span>"
-              );
-            case "tags":
-              return (
-                '<span class="chips">' +
-                (value || [])
-                  .map(function (t) {
-                    return '<span class="chip">' + esc(t) + "</span>";
-                  })
-                  .join("") +
-                "</span>"
-              );
-            default:
-              return pre + esc(value) + suf;
-          }
-        }
-        function thumb(schema, row) {
-          var f = firstByRole(schema, "image");
-          return has(row, f)
-            ? '<img class="thumb" loading="lazy" alt="" src="' +
-                esc(row[f.key]) +
-                '" onerror="this.style.visibility=\'hidden\'" />'
-            : "";
-        }
-        function badge(schema, row) {
-          var f = firstByRole(schema, "badge");
-          return has(row, f)
-            ? '<span class="badge">' + esc(row[f.key]) + "</span>"
-            : "";
-        }
-        function action(schema, row) {
-          var f = firstByRole(schema, "action");
-          return has(row, f)
-            ? '<a class="btn secondary" target="_blank" rel="noopener" href="' +
-                esc(row[f.key]) +
-                '">' +
-                esc(f.label || "Open") +
-                " ↗</a>"
-            : "";
-        }
-
-        /* ---- list superpowers: aggregates, best-value, JSON-LD ----------------- */
-        var NUMERIC = { number: 1, currency: 1, rating: 1 };
-        var currentBest = null;
-        function bestClass(row) {
-          return row === currentBest ? " is-best" : "";
-        }
-        function ribbon(row) {
-          return row === currentBest
-            ? '<span class="ribbon">★ Best value</span>'
-            : "";
-        }
-        function formatNum(field, value) {
-          var n = Number(value);
-          if (field.type === "currency")
-            return n.toLocaleString(undefined, {
-              style: "currency",
-              currency: field.currency || "USD",
-              maximumFractionDigits: 0,
-            });
-          if (field.type === "rating") return n.toFixed(1);
-          var r = Math.abs(n) >= 100 ? Math.round(n) : Math.round(n * 10) / 10;
-          return r.toLocaleString() + (field.suffix || "");
-        }
-        function aggregate(field, rows) {
-          var vals = [];
-          rows.forEach(function (r) {
-            var v = Number(r[field.key]);
-            if (!isNaN(v)) vals.push(v);
-          });
-          if (!vals.length) return null;
-          var sum = vals.reduce(function (a, b) {
-            return a + b;
-          }, 0);
-          return {
-            min: Math.min.apply(null, vals),
-            max: Math.max.apply(null, vals),
-            avg: sum / vals.length,
-          };
-        }
-        function computeBest(schema, rows) {
-          var usable = schema.fields
-            .filter(function (f) {
-              return f.goal && NUMERIC[f.type];
-            })
-            .map(function (f) {
-              var a = aggregate(f, rows);
-              return a && a.max !== a.min ? { f: f, a: a } : null;
-            })
-            .filter(Boolean);
-          if (usable.length < 2 || rows.length < 2) return null;
-          var best = null,
-            top = -1;
-          rows.forEach(function (row) {
-            var s = 0,
-              n = 0;
-            usable.forEach(function (u) {
-              var v = Number(row[u.f.key]);
-              if (isNaN(v)) return;
-              var norm = (v - u.a.min) / (u.a.max - u.a.min);
-              if (u.f.goal === "min") norm = 1 - norm;
-              s += norm;
-              n++;
-            });
-            if (n) {
-              var sc = s / n;
-              if (sc > top) {
-                top = sc;
-                best = row;
-              }
-            }
-          });
-          return best;
-        }
-        function summaryHtml(schema, rows) {
-          var numFields = schema.fields.filter(function (f) {
-            return NUMERIC[f.type];
-          });
-          if (!numFields.length || !rows.length) return "";
-          var nameF = firstByRole(schema, "title") || schema.fields[0];
-          var tiles =
-            '<div class="stat"><div class="s-val">' +
-            rows.length +
-            '</div><div class="s-lab">' +
-            (rows.length === 1 ? "option" : "options") +
-            "</div></div>";
-          numFields.forEach(function (f) {
-            var a = aggregate(f, rows);
-            if (!a) return;
-            tiles +=
-              '<div class="stat"><div class="s-val">' +
-              formatNum(f, a.avg) +
-              '</div><div class="s-lab">avg ' +
-              esc(f.label) +
-              '</div><div class="s-sub">' +
-              formatNum(f, a.min) +
-              " – " +
-              formatNum(f, a.max) +
-              "</div></div>";
-          });
-          var chips = "";
-          if (currentBest)
-            chips +=
-              '<div class="callout best"><span class="c-kick">★ Best value</span><span class="c-name">' +
-              esc(currentBest[nameF.key]) +
-              "</span></div>";
-          schema.fields
-            .filter(function (f) {
-              return f.goal && NUMERIC[f.type];
-            })
-            .forEach(function (f) {
-              var winner = null,
-                wv = null;
-              rows.forEach(function (r) {
-                var v = Number(r[f.key]);
-                if (isNaN(v)) return;
-                if (wv === null || (f.goal === "min" ? v < wv : v > wv)) {
-                  wv = v;
-                  winner = r;
-                }
-              });
-              if (!winner) return;
-              chips +=
-                '<div class="callout"><span class="c-kick">' +
-                esc((f.goal === "min" ? "Lowest " : "Highest ") + f.label) +
-                '</span><span class="c-name">' +
-                esc(winner[nameF.key]) +
-                '</span><span class="c-val">' +
-                formatValue(f, winner[f.key]) +
-                "</span></div>";
-            });
-          return (
-            '<div class="stats">' +
-            tiles +
-            "</div>" +
-            (chips ? '<div class="callouts">' + chips + "</div>" : "")
-          );
-        }
-        var CONTAINER_TYPES = {
-          offers: "Offer",
-          aggregateRating: "AggregateRating",
-          address: "PostalAddress",
-          geo: "GeoCoordinates",
-        };
-        function setPath(o, p, val) {
-          var ps = p.split("."),
-            c = o;
-          for (var i = 0; i < ps.length - 1; i++) {
-            var k = ps[i];
-            if (!c[k]) {
-              c[k] = {};
-              if (CONTAINER_TYPES[k]) c[k]["@type"] = CONTAINER_TYPES[k];
-            }
-            c = c[k];
-          }
-          c[ps[ps.length - 1]] = val;
-        }
-        function buildJsonLd(block) {
-          var mapped = block.fields.filter(function (f) {
-            return f.property;
-          });
-          return {
-            "@context": "https://schema.org",
-            "@type": "ItemList",
-            name: block.title || "",
-            numberOfItems: block.data.length,
-            itemListElement: block.data.map(function (row, i) {
-              var item = { "@type": block.itemType || "Thing" };
-              mapped.forEach(function (f) {
-                var v = row[f.key];
-                if (v === undefined || v === null || v === "") return;
-                var val = NUMERIC[f.type] ? Number(v) : v;
-                setPath(item, f.property, val);
-                if (f.type === "currency" && /\.price$/.test(f.property))
-                  setPath(
-                    item,
-                    f.property.replace(/price$/, "priceCurrency"),
-                    f.currency || "USD"
-                  );
-              });
-              return { "@type": "ListItem", position: i + 1, item: item };
-            }),
-          };
-        }
-        function emitJsonLd() {
-          var old = document.querySelectorAll("script.aitab-ld");
-          for (var i = 0; i < old.length; i++)
-            old[i].parentNode.removeChild(old[i]);
-          (PAGE.blocks || [])
-            .filter(function (b) {
-              return b.type === "list" && b.itemType;
-            })
-            .forEach(function (b) {
-              var s = document.createElement("script");
-              s.type = "application/ld+json";
-              s.className = "aitab-ld";
-              s.textContent = JSON.stringify(buildJsonLd(b), null, 2);
-              document.head.appendChild(s);
-            });
-        }
-
-        /* ---- list layout sub-registry ------------------------------------------ */
-        var LAYOUTS = {
-          cards: function (schema, rows) {
-            var titleF = firstByRole(schema, "title"),
-              subF = firstByRole(schema, "subtitle"),
-              details = byRole(schema, "detail");
-            return rows
-              .map(function (row) {
-                var img = thumb(schema, row),
-                  a = action(schema, row);
-                var h =
-                  '<div class="card' +
-                  (img ? "" : " no-image") +
-                  bestClass(row) +
-                  '">' +
-                  img +
-                  '<div class="body">';
-                h += '<div class="titlerow">';
-                if (titleF)
-                  h += '<h2 class="title">' + esc(row[titleF.key]) + "</h2>";
-                h += badge(schema, row) + ribbon(row) + "</div>";
-                if (has(row, subF))
-                  h += '<p class="subtitle">' + esc(row[subF.key]) + "</p>";
-                if (details.length) {
-                  h += '<div class="details">';
-                  details.forEach(function (f) {
-                    if (!has(row, f)) return;
-                    var full =
-                      f.type === "tags" || f.type === "long" ? " full" : "";
-                    h +=
-                      '<div class="detail' +
-                      full +
-                      '"><div class="k">' +
-                      esc(f.label) +
-                      '</div><div class="v">' +
-                      formatValue(f, row[f.key]) +
-                      "</div></div>";
-                  });
-                  h += "</div>";
-                }
-                h += "</div>"; // body
-                if (a) h += '<div class="action">' + a + "</div>";
-                return h + "</div>";
-              })
-              .join("");
-          },
-          compact: function (schema, rows) {
-            var titleF = firstByRole(schema, "title"),
-              subF = firstByRole(schema, "subtitle");
-            var details = byRole(schema, "detail").filter(function (f) {
-              return f.type !== "long";
-            });
-            return rows
-              .map(function (row) {
-                var img = thumb(schema, row),
-                  a = action(schema, row);
-                var h =
-                  '<div class="row' +
-                  bestClass(row) +
-                  '">' +
-                  img +
-                  '<div class="row-main">';
-                if (titleF)
-                  h += '<div class="title">' + esc(row[titleF.key]) + "</div>";
-                h += has(row, subF)
-                  ? '<div class="subtitle">' + esc(row[subF.key]) + "</div>"
-                  : "";
-                h += "</div>" + badge(schema, row) + ribbon(row);
-                h += '<div class="row-meta">';
-                details.forEach(function (f) {
-                  if (has(row, f))
-                    h +=
-                      '<span class="m"><em>' +
-                      esc(f.label) +
-                      "</em>" +
-                      formatValue(f, row[f.key]) +
-                      "</span>";
-                });
-                h += "</div>";
-                if (a) h += '<div class="action">' + a + "</div>";
-                return h + "</div>";
-              })
-              .join("");
-          },
-          grid: function (schema, rows) {
-            var titleF = firstByRole(schema, "title"),
-              subF = firstByRole(schema, "subtitle"),
-              details = byRole(schema, "detail");
-            return rows
-              .map(function (row) {
-                var h =
-                  '<div class="tile' +
-                  bestClass(row) +
-                  '">' +
-                  thumb(schema, row) +
-                  '<div class="tile-body">';
-                h += '<div class="titlerow">';
-                if (titleF)
-                  h +=
-                    '<span class="title">' + esc(row[titleF.key]) + "</span>";
-                h += badge(schema, row) + ribbon(row) + "</div>";
-                if (has(row, subF))
-                  h += '<div class="subtitle">' + esc(row[subF.key]) + "</div>";
-                if (details.length) {
-                  h += '<div class="details">';
-                  details.forEach(function (f) {
-                    if (!has(row, f)) return;
-                    var full =
-                      f.type === "tags" || f.type === "long" ? " full" : "";
-                    h +=
-                      '<div class="detail' +
-                      full +
-                      '"><span class="k">' +
-                      esc(f.label) +
-                      '</span><span class="v">' +
-                      formatValue(f, row[f.key]) +
-                      "</span></div>";
-                  });
-                  h += "</div>";
-                }
-                var a = action(schema, row);
-                if (a) h += '<div class="action">' + a + "</div>";
-                return h + "</div></div>";
-              })
-              .join("");
-          },
-          table: function (schema, rows) {
-            var titleF = firstByRole(schema, "title"),
-              imageF = firstByRole(schema, "image"),
-              badgeF = firstByRole(schema, "badge"),
-              actionF = firstByRole(schema, "action");
-            var cols = byRole(schema, "detail");
-            var head =
-              "<tr><th>" +
-              esc(titleF ? titleF.label || "Name" : "Name") +
-              "</th>";
-            if (badgeF)
-              head += "<th>" + esc(badgeF.label || "Status") + "</th>";
-            cols.forEach(function (f) {
-              head += "<th>" + esc(f.label) + "</th>";
-            });
-            if (actionF) head += "<th></th>";
-            head += "</tr>";
-            var body = rows
-              .map(function (row) {
-                var img =
-                  imageF && has(row, imageF)
-                    ? '<img class="thumb" loading="lazy" alt="" src="' +
-                      esc(row[imageF.key]) +
-                      '" onerror="this.style.display=\'none\'" />'
-                    : "";
-                var cls = bestClass(row).trim();
-                var r = "<tr" + (cls ? ' class="' + cls + '"' : "") + ">";
-                r +=
-                  '<td><div class="cell-title">' +
-                  img +
-                  "<span>" +
-                  esc(titleF ? row[titleF.key] : "") +
-                  "</span>" +
-                  ribbon(row) +
-                  "</div></td>";
-                if (badgeF) r += "<td>" + badge(schema, row) + "</td>";
-                cols.forEach(function (f) {
-                  r +=
-                    "<td>" +
-                    (has(row, f) ? formatValue(f, row[f.key]) : "—") +
-                    "</td>";
-                });
-                if (actionF) r += "<td>" + action(schema, row) + "</td>";
-                return r + "</tr>";
-              })
-              .join("");
-            return (
-              '<table class="tbl"><thead>' +
-              head +
-              "</thead><tbody>" +
-              body +
-              "</tbody></table>"
-            );
-          },
-        };
-
-        /* ==========================================================================
-     BLOCK RENDERER REGISTRY — one entry per component `type`.
-     Each returns an HTML string. This mirrors schemas/ 1:1.
-     ========================================================================== */
-        var RENDERERS = {
-          header: function (b) {
-            return (
-              '<header class="page-header">' +
-              (b.icon ? '<div class="ph-icon">' + esc(b.icon) + "</div>" : "") +
-              "<div><h1>" +
-              esc(b.title) +
-              "</h1>" +
-              (b.subhead
-                ? '<p class="ph-sub">' + esc(b.subhead) + "</p>"
-                : "") +
-              "</div></header>"
-            );
-          },
-          info: function (b) {
-            var inner = "";
-            if (b.icon)
-              inner += '<div class="pi-icon">' + esc(b.icon) + "</div>";
-            if (b.heading)
-              inner += '<div class="pi-head">' + esc(b.heading) + "</div>";
-            if (b.value)
-              inner += '<div class="pi-val">' + esc(b.value) + "</div>";
-            if (b.body)
-              inner += '<div class="pi-body">' + esc(b.body) + "</div>";
-            var cls =
-              "panel panel-" +
-              (b.size === "wide" ? "wide" : "square") +
-              (b.accent ? " accent" : "");
-            return b.href
-              ? '<a class="' +
-                  cls +
-                  '" href="' +
-                  esc(b.href) +
-                  '">' +
-                  inner +
-                  "</a>"
-              : '<div class="' + cls + '">' + inner + "</div>";
-          },
-          list: function (b) {
-            var layout = LAYOUTS[b.layout] ? b.layout : "cards";
-            var rows = b.data || [];
-            currentBest = computeBest(b, rows);
-            var summary = summaryHtml(b, rows);
-            var listHtml = rows.length
-              ? LAYOUTS[layout](b, rows)
-              : '<div class="empty">No items.</div>';
-            currentBest = null;
-            return (
-              '<section class="block list-block">' +
-              (b.title
-                ? '<h2 class="block-title">' + esc(b.title) + "</h2>"
-                : "") +
-              (b.description
-                ? '<p class="block-desc">' + esc(b.description) + "</p>"
-                : "") +
-              (summary ? '<div class="summary">' + summary + "</div>" : "") +
-              '<div class="list layout-' +
-              layout +
-              '">' +
-              listHtml +
-              "</div></section>"
-            );
-          },
-          todo: function (b, index) {
-            var items = b.items || [];
-            var done = items.filter(function (t) {
-              return t.done;
-            }).length;
-            var prog =
-              b.showProgress !== false
-                ? '<p class="todo-prog">' +
-                  done +
-                  " of " +
-                  items.length +
-                  " done</p>"
-                : "";
-            var lis = items
-              .map(function (t, i) {
-                var meta = "";
-                if (t.priority)
-                  meta +=
-                    '<span class="pri ' +
-                    esc(t.priority) +
-                    '">' +
-                    esc(t.priority) +
-                    "</span>";
-                if (t.due) meta += "<span>Due " + esc(t.due) + "</span>";
-                if (t.note) meta += "<span>" + esc(t.note) + "</span>";
-                if (t.href)
-                  meta +=
-                    '<a href="' +
-                    esc(t.href) +
-                    '" target="_blank" rel="noopener">Open ↗</a>';
-                return (
-                  '<li class="todo-item' +
-                  (t.done ? " done" : "") +
-                  '" data-idx="' +
-                  i +
-                  '">' +
-                  '<label><input type="checkbox" class="todo-cb"' +
-                  (t.done ? " checked" : "") +
-                  "/>" +
-                  '<span class="tx">' +
-                  esc(t.text) +
-                  "</span></label>" +
-                  (meta ? '<div class="todo-meta">' + meta + "</div>" : "") +
-                  "</li>"
-                );
-              })
-              .join("");
-            return (
-              '<section class="block todo" data-block="' +
-              index +
-              '">' +
-              (b.title
-                ? '<h2 class="block-title">' + esc(b.title) + "</h2>"
-                : "") +
-              prog +
-              '<ul class="todo-list">' +
-              lis +
-              "</ul></section>"
-            );
-          },
-          footer: function (b) {
-            var btns = (b.buttons || [])
-              .map(function (btn) {
-                return (
-                  '<a class="btn ' +
-                  (btn.variant === "primary" ? "primary" : "secondary") +
-                  '" href="' +
-                  esc(btn.href) +
-                  '">' +
-                  esc(btn.text) +
-                  "</a>"
-                );
-              })
-              .join("");
-            return (
-              '<footer class="page-footer">' +
-              (b.text ? '<div class="pf-text">' + esc(b.text) + "</div>" : "") +
-              '<div class="pf-buttons">' +
-              btns +
-              "</div></footer>"
-            );
-          },
-        };
-
-        /* ---- compose ----------------------------------------------------------- */
-        function renderBody(blocks) {
-          var out = "",
-            i = 0;
-          while (i < blocks.length) {
-            var b = blocks[i];
-            if (b.type === "info") {
-              // group consecutive info panels so they tile
-              var group = [];
-              while (i < blocks.length && blocks[i].type === "info") {
-                group.push(blocks[i]);
-                i++;
-              }
-              out +=
-                '<div class="panels">' +
-                group.map(RENDERERS.info).join("") +
-                "</div>";
-            } else {
-              out += RENDERERS[b.type] ? RENDERERS[b.type](b, i) : "";
-              i++;
-            }
-          }
-          return out;
-        }
-        function build() {
-          var html = "";
-          if (PAGE.header) html += RENDERERS.header(PAGE.header);
-          html += renderBody(PAGE.blocks || []);
-          if (PAGE.footer) html += RENDERERS.footer(PAGE.footer);
-          root.innerHTML = html;
-          emitJsonLd();
-        }
-
-        // interactive: toggling a todo checkbox updates state and rebuilds
-        root.addEventListener("change", function (e) {
-          if (!e.target.classList || !e.target.classList.contains("todo-cb"))
-            return;
-          var li = e.target.closest("[data-idx]"),
-            sec = e.target.closest("[data-block]");
-          if (!li || !sec) return;
-          var block = PAGE.blocks[+sec.getAttribute("data-block")];
-          if (block && block.items) {
-            block.items[+li.getAttribute("data-idx")].done = e.target.checked;
-            build();
-          }
-        });
-
-        build();
-      })();
-    </script>
+    <script src="aitab-viewer.js"></script>
   </body>
 </html>

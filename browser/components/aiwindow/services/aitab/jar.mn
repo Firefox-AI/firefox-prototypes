@@ -2,5 +2,10 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+# External viewer SPA lives next to this dir (not packaged):
+#   aitab-viewer.html (+ skins), aitab-viewer.js, aitab-viewer.css
+# Host that bundle and set browser.smartwindow.aitab.viewerURL.
+# Only the component schema ships in the browser build for validation
+# (overridable via browser.smartwindow.aitab.components).
 browser.jar:
   content/browser/aiwindow/aitab/component_schema.json       (component_schema.json)

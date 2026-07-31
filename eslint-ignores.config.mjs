@@ -292,11 +292,6 @@ export default [
   // Uses special template formatting.
   "tools/tryselect/selectors/chooser/templates/chooser.html",
 
-  // Self-contained AITab external viewers with an inline renderer that uses
-  // patterns (e.g. computed-member removeChild) the mozilla ESLint rules
-  // cannot statically analyze.
-  "browser/components/aiwindow/services/aitab/**/*.html",
-
   // Ignore preprocessed *(P)refs.js files in update-packaging.
   "tools/update-packaging/**/*refs.js",
 
