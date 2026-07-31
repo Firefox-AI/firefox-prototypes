@@ -924,6 +924,75 @@
      BLOCK RENDERER REGISTRY — one entry per component `type`.
      Each returns an HTML string. This mirrors schemas/ 1:1.
      ========================================================================== */
+  function sourceChipsHtml(sources) {
+    if (!Array.isArray(sources) || !sources.length) {
+      return "";
+    }
+    var chips = sources
+      .map(function (s) {
+        if (!s || !s.label) {
+          return "";
+        }
+        var label = esc(s.label);
+        if (s.url) {
+          return (
+            '<a class="src-chip" href="' +
+            esc(s.url) +
+            '" target="_blank" rel="noopener">' +
+            label +
+            "</a>"
+          );
+        }
+        return '<span class="src-chip">' + label + "</span>";
+      })
+      .filter(Boolean)
+      .join("");
+    return chips ? '<div class="src-chips">' + chips + "</div>" : "";
+  }
+
+  function contrastSideHtml(side) {
+    if (!side) {
+      return "";
+    }
+    var variant = side.variant === "accent" ? "accent" : "soft";
+    var body = "";
+    if (Array.isArray(side.sections) && side.sections.length) {
+      body = side.sections
+        .map(function (sec) {
+          return (
+            '<div class="contrast-section">' +
+            (sec.heading
+              ? '<h4 class="contrast-sec-head">' + esc(sec.heading) + "</h4>"
+              : "") +
+            (sec.body
+              ? '<p class="contrast-sec-body">' + esc(sec.body) + "</p>"
+              : "") +
+            "</div>"
+          );
+        })
+        .join("");
+    } else if (Array.isArray(side.items) && side.items.length) {
+      body =
+        '<ul class="contrast-bullets">' +
+        side.items
+          .map(function (item) {
+            return "<li>" + esc(item) + "</li>";
+          })
+          .join("") +
+        "</ul>";
+    }
+    return (
+      '<div class="contrast-card contrast-' +
+      variant +
+      '">' +
+      '<h3 class="contrast-card-title">' +
+      esc(side.title || "") +
+      "</h3>" +
+      body +
+      "</div>"
+    );
+  }
+
   var RENDERERS = {
     header(b) {
       return (
@@ -957,6 +1026,51 @@
       return b.href
         ? '<a class="' + cls + '" href="' + esc(b.href) + '">' + inner + "</a>"
         : '<div class="' + cls + '">' + inner + "</div>";
+    },
+    takeaways(b) {
+      var items = b.items || [];
+      var rows = items
+        .map(function (item, i) {
+          var num = String(i + 1).padStart(2, "0");
+          return (
+            '<article class="takeaway-item">' +
+            '<div class="takeaway-index">' +
+            esc(num) +
+            "</div>" +
+            '<div class="takeaway-main">' +
+            '<h3 class="takeaway-heading">' +
+            esc(item.heading || "") +
+            "</h3>" +
+            "</div>" +
+            '<div class="takeaway-detail">' +
+            (item.body
+              ? '<p class="takeaway-body">' + esc(item.body) + "</p>"
+              : "") +
+            sourceChipsHtml(item.sources) +
+            "</div>" +
+            "</article>"
+          );
+        })
+        .join("");
+      return (
+        '<section class="block takeaways">' +
+        (b.title
+          ? '<h2 class="block-title takeaways-title">' + esc(b.title) + "</h2>"
+          : '<h2 class="block-title takeaways-title">Key Takeaways</h2>') +
+        '<div class="takeaway-list">' +
+        rows +
+        "</div></section>"
+      );
+    },
+    contrast(b) {
+      return (
+        '<section class="block contrast">' +
+        (b.title ? '<h2 class="block-title">' + esc(b.title) + "</h2>" : "") +
+        '<div class="contrast-pair">' +
+        contrastSideHtml(b.left) +
+        contrastSideHtml(b.right) +
+        "</div></section>"
+      );
     },
     list(b, index) {
       var layout = LAYOUTS[b.layout] ? b.layout : "cards";

@@ -3,7 +3,7 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "page",
     "title": "Generated page",
-    "description": "A composed page: optional header, ordered body blocks (list / todo / info / takeaways / contrast), optional footer. Footer may include reshape chips via app://aitab/reshape?edit=… Each block self-identifies via its `type`.",
+    "description": "A composed page: optional header, ordered body blocks (list / todo / info / takeaways / contrast), optional footer. Each block self-identifies via its `type`.",
     "type": "object",
     "required": [
       "blocks"
@@ -39,6 +39,12 @@
             },
             {
               "$ref": "info"
+            },
+            {
+              "$ref": "takeaways"
+            },
+            {
+              "$ref": "contrast"
             }
           ]
         }
@@ -652,6 +658,235 @@
             "priority": "low"
           }
         ]
+      }
+    ]
+  },
+  {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "takeaways",
+    "title": "Key takeaways block",
+    "description": "Numbered research insights synthesized across sources. Each item has a short heading, supporting body, and optional source chips linking back to the tabs/pages that ground the claim.",
+    "type": "object",
+    "required": [
+      "type",
+      "items"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "type": {
+        "const": "takeaways",
+        "description": "Block discriminator."
+      },
+      "title": {
+        "type": "string",
+        "description": "Section heading, e.g. \"Key Takeaways\".",
+        "default": "Key Takeaways"
+      },
+      "items": {
+        "type": "array",
+        "description": "Ordered takeaways (typically 2–5).",
+        "minItems": 1,
+        "maxItems": 8,
+        "items": {
+          "$ref": "#/$defs/takeaway"
+        }
+      }
+    },
+    "$defs": {
+      "source": {
+        "type": "object",
+        "required": [
+          "label"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "Short chip label, e.g. \"energy.gov\" or site name.",
+            "minLength": 1
+          },
+          "url": {
+            "type": "string",
+            "format": "uri-reference",
+            "description": "Optional link back to the source page or open tab."
+          }
+        }
+      },
+      "takeaway": {
+        "type": "object",
+        "required": [
+          "heading",
+          "body"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "heading": {
+            "type": "string",
+            "description": "Punchy insight title.",
+            "minLength": 1
+          },
+          "body": {
+            "type": "string",
+            "description": "One or two sentences of supporting detail."
+          },
+          "sources": {
+            "type": "array",
+            "description": "Sources that ground this takeaway.",
+            "items": {
+              "$ref": "#/$defs/source"
+            }
+          }
+        }
+      }
+    },
+    "examples": [
+      {
+        "type": "takeaways",
+        "title": "Key Takeaways",
+        "items": [
+          {
+            "heading": "Cold is no longer the blocker",
+            "body": "Modern variable-speed units hold rated output down to about 5°F.",
+            "sources": [
+              {
+                "label": "energy.gov",
+                "url": "https://www.energy.gov"
+              },
+              {
+                "label": "NEEP",
+                "url": "https://neep.org"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "contrast",
+    "title": "Contrast / agreement block",
+    "description": "A paired two-column layout for research synthesis: e.g. Broad agreement vs Still disputed. Left and right each have a title and either simple bullet items or titled sections.",
+    "type": "object",
+    "required": [
+      "type",
+      "left",
+      "right"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "type": {
+        "const": "contrast",
+        "description": "Block discriminator."
+      },
+      "title": {
+        "type": "string",
+        "description": "Optional section heading above the pair."
+      },
+      "left": {
+        "$ref": "#/$defs/side"
+      },
+      "right": {
+        "$ref": "#/$defs/side"
+      }
+    },
+    "$defs": {
+      "section": {
+        "type": "object",
+        "required": [
+          "heading",
+          "body"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "heading": {
+            "type": "string",
+            "description": "Subheading within the card.",
+            "minLength": 1
+          },
+          "body": {
+            "type": "string",
+            "description": "Supporting detail."
+          }
+        }
+      },
+      "side": {
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false,
+        "anyOf": [
+          {
+            "required": [
+              "items"
+            ]
+          },
+          {
+            "required": [
+              "sections"
+            ]
+          }
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Card title, e.g. \"Broad agreement\".",
+            "minLength": 1
+          },
+          "variant": {
+            "description": "Visual weight. `soft` = light card; `accent` = filled/emphasized card.",
+            "enum": [
+              "soft",
+              "accent"
+            ],
+            "default": "soft"
+          },
+          "items": {
+            "type": "array",
+            "description": "Simple bullet strings (use for agreement-style lists).",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "sections": {
+            "type": "array",
+            "description": "Titled subsections (use for disputed topics).",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/$defs/section"
+            }
+          }
+        }
+      }
+    },
+    "examples": [
+      {
+        "type": "contrast",
+        "left": {
+          "title": "Broad agreement",
+          "variant": "soft",
+          "items": [
+            "Sizing by a Manual J load calculation, not by the old furnace's rating.",
+            "Installer quality matters more than brand."
+          ]
+        },
+        "right": {
+          "title": "Still disputed",
+          "variant": "accent",
+          "sections": [
+            {
+              "heading": "Running cost vs gas.",
+              "body": "Two sources call it a wash at current gas prices; three project 20–30% savings."
+            },
+            {
+              "heading": "Ductless vs ducted.",
+              "body": "Comfort reviews favor mini-splits; retrofit guides prefer keeping the ducts."
+            }
+          ]
+        }
       }
     ]
   }

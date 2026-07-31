@@ -335,7 +335,7 @@ Rules:
 - Keep the same job and preserve source URLs/hrefs from the current config whenever they still apply.
 - Do not invent new facts, prices, ratings, or URLs. Prefer omitting over guessing.
 - Keep todo done flags only when still accurate after the edit.
-- Prefer the same block mix (list / todo / info / footer) unless the edit requires a structural change.
+- Prefer the same block mix (list / todo / info / takeaways / contrast / footer) unless the edit requires a structural change.
 - Refresh footer buttons: keep useful act links; replace reshape chips (app://aitab/reshape?edit=…) with options still relevant after the edit (omit already-true edits).
 
 SCHEMAS:
@@ -601,8 +601,9 @@ async function extractOpenTabText(tab, url) {
  */
 export function companionFocusForSources({ groupLabel, sourceCount }) {
   const parts = [
-    "Companion plan from the user's open tabs: condensed, revisit-worthy next steps.",
-    "Prefer todo (actionable steps) plus list when comparing options; ground hrefs in source URLs.",
+    "Companion page from the user's open tabs: condensed, revisit-worthy synthesis.",
+    "If tabs are research/articles: use takeaways (key insights + source chips) and contrast (agreement vs dispute).",
+    "If tabs are products/options: use list + todo; ground hrefs in source URLs.",
     "Include footer act link(s) and 2–4 reshape chips (app://aitab/reshape?edit=…).",
   ];
   if (groupLabel) {
