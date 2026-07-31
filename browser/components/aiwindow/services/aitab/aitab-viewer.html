@@ -23,12 +23,10 @@
   This script reads location.hash first; with no hash it falls back to the
   embedded #page-config demo below. The hash is never sent to the server.
 
-  Reshape chips fire a content CustomEvent the browser listens for via the
-  AITabReshape JSWindowActor (any http(s) page when aitab.enabled):
-    window.dispatchEvent(new CustomEvent("AITab:Reshape", {
-      bubbles: true, composed: true,
-      detail: { edit: "Make vegetarian", label: "Make vegetarian" },
-    }));
+  Reshape is exposed as footer buttons with:
+    "href": "app://aitab/reshape?edit=" + encodeURIComponent(instruction)
+  Clicks fire AITab:Reshape (AITabReshape JSWindowActor → sidebar refine_aitab).
+  Outbound footer links (https) navigate normally.
   ============================================================================
 -->
     <script type="application/json" id="page-config">
@@ -174,8 +172,21 @@
               "href": "https://www.booking.com",
               "variant": "primary"
             },
-            { "text": "Plan the trip", "href": "app://views/trip" },
-            { "text": "Refine filters", "href": "app://views/refine" }
+            {
+              "text": "Fewer options",
+              "href": "app://aitab/reshape?edit=Fewer%20options",
+              "variant": "secondary"
+            },
+            {
+              "text": "Prioritize price",
+              "href": "app://aitab/reshape?edit=Prioritize%20price",
+              "variant": "secondary"
+            },
+            {
+              "text": "More detail",
+              "href": "app://aitab/reshape?edit=More%20detail",
+              "variant": "secondary"
+            }
           ]
         }
       }
@@ -440,48 +451,23 @@
         font-weight: 600;
       }
 
-      /* ---- reshape (fires AITab:Reshape → browser sidebar) ---- */
-      .reshape-bar {
-        margin-top: 28px;
-        padding-top: 18px;
-        border-top: 1px solid var(--line);
-      }
-      .reshape-label {
-        font-size: 0.72rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: var(--muted);
-        margin-bottom: 10px;
-      }
-      .reshape-chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-      .reshape-chip {
-        appearance: none;
-        border: 1px solid var(--line);
-        background: var(--surface);
-        color: var(--text);
-        font: inherit;
-        font-size: 0.85rem;
-        font-weight: 550;
-        padding: 8px 14px;
-        border-radius: 999px;
-        cursor: pointer;
-      }
-      .reshape-chip:hover {
-        border-color: var(--accent);
-        color: var(--accent);
-        background: var(--accent-soft);
-      }
-
       /* ---- footer ---- */
       .page-footer {
         border-top: 1px solid var(--line);
         margin-top: 36px;
         padding-top: 22px;
+      }
+      /* reshape buttons reuse .btn; look like secondary chips */
+      .btn.reshape {
+        cursor: pointer;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--text);
+      }
+      .btn.reshape:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: var(--accent-soft);
       }
       .pf-text {
         color: var(--muted);
@@ -935,6 +921,31 @@
 
         var root = document.getElementById("page");
         var PAGE;
+
+        /**
+         * Apply document chrome that depends on PAGE (title, theme).
+         * Called on first load and after hashchange (reshape reload).
+         */
+        function applyPageChrome() {
+          if (PAGE.header && PAGE.header.title) {
+            document.title = PAGE.header.title;
+          } else {
+            document.title = "AITab";
+          }
+          // theme comes from the page config; light/dark follows the OS
+          document.documentElement.setAttribute(
+            "data-theme",
+            PAGE.theme || "firefox"
+          );
+          document.documentElement.setAttribute(
+            "data-mode",
+            window.matchMedia &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light"
+          );
+        }
+
         try {
           PAGE = loadPageConfig();
         } catch (err) {
@@ -944,23 +955,7 @@
             "</p>";
           return;
         }
-
-        if (PAGE.header && PAGE.header.title) {
-          document.title = PAGE.header.title;
-        }
-
-        // theme comes from the page config; light/dark follows the OS
-        document.documentElement.setAttribute(
-          "data-theme",
-          PAGE.theme || "firefox"
-        );
-        document.documentElement.setAttribute(
-          "data-mode",
-          window.matchMedia &&
-            window.matchMedia("(prefers-color-scheme: dark)").matches
-            ? "dark"
-            : "light"
-        );
+        applyPageChrome();
 
         /* ---- shared helpers ---------------------------------------------------- */
         function esc(s) {
@@ -1581,11 +1576,28 @@
             );
           },
           footer: function (b) {
-            var btns = (b.buttons || [])
+            var list = footerButtonsWithReshapeFallback(b.buttons || []);
+            var btns = list
               .map(function (btn) {
+                var edit = parseReshapeHref(btn.href);
+                var variant =
+                  btn.variant === "primary" ? "primary" : "secondary";
+                if (edit) {
+                  return (
+                    '<button type="button" class="btn ' +
+                    variant +
+                    ' reshape" data-aitab-reshape data-edit="' +
+                    esc(edit) +
+                    '" data-label="' +
+                    esc(btn.text) +
+                    '">' +
+                    esc(btn.text) +
+                    "</button>"
+                  );
+                }
                 return (
                   '<a class="btn ' +
-                  (btn.variant === "primary" ? "primary" : "secondary") +
+                  variant +
                   '" href="' +
                   esc(btn.href) +
                   '">' +
@@ -1628,42 +1640,71 @@
           }
           return out;
         }
-        /** Default reshape chips when page.reshape is absent (spike). */
-        function defaultReshapeChips() {
+
+        /**
+         * Parse app://aitab/reshape?edit=… (or app://reshape?edit=…).
+         * @returns {string|null} decoded edit instruction
+         */
+        function parseReshapeHref(href) {
+          if (!href || typeof href !== "string") return null;
+          var h = href.trim();
+          var prefix = "app://aitab/reshape";
+          var alt = "app://reshape";
+          if (h.indexOf(prefix) !== 0 && h.indexOf(alt) !== 0) return null;
+          var q = h.indexOf("?");
+          if (q < 0) return null;
+          var query = h.slice(q + 1);
+          var parts = query.split("&");
+          for (var i = 0; i < parts.length; i++) {
+            var kv = parts[i].split("=");
+            if (decodeURIComponent(kv[0] || "") === "edit") {
+              try {
+                return decodeURIComponent(
+                  (kv.slice(1).join("=") || "").replace(/\+/g, " ")
+                ).trim();
+              } catch (e) {
+                return (kv.slice(1).join("=") || "").trim();
+              }
+            }
+          }
+          return null;
+        }
+
+        function defaultReshapeFooterButtons() {
           return [
-            { label: "Fewer options", edit: "Fewer options" },
-            { label: "Prioritize price", edit: "Prioritize price" },
-            { label: "More detail", edit: "More detail" },
+            {
+              text: "Fewer options",
+              href:
+                "app://aitab/reshape?edit=" +
+                encodeURIComponent("Fewer options"),
+              variant: "secondary",
+            },
+            {
+              text: "Prioritize price",
+              href:
+                "app://aitab/reshape?edit=" +
+                encodeURIComponent("Prioritize price"),
+              variant: "secondary",
+            },
+            {
+              text: "More detail",
+              href:
+                "app://aitab/reshape?edit=" + encodeURIComponent("More detail"),
+              variant: "secondary",
+            },
           ];
         }
 
-        function renderReshapeBar() {
-          var chips =
-            Array.isArray(PAGE.reshape) && PAGE.reshape.length
-              ? PAGE.reshape
-              : defaultReshapeChips();
-          var buttons = chips
-            .map(function (c) {
-              var label = c.label || c.edit || c.id || "Reshape";
-              var edit = c.edit || c.label || label;
-              return (
-                '<button type="button" class="reshape-chip" data-aitab-reshape data-edit="' +
-                esc(edit) +
-                '" data-label="' +
-                esc(label) +
-                '">' +
-                esc(label) +
-                "</button>"
-              );
-            })
-            .join("");
-          return (
-            '<section class="reshape-bar" aria-label="Reshape">' +
-            '<div class="reshape-label">Reshape</div>' +
-            '<div class="reshape-chips">' +
-            buttons +
-            "</div></section>"
-          );
+        /** If the model omitted reshape chips, append defaults (render only). */
+        function footerButtonsWithReshapeFallback(buttons) {
+          var list = Array.isArray(buttons) ? buttons.slice() : [];
+          var hasReshape = list.some(function (b) {
+            return !!parseReshapeHref(b && b.href);
+          });
+          if (!hasReshape) {
+            list = list.concat(defaultReshapeFooterButtons());
+          }
+          return list;
         }
 
         /**
@@ -1680,7 +1721,7 @@
               detail: {
                 edit: text,
                 label: (label || text).trim(),
-                source: "reshape-chip",
+                source: "footer",
               },
             })
           );
@@ -1690,8 +1731,13 @@
           var html = "";
           if (PAGE.header) html += RENDERERS.header(PAGE.header);
           html += renderBody(PAGE.blocks || []);
-          html += renderReshapeBar();
-          if (PAGE.footer) html += RENDERERS.footer(PAGE.footer);
+          // Always show a footer so reshape buttons have a home.
+          var footer = PAGE.footer || {
+            type: "footer",
+            text: "Next steps",
+            buttons: [],
+          };
+          html += RENDERERS.footer(footer);
           root.innerHTML = html;
           emitJsonLd();
         }
@@ -1721,6 +1767,27 @@
             chip.getAttribute("data-label")
           );
         });
+
+        /**
+         * refine_aitab navigates the same tab to a new viewer URL whose only
+         * change is often the hash. That is a same-document navigation, so
+         * scripts do not re-run — listen for hashchange and re-render.
+         */
+        function reloadFromLocation() {
+          try {
+            PAGE = loadPageConfig();
+          } catch (err) {
+            root.innerHTML =
+              '<p style="padding:2rem;font:message-box;color:#5b5b66">' +
+              String(err.message || err) +
+              "</p>";
+            return;
+          }
+          applyPageChrome();
+          build();
+        }
+
+        window.addEventListener("hashchange", reloadFromLocation);
 
         build();
       })();

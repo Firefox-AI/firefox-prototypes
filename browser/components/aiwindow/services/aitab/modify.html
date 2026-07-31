@@ -13,12 +13,11 @@
     · list rows (table / cards / compact / grid)
     · todo checklist items
     · info stat panels
-    · footer next-step buttons (max 3 per schema)
+    · footer next-step + reshape buttons (app://aitab/reshape?edit=…)
   Host this file and set:
     browser.smartwindow.aitab.viewerURL = https://your.host/path/modify.html
 
-  Reshape chips fire AITab:Reshape (AITabReshape JSWindowActor → sidebar):
-    detail: { edit, label, source: "reshape-chip" }
+  Reshape is footer buttons with href app://aitab/reshape?edit=… → AITab:Reshape.
   ============================================================================
 -->
     <script type="application/json" id="page-config">
@@ -430,48 +429,22 @@
         font-weight: 600;
       }
 
-      /* ---- reshape (fires AITab:Reshape → browser sidebar) ---- */
-      .reshape-bar {
-        margin-top: 28px;
-        padding-top: 18px;
-        border-top: 1px solid var(--line);
-      }
-      .reshape-label {
-        font-size: 0.72rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: var(--muted);
-        margin-bottom: 10px;
-      }
-      .reshape-chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-      .reshape-chip {
-        appearance: none;
-        border: 1px solid var(--line);
-        background: var(--surface);
-        color: var(--text);
-        font: inherit;
-        font-size: 0.85rem;
-        font-weight: 550;
-        padding: 8px 14px;
-        border-radius: 999px;
-        cursor: pointer;
-      }
-      .reshape-chip:hover {
-        border-color: var(--accent);
-        color: var(--accent);
-        background: var(--accent-soft);
-      }
-
       /* ---- footer ---- */
       .page-footer {
         border-top: 1px solid var(--line);
         margin-top: 36px;
         padding-top: 22px;
+      }
+      .btn.reshape {
+        cursor: pointer;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--text);
+      }
+      .btn.reshape:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: var(--accent-soft);
       }
       .pf-text {
         color: var(--muted);
@@ -1056,6 +1029,26 @@
 
         var root = document.getElementById("page");
         var PAGE;
+
+        function applyPageChrome() {
+          if (PAGE.header && PAGE.header.title) {
+            document.title = PAGE.header.title;
+          } else {
+            document.title = "AITab";
+          }
+          document.documentElement.setAttribute(
+            "data-theme",
+            PAGE.theme || "firefox"
+          );
+          document.documentElement.setAttribute(
+            "data-mode",
+            window.matchMedia &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light"
+          );
+        }
+
         try {
           PAGE = loadPageConfig();
         } catch (err) {
@@ -1065,23 +1058,7 @@
             "</p>";
           return;
         }
-
-        if (PAGE.header && PAGE.header.title) {
-          document.title = PAGE.header.title;
-        }
-
-        // theme comes from the page config; light/dark follows the OS
-        document.documentElement.setAttribute(
-          "data-theme",
-          PAGE.theme || "firefox"
-        );
-        document.documentElement.setAttribute(
-          "data-mode",
-          window.matchMedia &&
-            window.matchMedia("(prefers-color-scheme: dark)").matches
-            ? "dark"
-            : "light"
-        );
+        applyPageChrome();
 
         /* ---- shared helpers ---------------------------------------------------- */
         function esc(s) {
@@ -1775,29 +1752,40 @@
             );
           },
           footer: function (b) {
-            var buttons = b.buttons || [];
+            var buttons = footerButtonsWithReshapeFallback(b.buttons || []);
             var label = "action";
             var btns = buttons
               .map(function (btn, i) {
+                var edit = parseReshapeHref(btn.href);
+                var variant =
+                  btn.variant === "primary" ? "primary" : "secondary";
+                var control = edit
+                  ? '<button type="button" class="btn ' +
+                    variant +
+                    ' reshape" data-aitab-reshape data-edit="' +
+                    esc(edit) +
+                    '" data-label="' +
+                    esc(btn.text) +
+                    '">' +
+                    esc(btn.text) +
+                    "</button>"
+                  : '<a class="btn ' +
+                    variant +
+                    '" href="' +
+                    esc(btn.href) +
+                    '">' +
+                    esc(btn.text) +
+                    "</a>";
                 return (
                   '<span class="pf-btn-wrap"' +
                   rowAttrs(i) +
                   ">" +
-                  '<a class="btn ' +
-                  (btn.variant === "primary" ? "primary" : "secondary") +
-                  '" href="' +
-                  esc(btn.href) +
-                  '">' +
-                  esc(btn.text) +
-                  "</a>" +
+                  control +
                   removeBtn(label) +
                   "</span>"
                 );
               })
               .join("");
-            // Schema allows up to 3 next-step buttons.
-            var atMax = buttons.length >= 3;
-            var add = atMax ? "" : addBar(label);
             return (
               '<footer class="page-footer">' +
               (b.text ? '<div class="pf-text">' + esc(b.text) + "</div>" : "") +
@@ -1807,7 +1795,7 @@
               '<div class="pf-buttons">' +
               btns +
               "</div>" +
-              add +
+              addBar(label) +
               "</div></footer>"
             );
           },
@@ -1868,41 +1856,67 @@
           }
           return out;
         }
-        function defaultReshapeChips() {
+        function parseReshapeHref(href) {
+          if (!href || typeof href !== "string") return null;
+          var h = href.trim();
+          if (
+            h.indexOf("app://aitab/reshape") !== 0 &&
+            h.indexOf("app://reshape") !== 0
+          ) {
+            return null;
+          }
+          var q = h.indexOf("?");
+          if (q < 0) return null;
+          var parts = h.slice(q + 1).split("&");
+          for (var i = 0; i < parts.length; i++) {
+            var kv = parts[i].split("=");
+            if (decodeURIComponent(kv[0] || "") === "edit") {
+              try {
+                return decodeURIComponent(
+                  (kv.slice(1).join("=") || "").replace(/\+/g, " ")
+                ).trim();
+              } catch (e) {
+                return (kv.slice(1).join("=") || "").trim();
+              }
+            }
+          }
+          return null;
+        }
+
+        function defaultReshapeFooterButtons() {
           return [
-            { label: "Fewer options", edit: "Fewer options" },
-            { label: "Prioritize price", edit: "Prioritize price" },
-            { label: "More detail", edit: "More detail" },
+            {
+              text: "Fewer options",
+              href:
+                "app://aitab/reshape?edit=" +
+                encodeURIComponent("Fewer options"),
+              variant: "secondary",
+            },
+            {
+              text: "Prioritize price",
+              href:
+                "app://aitab/reshape?edit=" +
+                encodeURIComponent("Prioritize price"),
+              variant: "secondary",
+            },
+            {
+              text: "More detail",
+              href:
+                "app://aitab/reshape?edit=" + encodeURIComponent("More detail"),
+              variant: "secondary",
+            },
           ];
         }
 
-        function renderReshapeBar() {
-          var chips =
-            Array.isArray(PAGE.reshape) && PAGE.reshape.length
-              ? PAGE.reshape
-              : defaultReshapeChips();
-          var buttons = chips
-            .map(function (c) {
-              var label = c.label || c.edit || c.id || "Reshape";
-              var edit = c.edit || c.label || label;
-              return (
-                '<button type="button" class="reshape-chip" data-aitab-reshape data-edit="' +
-                esc(edit) +
-                '" data-label="' +
-                esc(label) +
-                '">' +
-                esc(label) +
-                "</button>"
-              );
-            })
-            .join("");
-          return (
-            '<section class="reshape-bar" aria-label="Reshape">' +
-            '<div class="reshape-label">Reshape</div>' +
-            '<div class="reshape-chips">' +
-            buttons +
-            "</div></section>"
-          );
+        function footerButtonsWithReshapeFallback(buttons) {
+          var list = Array.isArray(buttons) ? buttons.slice() : [];
+          var hasReshape = list.some(function (b) {
+            return !!parseReshapeHref(b && b.href);
+          });
+          if (!hasReshape) {
+            list = list.concat(defaultReshapeFooterButtons());
+          }
+          return list;
         }
 
         function requestReshape(edit, label) {
@@ -1915,7 +1929,7 @@
               detail: {
                 edit: text,
                 label: (label || text).trim(),
-                source: "reshape-chip",
+                source: "footer",
               },
             })
           );
@@ -1925,8 +1939,12 @@
           var html = "";
           if (PAGE.header) html += RENDERERS.header(PAGE.header);
           html += renderBody(PAGE.blocks || []);
-          html += renderReshapeBar();
-          if (PAGE.footer) html += RENDERERS.footer(PAGE.footer);
+          var footer = PAGE.footer || {
+            type: "footer",
+            text: "Next steps",
+            buttons: [],
+          };
+          html += RENDERERS.footer(footer);
           root.innerHTML = html;
           emitJsonLd();
         }
@@ -2018,7 +2036,6 @@
             }
             if (!PAGE.footer.buttons) PAGE.footer.buttons = [];
             if (action === "add") {
-              if (PAGE.footer.buttons.length >= 3) return;
               PAGE.footer.buttons.push({
                 text: "New action",
                 href: "https://",
@@ -2074,6 +2091,23 @@
             build();
           }
         });
+
+        /** Same-document hash update after refine_aitab → re-render. */
+        function reloadFromLocation() {
+          try {
+            PAGE = loadPageConfig();
+          } catch (err) {
+            root.innerHTML =
+              '<p style="padding:2rem;font:message-box;color:#5b5b66">' +
+              String(err.message || err) +
+              "</p>";
+            return;
+          }
+          applyPageChrome();
+          build();
+        }
+
+        window.addEventListener("hashchange", reloadFromLocation);
 
         build();
       })();

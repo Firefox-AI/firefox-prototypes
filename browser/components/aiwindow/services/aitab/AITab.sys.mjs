@@ -335,6 +335,7 @@ Rules:
 - Do not invent new facts, prices, ratings, or URLs. Prefer omitting over guessing.
 - Keep todo done flags only when still accurate after the edit.
 - Prefer the same block mix (list / todo / info / footer) unless the edit requires a structural change.
+- Refresh footer buttons: keep useful act links; replace reshape chips (app://aitab/reshape?edit=…) with options still relevant after the edit (omit already-true edits).
 
 SCHEMAS:
 ${schemaText(env)}`;

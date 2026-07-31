@@ -3,9 +3,11 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "page",
     "title": "Generated page",
-    "description": "A composed page: an optional header, an ordered array of body blocks (list / todo / info), and an optional footer. This is the document that gets injected into the HTML template. Each block self-identifies via its `type`.",
+    "description": "A composed page: optional header, ordered body blocks (list / todo / info / takeaways / contrast), optional footer. Footer may include reshape chips via app://aitab/reshape?edit=… Each block self-identifies via its `type`.",
     "type": "object",
-    "required": ["blocks"],
+    "required": [
+      "blocks"
+    ],
     "additionalProperties": false,
     "properties": {
       "version": {
@@ -14,18 +16,36 @@
       },
       "theme": {
         "description": "Page-wide theme.",
-        "enum": ["firefox", "slate", "sunset"],
+        "enum": [
+          "firefox",
+          "slate",
+          "sunset"
+        ],
         "default": "firefox"
       },
-      "header": { "$ref": "header" },
+      "header": {
+        "$ref": "header"
+      },
       "blocks": {
         "type": "array",
         "description": "Ordered body content. Each item is discriminated by its `type`.",
         "items": {
-          "oneOf": [{ "$ref": "list" }, { "$ref": "todo" }, { "$ref": "info" }]
+          "oneOf": [
+            {
+              "$ref": "list"
+            },
+            {
+              "$ref": "todo"
+            },
+            {
+              "$ref": "info"
+            }
+          ]
         }
       },
-      "footer": { "$ref": "footer" }
+      "footer": {
+        "$ref": "footer"
+      }
     },
     "examples": [
       {
@@ -117,7 +137,10 @@
                 "text": "Check the free-cancellation window",
                 "priority": "high"
               },
-              { "text": "Compare total price incl. taxes", "done": false }
+              {
+                "text": "Compare total price incl. taxes",
+                "done": false
+              }
             ]
           }
         ],
@@ -130,7 +153,10 @@
               "href": "https://www.booking.com",
               "variant": "primary"
             },
-            { "text": "Plan the trip", "href": "app://views/trip" }
+            {
+              "text": "Plan the trip",
+              "href": "app://views/trip"
+            }
           ]
         }
       }
@@ -140,9 +166,12 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "footer",
     "title": "Footer block",
-    "description": "Page footer with up to three follow-up action buttons. Buttons are the next things a user might want to do (open a tab, plan the trip, refine the view).",
+    "description": "Page footer with follow-up action buttons. Mix outbound links (book, open source) with reshape actions. Reshape buttons use href app://aitab/reshape?edit=… (URL-encoded instruction); the viewer fires AITab:Reshape instead of navigating.",
     "type": "object",
-    "required": ["type", "buttons"],
+    "required": [
+      "type",
+      "buttons"
+    ],
     "additionalProperties": false,
     "properties": {
       "type": {
@@ -155,16 +184,20 @@
       },
       "buttons": {
         "type": "array",
-        "description": "1 to 3 follow-up buttons.",
+        "description": "Follow-up buttons: primary act links plus secondary reshape chips as needed. No fixed maximum.",
         "minItems": 1,
-        "maxItems": 3,
-        "items": { "$ref": "#/$defs/button" }
+        "items": {
+          "$ref": "#/$defs/button"
+        }
       }
     },
     "$defs": {
       "button": {
         "type": "object",
-        "required": ["text", "href"],
+        "required": [
+          "text",
+          "href"
+        ],
         "additionalProperties": false,
         "properties": {
           "text": {
@@ -175,11 +208,14 @@
           "href": {
             "type": "string",
             "format": "uri-reference",
-            "description": "Where the click goes: an external URL, or an in-app route/action id."
+            "description": "External URL, or app://aitab/reshape?edit=URL_ENCODED_INSTRUCTION for a reshape action."
           },
           "variant": {
             "description": "Visual weight. Typically the first button is `primary`, the rest `secondary`.",
-            "enum": ["primary", "secondary"],
+            "enum": [
+              "primary",
+              "secondary"
+            ],
             "default": "secondary"
           }
         }
@@ -195,8 +231,16 @@
             "href": "https://www.booking.com",
             "variant": "primary"
           },
-          { "text": "Compare on a map", "href": "app://views/map" },
-          { "text": "Refine filters", "href": "app://views/refine" }
+          {
+            "text": "Fewer options",
+            "href": "app://aitab/reshape?edit=Fewer%20options",
+            "variant": "secondary"
+          },
+          {
+            "text": "Prioritize price",
+            "href": "app://aitab/reshape?edit=Prioritize%20price",
+            "variant": "secondary"
+          }
         ]
       }
     ]
@@ -207,7 +251,10 @@
     "title": "Header block",
     "description": "Page header: an emoji icon, a title, and an optional subhead. Usually the first thing on a generated page.",
     "type": "object",
-    "required": ["type", "title"],
+    "required": [
+      "type",
+      "title"
+    ],
     "additionalProperties": false,
     "properties": {
       "type": {
@@ -244,12 +291,26 @@
     "title": "Info panel block",
     "description": "A small info/stat panel. `square` panels are compact tiles (good for a single number or short note); `wide` panels span full width (good for a sentence or two). Adjacent panels tile/stack together in the layout.",
     "type": "object",
-    "required": ["type"],
+    "required": [
+      "type"
+    ],
     "additionalProperties": false,
     "anyOf": [
-      { "required": ["value"] },
-      { "required": ["body"] },
-      { "required": ["heading"] }
+      {
+        "required": [
+          "value"
+        ]
+      },
+      {
+        "required": [
+          "body"
+        ]
+      },
+      {
+        "required": [
+          "heading"
+        ]
+      }
     ],
     "properties": {
       "type": {
@@ -258,7 +319,10 @@
       },
       "size": {
         "description": "Footprint of the panel. `square` = compact tile; `wide` = full-width. Multiple panels can be stacked/tiled together.",
-        "enum": ["square", "wide"],
+        "enum": [
+          "square",
+          "wide"
+        ],
         "default": "square"
       },
       "icon": {
@@ -313,7 +377,11 @@
     "title": "List block",
     "description": "The comparison/list view: a display schema (`fields`) paired with `data`. Fields may carry schema.org property mappings (for JSON-LD), sort options, and a `goal` used for superlatives and best-value scoring. Supersedes the standalone list-view.schema.json, reframed as a composable block.",
     "type": "object",
-    "required": ["type", "fields", "data"],
+    "required": [
+      "type",
+      "fields",
+      "data"
+    ],
     "additionalProperties": false,
     "properties": {
       "type": {
@@ -324,37 +392,54 @@
         "type": "string",
         "description": "Optional heading for the block."
       },
-      "description": { "type": "string" },
+      "description": {
+        "type": "string"
+      },
       "itemType": {
         "type": "string",
         "description": "schema.org type of each data item, e.g. \"Hotel\", \"TouristAttraction\", \"Product\". Used to emit JSON-LD."
       },
       "layout": {
         "description": "Initial layout hint.",
-        "enum": ["cards", "compact", "grid", "table"]
+        "enum": [
+          "cards",
+          "compact",
+          "grid",
+          "table"
+        ]
       },
       "fields": {
         "type": "array",
         "minItems": 1,
-        "items": { "$ref": "#/$defs/field" }
+        "items": {
+          "$ref": "#/$defs/field"
+        }
       },
       "data": {
         "type": "array",
         "description": "One object per record; keys should match field `key`s.",
-        "items": { "type": "object" }
+        "items": {
+          "type": "object"
+        }
       }
     },
     "$defs": {
       "field": {
         "type": "object",
-        "required": ["key", "type"],
+        "required": [
+          "key",
+          "type"
+        ],
         "additionalProperties": false,
         "properties": {
           "key": {
             "type": "string",
             "description": "Property name read from each data object."
           },
-          "label": { "type": "string", "description": "Human-readable label." },
+          "label": {
+            "type": "string",
+            "description": "Human-readable label."
+          },
           "type": {
             "description": "How the value is formatted.",
             "enum": [
@@ -373,7 +458,14 @@
           },
           "role": {
             "description": "Where the field renders. Defaults to \"detail\".",
-            "enum": ["image", "title", "subtitle", "badge", "detail", "action"],
+            "enum": [
+              "image",
+              "title",
+              "subtitle",
+              "badge",
+              "detail",
+              "action"
+            ],
             "default": "detail"
           },
           "sortable": {
@@ -403,7 +495,10 @@
           },
           "goal": {
             "description": "For numeric/currency/rating fields: which direction is \"better\". Drives superlatives and the composite best-value score.",
-            "enum": ["min", "max"]
+            "enum": [
+              "min",
+              "max"
+            ]
           }
         }
       }
@@ -467,7 +562,10 @@
     "title": "To-do list block",
     "description": "A targeted, actionable checklist — distinct from the generic list block. Each item has a done state and optional due date, priority, note, and link back to its source.",
     "type": "object",
-    "required": ["type", "items"],
+    "required": [
+      "type",
+      "items"
+    ],
     "additionalProperties": false,
     "properties": {
       "type": {
@@ -486,13 +584,17 @@
       "items": {
         "type": "array",
         "minItems": 1,
-        "items": { "$ref": "#/$defs/task" }
+        "items": {
+          "$ref": "#/$defs/task"
+        }
       }
     },
     "$defs": {
       "task": {
         "type": "object",
-        "required": ["text"],
+        "required": [
+          "text"
+        ],
         "additionalProperties": false,
         "properties": {
           "text": {
@@ -512,7 +614,11 @@
           },
           "priority": {
             "description": "Optional priority.",
-            "enum": ["low", "medium", "high"]
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
           },
           "note": {
             "type": "string",
@@ -537,8 +643,14 @@
             "due": "2026-07-30",
             "href": "https://www.parquesdesintra.pt"
           },
-          { "text": "Confirm hotel free-cancellation window", "done": true },
-          { "text": "Download offline map of Alfama", "priority": "low" }
+          {
+            "text": "Confirm hotel free-cancellation window",
+            "done": true
+          },
+          {
+            "text": "Download offline map of Alfama",
+            "priority": "low"
+          }
         ]
       }
     ]
