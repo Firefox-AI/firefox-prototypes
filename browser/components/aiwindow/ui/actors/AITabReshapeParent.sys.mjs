@@ -11,9 +11,9 @@ ChromeUtils.defineESModuleGetters(lazy, {
 /**
  * Parent actor for AITab reshape requests from content.
  *
- * Opens the Smart Window sidebar and submits a short prompt that should
- * call refine_aitab (reads page JSON from the current tab URI hash, reloads
- * the same tab with the updated page).
+ * Opens the Smart Window sidebar with a reshape prompt. Complete chip edits
+ * auto-submit; incomplete "add …" prompts prefill only so the user can type
+ * the hotel / ingredient / task name before sending.
  */
 export class AITabReshapeParent extends JSWindowActorParent {
   receiveMessage({ name, data }) {
@@ -27,11 +27,11 @@ export class AITabReshapeParent extends JSWindowActorParent {
   }
 
   /**
-   * @param {{ edit?: string, label?: string, source?: string }} data
+   * @param {{ edit?: string, label?: string, source?: string, autoSubmit?: boolean }} data
    */
   async #handleReshapeRequest(data) {
-    const edit = (data?.edit || data?.label || "").trim();
-    if (!edit) {
+    const rawEdit = data?.edit || data?.label || "";
+    if (!String(rawEdit).trim()) {
       return;
     }
 
@@ -41,9 +41,12 @@ export class AITabReshapeParent extends JSWindowActorParent {
       return;
     }
 
-    // Keep the selected content tab (AITab viewer) focused so refine_aitab
-    // can read its URL hash — openSidebar must not steal the selected tab.
-    const prompt = `Reshape my AITab: ${edit}`;
+    const autoSubmit = data?.autoSubmit !== false;
+    // Preserve trailing space on incomplete add prompts ("Add a new hotel: ").
+    const edit = autoSubmit ? String(rawEdit).trim() : String(rawEdit);
+    const prompt = edit.startsWith("Reshape my AITab:")
+      ? edit
+      : `Reshape my AITab: ${edit}`;
 
     await lazy.AIWindowUI.openSidebar(win, null);
 
@@ -56,9 +59,9 @@ export class AITabReshapeParent extends JSWindowActorParent {
       return;
     }
 
-    if (typeof aiWindow.submitChatMessage === "function") {
+    if (autoSubmit && typeof aiWindow.submitChatMessage === "function") {
       aiWindow.submitChatMessage({
-        text: prompt,
+        text: prompt.trim(),
         submitType: "follow-up",
       });
     } else if (typeof aiWindow.updateInput === "function") {
@@ -75,6 +78,7 @@ export class AITabReshapeParent extends JSWindowActorParent {
             edit,
             label: data?.label || "",
             source: data?.source || "page",
+            autoSubmit,
             tabUri: win.gBrowser?.selectedBrowser?.currentURI?.spec || "",
           },
         })

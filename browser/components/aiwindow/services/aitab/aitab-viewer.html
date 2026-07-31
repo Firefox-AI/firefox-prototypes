@@ -25,7 +25,12 @@
 
   Reshape is exposed as footer buttons with:
     "href": "app://aitab/reshape?edit=" + encodeURIComponent(instruction)
-  Clicks fire AITab:Reshape (AITabReshape JSWindowActor → sidebar refine_aitab).
+  Clicks fire AITab:Reshape (auto-submit → refine_aitab).
+
+  Hover "Add …" / "Remove" (modify layer) also fire AITab:Reshape:
+    · Add  → prefill only (autoSubmit: false) so the user can type the
+             hotel / ingredient / task, then send.
+    · Remove → complete edit, auto-submit.
   Outbound footer links (https) navigate normally.
   ============================================================================
 -->
@@ -461,13 +466,143 @@
       .btn.reshape {
         cursor: pointer;
         border: 1px solid var(--line);
-        background: var(--surface);
-        color: var(--text);
+        background: var(--surface, var(--card));
+        color: var(--text, var(--ink));
       }
       .btn.reshape:hover {
         border-color: var(--accent);
         color: var(--accent);
         background: var(--accent-soft);
+      }
+
+      /* ---- modify layer (hover add / remove → reshape) ---- */
+      [data-mod-scope] {
+        position: relative;
+      }
+      [data-mod-row] {
+        position: relative;
+      }
+      [data-mod-scope]:hover [data-mod-row]:hover,
+      [data-mod-scope] [data-mod-row]:focus-within {
+        background: color-mix(in srgb, var(--accent) 7%, transparent);
+      }
+      .mod-remove {
+        position: absolute;
+        inset-block-start: 50%;
+        inset-inline-end: 8px;
+        transform: translateY(-50%);
+        z-index: 2;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.12s;
+        margin: 0;
+        padding: 4px 9px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--card);
+        color: var(--muted);
+        font: inherit;
+        font-size: 0.75rem;
+        font-weight: 600;
+        line-height: 1.2;
+        cursor: pointer;
+        white-space: nowrap;
+        box-shadow: var(--shadow);
+      }
+      [data-mod-row]:hover .mod-remove,
+      [data-mod-row]:focus-within .mod-remove {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .mod-remove:hover,
+      .mod-remove:focus-visible {
+        border-color: #c50042;
+        background: #ffe8ee;
+        color: #c50042;
+        outline: none;
+      }
+      [data-mode="dark"] .mod-remove:hover,
+      [data-mode="dark"] .mod-remove:focus-visible {
+        background: #5a1a2a;
+        border-color: #ff9aa2;
+        color: #ff9aa2;
+      }
+      .layout-table td.mod-cell {
+        width: 1%;
+        white-space: nowrap;
+        padding-inline-end: 12px;
+        position: relative;
+      }
+      .layout-table .mod-remove {
+        position: static;
+        transform: none;
+        inset: auto;
+      }
+      .layout-cards .card,
+      .layout-compact .row,
+      .layout-grid .tile,
+      .todo-item,
+      .panel {
+        padding-inline-end: 5.5rem;
+      }
+      .mod-add-bar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 10px;
+        padding: 10px 12px;
+        border: 1px dashed var(--line);
+        border-radius: var(--radius, 12px);
+        background: transparent;
+        color: var(--muted);
+        font: inherit;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        width: 100%;
+        transition:
+          border-color 0.12s,
+          background 0.12s,
+          color 0.12s,
+          opacity 0.12s;
+        opacity: 0;
+        pointer-events: none;
+      }
+      [data-mod-scope]:hover > .mod-add-bar,
+      [data-mod-scope]:focus-within > .mod-add-bar,
+      .mod-add-bar:focus-visible {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .mod-add-bar:hover,
+      .mod-add-bar:focus-visible {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+        color: var(--accent);
+        outline: none;
+      }
+      .mod-add-bar .plus {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.25rem;
+        height: 1.25rem;
+        border-radius: 50%;
+        border: 1.5px solid currentColor;
+        font-size: 0.95rem;
+        line-height: 1;
+      }
+      .pf-btn-wrap {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+      }
+      .pf-btn-wrap .mod-remove {
+        position: absolute;
+        inset-block-start: -10px;
+        inset-inline-end: -8px;
+        transform: none;
       }
       .pf-text {
         color: var(--muted);
@@ -1267,19 +1402,82 @@
         }
 
         /* ---- list layout sub-registry ------------------------------------------ */
+
+        /* ---- modify helpers (hover add/remove → reshape) -------------------- */
+        function itemLabelFor(block) {
+          if (block && block.itemType) {
+            return String(block.itemType)
+              .replace(/([a-z])([A-Z])/g, "$1 $2")
+              .toLowerCase();
+          }
+          if (block && block.type === "todo") return "task";
+          if (block && block.type === "info") return "stat";
+          return "item";
+        }
+        function removeBtn() {
+          return (
+            '<button type="button" class="mod-remove" data-mod-action="remove" title="Remove">' +
+            "Remove</button>"
+          );
+        }
+        function addBar(label) {
+          return (
+            '<button type="button" class="mod-add-bar" data-mod-action="add">' +
+            '<span class="plus" aria-hidden="true">+</span>' +
+            "<span>Add " +
+            esc(label) +
+            "</span></button>"
+          );
+        }
+        function wrapModScope(inner, blockIndex, label, extraAttrs) {
+          return (
+            '<div class="mod-scope" data-mod-scope data-mod-block="' +
+            blockIndex +
+            '" data-mod-label="' +
+            esc(label) +
+            '"' +
+            (extraAttrs || "") +
+            ">" +
+            inner +
+            addBar(label) +
+            "</div>"
+          );
+        }
+        function rowAttrs(i) {
+          return ' data-mod-row data-mod-index="' + i + '"';
+        }
+        function rowTitle(schema, row, index) {
+          var titleF = firstByRole(schema, "title");
+          if (
+            titleF &&
+            row &&
+            row[titleF.key] != null &&
+            row[titleF.key] !== ""
+          ) {
+            return String(row[titleF.key]);
+          }
+          if (row && row.text) return String(row.text);
+          return itemLabelFor(schema) + " " + (index + 1);
+        }
+
         var LAYOUTS = {
           cards: function (schema, rows) {
             var titleF = firstByRole(schema, "title"),
               subF = firstByRole(schema, "subtitle"),
               details = byRole(schema, "detail");
+            var label = itemLabelFor(schema);
             return rows
-              .map(function (row) {
+              .map(function (row, i) {
                 var img = thumb(schema, row),
                   a = action(schema, row);
                 var h =
                   '<div class="card' +
                   (img ? "" : " no-image") +
                   bestClass(row) +
+                  '"' +
+                  rowAttrs(i) +
+                  ' data-mod-title="' +
+                  esc(rowTitle(schema, row, i)) +
                   '">' +
                   img +
                   '<div class="body">';
@@ -1306,9 +1504,9 @@
                   });
                   h += "</div>";
                 }
-                h += "</div>"; // body
+                h += "</div>";
                 if (a) h += '<div class="action">' + a + "</div>";
-                return h + "</div>";
+                return h + removeBtn() + "</div>";
               })
               .join("");
           },
@@ -1318,13 +1516,18 @@
             var details = byRole(schema, "detail").filter(function (f) {
               return f.type !== "long";
             });
+            var label = itemLabelFor(schema);
             return rows
-              .map(function (row) {
+              .map(function (row, i) {
                 var img = thumb(schema, row),
                   a = action(schema, row);
                 var h =
                   '<div class="row' +
                   bestClass(row) +
+                  '"' +
+                  rowAttrs(i) +
+                  ' data-mod-title="' +
+                  esc(rowTitle(schema, row, i)) +
                   '">' +
                   img +
                   '<div class="row-main">';
@@ -1346,7 +1549,7 @@
                 });
                 h += "</div>";
                 if (a) h += '<div class="action">' + a + "</div>";
-                return h + "</div>";
+                return h + removeBtn() + "</div>";
               })
               .join("");
           },
@@ -1354,11 +1557,16 @@
             var titleF = firstByRole(schema, "title"),
               subF = firstByRole(schema, "subtitle"),
               details = byRole(schema, "detail");
+            var label = itemLabelFor(schema);
             return rows
-              .map(function (row) {
+              .map(function (row, i) {
                 var h =
                   '<div class="tile' +
                   bestClass(row) +
+                  '"' +
+                  rowAttrs(i) +
+                  ' data-mod-title="' +
+                  esc(rowTitle(schema, row, i)) +
                   '">' +
                   thumb(schema, row) +
                   '<div class="tile-body">';
@@ -1388,7 +1596,7 @@
                 }
                 var a = action(schema, row);
                 if (a) h += '<div class="action">' + a + "</div>";
-                return h + "</div></div>";
+                return h + removeBtn() + "</div></div>";
               })
               .join("");
           },
@@ -1398,6 +1606,7 @@
               badgeF = firstByRole(schema, "badge"),
               actionF = firstByRole(schema, "action");
             var cols = byRole(schema, "detail");
+            var label = itemLabelFor(schema);
             var head =
               "<tr><th>" +
               esc(titleF ? titleF.label || "Name" : "Name") +
@@ -1408,9 +1617,9 @@
               head += "<th>" + esc(f.label) + "</th>";
             });
             if (actionF) head += "<th></th>";
-            head += "</tr>";
+            head += "<th></th></tr>";
             var body = rows
-              .map(function (row) {
+              .map(function (row, i) {
                 var img =
                   imageF && has(row, imageF)
                     ? '<img class="thumb" loading="lazy" alt="" src="' +
@@ -1418,7 +1627,13 @@
                       '" onerror="this.style.display=\'none\'" />'
                     : "";
                 var cls = bestClass(row).trim();
-                var r = "<tr" + (cls ? ' class="' + cls + '"' : "") + ">";
+                var r =
+                  "<tr" +
+                  (cls ? ' class="' + cls + '"' : "") +
+                  rowAttrs(i) +
+                  ' data-mod-title="' +
+                  esc(rowTitle(schema, row, i)) +
+                  '">';
                 r +=
                   '<td><div class="cell-title">' +
                   img +
@@ -1435,7 +1650,8 @@
                     "</td>";
                 });
                 if (actionF) r += "<td>" + action(schema, row) + "</td>";
-                return r + "</tr>";
+                r += '<td class="mod-cell">' + removeBtn() + "</td></tr>";
+                return r;
               })
               .join("");
             return (
@@ -1490,7 +1706,7 @@
                   "</a>"
               : '<div class="' + cls + '">' + inner + "</div>";
           },
-          list: function (b) {
+          list: function (b, index) {
             var layout = LAYOUTS[b.layout] ? b.layout : "cards";
             var rows = b.data || [];
             currentBest = computeBest(b, rows);
@@ -1499,8 +1715,9 @@
               ? LAYOUTS[layout](b, rows)
               : '<div class="empty">No items.</div>';
             currentBest = null;
-            return (
-              '<section class="block list-block">' +
+            var label = itemLabelFor(b);
+            var blockIndex = typeof index === "number" ? index : 0;
+            var inner =
               (b.title
                 ? '<h2 class="block-title">' + esc(b.title) + "</h2>"
                 : "") +
@@ -1512,7 +1729,11 @@
               layout +
               '">' +
               listHtml +
-              "</div></section>"
+              "</div>";
+            return (
+              '<section class="block list-block">' +
+              wrapModScope(inner, blockIndex, label, ' data-mod-kind="list"') +
+              "</section>"
             );
           },
           todo: function (b, index) {
@@ -1528,6 +1749,7 @@
                   items.length +
                   " done</p>"
                 : "";
+            var label = itemLabelFor(b);
             var lis = items
               .map(function (t, i) {
                 var meta = "";
@@ -1550,6 +1772,10 @@
                   (t.done ? " done" : "") +
                   '" data-idx="' +
                   i +
+                  '"' +
+                  rowAttrs(i) +
+                  ' data-mod-title="' +
+                  esc(t.text || "task " + (i + 1)) +
                   '">' +
                   '<label><input type="checkbox" class="todo-cb"' +
                   (t.done ? " checked" : "") +
@@ -1558,32 +1784,39 @@
                   esc(t.text) +
                   "</span></label>" +
                   (meta ? '<div class="todo-meta">' + meta + "</div>" : "") +
+                  removeBtn() +
                   "</li>"
                 );
               })
               .join("");
-            return (
-              '<section class="block todo" data-block="' +
-              index +
-              '">' +
+            var blockIndex = typeof index === "number" ? index : 0;
+            var inner =
               (b.title
                 ? '<h2 class="block-title">' + esc(b.title) + "</h2>"
                 : "") +
               prog +
               '<ul class="todo-list">' +
               lis +
-              "</ul></section>"
+              "</ul>";
+            return (
+              '<section class="block todo" data-block="' +
+              blockIndex +
+              '">' +
+              wrapModScope(inner, blockIndex, label, ' data-mod-kind="todo"') +
+              "</section>"
             );
           },
           footer: function (b) {
             var list = footerButtonsWithReshapeFallback(b.buttons || []);
+            var label = "action";
             var btns = list
-              .map(function (btn) {
+              .map(function (btn, i) {
                 var edit = parseReshapeHref(btn.href);
                 var variant =
                   btn.variant === "primary" ? "primary" : "secondary";
+                var control;
                 if (edit) {
-                  return (
+                  control =
                     '<button type="button" class="btn ' +
                     variant +
                     ' reshape" data-aitab-reshape data-edit="' +
@@ -1592,25 +1825,39 @@
                     esc(btn.text) +
                     '">' +
                     esc(btn.text) +
-                    "</button>"
-                  );
+                    "</button>";
+                } else {
+                  control =
+                    '<a class="btn ' +
+                    variant +
+                    '" href="' +
+                    esc(btn.href) +
+                    '">' +
+                    esc(btn.text) +
+                    "</a>";
                 }
                 return (
-                  '<a class="btn ' +
-                  variant +
-                  '" href="' +
-                  esc(btn.href) +
+                  '<span class="pf-btn-wrap"' +
+                  rowAttrs(i) +
+                  ' data-mod-title="' +
+                  esc(btn.text || "action") +
                   '">' +
-                  esc(btn.text) +
-                  "</a>"
+                  control +
+                  removeBtn() +
+                  "</span>"
                 );
               })
               .join("");
             return (
               '<footer class="page-footer">' +
               (b.text ? '<div class="pf-text">' + esc(b.text) + "</div>" : "") +
+              '<div class="mod-scope" data-mod-scope data-mod-kind="footer" data-mod-label="' +
+              esc(label) +
+              '">' +
               '<div class="pf-buttons">' +
               btns +
+              "</div>" +
+              addBar(label) +
               "</div></footer>"
             );
           },
@@ -1623,16 +1870,48 @@
           while (i < blocks.length) {
             var b = blocks[i];
             if (b.type === "info") {
-              // group consecutive info panels so they tile
-              var group = [];
+              var start = i;
+              var groupHtml = "";
+              var g = 0;
               while (i < blocks.length && blocks[i].type === "info") {
-                group.push(blocks[i]);
+                var panel = blocks[i];
+                var inner = "";
+                if (panel.icon)
+                  inner += '<div class="pi-icon">' + esc(panel.icon) + "</div>";
+                if (panel.heading)
+                  inner +=
+                    '<div class="pi-head">' + esc(panel.heading) + "</div>";
+                if (panel.value)
+                  inner += '<div class="pi-val">' + esc(panel.value) + "</div>";
+                if (panel.body)
+                  inner += '<div class="pi-body">' + esc(panel.body) + "</div>";
+                var cls =
+                  "panel panel-" +
+                  (panel.size === "wide" ? "wide" : "square") +
+                  (panel.accent ? " accent" : "");
+                var title = panel.heading || panel.value || "stat " + (g + 1);
+                groupHtml +=
+                  '<div class="' +
+                  cls +
+                  '"' +
+                  rowAttrs(g) +
+                  ' data-mod-info-block="' +
+                  i +
+                  '" data-mod-title="' +
+                  esc(String(title)) +
+                  '">' +
+                  inner +
+                  removeBtn() +
+                  "</div>";
+                g++;
                 i++;
               }
-              out +=
-                '<div class="panels">' +
-                group.map(RENDERERS.info).join("") +
-                "</div>";
+              out += wrapModScope(
+                '<div class="panels">' + groupHtml + "</div>",
+                start,
+                "stat",
+                ' data-mod-kind="info-group" data-mod-end="' + (i - 1) + '"'
+              );
             } else {
               out += RENDERERS[b.type] ? RENDERERS[b.type](b, i) : "";
               i++;
@@ -1709,19 +1988,24 @@
 
         /**
          * Ask Firefox to open the sidebar with a reshape prompt.
-         * Handled by the AITabReshape JSWindowActor on http(s) pages.
+         * @param {string} edit
+         * @param {string} [label]
+         * @param {{ autoSubmit?: boolean, source?: string }} [opts]
          */
-        function requestReshape(edit, label) {
-          var text = (edit || label || "").trim();
-          if (!text) return;
+        function requestReshape(edit, label, opts) {
+          opts = opts || {};
+          var text = edit || label || "";
+          // Keep trailing spaces for incomplete "Add …: " prompts.
+          if (!String(text).trim()) return;
           window.dispatchEvent(
             new CustomEvent("AITab:Reshape", {
               bubbles: true,
               composed: true,
               detail: {
                 edit: text,
-                label: (label || text).trim(),
-                source: "footer",
+                label: String(label || text).trim(),
+                source: opts.source || "page",
+                autoSubmit: opts.autoSubmit !== false,
               },
             })
           );
@@ -1757,15 +2041,48 @@
         });
 
         root.addEventListener("click", function (e) {
-          var chip = e.target.closest
+          var reshapeChip = e.target.closest
             ? e.target.closest("[data-aitab-reshape]")
             : null;
-          if (!chip) return;
+          if (reshapeChip) {
+            e.preventDefault();
+            requestReshape(
+              reshapeChip.getAttribute("data-edit"),
+              reshapeChip.getAttribute("data-label"),
+              { autoSubmit: true, source: "footer" }
+            );
+            return;
+          }
+
+          var btn = e.target.closest
+            ? e.target.closest("[data-mod-action]")
+            : null;
+          if (!btn) return;
           e.preventDefault();
-          requestReshape(
-            chip.getAttribute("data-edit"),
-            chip.getAttribute("data-label")
-          );
+          e.stopPropagation();
+          var scope = btn.closest("[data-mod-scope]");
+          if (!scope) return;
+          var action = btn.getAttribute("data-mod-action");
+          var label = scope.getAttribute("data-mod-label") || "item";
+
+          if (action === "add") {
+            // Prefill only — user types the concrete name (ingredient, hotel…).
+            requestReshape("Add a new " + label + ": ", "Add " + label, {
+              autoSubmit: false,
+              source: "add",
+            });
+            return;
+          }
+
+          if (action === "remove") {
+            var row = btn.closest("[data-mod-row]");
+            var title = (row && row.getAttribute("data-mod-title")) || label;
+            requestReshape(
+              'Remove "' + title + '" (' + label + ") from this AITab",
+              "Remove " + label,
+              { autoSubmit: true, source: "remove" }
+            );
+          }
         });
 
         /**

@@ -9,11 +9,12 @@
  *   window.dispatchEvent(new CustomEvent("AITab:Reshape", {
  *     bubbles: true,
  *     composed: true,
- *     detail: { edit: "Make vegetarian", label: "Make vegetarian" },
+ *     detail: {
+ *       edit: "Make vegetarian",
+ *       label: "Make vegetarian",
+ *       autoSubmit: true,  // false → prefill sidebar only (e.g. "Add hotel: ")
+ *     },
  *   }));
- *
- * The parent opens the sidebar assistant with a prefilled reshape prompt.
- * Prior page JSON is expected to be read from the current tab URI hash later.
  */
 export class AITabReshapeChild extends JSWindowActorChild {
   /**
@@ -36,12 +37,14 @@ export class AITabReshapeChild extends JSWindowActorChild {
     } else if (typeof detail.label === "string") {
       edit = detail.label;
     }
+    // Allow trailing spaces for incomplete "Add …: " prompts; still require
+    // some non-whitespace content.
     if (!edit.trim()) {
       return;
     }
 
     const payload = {
-      edit: edit.trim().slice(0, 500),
+      edit: edit.slice(0, 500),
       label:
         typeof detail.label === "string"
           ? detail.label.trim().slice(0, 100)
@@ -50,6 +53,8 @@ export class AITabReshapeChild extends JSWindowActorChild {
         typeof detail.source === "string"
           ? detail.source.trim().slice(0, 40)
           : "page",
+      // Default true for complete reshape chips; add-row uses false.
+      autoSubmit: detail.autoSubmit !== false,
     };
 
     this.sendAsyncMessage("AITabReshape:Request", payload);
