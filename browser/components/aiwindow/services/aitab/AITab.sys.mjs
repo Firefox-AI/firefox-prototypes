@@ -316,6 +316,73 @@ async function generateStructuredPage({ sourceText, focus }) {
   }
 }
 
+/**
+ * System prompt for reshaping an existing page config.
+ * Uses the same single-schema env as generate (component_schema.json / pref).
+ *
+ * @param {object} env
+ * @returns {string}
+ */
+function buildReshapeSystemPrompt(env) {
+  return `You reshape an existing AITab "page config" according to a user edit.
+
+Respond with ONLY a single JSON object — no prose, no markdown fences.
+
+Rules:
+- Return a full page object that validates against the page schema below.
+- Apply the EDIT completely (e.g. fewer options, prioritize price, vegetarian).
+- Keep the same job and preserve source URLs/hrefs from the current config whenever they still apply.
+- Do not invent new facts, prices, ratings, or URLs. Prefer omitting over guessing.
+- Keep todo done flags only when still accurate after the edit.
+- Prefer the same block mix (list / todo / info / footer) unless the edit requires a structural change.
+
+SCHEMAS:
+${schemaText(env)}`;
+}
+
+/**
+ * Ask the model to rewrite a prior page config under an edit instruction.
+ *
+ * @param {object} options
+ * @param {object} options.priorPage
+ * @param {string} options.edit
+ * @returns {Promise<{page: object} | {error: string}>}
+ */
+async function reshapeStructuredPage({ priorPage, edit }) {
+  try {
+    const { env } = await loadAssets();
+
+    const conversation = await lazy.buildConversation(lazy.MODEL_FEATURES.CHAT);
+    conversation.setSystemMessage(buildReshapeSystemPrompt(env));
+    conversation.addUserMessage(
+      `EDIT: ${edit}\n\nCURRENT PAGE CONFIG:\n${JSON.stringify(priorPage)}`
+    );
+
+    const response = await conversation.run({
+      fxAccountToken: await lazy.openAIEngine.getFxAccountToken(),
+    });
+
+    const text = response?.finalOutput?.trim();
+    if (!text) {
+      return { error: "the model returned an empty response" };
+    }
+
+    const page = parsePageConfig(text);
+    if (!page) {
+      return { error: "the model did not return valid JSON" };
+    }
+
+    const result = buildPage(page, env);
+    if (!result.ok) {
+      return { error: "the reshaped page did not match the required format" };
+    }
+
+    return { page: result.page };
+  } catch (error) {
+    return { error: `page reshape failed: ${error?.message ?? error}` };
+  }
+}
+
 // ------------------------------------------------------------------ public --
 
 /**
@@ -468,4 +535,139 @@ export async function generateAITab(
   };
 
   return { metadata, page: structured.page };
+}
+
+/**
+ * Normalize a viewer base URL for comparison (strip hash + trailing slash).
+ *
+ * @param {string} url
+ * @returns {string}
+ */
+function normalizeViewerBase(url) {
+  return url.trim().replace(/#.*$/, "").replace(/\/$/, "");
+}
+
+/**
+ * True when the URI (without hash) matches the configured AITab viewer base.
+ *
+ * @param {string|nsIURI} uri
+ * @returns {boolean}
+ */
+export function isAITabViewerURI(uri) {
+  const viewerBase = getViewerBaseURL();
+  if (!viewerBase || !uri) {
+    return false;
+  }
+  const spec = typeof uri === "string" ? uri : uri.spec;
+  if (!spec) {
+    return false;
+  }
+  const base = normalizeViewerBase(spec.split("#")[0] || spec);
+  return base === normalizeViewerBase(viewerBase);
+}
+
+/**
+ * Parse and lightly check page JSON from an AITab viewer tab URI hash.
+ * Does not full-schema-validate (that happens after reshape); returns null
+ * when the URI is not the configured viewer or the hash is not an object.
+ *
+ * @param {string|nsIURI} uri
+ * @returns {object|null}
+ */
+export function parsePageFromViewerURI(uri) {
+  if (!isAITabViewerURI(uri)) {
+    return null;
+  }
+  const spec = typeof uri === "string" ? uri : uri.spec;
+  const hashIndex = spec.indexOf("#");
+  if (hashIndex < 0 || hashIndex === spec.length - 1) {
+    return null;
+  }
+  const rawHash = spec.slice(hashIndex + 1);
+  let page;
+  try {
+    page = JSON.parse(decodeURIComponent(rawHash));
+  } catch {
+    try {
+      page = JSON.parse(rawHash);
+    } catch {
+      return null;
+    }
+  }
+  if (!page || typeof page !== "object" || Array.isArray(page)) {
+    return null;
+  }
+  if (!Array.isArray(page.blocks)) {
+    return null;
+  }
+  return page;
+}
+
+/**
+ * Reshape an existing AITab page config and return a new viewer URL.
+ * Prior page is typically parsed from the current tab URI hash.
+ *
+ * @param {object} options
+ * @param {object} options.priorPage - Existing validated-ish page config
+ * @param {string} options.edit - Reshape instruction (e.g. "Fewer options")
+ * @returns {Promise<{url: string, page: object} | {error: string}>}
+ */
+export async function refineAITab({ priorPage, edit } = {}) {
+  const viewerBase = getViewerBaseURL();
+  if (!viewerBase) {
+    return {
+      error:
+        "AITab viewer URL is not configured (set browser.smartwindow.aitab.viewerURL to an https URL)",
+    };
+  }
+
+  const editText = typeof edit === "string" ? edit.trim() : "";
+  if (!editText) {
+    return { error: "no edit instruction was provided" };
+  }
+  if (!priorPage || typeof priorPage !== "object") {
+    return { error: "no prior page config was provided" };
+  }
+
+  const structured = await reshapeStructuredPage({
+    priorPage,
+    edit: editText,
+  });
+  if (structured.error) {
+    return { error: structured.error };
+  }
+
+  return {
+    url: buildViewerURL(viewerBase, structured.page),
+    page: structured.page,
+  };
+}
+
+/**
+ * Navigate a browser to a viewer URL (same tab). Only accepts URLs whose base
+ * matches the configured viewer (prevents open redirects from tool output).
+ *
+ * @param {MozBrowser} browser
+ * @param {string} url
+ * @returns {boolean}
+ */
+export function loadAITabViewerURL(browser, url) {
+  if (!browser || typeof url !== "string") {
+    return false;
+  }
+  if (!isAITabViewerURI(url)) {
+    return false;
+  }
+  try {
+    browser.documentGlobal.openLinkIn(url, "current", {
+      triggeringPrincipal: Services.scriptSecurityManager.createNullPrincipal(
+        {}
+      ),
+      loadFlags: Ci.nsIWebNavigation.LOAD_FLAGS_REPLACE_HISTORY,
+    });
+    return true;
+  } catch (error) {
+    console.error("AITab: failed to load viewer URL", error);
+    return false;
+  }
 }

@@ -2344,8 +2344,9 @@ pref("browser.smartwindow.mistralRelease", true);
 pref("places.semanticHistory.smartwindow.distanceThreshold", "0.6");
 
 // Smart Window: AITab — model builds structured JSON; chat links to an
-// external viewer SPA with the page config in the URL hash.
-// viewerURL must be https; leave empty until you host a viewer.
+// external viewer SPA (host aitab-viewer.html from services/aitab/) with the
+// JSON in the URL hash. viewerURL must be https; leave empty until you host
+// a viewer. Reshape uses refine_aitab on the open viewer tab.
 // Spike default: enabled + hosted viewer for quick dogfooding.
 pref("browser.smartwindow.aitab.enabled", true);
 pref("browser.smartwindow.aitab.viewerURL", "https://augment-aitab-viewer.quick.mozilla.cloud/aitab-viewer.html");

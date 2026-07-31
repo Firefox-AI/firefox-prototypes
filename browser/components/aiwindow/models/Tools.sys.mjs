@@ -41,6 +41,14 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/services/aitab/AITab.sys.mjs",
   buildViewerURL:
     "moz-src:///browser/components/aiwindow/services/aitab/AITab.sys.mjs",
+  refineAITab:
+    "moz-src:///browser/components/aiwindow/services/aitab/AITab.sys.mjs",
+  parsePageFromViewerURI:
+    "moz-src:///browser/components/aiwindow/services/aitab/AITab.sys.mjs",
+  loadAITabViewerURL:
+    "moz-src:///browser/components/aiwindow/services/aitab/AITab.sys.mjs",
+  isAITabViewerURI:
+    "moz-src:///browser/components/aiwindow/services/aitab/AITab.sys.mjs",
   setTimeout: "resource://gre/modules/Timer.sys.mjs",
   MemoriesManager:
     "moz-src:///browser/components/aiwindow/models/memories/MemoriesManager.sys.mjs",
@@ -103,6 +111,7 @@ export const GET_OPEN_TABS = "get_open_tabs";
 export const SEARCH_BROWSING_HISTORY = "search_browsing_history";
 export const GET_PAGE_CONTENT = "get_page_content";
 export const GENERATE_AITAB = "generate_aitab";
+export const REFINE_AITAB = "refine_aitab";
 export const RUN_SEARCH = "run_search";
 export const SEARCH_THE_WEB = "search_the_web";
 export const GET_USER_MEMORIES = "get_user_memories";
@@ -118,7 +127,8 @@ export const ADD_MEMORY = "add_memory";
 export const WORLD_CUP_TOOLS = new Set([WORLD_CUP_MATCHES, WORLD_CUP_LIVE]);
 export const WORLD_CUP_PREF = "browser.smartwindow.worldcup.enabled";
 export const AITAB_PREF = "browser.smartwindow.aitab.enabled";
-export const AITAB_TOOLS = new Set([GENERATE_AITAB]);
+export const AITAB_VIEWER_URL_PREF = "browser.smartwindow.aitab.viewerURL";
+export const AITAB_TOOLS = new Set([GENERATE_AITAB, REFINE_AITAB]);
 export const SEARCH_QUERY_ENDPOINT_PREF =
   "browser.smartwindow.searchQuery.endpointURL";
 export const SEARCH_QUERY_APIKEY_PREF =
@@ -308,6 +318,31 @@ export const toolsConfig = [
           },
         },
         required: ["url_list"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: REFINE_AITAB,
+      description:
+        "Reshape the AITab currently open in the selected browser tab. " +
+        "Reads the page JSON from that tab's URL hash, applies the edit, and " +
+        "reloads the same tab with the updated page. Use when the user asks to " +
+        "reshape, refine, or change an existing AITab (e.g. fewer options, " +
+        "prioritize price, make vegetarian). Prefer this over generate_aitab " +
+        "when an AITab is already open.",
+      parameters: {
+        type: "object",
+        properties: {
+          edit: {
+            type: "string",
+            description:
+              "The reshape instruction, e.g. 'Fewer options', 'Prioritize price', " +
+              "'Make vegetarian', or a short freeform edit.",
+          },
+        },
+        required: ["edit"],
       },
     },
   },
@@ -1360,6 +1395,95 @@ export async function createAITab({ url_list, focus }, conversation, signal) {
   return `The page was created. Link the user to it as [${title}](§url_token: ${token}§).`;
 }
 
+/**
+ * Find the selected browser in the most recent AI window whose current URI is
+ * an AITab viewer page. Falls back to any AI window selected tab that matches.
+ *
+ * @returns {MozBrowser|null}
+ */
+function getSelectedAITabViewerBrowser() {
+  for (const win of lazy.BrowserWindowTracker.orderedWindows) {
+    if (!lazy.AIWindow.isAIWindowActive(win) || win.closed || !win.gBrowser) {
+      continue;
+    }
+    const browser = win.gBrowser.selectedBrowser;
+    if (browser && lazy.isAITabViewerURI(browser.currentURI)) {
+      return browser;
+    }
+  }
+  // Fallback: first viewer tab across AI windows (selected tab may be chat).
+  for (const win of lazy.BrowserWindowTracker.orderedWindows) {
+    if (!lazy.AIWindow.isAIWindowActive(win) || win.closed || !win.gBrowser) {
+      continue;
+    }
+    for (const tab of win.gBrowser.tabs) {
+      const browser = tab.linkedBrowser;
+      if (browser && lazy.isAITabViewerURI(browser.currentURI)) {
+        return browser;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Reshape the AITab open in the current (or found) viewer tab.
+ *
+ * @param {object} toolParams
+ * @param {string} toolParams.edit
+ * @param {ChatConversation} conversation
+ * @param {AbortSignal} [_signal]
+ */
+export async function refineAITabTool({ edit }, conversation, _signal) {
+  lazy.console.log("[Tool] refineAITab", JSON.stringify({ edit }));
+  if (
+    !Services.prefs.getBoolPref(AITAB_PREF, false) ||
+    !Services.prefs.getStringPref(AITAB_VIEWER_URL_PREF, "").trim()
+  ) {
+    return "The AITab feature is disabled.";
+  }
+
+  const editText = typeof edit === "string" ? edit.trim() : "";
+  if (!editText) {
+    return "No edit instruction was provided for refine_aitab.";
+  }
+
+  const browser = getSelectedAITabViewerBrowser();
+  if (!browser) {
+    return (
+      "No AITab viewer tab is open. Open an AITab first, or use generate_aitab " +
+      "to create one."
+    );
+  }
+
+  const priorPage = lazy.parsePageFromViewerURI(browser.currentURI);
+  if (!priorPage) {
+    return (
+      "Could not read page JSON from the current AITab tab URL hash. " +
+      "Make sure the selected tab is an AITab viewer page."
+    );
+  }
+
+  const { url, error } = await lazy.refineAITab({
+    priorPage,
+    edit: editText,
+  });
+  if (error) {
+    return `The AITab could not be reshaped: ${error}.`;
+  }
+
+  const loaded = lazy.loadAITabViewerURL(browser, url);
+  if (!loaded) {
+    return "The AITab was reshaped but could not be loaded into the tab.";
+  }
+
+  const token = conversation.convertUrlToToken(url);
+  return (
+    `Updated the open AITab (${editText}). ` +
+    `The current tab now shows the reshaped page: §url_token: ${token}§`
+  );
+}
+
 // No securityProperties / trust flags: skill prompts are Remote Settings
 // content and carry the same trust level as the system prompt itself.
 export async function getSkill({ toolParams, model }) {
@@ -1525,6 +1649,7 @@ export const toolFns = {
   worldCupMatches,
   worldCupLive,
   createAITab,
+  refineAITabTool,
   manageTabs,
   addMemory,
   getSkill,

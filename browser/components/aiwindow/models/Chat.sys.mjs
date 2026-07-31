@@ -25,6 +25,7 @@ import {
   AITAB_PREF,
   AITAB_TOOLS,
   GENERATE_AITAB,
+  REFINE_AITAB,
   ADD_MEMORY,
   SEARCH_THE_WEB,
   GET_SKILL,
@@ -141,6 +142,7 @@ const FEATURE_GATED_HANDLERS = new Map([
   [WORLD_CUP_LIVE, toolFns.worldCupLive],
   [SEARCH_THE_WEB, runSearchTheWeb],
   [GENERATE_AITAB, toolFns.createAITab],
+  [REFINE_AITAB, toolFns.refineAITabTool],
 ]);
 
 /**
