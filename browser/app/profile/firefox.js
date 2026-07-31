@@ -2322,7 +2322,8 @@ pref("browser.ml.pageAssist.enabled", false);
 
 // Smart Window Feature
 pref("browser.smartwindow.enabled", false);
-// GenTab V0: page/tab/group menu → interactive checklist
+// GenTab menu: page/tab/group → companion AITab (page schema + remote viewer).
+// Requires browser.smartwindow.aitab.enabled and a https viewerURL.
 pref("browser.smartwindow.gentab.enabled", true);
 // Default endpoint for preset models
 pref("browser.smartwindow.endpoint", "https://mlpa-prod-prod-mozilla.global.ssl.fastly.net/v1");

@@ -7,6 +7,7 @@
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
+  BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
   JsonSchema: "resource://gre/modules/JsonSchema.sys.mjs",
   GetPageContent: "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs",
   buildConversation:
@@ -536,6 +537,161 @@ export async function generateAITab(
   };
 
   return { metadata, page: structured.page };
+}
+
+/**
+ * Find an open tab by URL in any browser window (not only AI windows).
+ * Used by the GenTab menu companion path.
+ *
+ * @param {string} url
+ * @returns {object|null} tab
+ */
+function getOpenTabWithURL(url) {
+  if (!url) {
+    return null;
+  }
+  for (const win of lazy.BrowserWindowTracker.orderedWindows) {
+    if (win.closed || !win.gBrowser) {
+      continue;
+    }
+    for (const tab of win.gBrowser.tabs) {
+      if (tab?.linkedBrowser?.currentURI?.spec === url) {
+        return tab;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Extract cleaned text from an already-open tab (no network fetch).
+ *
+ * @param {object} tab
+ * @param {string} url
+ * @returns {Promise<string>}
+ */
+async function extractOpenTabText(tab, url) {
+  try {
+    const currentWindowContext =
+      tab.linkedBrowser?.browsingContext?.currentWindowContext;
+    if (!currentWindowContext) {
+      return "";
+    }
+    const pageExtractor = await currentWindowContext.getActor("PageExtractor");
+    const extraction = await pageExtractor.getText({
+      sufficientLength: SOURCE_TEXT_BUDGET,
+      cleanWhitespace: true,
+      removeBoilerplate: true,
+      sourceUrl: url,
+    });
+    return extraction?.text || "";
+  } catch (error) {
+    console.warn("AITab: open-tab extract failed", url, error);
+    return "";
+  }
+}
+
+/**
+ * Build the companion focus string for menu-created AITabs.
+ *
+ * @param {object} options
+ * @param {string} [options.groupLabel]
+ * @param {number} options.sourceCount
+ * @returns {string}
+ */
+export function companionFocusForSources({ groupLabel, sourceCount }) {
+  const parts = [
+    "Companion plan from the user's open tabs: condensed, revisit-worthy next steps.",
+    "Prefer todo (actionable steps) plus list when comparing options; ground hrefs in source URLs.",
+    "Include footer act link(s) and 2–4 reshape chips (app://aitab/reshape?edit=…).",
+  ];
+  if (groupLabel) {
+    parts.push(`Job label from tab group: "${groupLabel}".`);
+  }
+  if (sourceCount > 1) {
+    parts.push(`Synthesize across all ${sourceCount} open source tabs.`);
+  }
+  return parts.join(" ");
+}
+
+/**
+ * Generate an AITab from open browser tabs (GenTab menu companion path).
+ * Does not require a chat conversation. Only reads already-open tabs
+ * (no headless fetch). Opens nothing — returns the viewer URL + page.
+ *
+ * @param {object} options
+ * @param {string[]} options.url_list - Open tab URLs to include
+ * @param {string} [options.focus] - Companion focus / group intent
+ * @param {string} [options.groupLabel] - Tab group name (folded into focus)
+ * @returns {Promise<{url: string, page: object} | {error: string}>}
+ */
+export async function generateAITabFromOpenTabs({
+  url_list,
+  focus,
+  groupLabel,
+} = {}) {
+  const viewerBase = getViewerBaseURL();
+  if (!viewerBase) {
+    return {
+      error:
+        "AITab viewer URL is not configured (set browser.smartwindow.aitab.viewerURL to an https URL)",
+    };
+  }
+
+  const urls = Array.isArray(url_list)
+    ? [...new Set(url_list.filter(url => typeof url === "string" && url))]
+    : [];
+  if (!urls.length) {
+    return { error: "no URLs were provided to build a page from" };
+  }
+
+  const perTabBudget = Math.floor(SOURCE_TEXT_BUDGET / urls.length);
+  const sourceParts = [];
+
+  for (const url of urls) {
+    const tab = getOpenTabWithURL(url);
+    if (!tab) {
+      sourceParts.push(`## ${url}\nURL: ${url}\n\n(Tab not open; skipped.)`);
+      continue;
+    }
+    const heading = tab.label || url;
+    const text = await extractOpenTabText(tab, url);
+    const budgetedText =
+      text.length > perTabBudget ? text.slice(0, perTabBudget) : text;
+    sourceParts.push(`## ${heading}\nURL: ${url}\n\n${budgetedText}`);
+  }
+
+  const hasContent = sourceParts.some(
+    part => !part.includes("(Tab not open; skipped.)") && part.length > 40
+  );
+  if (!hasContent) {
+    return { error: "could not extract content from the selected tabs" };
+  }
+
+  let focusText =
+    typeof focus === "string" && focus.trim()
+      ? focus.trim()
+      : companionFocusForSources({
+          groupLabel: typeof groupLabel === "string" ? groupLabel.trim() : "",
+          sourceCount: urls.length,
+        });
+  if (groupLabel && !focusText.includes(groupLabel)) {
+    focusText = `${focusText} Job label: "${groupLabel}".`;
+  }
+
+  const structured = await generateStructuredPage({
+    sourceText: sourceParts.join(PAGE_BREAK),
+    focus: focusText,
+  });
+
+  if (structured.error) {
+    return { error: structured.error };
+  }
+
+  return {
+    url: buildViewerURL(viewerBase, structured.page),
+    page: structured.page,
+  };
 }
 
 /**
