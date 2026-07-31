@@ -16,6 +16,9 @@
     · footer next-step buttons (max 3 per schema)
   Host this file and set:
     browser.smartwindow.aitab.viewerURL = https://your.host/path/modify.html
+
+  Reshape chips fire AITab:Reshape (AITabReshape JSWindowActor → sidebar):
+    detail: { edit, label, source: "reshape-chip" }
   ============================================================================
 -->
     <script type="application/json" id="page-config">
@@ -425,6 +428,43 @@
         background: var(--accent-soft);
         color: var(--accent);
         font-weight: 600;
+      }
+
+      /* ---- reshape (fires AITab:Reshape → browser sidebar) ---- */
+      .reshape-bar {
+        margin-top: 28px;
+        padding-top: 18px;
+        border-top: 1px solid var(--line);
+      }
+      .reshape-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        margin-bottom: 10px;
+      }
+      .reshape-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .reshape-chip {
+        appearance: none;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--text);
+        font: inherit;
+        font-size: 0.85rem;
+        font-weight: 550;
+        padding: 8px 14px;
+        border-radius: 999px;
+        cursor: pointer;
+      }
+      .reshape-chip:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: var(--accent-soft);
       }
 
       /* ---- footer ---- */
@@ -1828,10 +1868,64 @@
           }
           return out;
         }
+        function defaultReshapeChips() {
+          return [
+            { label: "Fewer options", edit: "Fewer options" },
+            { label: "Prioritize price", edit: "Prioritize price" },
+            { label: "More detail", edit: "More detail" },
+          ];
+        }
+
+        function renderReshapeBar() {
+          var chips =
+            Array.isArray(PAGE.reshape) && PAGE.reshape.length
+              ? PAGE.reshape
+              : defaultReshapeChips();
+          var buttons = chips
+            .map(function (c) {
+              var label = c.label || c.edit || c.id || "Reshape";
+              var edit = c.edit || c.label || label;
+              return (
+                '<button type="button" class="reshape-chip" data-aitab-reshape data-edit="' +
+                esc(edit) +
+                '" data-label="' +
+                esc(label) +
+                '">' +
+                esc(label) +
+                "</button>"
+              );
+            })
+            .join("");
+          return (
+            '<section class="reshape-bar" aria-label="Reshape">' +
+            '<div class="reshape-label">Reshape</div>' +
+            '<div class="reshape-chips">' +
+            buttons +
+            "</div></section>"
+          );
+        }
+
+        function requestReshape(edit, label) {
+          var text = (edit || label || "").trim();
+          if (!text) return;
+          window.dispatchEvent(
+            new CustomEvent("AITab:Reshape", {
+              bubbles: true,
+              composed: true,
+              detail: {
+                edit: text,
+                label: (label || text).trim(),
+                source: "reshape-chip",
+              },
+            })
+          );
+        }
+
         function build() {
           var html = "";
           if (PAGE.header) html += RENDERERS.header(PAGE.header);
           html += renderBody(PAGE.blocks || []);
+          html += renderReshapeBar();
           if (PAGE.footer) html += RENDERERS.footer(PAGE.footer);
           root.innerHTML = html;
           emitJsonLd();
@@ -1870,6 +1964,18 @@
         });
 
         root.addEventListener("click", function (e) {
+          var reshapeChip = e.target.closest
+            ? e.target.closest("[data-aitab-reshape]")
+            : null;
+          if (reshapeChip) {
+            e.preventDefault();
+            requestReshape(
+              reshapeChip.getAttribute("data-edit"),
+              reshapeChip.getAttribute("data-label")
+            );
+            return;
+          }
+
           var btn = e.target.closest
             ? e.target.closest("[data-mod-action]")
             : null;

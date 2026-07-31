@@ -273,6 +273,28 @@ let JSWINDOWACTORS = {
     remoteTypes: ["parent"],
   },
 
+  // Spike: listen for AITab:Reshape CustomEvents from any http(s) page so a
+  // remote AITab viewer (or any test page) can request a sidebar reshape.
+  // Narrow matches to the viewer origin before shipping.
+  AITabReshape: {
+    parent: {
+      esModuleURI:
+        "moz-src:///browser/components/aiwindow/ui/actors/AITabReshapeParent.sys.mjs",
+    },
+    child: {
+      esModuleURI:
+        "moz-src:///browser/components/aiwindow/ui/actors/AITabReshapeChild.sys.mjs",
+      events: {
+        "AITab:Reshape": { wantUntrusted: true },
+      },
+    },
+    matches: ["http://*/*", "https://*/*"],
+    messageManagerGroups: ["browsers"],
+    allFrames: true,
+    enablePreference: "browser.smartwindow.aitab.enabled",
+    safeForUntrustedWebProcess: true,
+  },
+
   SmartWindowTasks: {
     parent: {
       esModuleURI:
