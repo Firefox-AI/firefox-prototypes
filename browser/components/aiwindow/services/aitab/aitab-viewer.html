@@ -27,10 +27,11 @@
     "href": "app://aitab/reshape?edit=" + encodeURIComponent(instruction)
   Clicks fire AITab:Reshape (auto-submit → refine_aitab).
 
-  Hover "Add …" / "Remove" (modify layer) also fire AITab:Reshape:
-    · Add  → prefill only (autoSubmit: false) so the user can type the
-             hotel / ingredient / task, then send.
-    · Remove → complete edit, auto-submit.
+  Hover "Add …" / "Remove" (modify layer):
+    · Add    → AITab:Reshape prefill only (autoSubmit: false) so the user
+               can type the hotel / ingredient / task, then send.
+    · Remove → deterministic local edit: mutate page JSON, write the URL
+               hash, re-render (no AI).
   Outbound footer links (https) navigate normally.
   ============================================================================
 -->
@@ -2011,6 +2012,82 @@
           );
         }
 
+        /**
+         * Write PAGE into the URL hash (source of truth for refine_aitab) and
+         * re-render. Uses replaceState so we don't spam history or rely on AI.
+         */
+        function persistPageAndRender() {
+          try {
+            var encoded = encodeURIComponent(JSON.stringify(PAGE));
+            var next = location.pathname + location.search + "#" + encoded;
+            history.replaceState(null, "", next);
+          } catch (err) {
+            console.warn("AITab: could not persist page to hash", err);
+          }
+          applyPageChrome();
+          build();
+        }
+
+        /**
+         * Deterministic remove — mutates PAGE JSON in place. No AI.
+         * @returns {boolean} whether anything was removed
+         */
+        function removeFromPage(scope, row) {
+          if (!scope || !row) return false;
+          var kind = scope.getAttribute("data-mod-kind") || "";
+          var idx = +row.getAttribute("data-mod-index");
+
+          if (kind === "info-group") {
+            var infoIdx = +row.getAttribute("data-mod-info-block");
+            if (isNaN(infoIdx) || !PAGE.blocks) return false;
+            if (infoIdx < 0 || infoIdx >= PAGE.blocks.length) return false;
+            if (PAGE.blocks[infoIdx].type !== "info") return false;
+            PAGE.blocks.splice(infoIdx, 1);
+            return true;
+          }
+
+          if (kind === "footer") {
+            if (!PAGE.footer) {
+              PAGE.footer = { type: "footer", text: "Next steps", buttons: [] };
+            }
+            // Materialize render-time reshape fallbacks so remove edits the
+            // real config (and subsequent reloads stay consistent).
+            PAGE.footer.buttons = footerButtonsWithReshapeFallback(
+              PAGE.footer.buttons || []
+            );
+            if (isNaN(idx) || idx < 0 || idx >= PAGE.footer.buttons.length) {
+              return false;
+            }
+            PAGE.footer.buttons.splice(idx, 1);
+            if (!PAGE.footer.buttons.length) {
+              // Keep a valid footer object; viewer will re-add defaults if needed.
+              PAGE.footer.buttons = [];
+            }
+            return true;
+          }
+
+          var blockIndex = +scope.getAttribute("data-mod-block");
+          if (isNaN(blockIndex) || !PAGE.blocks) return false;
+          var block = PAGE.blocks[blockIndex];
+          if (!block) return false;
+
+          if (kind === "list" || block.type === "list") {
+            if (!Array.isArray(block.data) || isNaN(idx)) return false;
+            if (idx < 0 || idx >= block.data.length) return false;
+            block.data.splice(idx, 1);
+            return true;
+          }
+
+          if (kind === "todo" || block.type === "todo") {
+            if (!Array.isArray(block.items) || isNaN(idx)) return false;
+            if (idx < 0 || idx >= block.items.length) return false;
+            block.items.splice(idx, 1);
+            return true;
+          }
+
+          return false;
+        }
+
         function build() {
           var html = "";
           if (PAGE.header) html += RENDERERS.header(PAGE.header);
@@ -2026,7 +2103,7 @@
           emitJsonLd();
         }
 
-        // interactive: toggling a todo checkbox updates state and rebuilds
+        // interactive: toggling a todo checkbox updates state, hash, rebuilds
         root.addEventListener("change", function (e) {
           if (!e.target.classList || !e.target.classList.contains("todo-cb"))
             return;
@@ -2036,7 +2113,7 @@
           var block = PAGE.blocks[+sec.getAttribute("data-block")];
           if (block && block.items) {
             block.items[+li.getAttribute("data-idx")].done = e.target.checked;
-            build();
+            persistPageAndRender();
           }
         });
 
@@ -2076,12 +2153,9 @@
 
           if (action === "remove") {
             var row = btn.closest("[data-mod-row]");
-            var title = (row && row.getAttribute("data-mod-title")) || label;
-            requestReshape(
-              'Remove "' + title + '" (' + label + ") from this AITab",
-              "Remove " + label,
-              { autoSubmit: true, source: "remove" }
-            );
+            if (removeFromPage(scope, row)) {
+              persistPageAndRender();
+            }
           }
         });
 
