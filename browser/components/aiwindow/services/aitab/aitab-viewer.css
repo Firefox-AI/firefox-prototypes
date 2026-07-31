@@ -99,10 +99,102 @@ body {
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
 }
+body.has-aitab-chrome {
+  --aitab-viewbar-h: 48px;
+  --aitab-brand-footer-h: 52px;
+  padding-block-start: var(--aitab-viewbar-h);
+  padding-block-end: var(--aitab-brand-footer-h);
+}
 .wrap {
   max-width: 960px;
   margin: 0 auto;
   padding: 32px 20px 64px;
+}
+
+/* ---- fixed skin switcher + brand footer (all skins) ---- */
+.aitab-viewbar {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: 100;
+  height: var(--aitab-viewbar-h, 48px);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 16px;
+  background: color-mix(in srgb, var(--card, #fff) 92%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line, #e6e8eb);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+}
+.aitab-viewbar-brand {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted, #6b7280);
+  flex: 0 0 auto;
+}
+.aitab-viewbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+}
+.aitab-viewbar-link {
+  flex: 0 0 auto;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--muted, #6b7280);
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+.aitab-viewbar-link:hover {
+  color: var(--ink, #1a1c1f);
+  background: var(--chip, #f0f2f5);
+}
+.aitab-viewbar-link.is-active {
+  color: var(--accent, #0060df);
+  background: var(--accent-soft, #e3edfd);
+  border-color: color-mix(in srgb, var(--accent, #0060df) 25%, transparent);
+}
+.aitab-brand-footer {
+  position: fixed;
+  inset-block-end: 0;
+  inset-inline: 0;
+  z-index: 100;
+  height: var(--aitab-brand-footer-h, 52px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: color-mix(in srgb, var(--card, #fff) 92%, transparent);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line, #e6e8eb);
+  color: var(--muted, #6b7280);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.aitab-brand-mark {
+  color: var(--accent, #0060df);
+  font-size: 1rem;
+  line-height: 1;
+}
+.aitab-brand-label {
+  letter-spacing: 0.01em;
+}
+
+/* Skin sticky chrome sits below the fixed view bar */
+body.has-aitab-chrome .skin-chrome {
+  top: var(--aitab-viewbar-h, 48px);
 }
 
 /* ---- takeaways ---- */

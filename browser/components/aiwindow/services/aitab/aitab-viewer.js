@@ -251,6 +251,102 @@
   var PAGE;
   var booting = true;
 
+  /** Skin HTML files in this directory (same path, swap filename; keep hash). */
+  var SKIN_VIEWS = [
+    { file: "aitab-viewer.html", label: "Default", id: "default" },
+    { file: "nova.html", label: "Nova", id: "nova" },
+    { file: "mozilla.html", label: "Mozilla", id: "mozilla" },
+  ];
+
+  function currentSkinFile() {
+    var parts = (location.pathname || "").split("/");
+    var name = parts[parts.length - 1] || "";
+    return name || "aitab-viewer.html";
+  }
+
+  /**
+   * Same directory + query + hash, different skin file.
+   *
+   * @param {string} file
+   * @returns {string}
+   */
+  function skinHref(file) {
+    var dir = location.pathname.replace(/[^/]*$/, "");
+    return dir + file + (location.search || "") + (location.hash || "");
+  }
+
+  /**
+   * Fixed header (skin switcher) + fixed footer (Made with Smart Window).
+   * Injected once so every skin HTML gets the same chrome.
+   */
+  function installAppChrome() {
+    if (document.querySelector(".aitab-viewbar")) {
+      refreshSkinLinks();
+      return;
+    }
+
+    document.body.classList.add("has-aitab-chrome");
+
+    var bar = document.createElement("header");
+    bar.className = "aitab-viewbar";
+    bar.setAttribute("role", "banner");
+
+    var brand = document.createElement("div");
+    brand.className = "aitab-viewbar-brand";
+    brand.textContent = "AITab";
+    bar.appendChild(brand);
+
+    var nav = document.createElement("nav");
+    nav.className = "aitab-viewbar-nav";
+    nav.setAttribute("aria-label", "Viewer skin");
+    SKIN_VIEWS.forEach(function (view) {
+      var a = document.createElement("a");
+      a.className = "aitab-viewbar-link";
+      a.dataset.skinFile = view.file;
+      a.dataset.skinId = view.id;
+      a.textContent = view.label;
+      a.href = skinHref(view.file);
+      nav.appendChild(a);
+    });
+    bar.appendChild(nav);
+
+    var foot = document.createElement("footer");
+    foot.className = "aitab-brand-footer";
+    foot.setAttribute("role", "contentinfo");
+    var mark = document.createElement("span");
+    mark.className = "aitab-brand-mark";
+    mark.setAttribute("aria-hidden", "true");
+    mark.textContent = "✦";
+    var label = document.createElement("span");
+    label.className = "aitab-brand-label";
+    label.textContent = "Made with Smart Window";
+    foot.appendChild(mark);
+    foot.appendChild(label);
+
+    document.body.insertBefore(bar, document.body.firstChild);
+    document.body.appendChild(foot);
+    refreshSkinLinks();
+  }
+
+  /** Keep skin links on the current hash/query after persist/hashchange. */
+  function refreshSkinLinks() {
+    var current = currentSkinFile();
+    document.querySelectorAll(".aitab-viewbar-link").forEach(function (a) {
+      var file = a.dataset.skinFile;
+      if (!file) {
+        return;
+      }
+      a.href = skinHref(file);
+      var active = file === current;
+      a.classList.toggle("is-active", active);
+      if (active) {
+        a.setAttribute("aria-current", "page");
+      } else {
+        a.removeAttribute("aria-current");
+      }
+    });
+  }
+
   /**
    * Apply document chrome that depends on PAGE (title, theme).
    * Called on first load and after hashchange (reshape reload).
@@ -1401,6 +1497,7 @@
     }
     applyPageChrome();
     build();
+    refreshSkinLinks();
   }
 
   /**
@@ -1578,6 +1675,7 @@
     try {
       setPage(loadPageConfigFromHashOrThrow());
       build();
+      refreshSkinLinks();
     } catch (err) {
       showFatal(err);
     }
@@ -1591,6 +1689,7 @@
    * so this tab is a valid reshape/refine_aitab target.
    */
   function boot() {
+    installAppChrome();
     booting = true;
     var start;
     try {
@@ -1613,6 +1712,7 @@
       .then(function (page) {
         setPage(page);
         build();
+        refreshSkinLinks();
         booting = false;
       })
       .catch(function (err) {
