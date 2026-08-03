@@ -35,6 +35,12 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
   clearTimeout: "resource://gre/modules/Timer.sys.mjs",
+  generateAITab:
+    "moz-src:///browser/components/aiwindow/services/aitab/AITab.sys.mjs",
+  getViewerBaseURL:
+    "moz-src:///browser/components/aiwindow/services/aitab/AITab.sys.mjs",
+  buildViewerURL:
+    "moz-src:///browser/components/aiwindow/services/aitab/AITab.sys.mjs",
   setTimeout: "resource://gre/modules/Timer.sys.mjs",
   MemoriesManager:
     "moz-src:///browser/components/aiwindow/models/memories/MemoriesManager.sys.mjs",
@@ -96,6 +102,7 @@ const MAX_HISTORY_RESULTS = 15;
 export const GET_OPEN_TABS = "get_open_tabs";
 export const SEARCH_BROWSING_HISTORY = "search_browsing_history";
 export const GET_PAGE_CONTENT = "get_page_content";
+export const GENERATE_AITAB = "generate_aitab";
 export const RUN_SEARCH = "run_search";
 export const SEARCH_THE_WEB = "search_the_web";
 export const GET_USER_MEMORIES = "get_user_memories";
@@ -110,6 +117,8 @@ export const ADD_MEMORY = "add_memory";
 // in Chat.sys.mjs when the pref is off.
 export const WORLD_CUP_TOOLS = new Set([WORLD_CUP_MATCHES, WORLD_CUP_LIVE]);
 export const WORLD_CUP_PREF = "browser.smartwindow.worldcup.enabled";
+export const AITAB_PREF = "browser.smartwindow.aitab.enabled";
+export const AITAB_TOOLS = new Set([GENERATE_AITAB]);
 export const SEARCH_QUERY_ENDPOINT_PREF =
   "browser.smartwindow.searchQuery.endpointURL";
 export const SEARCH_QUERY_APIKEY_PREF =
@@ -257,6 +266,35 @@ export const toolsConfig = [
       parameters: {
         type: "object",
         properties: {
+          url_list: {
+            type: "array",
+            items: {
+              type: "string",
+              description:
+                "A URL token that appeared in the conversation, formatted as §url_token: DOMAIN_TLD_PATH_n§. " +
+                "Do NOT fabricate tokens. Only use tokens from user messages and tool results.",
+            },
+            minItems: 1,
+            description: "List of URL tokens to fetch content from.",
+          },
+        },
+        required: ["url_list"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: GENERATE_AITAB,
+      description: "Design a custom web page with user content",
+      parameters: {
+        type: "object",
+        properties: {
+          focus: {
+            type: "string",
+            description:
+              "The focus on what information the user wants in the generated AITab.",
+          },
           url_list: {
             type: "array",
             items: {
@@ -1282,6 +1320,46 @@ export async function worldCupLive(toolParams, conversation) {
   return trimmed;
 }
 
+/**
+ * @param {object} toolParams
+ * @param {string[]} [toolParams.url_list]
+ * @param {string} [toolParams.focus]
+ * @param {ChatConversation} conversation
+ * @param {AbortSignal} [signal] - Cancels in-flight page extractions.
+ */
+export async function createAITab({ url_list, focus }, conversation, signal) {
+  lazy.console.log("[Tool] aiTab", JSON.stringify({ url_list, focus }));
+  // Generate the page from the requested URLs. Nothing is persisted; the chat
+  // tool returns a link to the external viewer with the page config in the URL
+  // hash, so the page data never reaches the viewer host.
+  const result = await lazy.generateAITab(
+    { url_list, focus, signal },
+    conversation
+  );
+  if (result.error) {
+    return `The page could not be created: ${result.error}.`;
+  }
+  const viewerBase = lazy.getViewerBaseURL();
+  if (!viewerBase) {
+    return (
+      "The page could not be created: the AITab viewer URL is not configured " +
+      "(set the browser.smartwindow.aitab.viewerURL preference)."
+    );
+  }
+  const viewerURL = lazy.buildViewerURL(viewerBase, result.page);
+  // Mark the viewer URL as seen so the chat renders it as a trusted, labeled
+  // link. Unseen links are unfurled as "label (full URL)" for disclosure, and
+  // this URL's hash carries the whole page config, so the full URL is very long.
+  conversation.addSeenUrls([viewerURL]);
+  // Register the URL as a token so the model echoes the short token, never the
+  // long URL (which it would otherwise truncate); expandUrlTokens restores the
+  // exact URL when rendering the assistant's reply.
+  const token = conversation.convertUrlToToken(viewerURL);
+  // Strip characters that would break the markdown link text and expose the URL.
+  const title = (result.metadata?.title || "the page").replace(/[[\]]/g, "");
+  return `The page was created. Link the user to it as [${title}](§url_token: ${token}§).`;
+}
+
 // No securityProperties / trust flags: skill prompts are Remote Settings
 // content and carry the same trust level as the system prompt itself.
 export async function getSkill({ toolParams, model }) {
@@ -1446,6 +1524,7 @@ export const toolFns = {
   getNavigationInfo,
   worldCupMatches,
   worldCupLive,
+  createAITab,
   manageTabs,
   addMemory,
   getSkill,

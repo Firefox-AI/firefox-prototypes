@@ -121,6 +121,8 @@ export const MODEL_FEATURES = Object.freeze({
   AGENT_MONITOR: "agent-monitor",
   // search agent
   SEARCH_ANSWER_GENERATION: "search-answer-generation",
+  // aitab structured-page generation
+  AITAB: "aitab",
 });
 
 /** @typedef {(typeof MODEL_FEATURES)[keyof typeof MODEL_FEATURES]} ModelFeature */
@@ -144,6 +146,8 @@ export const PURPOSES = Object.freeze({
   MEMORY_GENERATION: "memory-generation",
   // agents
   MONITOR: "monitor",
+  // aitab structured-page generation
+  AITAB: "aitab",
 });
 
 /**
@@ -185,6 +189,8 @@ export const FEATURE_MAJOR_VERSIONS = Object.freeze({
   [MODEL_FEATURES.AGENT_MONITOR]: 1,
   // search agent
   [MODEL_FEATURES.SEARCH_ANSWER_GENERATION]: 1,
+  // aitab structured-page generation
+  [MODEL_FEATURES.AITAB]: 1,
 });
 
 /**

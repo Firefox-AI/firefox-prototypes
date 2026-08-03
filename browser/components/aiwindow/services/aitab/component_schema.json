@@ -1,0 +1,546 @@
+[
+  {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "page",
+    "title": "Generated page",
+    "description": "A composed page: an optional header, an ordered array of body blocks (list / todo / info), and an optional footer. This is the document that gets injected into the HTML template. Each block self-identifies via its `type`.",
+    "type": "object",
+    "required": ["blocks"],
+    "additionalProperties": false,
+    "properties": {
+      "version": {
+        "type": "string",
+        "description": "Optional schema/version tag, e.g. \"1\"."
+      },
+      "theme": {
+        "description": "Page-wide theme.",
+        "enum": ["firefox", "slate", "sunset"],
+        "default": "firefox"
+      },
+      "header": { "$ref": "header" },
+      "blocks": {
+        "type": "array",
+        "description": "Ordered body content. Each item is discriminated by its `type`.",
+        "items": {
+          "oneOf": [{ "$ref": "list" }, { "$ref": "todo" }, { "$ref": "info" }]
+        }
+      },
+      "footer": { "$ref": "footer" }
+    },
+    "examples": [
+      {
+        "version": "1",
+        "theme": "firefox",
+        "header": {
+          "type": "header",
+          "icon": "🏨",
+          "title": "Hotels in Lisbon",
+          "subhead": "4 options gathered from your open tabs"
+        },
+        "blocks": [
+          {
+            "type": "info",
+            "size": "square",
+            "icon": "💰",
+            "heading": "Cheapest",
+            "value": "$72 / night",
+            "accent": true
+          },
+          {
+            "type": "info",
+            "size": "square",
+            "icon": "⭐",
+            "heading": "Top rated",
+            "value": "4.9 / 5"
+          },
+          {
+            "type": "list",
+            "title": "Compare",
+            "itemType": "Hotel",
+            "layout": "table",
+            "fields": [
+              {
+                "key": "name",
+                "label": "Name",
+                "type": "text",
+                "role": "title",
+                "property": "name"
+              },
+              {
+                "key": "price",
+                "label": "Price",
+                "type": "currency",
+                "role": "detail",
+                "sortable": true,
+                "suffix": " / night",
+                "property": "offers.price",
+                "goal": "min"
+              },
+              {
+                "key": "rating",
+                "label": "Rating",
+                "type": "rating",
+                "role": "detail",
+                "sortable": true,
+                "max": 5,
+                "property": "aggregateRating.ratingValue",
+                "goal": "max"
+              },
+              {
+                "key": "url",
+                "label": "Open tab",
+                "type": "url",
+                "role": "action",
+                "property": "url"
+              }
+            ],
+            "data": [
+              {
+                "name": "Budget Central Hostel",
+                "price": 72,
+                "rating": 4.0,
+                "url": "https://www.airbnb.com"
+              },
+              {
+                "name": "The Riverside Grand",
+                "price": 182,
+                "rating": 4.6,
+                "url": "https://www.booking.com"
+              }
+            ]
+          },
+          {
+            "type": "todo",
+            "title": "Before you book",
+            "items": [
+              {
+                "text": "Check the free-cancellation window",
+                "priority": "high"
+              },
+              { "text": "Compare total price incl. taxes", "done": false }
+            ]
+          }
+        ],
+        "footer": {
+          "type": "footer",
+          "text": "Next steps",
+          "buttons": [
+            {
+              "text": "Book The Riverside Grand",
+              "href": "https://www.booking.com",
+              "variant": "primary"
+            },
+            { "text": "Plan the trip", "href": "app://views/trip" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "footer",
+    "title": "Footer block",
+    "description": "Page footer with up to three follow-up action buttons. Buttons are the next things a user might want to do (open a tab, plan the trip, refine the view).",
+    "type": "object",
+    "required": ["type", "buttons"],
+    "additionalProperties": false,
+    "properties": {
+      "type": {
+        "const": "footer",
+        "description": "Block discriminator."
+      },
+      "text": {
+        "type": "string",
+        "description": "Optional line of context shown above the buttons."
+      },
+      "buttons": {
+        "type": "array",
+        "description": "1 to 3 follow-up buttons.",
+        "minItems": 1,
+        "maxItems": 3,
+        "items": { "$ref": "#/$defs/button" }
+      }
+    },
+    "$defs": {
+      "button": {
+        "type": "object",
+        "required": ["text", "href"],
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Button label.",
+            "minLength": 1
+          },
+          "href": {
+            "type": "string",
+            "format": "uri-reference",
+            "description": "Where the click goes: an external URL, or an in-app route/action id."
+          },
+          "variant": {
+            "description": "Visual weight. Typically the first button is `primary`, the rest `secondary`.",
+            "enum": ["primary", "secondary"],
+            "default": "secondary"
+          }
+        }
+      }
+    },
+    "examples": [
+      {
+        "type": "footer",
+        "text": "Next steps",
+        "buttons": [
+          {
+            "text": "Book The Riverside Grand",
+            "href": "https://www.booking.com",
+            "variant": "primary"
+          },
+          { "text": "Compare on a map", "href": "app://views/map" },
+          { "text": "Refine filters", "href": "app://views/refine" }
+        ]
+      }
+    ]
+  },
+  {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "header",
+    "title": "Header block",
+    "description": "Page header: an emoji icon, a title, and an optional subhead. Usually the first thing on a generated page.",
+    "type": "object",
+    "required": ["type", "title"],
+    "additionalProperties": false,
+    "properties": {
+      "type": {
+        "const": "header",
+        "description": "Block discriminator."
+      },
+      "icon": {
+        "type": "string",
+        "description": "A single emoji shown with the title, e.g. \"🏨\" or \"🗺️\".",
+        "maxLength": 8
+      },
+      "title": {
+        "type": "string",
+        "description": "Main page title.",
+        "minLength": 1
+      },
+      "subhead": {
+        "type": "string",
+        "description": "Optional supporting line beneath the title."
+      }
+    },
+    "examples": [
+      {
+        "type": "header",
+        "icon": "🏨",
+        "title": "Hotels in Lisbon",
+        "subhead": "4 options gathered from your open tabs"
+      }
+    ]
+  },
+  {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "info",
+    "title": "Info panel block",
+    "description": "A small info/stat panel. `square` panels are compact tiles (good for a single number or short note); `wide` panels span full width (good for a sentence or two). Adjacent panels tile/stack together in the layout.",
+    "type": "object",
+    "required": ["type"],
+    "additionalProperties": false,
+    "anyOf": [
+      { "required": ["value"] },
+      { "required": ["body"] },
+      { "required": ["heading"] }
+    ],
+    "properties": {
+      "type": {
+        "const": "info",
+        "description": "Block discriminator."
+      },
+      "size": {
+        "description": "Footprint of the panel. `square` = compact tile; `wide` = full-width. Multiple panels can be stacked/tiled together.",
+        "enum": ["square", "wide"],
+        "default": "square"
+      },
+      "icon": {
+        "type": "string",
+        "description": "Optional emoji, e.g. \"💰\" or \"📍\".",
+        "maxLength": 8
+      },
+      "heading": {
+        "type": "string",
+        "description": "Small label for the panel (e.g. \"Total cost\")."
+      },
+      "value": {
+        "type": "string",
+        "description": "Prominent value/stat (e.g. \"€1,240\" or \"3 days\")."
+      },
+      "body": {
+        "type": "string",
+        "description": "Supporting text; best for `wide` panels."
+      },
+      "href": {
+        "type": "string",
+        "format": "uri-reference",
+        "description": "Optional link that the whole panel points to (a URL or an in-app route)."
+      },
+      "accent": {
+        "type": "boolean",
+        "description": "Emphasize the panel with the theme accent color.",
+        "default": false
+      }
+    },
+    "examples": [
+      {
+        "type": "info",
+        "size": "square",
+        "icon": "💰",
+        "heading": "Cheapest",
+        "value": "$72 / night",
+        "accent": true
+      },
+      {
+        "type": "info",
+        "size": "wide",
+        "icon": "📍",
+        "heading": "Neighborhood",
+        "body": "All four options are within 2.2 km of the city center; the two cheapest are also the closest."
+      }
+    ]
+  },
+  {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "list",
+    "title": "List block",
+    "description": "The comparison/list view: a display schema (`fields`) paired with `data`. Fields may carry schema.org property mappings (for JSON-LD), sort options, and a `goal` used for superlatives and best-value scoring. Supersedes the standalone list-view.schema.json, reframed as a composable block.",
+    "type": "object",
+    "required": ["type", "fields", "data"],
+    "additionalProperties": false,
+    "properties": {
+      "type": {
+        "const": "list",
+        "description": "Block discriminator."
+      },
+      "title": {
+        "type": "string",
+        "description": "Optional heading for the block."
+      },
+      "description": { "type": "string" },
+      "itemType": {
+        "type": "string",
+        "description": "schema.org type of each data item, e.g. \"Hotel\", \"TouristAttraction\", \"Product\". Used to emit JSON-LD."
+      },
+      "layout": {
+        "description": "Initial layout hint.",
+        "enum": ["cards", "compact", "grid", "table"]
+      },
+      "fields": {
+        "type": "array",
+        "minItems": 1,
+        "items": { "$ref": "#/$defs/field" }
+      },
+      "data": {
+        "type": "array",
+        "description": "One object per record; keys should match field `key`s.",
+        "items": { "type": "object" }
+      }
+    },
+    "$defs": {
+      "field": {
+        "type": "object",
+        "required": ["key", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Property name read from each data object."
+          },
+          "label": { "type": "string", "description": "Human-readable label." },
+          "type": {
+            "description": "How the value is formatted.",
+            "enum": [
+              "text",
+              "number",
+              "currency",
+              "rating",
+              "tags",
+              "badge",
+              "boolean",
+              "date",
+              "url",
+              "image",
+              "long"
+            ]
+          },
+          "role": {
+            "description": "Where the field renders. Defaults to \"detail\".",
+            "enum": ["image", "title", "subtitle", "badge", "detail", "action"],
+            "default": "detail"
+          },
+          "sortable": {
+            "type": "boolean",
+            "description": "Offer this field in the Sort menu."
+          },
+          "prefix": {
+            "type": "string",
+            "description": "Text shown before the value."
+          },
+          "suffix": {
+            "type": "string",
+            "description": "Text shown after the value, e.g. \" / night\"."
+          },
+          "max": {
+            "type": "number",
+            "description": "Denominator for `rating` fields (default 5)."
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 code for `currency` fields (default USD).",
+            "default": "USD"
+          },
+          "property": {
+            "type": "string",
+            "description": "schema.org property this field maps to. Dotted paths nest, e.g. \"offers.price\" or \"aggregateRating.ratingValue\"."
+          },
+          "goal": {
+            "description": "For numeric/currency/rating fields: which direction is \"better\". Drives superlatives and the composite best-value score.",
+            "enum": ["min", "max"]
+          }
+        }
+      }
+    },
+    "examples": [
+      {
+        "type": "list",
+        "title": "Hotel comparison",
+        "itemType": "Hotel",
+        "layout": "table",
+        "fields": [
+          {
+            "key": "name",
+            "label": "Name",
+            "type": "text",
+            "role": "title",
+            "property": "name"
+          },
+          {
+            "key": "price",
+            "label": "Price",
+            "type": "currency",
+            "role": "detail",
+            "sortable": true,
+            "suffix": " / night",
+            "property": "offers.price",
+            "goal": "min"
+          },
+          {
+            "key": "rating",
+            "label": "Rating",
+            "type": "rating",
+            "role": "detail",
+            "sortable": true,
+            "max": 5,
+            "property": "aggregateRating.ratingValue",
+            "goal": "max"
+          },
+          {
+            "key": "url",
+            "label": "Open tab",
+            "type": "url",
+            "role": "action",
+            "property": "url"
+          }
+        ],
+        "data": [
+          {
+            "name": "The Riverside Grand",
+            "price": 182,
+            "rating": 4.6,
+            "url": "https://www.booking.com"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "todo",
+    "title": "To-do list block",
+    "description": "A targeted, actionable checklist — distinct from the generic list block. Each item has a done state and optional due date, priority, note, and link back to its source.",
+    "type": "object",
+    "required": ["type", "items"],
+    "additionalProperties": false,
+    "properties": {
+      "type": {
+        "const": "todo",
+        "description": "Block discriminator."
+      },
+      "title": {
+        "type": "string",
+        "description": "Optional heading for the checklist."
+      },
+      "showProgress": {
+        "type": "boolean",
+        "description": "Show a completed/total progress indicator.",
+        "default": true
+      },
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "items": { "$ref": "#/$defs/task" }
+      }
+    },
+    "$defs": {
+      "task": {
+        "type": "object",
+        "required": ["text"],
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "What needs doing.",
+            "minLength": 1
+          },
+          "done": {
+            "type": "boolean",
+            "description": "Whether the task is complete.",
+            "default": false
+          },
+          "due": {
+            "type": "string",
+            "format": "date",
+            "description": "Optional due date, ISO 8601 (YYYY-MM-DD)."
+          },
+          "priority": {
+            "description": "Optional priority.",
+            "enum": ["low", "medium", "high"]
+          },
+          "note": {
+            "type": "string",
+            "description": "Optional supporting detail."
+          },
+          "href": {
+            "type": "string",
+            "format": "uri-reference",
+            "description": "Optional link to the source tab or a details page."
+          }
+        }
+      }
+    },
+    "examples": [
+      {
+        "type": "todo",
+        "title": "Before the Lisbon trip",
+        "items": [
+          {
+            "text": "Book Pena Palace timed entry",
+            "priority": "high",
+            "due": "2026-07-30",
+            "href": "https://www.parquesdesintra.pt"
+          },
+          { "text": "Confirm hotel free-cancellation window", "done": true },
+          { "text": "Download offline map of Alfama", "priority": "low" }
+        ]
+      }
+    ]
+  }
+]
