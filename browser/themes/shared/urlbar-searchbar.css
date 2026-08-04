@@ -121,7 +121,7 @@ toolbar[inactive="true"] .urlbar,
 #urlbar:not([actiontype="switchtab"]) > .urlbar-input-container > #urlbar-label-box > #urlbar-label-switchtab,
 #urlbar:not([actiontype="extension"]) > .urlbar-input-container > #urlbar-label-box > #urlbar-label-extension,
 .urlbar-input-container[pageproxystate="invalid"] > #page-action-buttons > .urlbar-page-action,
-#identity-box.chromeUI ~ #page-action-buttons > .urlbar-page-action:not(#star-button-box, #split-view-button),
+#identity-box.chromeUI ~ #page-action-buttons > .urlbar-page-action:not(#star-button-box, #split-view-button, #gentab-button),
 #urlbar[usertyping] > .urlbar-input-container > #page-action-buttons > #urlbar-zoom-button,
 .urlbar:not([usertyping]) > .urlbar-input-container > .urlbar-go-button,
 .urlbar:not(#searchbar-new, [focused]) > .urlbar-input-container > .urlbar-go-button,
@@ -1092,6 +1092,127 @@ toolbar[inactive="true"] .urlbar,
   list-style-image: url(chrome://browser/skin/taskbar-tabs-add-tab.svg);
   :root[taskbartab] & {
     list-style-image: url(chrome://browser/skin/taskbar-tabs-move-tab.svg);
+  }
+}
+
+/* GenTab / AITab viewer chrome
+   [✦ Smart Window Tab]  {page title}              [Generated page] */
+
+#urlbar[aitab-viewer] {
+  --gentab-badge-fill: var(--toolbar-field-background-color);
+  --gentab-badge-gradient: linear-gradient(
+    117deg,
+    #321bfd -17.87%,
+    #cf30e2 52.93%,
+    #f90 89.02%,
+    #f5c451 109.44%
+  );
+  --gentab-status-bg: color-mix(in srgb, var(--toolbar-field-color) 8%, transparent);
+  --gentab-status-fg: color-mix(in srgb, var(--toolbar-field-color) 72%, transparent);
+  --gentab-title-fg: color-mix(in srgb, var(--toolbar-field-color) 78%, transparent);
+}
+
+/* Left product chip */
+#gentab-type-badge {
+  flex-shrink: 0;
+  gap: var(--space-xsmall);
+  height: var(--urlbar-basic-component-size);
+  margin-inline-end: var(--space-small);
+  padding-inline: calc(var(--space-small) + 1px) var(--space-medium);
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  background:
+    linear-gradient(var(--gentab-badge-fill), var(--gentab-badge-fill)) padding-box,
+    var(--gentab-badge-gradient) border-box;
+  color: var(--toolbar-field-color);
+  font-size: 0.85em;
+  font-weight: var(--font-weight-semibold, 600);
+  white-space: nowrap;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+#gentab-type-badge > .gentab-type-badge-icon {
+  list-style-image: url("chrome://browser/content/aiwindow/assets/ask-icon.svg");
+  width: 14px;
+  height: 14px;
+  -moz-context-properties: fill, fill-opacity;
+  fill: currentColor;
+  fill-opacity: 1;
+  flex-shrink: 0;
+}
+
+#gentab-type-badge > .gentab-type-badge-label {
+  margin: 0;
+  line-height: 1;
+}
+
+/* Page title overlay (replaces the transparent hash URL) */
+#urlbar .urlbar-input-box {
+  position: relative;
+}
+
+.gentab-title-label {
+  display: none;
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--gentab-title-fg, var(--toolbar-field-color));
+  font: inherit;
+  pointer-events: none;
+  z-index: 1;
+}
+
+#urlbar[aitab-viewer]:not([focused]):not([usertyping]) > .urlbar-input-container > .urlbar-input-box > .gentab-title-label {
+  display: flex;
+}
+
+/* Right status chip */
+#gentab-button.gentab-status-chip {
+  width: auto;
+  max-width: min(24ch, 30vw);
+  height: calc(var(--urlbar-basic-component-size) - 4px);
+  margin-inline: var(--space-xsmall);
+  padding-inline: var(--space-medium);
+  border-radius: 999px;
+  background-color: var(--gentab-status-bg);
+  color: var(--gentab-status-fg);
+  gap: 0;
+
+  &:not([disabled]):hover {
+    background-color: color-mix(in srgb, var(--toolbar-field-color) 14%, transparent);
+    color: var(--toolbar-field-color);
+  }
+}
+
+#gentab-button.gentab-status-chip > .gentab-button-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8em;
+  margin: 0;
+  pointer-events: none;
+}
+
+/* Hide long viewer#JSON hash while GenTab chrome is available; focus/type restores it.
+   Use opacity (not color) so SELECTION_URLSECONDARY path/scheme paint is hidden too —
+   layout paints secondary URL ranges with fixed alpha and ignores color:transparent. */
+#urlbar[aitab-viewer]:not([focused]):not([usertyping]) {
+  & .urlbar-input,
+  & #urlbar-scheme {
+    opacity: 0;
+  }
+}
+
+/* Match mock: no lock/identity chrome when the product chip is present. */
+#urlbar[aitab-viewer] {
+  & #identity-box,
+  & #trust-icon-container,
+  & #tracking-protection-icon-container {
+    display: none;
   }
 }
 

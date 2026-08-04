@@ -361,6 +361,16 @@
                       aria-labelledby="urlbar-search-mode-indicator-close urlbar-search-mode-indicator-title"
                       data-l10n-id="urlbar-search-mode-indicator-close"/>
           </html:div>
+          <hbox id="gentab-type-badge"
+                class="gentab-type-badge"
+                align="center"
+                urlbar-slot="site-info"
+                hidden="true">
+            <image class="urlbar-icon gentab-type-badge-icon"/>
+            <label id="gentab-type-badge-label"
+                   class="gentab-type-badge-label"
+                   data-l10n-id="gentab-urlbar-type-label"/>
+          </hbox>
 
           <hbox id="urlbar-revert-button-container" urlbar-slot="revert-button">
             <toolbartabstop/>
@@ -409,6 +419,15 @@
                   data-l10n-id="taskbar-tab-urlbar-button-open"
                   hidden="true">
               <image class="urlbar-icon"/>
+            </hbox>
+            <hbox id="gentab-button"
+                  class="urlbar-page-action gentab-status-chip"
+                  role="button"
+                  hidden="true"
+                  data-l10n-id="gentab-urlbar-status-button">
+              <label id="gentab-button-label"
+                     class="gentab-button-label"
+                     data-l10n-id="gentab-urlbar-status-generated"/>
             </hbox>
             <hbox id="translations-button"
                   class="urlbar-page-action"

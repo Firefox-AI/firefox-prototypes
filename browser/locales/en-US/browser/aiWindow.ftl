@@ -16,6 +16,20 @@ tab-context-create-gentab =
     .label = Create GenTab
     .accesskey = G
 
+## GenTab urlbar chrome (viewer page)
+
+gentab-urlbar-type-label = { -smart-window-brand-name } Tab
+
+gentab-urlbar-status-button =
+    .tooltiptext = Show page address
+    .aria-label = Show page address
+
+gentab-urlbar-status-generated = Generated page
+
+gentab-urlbar-status-generating = Generating…
+
+gentab-urlbar-status-error = Generation failed
+
 appmenuitem-new-ai-window =
     .label = New { -smart-window-brand-name }
     .value = New { -smart-window-brand-name }

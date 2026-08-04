@@ -66,6 +66,7 @@ category browser-window-delayed-startup moz-src:///browser/components/genai/Link
 category browser-window-delayed-startup moz-src:///browser/components/reportbrokensite/ReportBrokenSite.sys.mjs ReportBrokenSite.init
 category browser-window-delayed-startup moz-src:///browser/components/search/SearchUIUtils.sys.mjs SearchUIUtils.init
 category browser-window-delayed-startup resource:///modules/taskbartabs/TaskbarTabsPageAction.sys.mjs TaskbarTabsPageAction.init
+category browser-window-delayed-startup moz-src:///browser/components/aiwindow/ui/modules/GenTabPageAction.sys.mjs GenTabPageAction.init
 #ifdef XP_MACOSX
 category browser-window-delayed-startup resource://gre/modules/RosettaUtils.sys.mjs RosettaUtils.maybeWarnAboutRosetta
 #endif
