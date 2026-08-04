@@ -250,6 +250,15 @@
   var root = document.getElementById("page");
   var PAGE;
   var booting = true;
+  /**
+   * Pending Add… flows waiting on chat (prefill, no autosubmit).
+   * Each shows a shimmering placeholder until refine_aitab rewrites the hash
+   * (then the whole list is cleared — page JSON is authoritative).
+   *
+   * @type {Array<{ id: string, kind: string, label: string, blockIndex: string|null }>}
+   */
+  var pendingModifies = [];
+  var pendingModifySeq = 0;
 
   /** Skin HTML files in this directory (same path, swap filename; keep hash). */
   var SKIN_VIEWS = [
@@ -786,6 +795,175 @@
   }
   function rowAttrs(i) {
     return ' data-mod-row data-mod-index="' + i + '"';
+  }
+
+  /**
+   * Resolve the mod-scope element for a pending entry.
+   *
+   * @param {{ kind: string, blockIndex: string|null }} pending
+   * @returns {Element|null}
+   */
+  function findScopeForPending(pending) {
+    var scope = null;
+    if (pending.blockIndex != null && pending.blockIndex !== "") {
+      scope = document.querySelector(
+        '.mod-scope[data-mod-block="' +
+          CSS.escape(String(pending.blockIndex)) +
+          '"]'
+      );
+    }
+    if (!scope) {
+      scope = document.querySelector(
+        '.mod-scope[data-mod-kind="' + CSS.escape(pending.kind) + '"]'
+      );
+    }
+    if (!scope && pending.kind === "footer") {
+      scope = document.querySelector('.mod-scope[data-mod-kind="footer"]');
+    }
+    return scope;
+  }
+
+  /**
+   * Build one shimmer placeholder for a pending Add… entry.
+   *
+   * @param {{ id: string, label: string }} pending
+   * @param {boolean} asTableRow
+   * @param {number} colCount
+   * @returns {HTMLElement}
+   */
+  function createPendingPlaceholder(pending, asTableRow, colCount) {
+    var label = pending.label || "item";
+    var aria = "Adding " + label + ". Waiting for details in chat.";
+    var hintText = "Adding " + label + "… finish details in chat";
+
+    if (asTableRow) {
+      var tr = document.createElement("tr");
+      tr.className = "mod-pending-row mod-pending-tr";
+      tr.dataset.pendingId = pending.id;
+      tr.setAttribute("role", "status");
+      tr.setAttribute("aria-busy", "true");
+      tr.setAttribute("aria-label", aria);
+      for (var c = 0; c < colCount; c++) {
+        var td = document.createElement("td");
+        if (c === 0) {
+          var hintCell = document.createElement("div");
+          hintCell.className = "mod-pending-hint";
+          hintCell.textContent = hintText;
+          td.appendChild(hintCell);
+        }
+        var cell = document.createElement("div");
+        cell.className =
+          "mod-pending-line " +
+          (c === 0 ? "mod-pending-line-md" : "mod-pending-line-sm");
+        td.appendChild(cell);
+        tr.appendChild(td);
+      }
+      return tr;
+    }
+
+    var placeholder = document.createElement("div");
+    placeholder.className = "mod-pending-row";
+    placeholder.dataset.pendingId = pending.id;
+    placeholder.setAttribute("role", "status");
+    placeholder.setAttribute("aria-busy", "true");
+    placeholder.setAttribute("aria-label", aria);
+
+    var shimmer = document.createElement("div");
+    shimmer.className = "mod-pending-shimmer";
+    var line1 = document.createElement("div");
+    line1.className = "mod-pending-line mod-pending-line-lg";
+    var line2 = document.createElement("div");
+    line2.className = "mod-pending-line mod-pending-line-md";
+    var line3 = document.createElement("div");
+    line3.className = "mod-pending-line mod-pending-line-sm";
+    shimmer.appendChild(line1);
+    shimmer.appendChild(line2);
+    shimmer.appendChild(line3);
+    placeholder.appendChild(shimmer);
+
+    var hint = document.createElement("div");
+    hint.className = "mod-pending-hint";
+    hint.textContent = hintText;
+    placeholder.appendChild(hint);
+    return placeholder;
+  }
+
+  /**
+   * Queue a modifying UI state for an incomplete Add… reshape.
+   * Multiple pending adds are allowed (including on the same block).
+   *
+   * @param {Element} scope
+   * @param {string} label
+   */
+  function beginPendingAdd(scope, label) {
+    pendingModifySeq += 1;
+    pendingModifies.push({
+      id: "pending-" + pendingModifySeq,
+      kind: (scope && scope.getAttribute("data-mod-kind")) || "list",
+      label: label || "item",
+      blockIndex: scope ? scope.getAttribute("data-mod-block") : null,
+    });
+    applyPendingModifyUI();
+  }
+
+  /** Clear all pending Add… shimmers (e.g. after refine rewrites the hash). */
+  function clearPendingModifies() {
+    pendingModifies = [];
+    document.querySelectorAll(".mod-pending-row").forEach(function (el) {
+      el.remove();
+    });
+    document.body.classList.remove("is-modifying");
+    document.querySelectorAll(".mod-add-bar").forEach(function (bar) {
+      bar.hidden = false;
+      bar.disabled = false;
+    });
+  }
+
+  /**
+   * Insert / refresh shimmer placeholders for all pending Add… actions.
+   * Safe to call after build() so rows survive re-render.
+   */
+  function applyPendingModifyUI() {
+    document.querySelectorAll(".mod-pending-row").forEach(function (el) {
+      el.remove();
+    });
+    document.querySelectorAll(".mod-add-bar").forEach(function (bar) {
+      bar.hidden = false;
+      bar.disabled = false;
+    });
+
+    if (!pendingModifies.length) {
+      document.body.classList.remove("is-modifying");
+      return;
+    }
+
+    document.body.classList.add("is-modifying");
+
+    pendingModifies.forEach(function (pending) {
+      var scope = findScopeForPending(pending);
+      if (!scope) {
+        return;
+      }
+
+      var addBarEl = scope.querySelector(".mod-add-bar");
+      var tbody = scope.querySelector("tbody");
+      if (tbody) {
+        var colCount = 3;
+        var headerRow = scope.querySelector("thead tr");
+        if (headerRow) {
+          colCount = headerRow.children.length || colCount;
+        }
+        tbody.appendChild(createPendingPlaceholder(pending, true, colCount));
+        return;
+      }
+
+      var placeholder = createPendingPlaceholder(pending, false, 0);
+      if (addBarEl) {
+        scope.insertBefore(placeholder, addBarEl);
+      } else {
+        scope.appendChild(placeholder);
+      }
+    });
   }
   function rowTitle(schema, row, index) {
     var titleF = firstByRole(schema, "title");
@@ -1600,6 +1778,8 @@
     // eslint-disable-next-line no-unsanitized/property
     root.innerHTML = html;
     emitJsonLd();
+    // Re-apply after re-render so the shimmer survives until hash updates.
+    applyPendingModifyUI();
   }
 
   // interactive: toggling a todo checkbox updates state, hash, rebuilds
@@ -1647,7 +1827,9 @@
     var label = scope.getAttribute("data-mod-label") || "item";
 
     if (modAction === "add") {
-      // Prefill only — user types the concrete name (ingredient, hotel…).
+      // Show shimmer while the user fills details in the sidebar (no autosubmit).
+      // Multiple pending adds are allowed — each gets its own placeholder + prefill.
+      beginPendingAdd(scope, label);
       requestReshape("Add a new " + label + ": ", "Add " + label, {
         autoSubmit: false,
         source: "add",
@@ -1673,6 +1855,8 @@
       return;
     }
     try {
+      // Hash rewrite from refine_aitab completes pending Add… flows.
+      clearPendingModifies();
       setPage(loadPageConfigFromHashOrThrow());
       build();
       refreshSkinLinks();

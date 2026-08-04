@@ -197,6 +197,74 @@ body.has-aitab-chrome .skin-chrome {
   top: var(--aitab-viewbar-h, 48px);
 }
 
+/* ---- pending Add… (wait for chat details / reshape) ---- */
+@keyframes aitab-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+.mod-pending-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 10px 0;
+  padding: 14px 16px;
+  border: 1px dashed color-mix(in srgb, var(--accent, #0060df) 35%, var(--line, #e6e8eb));
+  border-radius: var(--radius, 12px);
+  background: color-mix(in srgb, var(--accent-soft, #e3edfd) 55%, var(--card, #fff));
+}
+.mod-pending-shimmer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mod-pending-line {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--muted, #6b7280) 12%, transparent) 0%,
+    color-mix(in srgb, var(--muted, #6b7280) 28%, transparent) 40%,
+    color-mix(in srgb, var(--muted, #6b7280) 12%, transparent) 80%
+  );
+  background-size: 200% 100%;
+  animation: aitab-shimmer 1.2s ease-in-out infinite;
+}
+.mod-pending-line-lg {
+  width: 72%;
+  height: 14px;
+}
+.mod-pending-line-md {
+  width: 88%;
+}
+.mod-pending-line-sm {
+  width: 48%;
+}
+.mod-pending-hint {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent, #0060df);
+}
+tr.mod-pending-tr td {
+  padding: 12px 14px;
+  border-top: 1px dashed color-mix(in srgb, var(--accent, #0060df) 30%, var(--line, #e6e8eb));
+  background: color-mix(in srgb, var(--accent-soft, #e3edfd) 40%, transparent);
+}
+tr.mod-pending-tr .mod-pending-line {
+  margin: 2px 0;
+}
+body.is-modifying .mod-add-bar[hidden] {
+  display: none !important;
+}
+.mod-scope:has(.mod-pending-row) {
+  outline: 1px solid color-mix(in srgb, var(--accent, #0060df) 20%, transparent);
+  outline-offset: 4px;
+  border-radius: var(--radius, 12px);
+}
+
 /* ---- takeaways ---- */
 .takeaways {
   margin-bottom: 40px;
