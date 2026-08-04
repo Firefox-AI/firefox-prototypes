@@ -423,6 +423,74 @@ export function buildViewerURL(viewerBase, page) {
 }
 
 /**
+ * Lightweight page config shown while GenTab / AITab generation is in flight.
+ * Not schema-validated — viewer treats `status: "generating"` as a special UI.
+ *
+ * @param {object} [options]
+ * @param {string} [options.title]
+ * @param {string} [options.subhead]
+ * @param {number} [options.sourceCount]
+ * @param {string} [options.groupLabel]
+ * @returns {object}
+ */
+export function buildGeneratingPage(options = {}) {
+  const sourceCount =
+    typeof options.sourceCount === "number" ? options.sourceCount : 0;
+  const groupLabel =
+    typeof options.groupLabel === "string" ? options.groupLabel.trim() : "";
+  let title = "Creating your GenTab…";
+  if (typeof options.title === "string" && options.title.trim()) {
+    title = options.title.trim();
+  } else if (groupLabel) {
+    title = `Creating “${groupLabel}”…`;
+  }
+  let subhead = "Working…";
+  if (typeof options.subhead === "string" && options.subhead.trim()) {
+    subhead = options.subhead.trim();
+  } else if (sourceCount > 1) {
+    subhead = `Reading ${sourceCount} open tabs…`;
+  } else if (sourceCount === 1) {
+    subhead = "Reading your open tab…";
+  }
+  return {
+    version: "1",
+    status: "generating",
+    theme: "firefox",
+    header: {
+      type: "header",
+      title,
+      subhead,
+    },
+    blocks: [],
+  };
+}
+
+/**
+ * Error page config when generation fails after the pending tab was opened.
+ *
+ * @param {object} [options]
+ * @param {string} [options.message]
+ * @returns {object}
+ */
+export function buildErrorPage(options = {}) {
+  const message =
+    typeof options.message === "string" && options.message.trim()
+      ? options.message.trim()
+      : "Something went wrong while creating this page.";
+  return {
+    version: "1",
+    status: "error",
+    theme: "firefox",
+    header: {
+      type: "header",
+      title: "Could not create GenTab",
+      subhead: message,
+    },
+    blocks: [],
+  };
+}
+
+/**
  * Resolve and validate the viewer base URL from prefs. Returns null when the
  * pref is empty or is not an https URL.
  *

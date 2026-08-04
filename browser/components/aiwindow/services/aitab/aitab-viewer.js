@@ -1761,7 +1761,66 @@
     return false;
   }
 
+  /**
+   * Full-page shimmer / error shell for GenTab create (status in hash JSON).
+   * Built with DOM APIs (no untrusted HTML).
+   */
+  function renderStatusShell() {
+    while (root.firstChild) {
+      root.firstChild.remove();
+    }
+    var isError = PAGE && PAGE.status === "error";
+    var shell = document.createElement("section");
+    shell.className =
+      "aitab-status-shell " +
+      (isError ? "aitab-status-error" : "aitab-status-generating");
+    shell.setAttribute("role", isError ? "alert" : "status");
+    shell.setAttribute("aria-busy", isError ? "false" : "true");
+
+    var title = document.createElement("h1");
+    title.className = "aitab-status-title";
+    title.textContent =
+      (PAGE.header && PAGE.header.title) ||
+      (isError ? "Could not create page" : "Creating your GenTab…");
+    shell.appendChild(title);
+
+    if (PAGE.header && PAGE.header.subhead) {
+      var sub = document.createElement("p");
+      sub.className = "aitab-status-subhead";
+      sub.textContent = PAGE.header.subhead;
+      shell.appendChild(sub);
+    }
+
+    if (!isError) {
+      var shimmer = document.createElement("div");
+      shimmer.className = "aitab-status-shimmer";
+      for (var i = 0; i < 5; i++) {
+        var block = document.createElement("div");
+        block.className = "aitab-status-card";
+        var l1 = document.createElement("div");
+        l1.className = "mod-pending-line mod-pending-line-lg";
+        var l2 = document.createElement("div");
+        l2.className = "mod-pending-line mod-pending-line-md";
+        var l3 = document.createElement("div");
+        l3.className = "mod-pending-line mod-pending-line-sm";
+        block.appendChild(l1);
+        block.appendChild(l2);
+        block.appendChild(l3);
+        shimmer.appendChild(block);
+      }
+      shell.appendChild(shimmer);
+    }
+
+    root.appendChild(shell);
+  }
+
   function build() {
+    // Special hash states from GenTab create: generating / error (not schema pages).
+    if (PAGE && (PAGE.status === "generating" || PAGE.status === "error")) {
+      renderStatusShell();
+      return;
+    }
+
     var html = "";
     if (PAGE.header) {
       html += RENDERERS.header(PAGE.header);

@@ -197,6 +197,44 @@ body.has-aitab-chrome .skin-chrome {
   top: var(--aitab-viewbar-h, 48px);
 }
 
+/* ---- full-page generating / error (GenTab menu open) ---- */
+.aitab-status-shell {
+  max-width: 720px;
+  margin: 48px auto 32px;
+  padding: 8px 8px 32px;
+}
+.aitab-status-title {
+  margin: 0 0 8px;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+.aitab-status-subhead {
+  margin: 0 0 28px;
+  text-align: center;
+  color: var(--muted, #6b7280);
+  font-size: 0.95rem;
+}
+.aitab-status-error .aitab-status-title {
+  color: #c50042;
+}
+.aitab-status-shimmer {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.aitab-status-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 16px;
+  border-radius: var(--radius, 14px);
+  border: 1px solid var(--line, #e6e8eb);
+  background: var(--card, #fff);
+  box-shadow: var(--shadow);
+}
+
 /* ---- pending Add… (wait for chat details / reshape) ---- */
 @keyframes aitab-shimmer {
   0% {

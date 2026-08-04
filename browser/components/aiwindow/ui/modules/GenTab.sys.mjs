@@ -7,7 +7,8 @@
  *
  * Menus still call GenTab.createFromBrowser(s) / createFromTabGroup.
  * Generation uses the AITab page schema + remote viewer (hash JSON).
- * Reshape / add / remove live in the viewer + refine_aitab tool.
+ * Opens the viewer immediately with status:"generating", then replaces
+ * the hash when the real page config is ready.
  */
 
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
@@ -15,11 +16,19 @@ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   URILoadingHelper: "resource:///modules/URILoadingHelper.sys.mjs",
+  buildErrorPage:
+    "moz-src:///browser/components/aiwindow/services/aitab/AITab.sys.mjs",
+  buildGeneratingPage:
+    "moz-src:///browser/components/aiwindow/services/aitab/AITab.sys.mjs",
+  buildViewerURL:
+    "moz-src:///browser/components/aiwindow/services/aitab/AITab.sys.mjs",
   companionFocusForSources:
     "moz-src:///browser/components/aiwindow/services/aitab/AITab.sys.mjs",
   generateAITabFromOpenTabs:
     "moz-src:///browser/components/aiwindow/services/aitab/AITab.sys.mjs",
   getViewerBaseURL:
+    "moz-src:///browser/components/aiwindow/services/aitab/AITab.sys.mjs",
+  loadAITabViewerURL:
     "moz-src:///browser/components/aiwindow/services/aitab/AITab.sys.mjs",
 });
 
@@ -141,11 +150,12 @@ export const GenTab = {
   },
 
   /**
-   * Build a companion AITab from open tabs and open the remote viewer.
+   * Open the viewer immediately with a generating hash, then replace the hash
+   * when the real page config is ready.
    *
    * @param {MozBrowser[]} browsers
    * @param {{ groupLabel?: string }} [options]
-   * @returns {Promise<string | null>} viewer URL, or null on failure
+   * @returns {Promise<string | null>} final viewer URL, or null on failure
    */
   async createFromBrowsers(browsers, options = {}) {
     const eligible = (browsers || [])
@@ -161,6 +171,12 @@ export const GenTab = {
       return null;
     }
 
+    const viewerBase = lazy.getViewerBaseURL();
+    if (!viewerBase) {
+      console.error("GenTab: AITab viewer URL is not configured");
+      return null;
+    }
+
     const url_list = eligible.map(browser => browser.currentURI.spec);
     const groupLabel =
       typeof options.groupLabel === "string" ? options.groupLabel.trim() : "";
@@ -169,6 +185,26 @@ export const GenTab = {
       sourceCount: url_list.length,
     });
 
+    // 1) Open viewer right away with a special generating state in the hash.
+    const pendingPage = lazy.buildGeneratingPage({
+      sourceCount: url_list.length,
+      groupLabel,
+    });
+    const pendingUrl = lazy.buildViewerURL(viewerBase, pendingPage);
+
+    let targetBrowser;
+    try {
+      const tab = win.gBrowser.addTrustedTab(pendingUrl);
+      win.gBrowser.selectedTab = tab;
+      targetBrowser = tab.linkedBrowser;
+    } catch (error) {
+      console.error("GenTab: failed to open pending viewer tab", error);
+      // Fallback: open without keeping a browser handle (cannot replace hash).
+      lazy.URILoadingHelper.openTrustedLinkIn(win, pendingUrl, "tab");
+      targetBrowser = null;
+    }
+
+    // 2) Generate in the background; replace the same tab's hash when done.
     let result;
     try {
       result = await lazy.generateAITabFromOpenTabs({
@@ -178,16 +214,37 @@ export const GenTab = {
       });
     } catch (error) {
       console.error("GenTab: AITab generation failed", error);
+      if (targetBrowser) {
+        const errUrl = lazy.buildViewerURL(
+          viewerBase,
+          lazy.buildErrorPage({
+            message: error?.message || "Generation failed.",
+          })
+        );
+        lazy.loadAITabViewerURL(targetBrowser, errUrl);
+      }
       return null;
     }
 
     if (result.error || !result.url) {
       console.error("GenTab: AITab generation error:", result.error);
+      if (targetBrowser) {
+        const errUrl = lazy.buildViewerURL(
+          viewerBase,
+          lazy.buildErrorPage({
+            message: result.error || "Generation failed.",
+          })
+        );
+        lazy.loadAITabViewerURL(targetBrowser, errUrl);
+      }
       return null;
     }
 
-    // Remote viewer is https — open as a normal web link.
-    lazy.URILoadingHelper.openTrustedLinkIn(win, result.url, "tab");
+    if (targetBrowser) {
+      lazy.loadAITabViewerURL(targetBrowser, result.url);
+    } else {
+      lazy.URILoadingHelper.openTrustedLinkIn(win, result.url, "tab");
+    }
     return result.url;
   },
 
