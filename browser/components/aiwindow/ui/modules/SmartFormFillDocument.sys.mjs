@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { SUPPORTED_INPUT_TYPES } from "chrome://browser/content/aiwindow/modules/SmartFormFillConstants.mjs";
+
 const lazy = {};
 
 ChromeUtils.defineLazyGetter(lazy, "console", function () {
@@ -26,16 +28,6 @@ const MUTATION_OBSERVER_OPTIONS = {
   childList: true,
   subtree: true,
 };
-
-// List of input types current being autofilled by SmartFormFill
-export const SUPPORTED_INPUT_TYPES = [
-  "text",
-  "email",
-  "tel",
-  "number",
-  "search",
-  "month",
-];
 
 /**
  * @typedef {{

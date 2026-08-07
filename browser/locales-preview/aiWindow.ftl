@@ -251,3 +251,19 @@ ai-smart-form-fill-autocomplete-loading = Loading…
 ai-smart-form-fill-autocomplete-sources-label = Sources:
 ai-smart-form-fill-autocomplete-choose-tabs = You need to choose some relevant tabs
 ai-smart-form-fill-autocomplete-open-tabs = You need to open some tabs
+
+# Sources are what tabs the Smart Form Fill should use to generate field values
+ai-smart-form-fill-edit-sources = Edit sources
+ai-smart-form-fill-suggested-tabs = Suggested tabs
+ai-smart-form-fill-other-tabs = Other tabs
+
+# Variables:
+#   $tabTitle (string) - Title of the tab controlled by the toggle
+ai-smart-form-fill-tab-select-toggle =
+    .aria-label = Toggle tab selection for “{ $tabTitle }”
+
+ai-smart-form-fill-cancel-tab-select =
+    .label = Cancel
+
+ai-smart-form-fill-accept-tab-select =
+    .label = Done

@@ -6,6 +6,8 @@ const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
   clearTimeout: "resource://gre/modules/Timer.sys.mjs",
+  MAX_SELECTED_TABS:
+    "chrome://browser/content/aiwindow/modules/SmartFormFillConstants.mjs",
   getTabList: "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs",
   FormHistory: "resource://gre/modules/FormHistory.sys.mjs",
   MemoriesManager:
@@ -73,11 +75,14 @@ const CONFIDENCE_RANK = new Map([
 // the threshold of the generation request, so both have to move together.
 const FILL_CONFIDENCE_THRESHOLD = "high";
 
+/**
+ * @typedef {{
+ *   id: string,
+ * }} SelectedTab
+ */
+
 // TODO: Adjust this based on evals for optimal amount
 const MAX_TABS = 30;
-
-// Max number of tabs for the LLM to select
-const MAX_SELECTED_TABS = 5;
 
 const REQUEST_RETRY_BASE_DELAY_MS = 1000;
 const REQUEST_RETRY_JITTER_MS = 250;
@@ -214,7 +219,7 @@ export class SmartFormFillController {
    *
    * @returns {TabData | undefined}
    */
-  getRelevantTabData(tabId) {
+  getTabData(tabId) {
     return this.#tabsById.get(tabId);
   }
 
@@ -318,11 +323,20 @@ export class SmartFormFillController {
   }
 
   /**
+   * Gets the current open-tab data.
+   *
+   * @returns {Array<TabData>}
+   */
+  getTabs() {
+    return this.#tabList?.map(tab => ({ ...tab })) ?? [];
+  }
+
+  /**
    * Generates values for a form.
    *
    * @param {string} formId
    * @param {Set<string>} emptyFieldIds
-   * @param {Array<RelevantTab>} selectedTabs
+   * @param {Array<SelectedTab>} selectedTabs
    * @param {Map<string, string>} tabContentById
    * @param {string} pageText
    *
@@ -365,7 +379,7 @@ export class SmartFormFillController {
    * @param {Array<FieldData>} formFields Every field of the form, as it was
    * when the fields to fill were picked. Read here rather than when the
    * response lands so a form update cannot renumber the fields that were sent
-   * @param {Array<RelevantTab>} selectedTabs
+   * @param {Array<SelectedTab>} selectedTabs
    * @param {Map<string, string>} tabContentById
    * @param {string} pageText
    *
@@ -794,7 +808,7 @@ export class SmartFormFillController {
         seen.add(id);
         return true;
       })
-      .slice(0, MAX_SELECTED_TABS);
+      .slice(0, lazy.MAX_SELECTED_TABS);
   }
 
   /**
@@ -940,8 +954,8 @@ export class SmartFormFillController {
     const task = "select_tabs";
     const page = this.#pageInfo;
     const tabs = this.#tabList;
-    const maxSelectedTabs = MAX_SELECTED_TABS;
     const classificationFields = this.#getFieldDataForClassification(fields);
+    const maxSelectedTabs = lazy.MAX_SELECTED_TABS;
 
     return {
       task,
