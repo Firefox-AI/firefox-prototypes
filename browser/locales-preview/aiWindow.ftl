@@ -267,3 +267,45 @@ ai-smart-form-fill-cancel-tab-select =
 
 ai-smart-form-fill-accept-tab-select =
     .label = Done
+
+ai-smart-form-fill-suggestions-found = Suggestions found
+
+# Variables:
+#   $count (number) - The number of generated form field suggestions
+ai-smart-form-fill-suggestions-found-description =
+    { $count ->
+        [one] Suggestions found for { $count } field. We recommend reviewing it before you fill the form.
+       *[other] Suggestions found for { $count } fields. We recommend reviewing them before you fill the form.
+    }
+
+ai-smart-form-fill-review-suggestions =
+    .label = Review suggestions
+
+ai-smart-form-fill-fill-form =
+    .label = Fill form
+
+ai-smart-form-fill-review-heading = Review suggestions
+ai-smart-form-fill-review-description = Edit or delete anything that’s not correct.
+
+ai-smart-form-fill-field =
+    .label = Field
+
+ai-smart-form-fill-cancel-review =
+    .label = Cancel
+
+ai-smart-form-fill-finding-suggestions = Finding suggestions
+
+ai-smart-form-fill-stop-finding-suggestions =
+    .aria-label = Stop finding suggestions
+
+ai-smart-form-fill-success-heading = Form filled with suggestions
+ai-smart-form-fill-success-description = Check the form. Review the filled fields and update anything that looks off or missing before submitting.
+
+ai-smart-form-fill-no-suggestions-heading = No suggestions found
+ai-smart-form-fill-no-suggestions-description = Smart Form Fill wasn’t able to generate any suggestions for this form.
+
+ai-smart-form-fill-error-heading = Something happened catch-all headline
+ai-smart-form-fill-error-description = General explanation that maybe its the connection, or something else happened, and to try again
+
+ai-smart-form-fill-close-review =
+    .label = Close

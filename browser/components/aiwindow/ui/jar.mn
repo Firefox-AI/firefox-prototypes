@@ -65,6 +65,8 @@ browser.jar:
   content/browser/aiwindow/smartformfill-tab-select.css             (content/smartformfill-tab-select.css)
   content/browser/aiwindow/components/ai-sff-tab-selector.mjs       (components/ai-sff-tab-selector/ai-sff-tab-selector.mjs)
   content/browser/aiwindow/components/ai-sff-tab-selector.css       (components/ai-sff-tab-selector/ai-sff-tab-selector.css)
+  content/browser/aiwindow/components/ai-sff-form-review.mjs        (components/ai-sff-form-review/ai-sff-form-review.mjs)
+  content/browser/aiwindow/components/ai-sff-form-review.css        (components/ai-sff-form-review/ai-sff-form-review.css)
   content/browser/aiwindow/components/applied-memories-button.mjs   (components/ai-chat-content/chat-assistant-footer/applied-memories-button.mjs)
   content/browser/aiwindow/components/applied-memories-button.css   (components/ai-chat-content/chat-assistant-footer/applied-memories-button.css)
   content/browser/aiwindow/components/assistant-message-footer.mjs  (components/ai-chat-content/chat-assistant-footer/assistant-message-footer.mjs)
