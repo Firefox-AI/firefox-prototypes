@@ -9,6 +9,7 @@ support-files = [
   "head.js",
   "head_smartformfill_autocomplete.js",
   "head_history_thumbnails.js",
+  "head_smartformfill_form_review.js",
   "test_agent_monitor_item_page.html",
   "test_agent_monitor_item.mjs",
   "test_ai_action_result_page.html",
@@ -234,6 +235,12 @@ skip-if = [
 ["browser_security_search_browsing_history.js"]
 
 ["browser_sidebar_aiwindow.js"]
+
+["browser_smartformfill_form_review_editing.js"]
+
+["browser_smartformfill_form_review_filling.js"]
+
+["browser_smartformfill_form_review_generation.js"]
 
 ["browser_smartformfill_tab_selector.js"]
 
