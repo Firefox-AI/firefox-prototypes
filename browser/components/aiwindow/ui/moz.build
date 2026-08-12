@@ -46,6 +46,7 @@ MOZ_SRC_FILES += [
     "modules/SmartFormFillAutocomplete.sys.mjs",
     "modules/SmartFormFillController.sys.mjs",
     "modules/SmartFormFillDocument.sys.mjs",
+    "modules/SmartFormFillReviewSession.sys.mjs",
     "modules/SmartFormFillTelemetry.sys.mjs",
     "modules/SmartFormFillUtils.sys.mjs",
     "modules/SmartWindowTelemetry.sys.mjs",

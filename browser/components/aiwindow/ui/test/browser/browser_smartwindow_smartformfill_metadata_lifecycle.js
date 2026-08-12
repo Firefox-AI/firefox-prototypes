@@ -314,10 +314,7 @@ describe("Smart Form Fill metadata lifecycle", () => {
     await BrowserTestUtils.openNewForegroundTab(win.gBrowser, SOURCE_URL);
     await BrowserTestUtils.switchTab(win.gBrowser, formTab);
 
-    const { browser, popup, item } = await openLoadingAutocomplete(
-      win,
-      "#email"
-    );
+    const { popup, item } = await openLoadingAutocomplete(win, "#email");
     const handledSchemas = new Set();
     let row;
 
@@ -335,18 +332,6 @@ describe("Smart Form Fill metadata lifecycle", () => {
       return handledSchemas.has(RELEVANT_TABS_SCHEMA) && row && !row.loading;
     }, "Waiting for relevant tabs without resolving classification");
     await row.updateComplete;
-
-    const inputEvent = SpecialPowers.spawn(
-      browser,
-      [],
-      () =>
-        new Promise(resolve => {
-          const input = content.document.querySelector("#email");
-          input.addEventListener("input", () => resolve(input.value), {
-            once: true,
-          });
-        })
-    );
 
     EventUtils.synthesizeMouseAtCenter(item, {}, win);
 
@@ -372,10 +357,5 @@ describe("Smart Form Fill metadata lifecycle", () => {
     }, "Waiting for field classification to resolve");
 
     await respondWithGeneratedValues(mockEngineManager);
-    Assert.equal(
-      await inputEvent,
-      "email@email.com",
-      "Autofill should continue after classification resolves"
-    );
   });
 });
