@@ -2383,7 +2383,7 @@ pref("browser.smartwindow.mistralRelease", true);
 pref("places.semanticHistory.smartwindow.distanceThreshold", "0.6");
 
 // Smart Window: AITab
-pref("browser.smartwindow.aitab.enabled", false);
+pref("browser.smartwindow.aitab.enabled", true);
 // Base URL of the AITab viewer. https for a hosted/export viewer; about:smartwindowtasks
 // for the in-tree Lit prototype. generate_aitab opens it with the page config in the URL hash.
 pref("browser.smartwindow.aitab.viewerURL", "about:smartwindowtasks");
