@@ -317,7 +317,9 @@ export const toolsConfig = [
     type: "function",
     function: {
       name: GENERATE_AITAB,
-      description: "Design a custom web page with user content",
+      description:
+        "Design a custom web page from user content and open it in a new tab. " +
+        "Do not try to link to the page; the tab is opened by this tool.",
       parameters: {
         type: "object",
         properties: {
@@ -1352,6 +1354,21 @@ export async function worldCupLive(toolParams, conversation) {
 }
 
 /**
+ * @param {string} url
+ * @returns {boolean}
+ */
+function openViewerInTab(url) {
+  const win =
+    lazy.BrowserWindowTracker.getTopWindow({ private: false }) ??
+    lazy.BrowserWindowTracker.getTopWindow();
+  if (!win?.openTrustedLinkIn) {
+    return false;
+  }
+  win.openTrustedLinkIn(url, "tab", { relatedToCurrent: true });
+  return true;
+}
+
+/**
  * @param {object} toolParams
  * @param {string[]} [toolParams.url_list]
  * @param {string} [toolParams.focus]
@@ -1360,9 +1377,6 @@ export async function worldCupLive(toolParams, conversation) {
  */
 export async function createAITab({ url_list, focus }, conversation, signal) {
   lazy.console.log("[Tool] aiTab", JSON.stringify({ url_list, focus }));
-  // Generate the page from the requested URLs. Nothing is persisted; the chat
-  // tool returns a link to the external viewer with the page config in the URL
-  // hash, so the page data never reaches the viewer host.
   const viewerBase = lazy.AITab.getViewerBaseURL();
   if (!viewerBase) {
     return (
@@ -1378,17 +1392,11 @@ export async function createAITab({ url_list, focus }, conversation, signal) {
     return `The page could not be created: ${result.error}.`;
   }
   const viewerURL = lazy.AITab.buildViewerURL(viewerBase, result.page);
-  // Mark the viewer URL as seen so the chat renders it as a trusted, labeled
-  // link. Unseen links are unfurled as "label (full URL)" for disclosure, and
-  // this URL's hash carries the whole page config, so the full URL is very long.
-  conversation.addSeenUrls([viewerURL]);
-  // Register the URL as a token so the model echoes the short token, never the
-  // long URL (which it would otherwise truncate); expandUrlTokens restores the
-  // exact URL when rendering the assistant's reply.
-  const token = conversation.convertUrlToToken(viewerURL);
-  // Strip characters that would break the markdown link text and expose the URL.
-  const title = (result.metadata?.title || "the page").replace(/[[\]]/g, "");
-  return `The page was created. Link the user to it as [${title}](§url_token: ${token}§).`;
+  if (!openViewerInTab(viewerURL)) {
+    return "The page was created but no browser window was available to open it.";
+  }
+  const title = result.metadata?.title || "the page";
+  return `The page "${title}" was opened in a new tab. Do not include a URL.`;
 }
 
 // No securityProperties / trust flags: skill prompts are Remote Settings

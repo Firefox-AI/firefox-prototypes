@@ -34,20 +34,56 @@ add_task(function test_buildViewerURL_strips_existing_hash() {
   Assert.ok(!url.includes("#stale"), "an existing hash on the base is dropped");
 });
 
-add_task(function test_getViewerBaseURL_requires_https() {
-  Services.prefs.clearUserPref(VIEWER_PREF);
-  Assert.equal(getViewerBaseURL(), null, "empty pref yields null");
+add_task(function test_buildViewerURL_about_smartwindowtasks() {
+  const page = { header: { type: "header", title: "Niijima" }, blocks: [] };
+  const url = buildViewerURL("about:smartwindowtasks", page);
+  Assert.ok(
+    url.startsWith("about:smartwindowtasks#"),
+    "the in-tree viewer keeps its about: address"
+  );
+  Assert.deepEqual(
+    JSON.parse(decodeURIComponent(url.slice(url.indexOf("#") + 1))),
+    page,
+    "the page config still lives in the hash"
+  );
+});
 
-  Services.prefs.setStringPref(VIEWER_PREF, "http://insecure.example/app");
-  Assert.equal(getViewerBaseURL(), null, "non-https pref yields null");
+add_task(function test_getViewerBaseURL_accepts_https_and_about_viewer() {
+  const { parseViewerBaseURL } = AITab;
 
-  Services.prefs.setStringPref(VIEWER_PREF, "not a url");
-  Assert.equal(getViewerBaseURL(), null, "unparseable pref yields null");
-
-  Services.prefs.setStringPref(VIEWER_PREF, "https://viewer.example/app#x");
+  Assert.equal(parseViewerBaseURL(""), null, "empty pref yields null");
   Assert.equal(
-    getViewerBaseURL(),
+    parseViewerBaseURL("http://insecure.example/app"),
+    null,
+    "non-https http pref yields null"
+  );
+  Assert.equal(
+    parseViewerBaseURL("not a url"),
+    null,
+    "unparseable pref yields null"
+  );
+  Assert.equal(
+    parseViewerBaseURL("about:preferences"),
+    null,
+    "other about: pages are not viewers"
+  );
+  Assert.equal(
+    parseViewerBaseURL("https://viewer.example/app#x"),
     "https://viewer.example/app",
     "an https pref is returned with any hash stripped"
+  );
+  Assert.equal(
+    parseViewerBaseURL("about:smartwindowtasks#stale"),
+    "about:smartwindowtasks",
+    "the in-tree viewer is accepted with its hash stripped"
+  );
+});
+
+add_task(function test_getViewerBaseURL_reads_about_viewer_pref() {
+  Services.prefs.setStringPref(VIEWER_PREF, "about:smartwindowtasks");
+  Assert.equal(
+    getViewerBaseURL(),
+    "about:smartwindowtasks",
+    "the live pref is accepted as the in-tree Lit viewer"
   );
 });

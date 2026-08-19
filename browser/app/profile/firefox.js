@@ -2384,9 +2384,9 @@ pref("places.semanticHistory.smartwindow.distanceThreshold", "0.6");
 
 // Smart Window: AITab
 pref("browser.smartwindow.aitab.enabled", false);
-// Base URL of the external AITab viewer used for development prototyping.
-// The generate_aitab tool returns a link to this viewer with the page config in the URL hash.
-pref("browser.smartwindow.aitab.viewerURL", "");
+// Base URL of the AITab viewer. https for a hosted/export viewer; about:smartwindowtasks
+// for the in-tree Lit prototype. generate_aitab opens it with the page config in the URL hash.
+pref("browser.smartwindow.aitab.viewerURL", "about:smartwindowtasks");
 
 // Smart Window: Auto Tab Grouping (bug 2054500).
 pref("browser.smartwindow.autoTabGrouping.enabled", true);

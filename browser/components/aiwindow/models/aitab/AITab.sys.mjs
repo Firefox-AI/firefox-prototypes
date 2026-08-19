@@ -58,24 +58,42 @@ XPCOMUtils.defineLazyPreferenceGetter(
   }
 );
 
-// The external AITab viewer's base URL, or null when the pref is empty or does
-// not hold an https URL. The generate_aitab chat tool returns a link to this
-// viewer with the page config in the hash fragment; when this is null the tool
-// reports that the viewer is not configured.
+/**
+ * Accept an https viewer or the in-tree about:smartwindowtasks prototype.
+ *
+ * @param {string} prefValue
+ * @returns {string|null}
+ */
+function parseViewerBaseURL(prefValue) {
+  const parsed = URL.parse(String(prefValue ?? "").trim());
+  if (!parsed) {
+    return null;
+  }
+  parsed.hash = "";
+  parsed.search = "";
+  if (parsed.protocol == "https:") {
+    return parsed.href;
+  }
+  if (parsed.protocol == "about:") {
+    const name = parsed.href.slice("about:".length).split(/[?#]/, 1)[0];
+    if (name.toLowerCase() == "smartwindowtasks") {
+      return "about:smartwindowtasks";
+    }
+  }
+  return null;
+}
+
+// The AITab viewer's base URL, or null when the pref is empty or is not an
+// allowed viewer. https is the hosted/export viewer; about:smartwindowtasks is
+// the in-tree Lit prototype (reuses that about: registration so no C++ rebuild).
+// generate_aitab opens this viewer with the page config in the hash.
 XPCOMUtils.defineLazyPreferenceGetter(
   lazy,
   "viewerBaseURL",
   "browser.smartwindow.aitab.viewerURL",
   "",
   null,
-  prefValue => {
-    const parsed = URL.parse(prefValue.trim());
-    if (parsed?.protocol != "https:") {
-      return null;
-    }
-    parsed.hash = "";
-    return parsed.href;
-  }
+  parseViewerBaseURL
 );
 
 // Packaged component schemas (see models/aitab/jar.mn). The service produces
@@ -226,10 +244,11 @@ export class AITab {
   }
 
   /**
-   * Build the external viewer URL for a validated page config. The JSON is
-   * placed in the hash fragment so it is never sent to the viewer host.
+   * Build the viewer URL for a validated page config. The JSON is placed in
+   * the hash fragment so it is never sent to a hosted viewer (and so
+   * about:smartwindowtasks can render it locally).
    *
-   * @param {string} viewerBase - Pref-configured base URL (https only).
+   * @param {string} viewerBase - Pref-configured base URL.
    * @param {object} page - The validated page config.
    * @returns {string}
    */
@@ -237,6 +256,14 @@ export class AITab {
     const url = new URL(viewerBase);
     url.hash = encodeURIComponent(JSON.stringify(page));
     return url.href;
+  }
+
+  /**
+   * @param {string} prefValue
+   * @returns {string|null}
+   */
+  static parseViewerBaseURL(prefValue) {
+    return parseViewerBaseURL(prefValue);
   }
 
   /**

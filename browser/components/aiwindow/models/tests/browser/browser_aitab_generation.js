@@ -6,8 +6,8 @@
 // End-to-end generateAITab() with only the LLM mocked: the source pages are
 // served over HTTP and read through the real GetPageContent, so this covers
 // extraction, prompt assembly, page validation and metadata derivation. The
-// last task goes one step further and drives the create_aitab tool itself, then
-// loads the viewer link it returns in a tab.
+// last task goes one step further and drives the create_aitab tool itself,
+// which opens the viewer in a tab.
 
 const { AITab } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/aitab/AITab.sys.mjs"
@@ -16,9 +16,6 @@ const { generateAITab } = AITab;
 
 const { createAITab } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs"
-);
-const { expandUrlTokens } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/aiwindow/models/ChatUtils.sys.mjs"
 );
 
 const { MockEngineManager } = ChromeUtils.importESModule(
@@ -227,7 +224,7 @@ add_task(async function test_generateAITab_default_title_is_localized() {
 const VIEWER_URL =
   "https://example.com/browser/browser/components/aiwindow/models/tests/browser/aitab_viewer_stub.html";
 
-add_task(async function test_createAITab_link_loads_config_in_a_tab() {
+add_task(async function test_createAITab_opens_viewer_tab() {
   await SpecialPowers.pushPrefEnv({
     set: [["browser.smartwindow.aitab.viewerURL", VIEWER_URL]],
   });
@@ -235,8 +232,9 @@ add_task(async function test_createAITab_link_loads_config_in_a_tab() {
   const { url, cleanup: stopServing } = servePage();
   const conversation = newConversation();
   try {
-    // The tool is the production entry point: it generates the page and returns
-    // a markdown link carrying the viewer URL as a token.
+    const tabPromise = BrowserTestUtils.waitForNewTab(gBrowser, opened =>
+      opened.startsWith(`${VIEWER_URL}#`)
+    );
     const toolPromise = createAITab(
       { url_list: [url], focus: "hotels in Lisbon" },
       conversation
@@ -246,20 +244,13 @@ add_task(async function test_createAITab_link_loads_config_in_a_tab() {
       response: JSON.stringify(GENERATED_PAGE),
     });
     const toolResult = await toolPromise;
-
-    const expanded = expandUrlTokens(toolResult, conversation.tokenToUrl);
-    const [, viewerURL] = expanded.match(/\]\((https:\/\/[^\s)]+)\)/) ?? [];
-    Assert.ok(viewerURL, `the tool returns a viewer link: ${expanded}`);
     Assert.ok(
-      viewerURL.startsWith(`${VIEWER_URL}#`),
-      "the link points at the configured viewer, with the config in the hash"
+      !/https?:\/\/|about:/.test(toolResult),
+      `the tool result has no viewer URL: ${toolResult}`
     );
+    Assert.ok(toolResult.includes("new tab"), toolResult);
 
-    const tab = await BrowserTestUtils.openNewForegroundTab(
-      gBrowser,
-      viewerURL,
-      true // waitForLoad
-    );
+    const tab = await tabPromise;
     try {
       const [title, hash] = await SpecialPowers.spawn(
         tab.linkedBrowser,
@@ -270,7 +261,7 @@ add_task(async function test_createAITab_link_loads_config_in_a_tab() {
       Assert.deepEqual(
         JSON.parse(decodeURIComponent(hash.slice(1))),
         GENERATED_PAGE,
-        "the page config round-trips through the hash of the loaded URL"
+        "the page config round-trips through the hash of the opened tab"
       );
     } finally {
       BrowserTestUtils.removeTab(tab);
