@@ -1,0 +1,304 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/* Portable document styles. Token names follow Acorn; values are local so a
+ * saved copy still paints without chrome:// design-system sheets. */
+
+:root {
+  --aitab-color-canvas: #f4f1ec;
+  --aitab-color-ink: #1a1a1a;
+  --aitab-color-muted: #5c5c5c;
+  --aitab-color-line: #d6d0c8;
+  --aitab-color-card: #fffdf9;
+  --aitab-color-accent: #2b1a66;
+  --aitab-color-accent-soft: #ece7fb;
+  --aitab-font-body: "Mozilla Text", "Fira Sans", "Helvetica Neue", system-ui, sans-serif;
+  --aitab-font-display: "Mozilla Headline", "Zilla Slab", Georgia, serif;
+  --aitab-space: 1rem;
+  --aitab-measure: 46rem;
+  --aitab-radius: 0.75rem;
+}
+
+html[data-aitab-viewer] {
+  background: var(--aitab-color-canvas);
+  color: var(--aitab-color-ink);
+}
+
+html[data-aitab-viewer],
+html[data-aitab-viewer] body {
+  margin: 0;
+  min-height: 100%;
+}
+
+aitab-page {
+  display: block;
+  box-sizing: border-box;
+  max-width: var(--aitab-measure);
+  margin-inline: auto;
+  padding: calc(var(--aitab-space) * 2.5) var(--aitab-space) calc(var(--aitab-space) * 4);
+  font: 1rem/1.5 var(--aitab-font-body);
+}
+
+aitab-page *,
+aitab-page *::before,
+aitab-page *::after {
+  box-sizing: border-box;
+}
+
+.aitab-status {
+  color: var(--aitab-color-muted);
+}
+
+.aitab-header {
+  margin-block-end: calc(var(--aitab-space) * 2);
+}
+
+.aitab-eyebrow {
+  margin: 0 0 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--aitab-color-muted);
+}
+
+.aitab-title {
+  margin: 0;
+  font-family: var(--aitab-font-display);
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 580;
+  line-height: 1.15;
+}
+
+.aitab-icon {
+  margin-inline-end: 0.35em;
+}
+
+.aitab-subhead,
+.aitab-desc,
+.aitab-footer-text {
+  margin: 0.6rem 0 0;
+  color: var(--aitab-color-muted);
+}
+
+.aitab-main {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--aitab-space) * 2);
+}
+
+.aitab-block h2 {
+  margin: 0 0 0.75rem;
+  font-family: var(--aitab-font-display);
+  font-size: 1.35rem;
+  font-weight: 580;
+}
+
+.aitab-block h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1.05rem;
+}
+
+.aitab-block p {
+  margin: 0 0 0.75rem;
+}
+
+.aitab-lead {
+  font-size: 1.2rem;
+  line-height: 1.4;
+}
+
+.aitab-text[data-layout="side-title"],
+.aitab-timeline[data-layout="side-title"] {
+  display: grid;
+  gap: var(--aitab-space);
+}
+
+@media (min-width: 40rem) {
+  .aitab-text[data-layout="side-title"],
+  .aitab-timeline[data-layout="side-title"] {
+    grid-template-columns: 11rem 1fr;
+    gap: calc(var(--aitab-space) * 1.5);
+  }
+}
+
+.aitab-side h2 {
+  margin-block-end: 0.35rem;
+}
+
+.aitab-side p {
+  color: var(--aitab-color-muted);
+}
+
+.aitab-text-section + .aitab-text-section {
+  margin-block-start: 1.25rem;
+}
+
+.aitab-table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--aitab-color-card);
+  border: 1px solid var(--aitab-color-line);
+  border-radius: var(--aitab-radius);
+}
+
+th,
+td {
+  padding: 0.7rem 0.85rem;
+  text-align: start;
+  vertical-align: top;
+  border-bottom: 1px solid var(--aitab-color-line);
+}
+
+thead th {
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: var(--aitab-color-muted);
+}
+
+.aitab-winner {
+  font-weight: 650;
+  background: var(--aitab-color-accent-soft);
+}
+
+.aitab-note {
+  display: inline-block;
+  margin-inline-start: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: var(--aitab-color-accent);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.aitab-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--aitab-space);
+}
+
+.aitab-card {
+  display: block;
+  padding: 1rem;
+  background: var(--aitab-color-card);
+  border: 1px solid var(--aitab-color-line);
+  border-radius: var(--aitab-radius);
+  color: inherit;
+  text-decoration: none;
+}
+
+.aitab-card-image {
+  display: block;
+  width: 100%;
+  height: 8rem;
+  object-fit: cover;
+  border-radius: calc(var(--aitab-radius) - 0.25rem);
+  margin-block-end: 0.75rem;
+}
+
+.aitab-card-value {
+  margin: 0 0 0.25rem;
+  font-family: var(--aitab-font-display);
+  font-size: 1.35rem;
+}
+
+.aitab-card-sub,
+.aitab-sublabel {
+  color: var(--aitab-color-muted);
+  font-size: 0.9rem;
+}
+
+.aitab-favicon,
+.aitab-thumb {
+  width: 1rem;
+  height: 1rem;
+  object-fit: cover;
+  vertical-align: middle;
+  margin-inline-end: 0.35rem;
+}
+
+.aitab-takeaways,
+.aitab-timeline-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.aitab-takeaways li {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr;
+  gap: 0.75rem;
+  padding-block: 1rem;
+  border-top: 1px solid var(--aitab-color-line);
+}
+
+.aitab-index {
+  font-family: var(--aitab-font-display);
+  font-size: 1.1rem;
+  color: var(--aitab-color-muted);
+}
+
+.aitab-timeline-items li {
+  display: grid;
+  grid-template-columns: 7rem 1fr;
+  gap: 0.75rem;
+  padding-block: 0.85rem;
+  border-inline-start: 2px solid var(--aitab-color-line);
+  padding-inline-start: 1rem;
+}
+
+.aitab-timeline-items li[data-state="now"] {
+  border-inline-start-color: var(--aitab-color-accent);
+}
+
+.aitab-label {
+  margin: 0;
+  font-weight: 650;
+}
+
+.aitab-footer {
+  margin-block-start: calc(var(--aitab-space) * 2.5);
+  padding-block-start: var(--aitab-space);
+  border-top: 1px solid var(--aitab-color-line);
+}
+
+.aitab-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-block-start: 0.75rem;
+}
+
+.aitab-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--aitab-color-line);
+  border-radius: 999px;
+  background: var(--aitab-color-card);
+  color: inherit;
+  font: inherit;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.aitab-chip[data-variant="primary"] {
+  background: var(--aitab-color-accent);
+  border-color: var(--aitab-color-accent);
+  color: #fff;
+}
+
+a {
+  color: var(--aitab-color-accent);
+}
+
+.aitab-unknown {
+  color: var(--aitab-color-muted);
+  font-style: italic;
+}

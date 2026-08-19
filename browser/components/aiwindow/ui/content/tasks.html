@@ -9,7 +9,7 @@
     <meta name="referrer" content="no-referrer" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src resource: chrome:; object-src 'none';"
+      content="default-src resource: chrome:; object-src 'none'; img-src chrome: https: data:; style-src chrome: 'unsafe-inline';"
     />
     <meta name="color-scheme" content="light dark" />
     <link rel="stylesheet" href="chrome://global/skin/in-content/common.css" />
@@ -22,10 +22,8 @@
     <script src="chrome://browser/content/contentTheme.js"></script>
     <script
       type="module"
-      src="chrome://browser/content/aiwindow/components/ai-tasks.mjs"
+      src="chrome://browser/content/aiwindow/aitab/aitab-viewer.mjs"
     ></script>
   </head>
-  <body>
-    <ai-tasks></ai-tasks>
-  </body>
+  <body></body>
 </html>

@@ -4,3 +4,6 @@
 
 browser.jar:
   content/browser/aiwindow/aitab/component_schema.json       (component_schema.json)
+  content/browser/aiwindow/aitab/aitab-viewer.css            (aitab-viewer.css)
+  content/browser/aiwindow/aitab/aitab-viewer.mjs            (aitab-viewer.mjs)
+  content/browser/aiwindow/aitab/lit.mjs                     (lit.mjs)
