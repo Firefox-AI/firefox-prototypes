@@ -25,13 +25,13 @@ export class AitabList extends AitabElement {
           ${(block.items || []).map(
             (item, index) => html`
               <li>
-                <span class="aitab-index"
-                  >${item.number || String(index + 1).padStart(2, "0")}</span
-                >
-                <div>
+                <header>
+                  <span class="aitab-index"
+                    >${item.number || String(index + 1).padStart(2, "0")}</span
+                  >
                   ${item.title ? html`<h3>${item.title}</h3>` : nothing}
-                  ${item.body ? html`<p>${item.body}</p>` : nothing}
-                </div>
+                </header>
+                <div>${item.body ? html`<p>${item.body}</p>` : nothing}</div>
               </li>
             `
           )}

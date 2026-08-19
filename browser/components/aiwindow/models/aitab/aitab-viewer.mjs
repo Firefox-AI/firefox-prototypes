@@ -100,11 +100,17 @@ export class AitabPage extends LitElement {
       return html`<p class="aitab-status">No page config in the URL hash.</p>`;
     }
     return html`
-      ${renderHeader(this.page.header)}
-      <main class="aitab-main">
-        ${(this.page.blocks || []).map(block => renderBlock(block))}
-      </main>
-      ${renderFooter(this.page.footer)}
+      <header class="aitab-chrome" aria-label="Firefox">
+        <p class="aitab-wordmark">Firefox</p>
+        <p class="aitab-chrome-tag">For a better internet</p>
+      </header>
+      <div class="aitab-doc">
+        ${renderHeader(this.page.header)}
+        <main class="aitab-main">
+          ${(this.page.blocks || []).map(block => renderBlock(block))}
+        </main>
+        ${renderFooter(this.page.footer)}
+      </div>
     `;
   }
 }

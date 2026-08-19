@@ -2,27 +2,95 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* Portable document styles. Token names follow Acorn; values are local so a
- * saved copy still paints without chrome:// design-system sheets. */
+/* First-party skin inspired by firefox.com / Flare. Values copied from
+ * --token-color-* and the firefox.html spike so this file stands alone
+ * (no flare*.css, no .fl-* class names). */
+
+@font-face {
+  font-display: swap;
+  font-family: "Mozilla Headline VF";
+  font-stretch: 75% 125%;
+  font-style: normal;
+  font-weight: 100 900;
+  src:
+    url("https://www.firefox.com/media/fonts/mozilla-headline/MozillaHeadline-Variable.19ade5d17bd1.woff2") format("woff2"),
+    url("https://www.firefox.com/media/fonts/mozilla-headline/MozillaHeadline-Variable.7e7e5e7e4280.woff") format("woff");
+}
+
+@font-face {
+  font-display: swap;
+  font-family: "Mozilla Text VF";
+  font-style: normal;
+  font-weight: 100 900;
+  src:
+    url("https://www.firefox.com/media/fonts/mozilla-text/MozillaText-Variable.fc7317808d75.woff2") format("woff2"),
+    url("https://www.firefox.com/media/fonts/mozilla-text/MozillaText-Variable.59244cbcbe6b.woff") format("woff");
+}
 
 :root {
-  --aitab-color-canvas: #f4f1ec;
-  --aitab-color-ink: #1a1a1a;
-  --aitab-color-muted: #5c5c5c;
-  --aitab-color-line: #d6d0c8;
-  --aitab-color-card: #fffdf9;
-  --aitab-color-accent: #2b1a66;
-  --aitab-color-accent-soft: #ece7fb;
-  --aitab-font-body: "Mozilla Text", "Fira Sans", "Helvetica Neue", system-ui, sans-serif;
-  --aitab-font-display: "Mozilla Headline", "Zilla Slab", Georgia, serif;
+  --aitab-white: #fff;
+  --aitab-cream: #fcf5f0;
+  --aitab-grey-3: #7b7a82;
+  --aitab-black-1: #42414d;
+  --aitab-black-4: #15141a;
+  --aitab-dark-purple: #210340;
+  --aitab-purple: #3a0f6e;
+  --aitab-medium-purple: #4c2489;
+  --aitab-link-purple: #6132bc;
+  --aitab-light-purple: #7543e3;
+  --aitab-soft-purple: #f1e7f8;
+  --aitab-soft-purple-2: #e4d8fc;
+  --aitab-soft-purple-4: #c7a8ff;
+  --aitab-soft-green: #deffd6;
+  --aitab-green: #144a27;
+
+  --aitab-color-canvas: var(--aitab-cream);
+  --aitab-color-card: var(--aitab-white);
+  --aitab-color-ink: var(--aitab-black-4);
+  --aitab-color-ink-secondary: var(--aitab-black-1);
+  --aitab-color-muted: var(--aitab-grey-3);
+  --aitab-color-line: var(--aitab-soft-purple-2);
+  --aitab-color-line-soft: var(--aitab-soft-purple);
+  --aitab-color-accent: var(--aitab-light-purple);
+  --aitab-color-accent-hover: var(--aitab-link-purple);
+  --aitab-color-accent-soft: var(--aitab-soft-purple);
+  --aitab-color-chip: var(--aitab-soft-purple-2);
+  --aitab-color-good: var(--aitab-green);
+  --aitab-color-link: var(--aitab-link-purple);
+  --aitab-shadow: 0 1px 2px rgba(33, 3, 64, 0.06), 0 8px 24px rgba(117, 67, 227, 0.1);
+  --aitab-font-body: "Mozilla Text VF", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --aitab-font-display: "Mozilla Headline VF", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --aitab-space: 1rem;
-  --aitab-measure: 46rem;
-  --aitab-radius: 0.75rem;
+  --aitab-measure: 58.375rem;
+  --aitab-radius: 12px;
+  --aitab-radius-pill: 32px;
+  --aitab-logo: url("https://www.firefox.com/media/img/logos/firefox/logo-word-hor-2026.ec99fb357f62.svg");
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --aitab-color-canvas: var(--aitab-dark-purple);
+    --aitab-color-card: var(--aitab-medium-purple);
+    --aitab-color-ink: var(--aitab-white);
+    --aitab-color-ink-secondary: var(--aitab-soft-purple-4);
+    --aitab-color-muted: var(--aitab-soft-purple-4);
+    --aitab-color-line: var(--aitab-light-purple);
+    --aitab-color-line-soft: var(--aitab-purple);
+    --aitab-color-accent: var(--aitab-soft-purple-4);
+    --aitab-color-accent-hover: var(--aitab-white);
+    --aitab-color-accent-soft: var(--aitab-purple);
+    --aitab-color-chip: var(--aitab-purple);
+    --aitab-color-good: var(--aitab-soft-green);
+    --aitab-color-link: var(--aitab-soft-purple-4);
+    --aitab-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 28px rgba(20, 2, 38, 0.45);
+    --aitab-logo: url("https://www.firefox.com/media/img/logos/firefox/logo-word-hor-white-2026.38b0d9aa301a.svg");
+  }
 }
 
 html[data-aitab-viewer] {
   background: var(--aitab-color-canvas);
   color: var(--aitab-color-ink);
+  accent-color: var(--aitab-color-accent);
 }
 
 html[data-aitab-viewer],
@@ -31,13 +99,18 @@ html[data-aitab-viewer] body {
   min-height: 100%;
 }
 
+html[data-aitab-viewer] body {
+  font-family: var(--aitab-font-body);
+  font-weight: 400;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
 aitab-page {
   display: block;
   box-sizing: border-box;
-  max-width: var(--aitab-measure);
-  margin-inline: auto;
-  padding: calc(var(--aitab-space) * 2.5) var(--aitab-space) calc(var(--aitab-space) * 4);
-  font: 1rem/1.5 var(--aitab-font-body);
+  font: 1rem/1.55 var(--aitab-font-body);
+  color: var(--aitab-color-ink);
 }
 
 aitab-table,
@@ -53,18 +126,57 @@ aitab-page *::after {
   box-sizing: border-box;
 }
 
+.aitab-chrome {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: var(--aitab-color-card);
+  border-bottom: 1px solid var(--aitab-color-line);
+}
+
+.aitab-wordmark {
+  overflow: hidden;
+  width: 7rem;
+  height: 2.25rem;
+  margin: 0;
+  background: var(--aitab-logo) no-repeat left center / contain;
+  text-indent: 100%;
+  white-space: nowrap;
+}
+
+.aitab-chrome-tag {
+  margin: 0 0 0 auto;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--aitab-color-muted);
+}
+
+.aitab-doc {
+  max-width: var(--aitab-measure);
+  margin-inline: auto;
+  padding: 3rem 1.5rem 6rem;
+}
+
 .aitab-status {
   color: var(--aitab-color-muted);
 }
 
 .aitab-header {
-  margin-block-end: calc(var(--aitab-space) * 2);
+  margin-block-end: 2.5rem;
+  padding: 2rem 1.75rem;
+  background: var(--aitab-color-card);
+  border: 1px solid var(--aitab-color-line);
+  border-radius: var(--aitab-radius);
+  box-shadow: var(--aitab-shadow);
 }
 
 .aitab-eyebrow {
   margin: 0 0 0.4rem;
   font-size: 0.75rem;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--aitab-color-muted);
@@ -72,39 +184,58 @@ aitab-page *::after {
 
 .aitab-title {
   margin: 0;
+  max-width: 20ch;
   font-family: var(--aitab-font-display);
-  font-size: clamp(2rem, 4vw, 2.75rem);
-  font-weight: 580;
+  font-size: clamp(2rem, 4.5vw, 3rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
   line-height: 1.15;
 }
 
 .aitab-icon {
-  margin-inline-end: 0.35em;
+  display: block;
+  margin-block-end: 0.75rem;
+  font-size: 2.75rem;
+  line-height: 1;
 }
 
 .aitab-subhead,
 .aitab-desc,
 .aitab-footer-text {
-  margin: 0.6rem 0 0;
+  margin: 0.85rem 0 0;
+  max-width: 42ch;
+  color: var(--aitab-color-ink-secondary);
+  font-size: 1.1rem;
+  line-height: 1.5;
+}
+
+.aitab-desc {
+  margin: 0 0 1.25rem;
+  font-size: 1rem;
+  max-width: 50ch;
   color: var(--aitab-color-muted);
 }
 
 .aitab-main {
   display: flex;
   flex-direction: column;
-  gap: calc(var(--aitab-space) * 2);
+  gap: 2.5rem;
 }
 
 .aitab-block h2 {
   margin: 0 0 0.75rem;
   font-family: var(--aitab-font-display);
-  font-size: 1.35rem;
-  font-weight: 580;
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .aitab-block h3 {
   margin: 0 0 0.25rem;
-  font-size: 1.05rem;
+  font-family: var(--aitab-font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .aitab-block p {
@@ -126,7 +257,7 @@ aitab-page *::after {
   .aitab-text[data-layout="side-title"],
   .aitab-timeline[data-layout="side-title"] {
     grid-template-columns: 11rem 1fr;
-    gap: calc(var(--aitab-space) * 1.5);
+    gap: 1.5rem;
   }
 }
 
@@ -144,28 +275,33 @@ aitab-page *::after {
 
 .aitab-table-wrap {
   overflow-x: auto;
+  background: var(--aitab-color-card);
+  border: 1px solid var(--aitab-color-line);
+  border-radius: var(--aitab-radius);
+  box-shadow: var(--aitab-shadow);
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
-  background: var(--aitab-color-card);
-  border: 1px solid var(--aitab-color-line);
-  border-radius: var(--aitab-radius);
 }
 
 th,
 td {
-  padding: 0.7rem 0.85rem;
+  padding: 1rem 0.9rem;
   text-align: start;
   vertical-align: top;
-  border-bottom: 1px solid var(--aitab-color-line);
+  border-bottom: 1px solid var(--aitab-color-line-soft);
 }
 
 thead th {
-  font-size: 0.8rem;
-  font-weight: 650;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--aitab-color-muted);
+  background: var(--aitab-color-accent-soft);
+  border-bottom: 1px solid var(--aitab-color-line);
 }
 
 .aitab-winner {
@@ -176,28 +312,36 @@ thead th {
 .aitab-note {
   display: inline-block;
   margin-inline-start: 0.4rem;
-  padding: 0.05rem 0.4rem;
-  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  border-radius: var(--aitab-radius-pill);
   background: var(--aitab-color-accent);
-  color: #fff;
-  font-size: 0.7rem;
-  font-weight: 650;
+  color: var(--aitab-white);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .aitab-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: var(--aitab-space);
+  gap: 1rem;
 }
 
 .aitab-card {
   display: block;
-  padding: 1rem;
+  padding: 1.35rem 1.25rem;
   background: var(--aitab-color-card);
   border: 1px solid var(--aitab-color-line);
   border-radius: var(--aitab-radius);
+  box-shadow: var(--aitab-shadow);
   color: inherit;
   text-decoration: none;
+}
+
+a.aitab-card:hover {
+  border-color: var(--aitab-color-accent);
+  background: var(--aitab-color-accent-soft);
 }
 
 .aitab-card-image {
@@ -205,14 +349,18 @@ thead th {
   width: 100%;
   height: 8rem;
   object-fit: cover;
-  border-radius: calc(var(--aitab-radius) - 0.25rem);
+  border-radius: calc(var(--aitab-radius) - 4px);
   margin-block-end: 0.75rem;
+  background: var(--aitab-color-chip);
 }
 
 .aitab-card-value {
   margin: 0 0 0.25rem;
   font-family: var(--aitab-font-display);
-  font-size: 1.35rem;
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 
 .aitab-card-sub,
@@ -239,16 +387,41 @@ thead th {
 
 .aitab-takeaways li {
   display: grid;
-  grid-template-columns: 2.5rem 1fr;
   gap: 0.75rem;
-  padding-block: 1rem;
-  border-top: 1px solid var(--aitab-color-line);
+  padding-block: 1.5rem;
+  border-block-start: 1px solid var(--aitab-color-line-soft);
+}
+
+.aitab-takeaways header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.aitab-takeaways header h3 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.aitab-takeaways header + div p:last-child {
+  margin-block-end: 0;
+}
+
+@media (min-width: 56rem) {
+  .aitab-takeaways li {
+    grid-template-columns: 1fr 1fr;
+    padding-block-end: 1.25rem;
+  }
 }
 
 .aitab-index {
-  font-family: var(--aitab-font-display);
-  font-size: 1.1rem;
-  color: var(--aitab-color-muted);
+  flex: 0 0 auto;
+  font-family: var(--aitab-font-body);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--aitab-color-accent);
 }
 
 .aitab-timeline-items li {
@@ -270,42 +443,85 @@ thead th {
 }
 
 .aitab-footer {
-  margin-block-start: calc(var(--aitab-space) * 2.5);
-  padding-block-start: var(--aitab-space);
+  margin-block-start: 3.5rem;
+  padding-block-start: 1.75rem;
   border-top: 1px solid var(--aitab-color-line);
+}
+
+.aitab-footer-text {
+  margin: 0 0 1rem;
+  font-family: var(--aitab-font-display);
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--aitab-color-ink);
 }
 
 .aitab-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-block-start: 0.75rem;
+  gap: 0.75rem;
 }
 
 .aitab-chip {
   display: inline-flex;
   align-items: center;
-  padding: 0.4rem 0.75rem;
-  border: 1px solid var(--aitab-color-line);
-  border-radius: 999px;
-  background: var(--aitab-color-card);
-  color: inherit;
+  justify-content: center;
+  padding: 0.65rem 1.35rem;
+  border: 2px solid var(--aitab-color-accent);
+  border-radius: var(--aitab-radius-pill);
+  background: transparent;
+  color: var(--aitab-color-ink);
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1;
   text-decoration: none;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s,
+    transform 0.12s;
+}
+
+.aitab-chip:hover {
+  background: var(--aitab-color-accent-soft);
+  border-color: var(--aitab-color-accent-hover);
+  color: var(--aitab-color-accent-hover);
+  transform: translateY(-1px);
 }
 
 .aitab-chip[data-variant="primary"] {
   background: var(--aitab-color-accent);
   border-color: var(--aitab-color-accent);
-  color: #fff;
+  color: var(--aitab-white);
+}
+
+.aitab-chip[data-variant="primary"]:hover {
+  background: var(--aitab-color-accent-hover);
+  border-color: var(--aitab-color-accent-hover);
+  color: var(--aitab-white);
 }
 
 a {
-  color: var(--aitab-color-accent);
+  color: var(--aitab-color-link);
+}
+
+a:hover {
+  color: var(--aitab-color-accent-hover);
 }
 
 .aitab-unknown {
   color: var(--aitab-color-muted);
   font-style: italic;
+}
+
+@media (max-width: 600px) {
+  .aitab-doc {
+    padding: 2rem 1rem 4.5rem;
+  }
+
+  .aitab-chrome {
+    padding: 0.85rem 1rem;
+  }
 }
