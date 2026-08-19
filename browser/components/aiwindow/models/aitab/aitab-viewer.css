@@ -40,6 +40,13 @@ aitab-page {
   font: 1rem/1.5 var(--aitab-font-body);
 }
 
+aitab-table,
+aitab-cards,
+aitab-list,
+aitab-timeline {
+  display: block;
+}
+
 aitab-page *,
 aitab-page *::before,
 aitab-page *::after {

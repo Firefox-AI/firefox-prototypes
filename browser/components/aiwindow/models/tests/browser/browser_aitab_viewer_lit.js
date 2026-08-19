@@ -44,7 +44,15 @@ add_task(async function test_about_smartwindowtasks_renders_hash() {
       );
       const title = content.document.querySelector(".aitab-title");
       Assert.ok(title.textContent.includes("Hotels in Lisbon"));
+      Assert.ok(
+        content.document.querySelector("aitab-list"),
+        "takeaways render as a LitElement"
+      );
       Assert.ok(content.document.querySelector(".aitab-takeaways"));
+      Assert.ok(
+        content.document.querySelector(".aitab-text"),
+        "text blocks stay as function-rendered markup"
+      );
       Assert.ok(
         !content.document.querySelector("ai-tasks"),
         "the tasks UI is not loaded when a page hash is present"
