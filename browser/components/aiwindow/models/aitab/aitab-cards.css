@@ -1,0 +1,68 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+.aitab-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 24px;
+}
+
+.aitab-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 16px;
+  transition:
+    transform 0.16s ease,
+    filter 0.16s ease;
+}
+
+a.aitab-card:hover {
+  transform: translateY(-4px);
+  filter: drop-shadow(0 14px 26px rgba(33, 3, 64, 0.16));
+}
+
+.aitab-card-image {
+  display: block;
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 16px;
+  background: var(--aitab-chip);
+}
+
+.aitab-card .aitab-eyebrow {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--aitab-accent);
+}
+
+.aitab-card-value {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--aitab-ink);
+}
+
+.aitab-card-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  color: var(--aitab-body);
+}
+
+.aitab-favicon {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  object-fit: cover;
+}

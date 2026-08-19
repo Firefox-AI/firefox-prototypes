@@ -45,6 +45,12 @@ add_task(async function test_about_smartwindowtasks_renders_hash() {
       const title = content.document.querySelector(".aitab-title");
       Assert.ok(title.textContent.includes("Hotels in Lisbon"));
       Assert.ok(
+        content.document.querySelector(
+          'link[href="chrome://browser/content/aiwindow/aitab/aitab-list.css"]'
+        ),
+        "list CSS is loaded by the list module"
+      );
+      Assert.ok(
         content.document.querySelector("aitab-list"),
         "takeaways render as a LitElement"
       );
@@ -56,6 +62,10 @@ add_task(async function test_about_smartwindowtasks_renders_hash() {
       Assert.ok(
         !content.document.querySelector("ai-tasks"),
         "the tasks UI is not loaded when a page hash is present"
+      );
+      Assert.ok(
+        !content.document.querySelector(".aitab-sheet [style]"),
+        "viewer markup does not use style attributes"
       );
       Assert.equal(content.document.title, "Hotels in Lisbon");
     });

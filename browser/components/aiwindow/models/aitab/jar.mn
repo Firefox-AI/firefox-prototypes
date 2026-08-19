@@ -4,11 +4,16 @@
 
 browser.jar:
   content/browser/aiwindow/aitab/component_schema.json       (component_schema.json)
+  content/browser/aiwindow/aitab/aitab-blocks.css            (aitab-blocks.css)
   content/browser/aiwindow/aitab/aitab-blocks.mjs            (aitab-blocks.mjs)
+  content/browser/aiwindow/aitab/aitab-cards.css             (aitab-cards.css)
   content/browser/aiwindow/aitab/aitab-cards.mjs             (aitab-cards.mjs)
   content/browser/aiwindow/aitab/aitab-element.mjs           (aitab-element.mjs)
+  content/browser/aiwindow/aitab/aitab-list.css              (aitab-list.css)
   content/browser/aiwindow/aitab/aitab-list.mjs              (aitab-list.mjs)
+  content/browser/aiwindow/aitab/aitab-table.css             (aitab-table.css)
   content/browser/aiwindow/aitab/aitab-table.mjs             (aitab-table.mjs)
+  content/browser/aiwindow/aitab/aitab-timeline.css          (aitab-timeline.css)
   content/browser/aiwindow/aitab/aitab-timeline.mjs          (aitab-timeline.mjs)
   content/browser/aiwindow/aitab/aitab-util.mjs              (aitab-util.mjs)
   content/browser/aiwindow/aitab/aitab-viewer.css            (aitab-viewer.css)

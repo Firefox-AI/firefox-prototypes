@@ -3,7 +3,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { html, nothing } from "chrome://browser/content/aiwindow/aitab/lit.mjs";
+import { ensureSheet } from "chrome://browser/content/aiwindow/aitab/aitab-element.mjs";
 import { httpUrl } from "chrome://browser/content/aiwindow/aitab/aitab-util.mjs";
+
+ensureSheet("chrome://browser/content/aiwindow/aitab/aitab-blocks.css");
 
 function chip(text, href, variant = "secondary") {
   const url = httpUrl(href);
@@ -30,7 +33,7 @@ export function renderHeader(header) {
   return html`
     <header class="aitab-header">
       ${header.eyebrow
-        ? html`<p class="aitab-eyebrow">${header.eyebrow}</p>`
+        ? html`<p class="aitab-kicker">${header.eyebrow}</p>`
         : nothing}
       <h1 class="aitab-title">
         ${header.icon
@@ -87,7 +90,9 @@ export function renderText(block) {
     return html`
       <section class="aitab-block aitab-text" data-layout="side-title">
         <div class="aitab-side">
-          ${block.title ? html`<h2>${block.title}</h2>` : nothing}
+          ${block.title
+            ? html`<h2 class="aitab-side-title">${block.title}</h2>`
+            : nothing}
           ${block.subtitle ? html`<p>${block.subtitle}</p>` : nothing}
         </div>
         <div class="aitab-side-body">

@@ -3,7 +3,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { html, nothing } from "chrome://browser/content/aiwindow/aitab/lit.mjs";
-import { AitabElement } from "chrome://browser/content/aiwindow/aitab/aitab-element.mjs";
+import {
+  AitabElement,
+  ensureSheet,
+} from "chrome://browser/content/aiwindow/aitab/aitab-element.mjs";
+
+ensureSheet("chrome://browser/content/aiwindow/aitab/aitab-list.css");
 
 /**
  *
@@ -20,18 +25,22 @@ export class AitabList extends AitabElement {
         class="aitab-block aitab-list"
         data-layout=${block.layout || "takeaways"}
       >
-        ${block.title ? html`<h2>${block.title}</h2>` : nothing}
+        ${block.title
+          ? html`<h2 class="aitab-display-title">${block.title}</h2>`
+          : nothing}
         <ol class="aitab-takeaways">
           ${(block.items || []).map(
             (item, index) => html`
               <li>
-                <header>
+                <div class="aitab-takeaway-claim">
                   <span class="aitab-index"
                     >${item.number || String(index + 1).padStart(2, "0")}</span
                   >
                   ${item.title ? html`<h3>${item.title}</h3>` : nothing}
-                </header>
-                <div>${item.body ? html`<p>${item.body}</p>` : nothing}</div>
+                </div>
+                <div class="aitab-takeaway-evidence">
+                  ${item.body ? html`<p>${item.body}</p>` : nothing}
+                </div>
               </li>
             `
           )}

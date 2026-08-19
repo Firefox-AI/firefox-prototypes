@@ -16,6 +16,7 @@ import {
   LitElement,
   html,
 } from "chrome://browser/content/aiwindow/aitab/lit.mjs";
+import { ensureSheet } from "chrome://browser/content/aiwindow/aitab/aitab-element.mjs";
 import {
   renderFooter,
   renderHeader,
@@ -31,7 +32,7 @@ import "chrome://browser/content/aiwindow/aitab/aitab-list.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/aitab/aitab-timeline.mjs";
 
-const VIEWER_CSS = "chrome://browser/content/aiwindow/aitab/aitab-viewer.css";
+const PAGE_CSS = "chrome://browser/content/aiwindow/aitab/aitab-viewer.css";
 
 function renderBlock(block) {
   switch (block?.type) {
@@ -100,15 +101,13 @@ export class AitabPage extends LitElement {
       return html`<p class="aitab-status">No page config in the URL hash.</p>`;
     }
     return html`
-      <header class="aitab-chrome" aria-label="Firefox">
-        <p class="aitab-wordmark">Firefox</p>
-        <p class="aitab-chrome-tag">For a better internet</p>
-      </header>
-      <div class="aitab-doc">
+      <div class="aitab-sheet">
         ${renderHeader(this.page.header)}
-        <main class="aitab-main">
-          ${(this.page.blocks || []).map(block => renderBlock(block))}
-        </main>
+        <div class="aitab-doc">
+          <main class="aitab-main">
+            ${(this.page.blocks || []).map(block => renderBlock(block))}
+          </main>
+        </div>
         ${renderFooter(this.page.footer)}
       </div>
     `;
@@ -118,16 +117,13 @@ export class AitabPage extends LitElement {
 customElements.define("aitab-page", AitabPage);
 
 function ensureViewerStyles() {
-  if (document.querySelector(`link[href="${VIEWER_CSS}"]`)) {
-    return;
+  for (const href of [
+    "chrome://global/skin/in-content/common.css",
+    "chrome://browser/content/aiwindow/ai-window-shared.css",
+  ]) {
+    document.querySelector(`link[href="${href}"]`)?.remove();
   }
-  for (const link of [...document.querySelectorAll('link[rel="stylesheet"]')]) {
-    link.remove();
-  }
-  const css = document.createElement("link");
-  css.rel = "stylesheet";
-  css.href = VIEWER_CSS;
-  document.head.append(css);
+  ensureSheet(PAGE_CSS);
 }
 
 function applyHash(host) {

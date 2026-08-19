@@ -3,7 +3,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { html, nothing } from "chrome://browser/content/aiwindow/aitab/lit.mjs";
-import { AitabElement } from "chrome://browser/content/aiwindow/aitab/aitab-element.mjs";
+import {
+  AitabElement,
+  ensureSheet,
+} from "chrome://browser/content/aiwindow/aitab/aitab-element.mjs";
+
+ensureSheet("chrome://browser/content/aiwindow/aitab/aitab-timeline.css");
 
 /**
  *
@@ -21,7 +26,9 @@ export class AitabTimeline extends AitabElement {
         data-layout=${block.layout || "side-title"}
       >
         <div class="aitab-side">
-          ${block.title ? html`<h2>${block.title}</h2>` : nothing}
+          ${block.title
+            ? html`<h2 class="aitab-side-title">${block.title}</h2>`
+            : nothing}
           ${block.description ? html`<p>${block.description}</p>` : nothing}
         </div>
         <ol class="aitab-timeline-items">
@@ -29,6 +36,9 @@ export class AitabTimeline extends AitabElement {
             item => html`
               <li data-state=${item.state || "upcoming"}>
                 <div class="aitab-when">
+                  ${item.eyebrow
+                    ? html`<p class="aitab-super">${item.eyebrow}</p>`
+                    : nothing}
                   ${item.label
                     ? html`<p class="aitab-label">${item.label}</p>`
                     : nothing}
@@ -36,10 +46,8 @@ export class AitabTimeline extends AitabElement {
                     ? html`<p class="aitab-sublabel">${item.sublabel}</p>`
                     : nothing}
                 </div>
+                <div class="aitab-rail" aria-hidden="true"></div>
                 <div class="aitab-event">
-                  ${item.eyebrow
-                    ? html`<p class="aitab-eyebrow">${item.eyebrow}</p>`
-                    : nothing}
                   <h3>${item.title}</h3>
                   ${item.body ? html`<p>${item.body}</p>` : nothing}
                 </div>

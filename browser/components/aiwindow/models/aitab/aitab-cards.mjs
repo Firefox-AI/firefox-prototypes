@@ -3,8 +3,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { html, nothing } from "chrome://browser/content/aiwindow/aitab/lit.mjs";
-import { AitabElement } from "chrome://browser/content/aiwindow/aitab/aitab-element.mjs";
+import {
+  AitabElement,
+  ensureSheet,
+} from "chrome://browser/content/aiwindow/aitab/aitab-element.mjs";
 import { httpUrl } from "chrome://browser/content/aiwindow/aitab/aitab-util.mjs";
+
+ensureSheet("chrome://browser/content/aiwindow/aitab/aitab-cards.css");
 
 /**
  *
@@ -43,12 +48,11 @@ export class AitabCards extends AitabElement {
       ${item.value
         ? html`<p class="aitab-card-value">${item.value}</p>`
         : nothing}
-      ${item.title ? html`<h3>${item.title}</h3>` : nothing}
-      ${item.subtitle
+      ${item.title || item.subtitle
         ? html`<p class="aitab-card-sub">
             ${favicon
               ? html`<img class="aitab-favicon" src=${favicon} alt="" />`
-              : nothing}${item.subtitle}
+              : nothing}${item.title || item.subtitle}
           </p>`
         : nothing}
     `;

@@ -4,6 +4,16 @@
 
 import { LitElement } from "chrome://browser/content/aiwindow/aitab/lit.mjs";
 
+export function ensureSheet(href) {
+  if (document.querySelector(`link[href="${href}"]`)) {
+    return;
+  }
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = href;
+  document.head.append(link);
+}
+
 /**
  *
  */

@@ -1,0 +1,108 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+.aitab-timeline-items {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.aitab-timeline-items li {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 9.5rem) 40px minmax(0, 1fr);
+  column-gap: 16px;
+  align-items: stretch;
+}
+
+@media (min-width: 40rem) {
+  .aitab-timeline-items li {
+    column-gap: 20px;
+  }
+}
+
+.aitab-when {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: end;
+  padding-block: 4px 40px;
+}
+
+.aitab-timeline-items li:last-child .aitab-when {
+  padding-block-end: 0;
+}
+
+.aitab-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.aitab-rail::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  margin-block-start: 4px;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: var(--aitab-sheet);
+  box-shadow: inset 0 0 0 3px var(--aitab-lilac);
+}
+
+.aitab-timeline-items li[data-state="now"] .aitab-rail::before {
+  background: var(--aitab-accent);
+  box-shadow: 0 0 0 6px #ede3fe;
+}
+
+.aitab-rail::after {
+  content: "";
+  flex: 1 1 auto;
+  width: 2px;
+  min-height: 24px;
+  background: var(--aitab-line);
+}
+
+.aitab-timeline-items li:last-child .aitab-rail::after {
+  content: none;
+}
+
+.aitab-event {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding-block-end: 40px;
+}
+
+.aitab-timeline-items li:last-child .aitab-event {
+  padding-block-end: 0;
+}
+
+.aitab-label {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--aitab-ink);
+}
+
+.aitab-sublabel {
+  margin: 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--aitab-quiet);
+}
+
+.aitab-event h3 {
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.aitab-event p {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--aitab-body);
+}

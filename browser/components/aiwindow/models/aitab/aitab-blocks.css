@@ -1,0 +1,170 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+.aitab-header {
+  position: relative;
+  overflow: hidden;
+  padding: 72px 88px 60px;
+  background: var(--aitab-accent-deep);
+  border-radius: 0 0 128px 128px;
+  color: #fff;
+}
+
+.aitab-header::after {
+  content: "";
+  position: absolute;
+  inset-inline: -6%;
+  bottom: -340px;
+  height: 460px;
+  border-radius: 50%;
+  background: var(--aitab-accent);
+  filter: blur(70px);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.aitab-header > * {
+  position: relative;
+  z-index: 1;
+}
+
+.aitab-kicker {
+  margin: 0 0 14px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--aitab-lilac);
+}
+
+.aitab-title {
+  margin: 0;
+  max-width: 16ch;
+  font-family: var(--aitab-font-display);
+  font-stretch: 75%;
+  font-size: clamp(36px, 5vw, 54px);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 0.98;
+  color: #fff;
+}
+
+.aitab-icon {
+  margin-inline-end: 0.2em;
+}
+
+.aitab-subhead {
+  margin: 14px 0 0;
+  max-width: 36em;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--aitab-line);
+}
+
+.aitab-text[data-layout="summary"] {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 720px;
+}
+
+.aitab-text[data-layout="summary"] .aitab-lead {
+  font-family: var(--aitab-font-display);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--aitab-accent-deep);
+}
+
+.aitab-text p,
+.aitab-side-body p {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--aitab-body);
+}
+
+.aitab-text[data-layout="subheads"] {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  max-width: 720px;
+}
+
+.aitab-text-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.aitab-text[data-layout="side-title"],
+.aitab-timeline[data-layout="side-title"] {
+  display: grid;
+  gap: 24px;
+}
+
+@media (min-width: 52rem) {
+  .aitab-text[data-layout="side-title"],
+  .aitab-timeline[data-layout="side-title"] {
+    grid-template-columns: 300px 1fr;
+    column-gap: 40px;
+    align-items: start;
+  }
+}
+
+.aitab-side-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 620px;
+}
+
+.aitab-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 56px 88px 72px;
+  background: linear-gradient(180deg, #fff 0%, #ede6fb 100%);
+}
+
+.aitab-footer-text {
+  margin: 0;
+  font-family: var(--aitab-font-display);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--aitab-ink);
+}
+
+.aitab-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.aitab-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 15px;
+  border: 1px solid #d9cff0;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--aitab-accent-text);
+  font: inherit;
+  font-size: 12.5px;
+  text-decoration: none;
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s,
+    transform 0.12s;
+}
+
+.aitab-chip:hover,
+.aitab-chip[data-variant="primary"] {
+  background: #fff;
+  border-color: var(--aitab-accent);
+  color: var(--aitab-accent-deep);
+  transform: translateY(-1px);
+}
