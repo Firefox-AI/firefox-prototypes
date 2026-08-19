@@ -30,12 +30,24 @@ bool BaseHistory::CanStore(nsIURI* aURI) {
     return false;
   }
 
-  if (!scheme.EqualsLiteral("http") && !scheme.EqualsLiteral("https")) {
+  nsAutoCString filePath;
+  // Spike: persist about:smartwindowtasks, including its page-config hash.
+  const bool isSmartWindowTasks =
+      scheme.EqualsLiteral("about") &&
+      NS_SUCCEEDED(aURI->GetFilePath(filePath)) &&
+      filePath.EqualsLiteral("smartwindowtasks");
+
+  if (!scheme.EqualsLiteral("http") && !scheme.EqualsLiteral("https") &&
+      !isSmartWindowTasks) {
     for (const nsLiteralCString& disallowed : kDisallowedSchemes) {
       if (scheme.Equals(disallowed)) {
         return false;
       }
     }
+  }
+
+  if (isSmartWindowTasks) {
+    return true;
   }
 
   nsAutoCString spec;
