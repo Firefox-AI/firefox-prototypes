@@ -2,7 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { ExaClient } from "moz-src:///browser/components/aiwindow/models/ExaClient.sys.mjs";
 import {
   MODEL_FEATURES,
   openAIEngine,
@@ -29,6 +28,9 @@ ChromeUtils.defineESModuleGetters(lazy, {
   Downloads: "resource://gre/modules/Downloads.sys.mjs",
   buildEngineForFeature:
     "moz-src:///browser/components/aiwindow/models/PromptLoader.sys.mjs",
+  ExaSearchProvider:
+    "moz-src:///browser/components/aiwindow/models/search/SearchProviders.sys.mjs",
+  GetPageContent: "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs",
   setTimeout: "resource://gre/modules/Timer.sys.mjs",
 });
 ChromeUtils.defineLazyGetter(lazy, "parseMarkdown", () => {
@@ -64,6 +66,7 @@ const MIN_RESEARCH_ROUNDS = 2;
 const SEARCHES_PER_ROUND = 6;
 const RESULTS_PER_SEARCH = 8;
 const CONTENT_URLS_PER_ROUND = 10;
+const PAGE_TEXT_MAX_CHARS = 8000;
 const MAX_VISITED_URLS = 45;
 const MAX_MODEL_CONTEXT_CHARS = 28000;
 const MAX_NOTE_CHARS = 5000;
@@ -1422,7 +1425,6 @@ async function updateExistingResearchReport(
  */
 class ResearchAgentSingleton {
   #sessions = new Map();
-  #exaClient = new ExaClient();
 
   isWaitingForClarifications(conversationId) {
     return (
@@ -2269,15 +2271,27 @@ class ResearchAgentSingleton {
     try {
       this.#throwIfCancelled(session);
       recordSearchUsage(session);
-      const data = await this.#exaClient.search({
-        query,
-        numResults,
-        contents: {
-          highlights: true,
-        },
+      const provider = new lazy.ExaSearchProvider();
+      const { results } = await provider.search(query, {
+        maxResults: numResults,
       });
       this.#throwIfCancelled(session);
-      return Array.isArray(data.results) ? data.results : [];
+      const list = Array.isArray(results) ? results : [];
+
+      // Results came from a trusted search provider, so they are eligible for
+      // an anonymous fetch by get_page_content. Without registering them the
+      // security policy blocks the reads once private + untrusted are set,
+      // which is the same handshake SearchWorkflow performs.
+      const conversation = session?.conversation;
+      if (conversation) {
+        conversation.addSerpUrlsForAnonymousFetch(
+          list.map(item => item.url).filter(Boolean)
+        );
+        conversation.securityProperties.setPrivateData();
+        conversation.securityProperties.setUntrustedInput();
+      }
+
+      return list;
     } catch (error) {
       if (error instanceof ResearchCancelledError) {
         throw error;
@@ -2324,15 +2338,30 @@ class ResearchAgentSingleton {
       return [];
     }
 
+    // Carry titles over from the search results so visited pages stay labelled;
+    // the page extractor returns text only.
+    const titleByUrl = new Map();
+    for (const { results } of roundResults) {
+      for (const result of results) {
+        if (result.url && !titleByUrl.has(result.url)) {
+          titleByUrl.set(result.url, result.title || "");
+        }
+      }
+    }
+
     try {
-      const data = await this.#exaClient.contents({
-        urls,
-        text: {
-          maxCharacters: 8000,
-        },
-      });
+      const fetched = await lazy.GetPageContent.getPageContentResults(
+        { url_list: urls },
+        session.conversation
+      );
       this.#throwIfCancelled(session);
-      const pages = Array.isArray(data.results) ? data.results : [];
+      const pages = fetched
+        .filter(entry => entry?.ok && entry.content)
+        .map(entry => ({
+          url: entry.url,
+          title: titleByUrl.get(entry.url) || entry.url,
+          text: truncate(entry.content, PAGE_TEXT_MAX_CHARS),
+        }));
       this.#rememberUrls(session, pages, { visited: true });
       return pages;
     } catch (error) {

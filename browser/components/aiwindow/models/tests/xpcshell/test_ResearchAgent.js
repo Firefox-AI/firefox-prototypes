@@ -1,9 +1,6 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
-const { ExaClient } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/aiwindow/models/ExaClient.sys.mjs"
-);
 const {
   ResearchAgent,
   parseResearchJson,
@@ -232,87 +229,4 @@ add_task(async function test_updateReport_rewrites_answer_and_appends_log() {
     html.includes("Moved the rest day to the middle of the week."),
     "Should append the edit summary to the appendix"
   );
-});
-
-add_task(async function test_exa_search_posts_expected_payload() {
-  let request;
-  const client = new ExaClient({
-    apiKey: "test-key",
-    fetchImpl: async (url, options) => {
-      request = { url, options };
-      return {
-        ok: true,
-        status: 200,
-        text: async () => JSON.stringify({ results: [] }),
-      };
-    },
-  });
-
-  await client.search({ query: "mozilla research", numResults: 4 });
-
-  Assert.equal(request.url, "https://api.exa.ai/search");
-  Assert.equal(request.options.method, "POST");
-  Assert.equal(request.options.headers["x-api-key"], "test-key");
-  Assert.deepEqual(JSON.parse(request.options.body), {
-    query: "mozilla research",
-    type: "auto",
-    numResults: 4,
-    contents: {
-      highlights: true,
-    },
-  });
-});
-
-add_task(async function test_exa_contents_posts_urls() {
-  let body;
-  const client = new ExaClient({
-    apiKey: "test-key",
-    fetchImpl: async (_url, options) => {
-      body = JSON.parse(options.body);
-      return {
-        ok: true,
-        status: 200,
-        text: async () => JSON.stringify({ results: [] }),
-      };
-    },
-  });
-
-  await client.contents({ urls: ["https://example.com/"] });
-
-  Assert.deepEqual(body, {
-    urls: ["https://example.com/"],
-    text: {
-      maxCharacters: 8000,
-    },
-  });
-});
-
-add_task(async function test_exa_search_retries_transient_502() {
-  let attempts = 0;
-  const client = new ExaClient({
-    apiKey: "test-key",
-    maxRetries: 1,
-    retryDelayMs: 0,
-    fetchImpl: async () => {
-      attempts++;
-      if (attempts === 1) {
-        return {
-          ok: false,
-          status: 502,
-          text: async () => "",
-        };
-      }
-      return {
-        ok: true,
-        status: 200,
-        text: async () =>
-          JSON.stringify({ results: [{ url: "https://a.com" }] }),
-      };
-    },
-  });
-
-  const result = await client.search({ query: "mozilla research" });
-
-  Assert.equal(attempts, 2);
-  Assert.equal(result.results[0].url, "https://a.com");
 });

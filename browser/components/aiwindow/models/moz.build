@@ -22,7 +22,6 @@ MOZ_SRC_FILES += [
     "ChatUtils.sys.mjs",
     "Conversation.sys.mjs",
     "ConversationSuggestions.sys.mjs",
-    "ExaClient.sys.mjs",
     "HistoryThumbnails.sys.mjs",
     "IntentClassifier.sys.mjs",
     "ManageTabs.sys.mjs",
