@@ -27,6 +27,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   clearTimeout: "resource://gre/modules/Timer.sys.mjs",
   DownloadPaths: "resource://gre/modules/DownloadPaths.sys.mjs",
   Downloads: "resource://gre/modules/Downloads.sys.mjs",
+  buildEngineForFeature:
+    "moz-src:///browser/components/aiwindow/models/PromptLoader.sys.mjs",
   setTimeout: "resource://gre/modules/Timer.sys.mjs",
 });
 ChromeUtils.defineLazyGetter(lazy, "parseMarkdown", () => {
@@ -1500,10 +1502,7 @@ class ResearchAgentSingleton {
       this.#throwIfCancelled(session);
       await session.report.addSection("Initial question", text);
       this.#throwIfCancelled(session);
-      const engine = await openAIEngine.build(
-        MODEL_FEATURES.CHAT,
-        conversation.id
-      );
+      const engine = await this.#buildResearchEngine(conversation.id);
       this.#throwIfCancelled(session);
       const plan = await this.#buildClarifyingSearchPlan(engine, session);
       this.#throwIfCancelled(session);
@@ -1666,10 +1665,7 @@ class ResearchAgentSingleton {
 
   async #runReportContinuation(session) {
     this.#throwIfCancelled(session);
-    const engine = await openAIEngine.build(
-      MODEL_FEATURES.CHAT,
-      session.conversation.id
-    );
+    const engine = await this.#buildResearchEngine(session.conversation.id);
     this.#throwIfCancelled(session);
 
     const sections = [];
@@ -1761,10 +1757,7 @@ class ResearchAgentSingleton {
 
   async #runDeepResearch(session) {
     this.#throwIfCancelled(session);
-    const engine = await openAIEngine.build(
-      MODEL_FEATURES.CHAT,
-      session.conversation.id
-    );
+    const engine = await this.#buildResearchEngine(session.conversation.id);
     this.#throwIfCancelled(session);
     let done = false;
 
@@ -2228,6 +2221,25 @@ class ResearchAgentSingleton {
       .join("\n");
   }
 
+  /**
+   * Builds the chat engine used for every research LLM call.
+   *
+   * `openAIEngine.build` takes an options object and no longer exposes
+   * `getConfig`, so inference parameters are resolved here (from
+   * RemoteSettings, via PromptLoader) and ride along on the engine.
+   *
+   * @param {string} conversationId - Used as the telemetry flow id.
+   * @returns {Promise<object>} The engine, with `researchInferenceParams` set.
+   */
+  async #buildResearchEngine(conversationId) {
+    const { engine, parameters } = await lazy.buildEngineForFeature(
+      MODEL_FEATURES.CHAT,
+      { flowId: conversationId }
+    );
+    engine.researchInferenceParams = parameters ?? {};
+    return engine;
+  }
+
   async #runModel(
     engine,
     messages,
@@ -2239,14 +2251,12 @@ class ResearchAgentSingleton {
       throw new Error("FxA token unavailable");
     }
 
-    const config = engine.getConfig(engine.feature);
-    const inferenceParams = config?.parameters || {};
     const response = await retryTransient(
       () =>
         engine.run({
           args: messages,
           fxAccountToken,
-          ...inferenceParams,
+          inferenceParams: engine.researchInferenceParams ?? {},
         }),
       label
     );
