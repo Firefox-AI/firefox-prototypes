@@ -13,6 +13,10 @@ const {
   "moz-src:///browser/components/aiwindow/models/ResearchAgent.sys.mjs"
 );
 
+const { AITab } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/aiwindow/models/aitab/AITab.sys.mjs"
+);
+
 async function writeIndexedReport({
   id = crypto.randomUUID(),
   title = "Park Week Plan",
@@ -315,71 +319,132 @@ add_task(function test_formatDuration_renders_minutes_and_seconds() {
   }
 });
 
-add_task(function test_buildVerbatimAnswerBlocks_keeps_every_word() {
-  const markdown = [
-    "For your **5.5-year-old**, the choice comes down to harness vs booster.",
-    "",
-    "## Core Comparison",
-    "",
-    "| Feature | LUMN | AACE |",
-    "| --- | --- | --- |",
-    "| Primary Mode | 5-point harness | Vehicle seat belt |",
-    "",
-    "### Key Considerations",
-    "",
-    "- **Safety:** keep them harnessed longer.",
-    "- Tesla fit: see the [manual](https://example.com/manual).",
-    "",
-    "> Experts favour the harness.",
-  ].join("\n");
+const VERBATIM_MARKDOWN = [
+  "For your **5.5-year-old**, the choice comes down to harness vs booster.",
+  "",
+  "## Comparison Summary",
+  "",
+  "| Feature | Nuna AACE | Nuna EXEC |",
+  "| --- | --- | --- |",
+  "| Primary Use | Dedicated Booster | All-in-One |",
+  "| Tesla Fit | Slim; easy access | Wide; obstructs |",
+  "",
+  "### Key Considerations",
+  "",
+  "- **Safety:** keep them harnessed longer.",
+  "- Tesla fit: see the [manual](https://example.com/manual).",
+  "",
+  "> Experts favour the harness.",
+].join("\n");
 
-  const blocks = buildVerbatimAnswerBlocks(markdown);
+/**
+ * Every human-readable string in a block tree.
+ *
+ * @param {*} node - A block, or any value nested inside one.
+ * @param {string[]} out - Accumulator.
+ * @returns {string[]} Collected strings.
+ */
+function collectBlockText(node, out = []) {
+  if (typeof node === "string") {
+    out.push(node);
+  } else if (Array.isArray(node)) {
+    node.forEach(item => collectBlockText(item, out));
+  } else if (node && typeof node === "object") {
+    for (const [key, value] of Object.entries(node)) {
+      if (
+        key !== "type" &&
+        key !== "layout" &&
+        key !== "role" &&
+        key !== "key"
+      ) {
+        collectBlockText(value, out);
+      }
+    }
+  }
+  return out;
+}
 
-  Assert.greaterOrEqual(blocks.length, 3, "One block per heading section");
-  Assert.ok(
-    blocks.every(block => block.type === "text" && block.layout === "summary"),
-    "Every block is a text/summary block"
-  );
-  Assert.equal(blocks[0].title, "Full answer", "Lead prose is labelled");
+add_task(function test_buildVerbatimAnswerBlocks_maps_each_construct() {
+  const blocks = buildVerbatimAnswerBlocks(VERBATIM_MARKDOWN);
+  const kinds = blocks.map(block => `${block.type}/${block.layout}`);
+
   Assert.deepEqual(
-    blocks.map(block => block.title),
-    ["Full answer", "Core Comparison", "Key Considerations"],
-    "Headings become block titles, in order"
+    kinds,
+    ["text/summary", "table/ranked", "list/takeaways", "text/quote"],
+    "Each markdown construct becomes the block type that fits it"
   );
 
-  const rendered = blocks.flatMap(block => block.paragraphs).join("\n");
+  // Prose keeps its heading label.
+  Assert.equal(blocks[0].title, "Full answer");
+  Assert.ok(blocks[0].paragraphs[0].includes("5.5-year-old"));
+  Assert.ok(!blocks[0].paragraphs[0].includes("**"), "Bold markers stripped");
 
-  // Table data survives; the |---| separator row carries no words and is gone.
-  Assert.ok(
-    rendered.includes("Primary Mode | 5-point harness | Vehicle seat belt"),
-    "Table rows are preserved as pipe-joined lines"
+  // The table is a real table, not pipe-joined prose.
+  const table = blocks[1];
+  Assert.equal(table.title, "Comparison Summary", "Heading labels the table");
+  Assert.deepEqual(
+    table.fields.map(field => field.label),
+    ["Feature", "Nuna AACE", "Nuna EXEC"],
+    "Header cells become column labels"
   );
-  Assert.ok(!/\|\s*---/.test(rendered), "Separator rows are dropped");
-
-  // Bullets keep their text.
-  Assert.ok(rendered.includes("• Safety: keep them harnessed longer."));
-  Assert.ok(rendered.includes("Experts favour the harness."), "Quote kept");
-
-  // Markup is stripped, never the words it wrapped.
-  Assert.ok(!rendered.includes("**"), "Bold markers removed");
-  Assert.ok(rendered.includes("5.5-year-old"), "Bolded words survive");
+  Assert.equal(table.fields[0].role, "title", "First column titles the row");
+  Assert.equal(table.data.length, 2, "One object per body row");
+  Assert.equal(table.data[0][table.fields[1].key], "Dedicated Booster");
   Assert.ok(
-    rendered.includes("manual (https://example.com/manual)"),
+    !JSON.stringify(table).includes("---"),
+    "The separator row is discarded"
+  );
+
+  // Bullets become list items, splitting a "Lead: detail" claim.
+  const list = blocks[2];
+  Assert.equal(list.title, "Key Considerations");
+  Assert.equal(list.items.length, 2);
+  Assert.equal(list.items[0].number, "01");
+  Assert.equal(list.items[0].title, "Safety");
+  Assert.equal(list.items[0].body, "keep them harnessed longer.");
+  Assert.ok(
+    list.items[1].body.includes("manual (https://example.com/manual)"),
     "Link text and target both survive"
   );
 
-  // Word-level coverage: nothing the answer said is missing from the page.
-  const words = markdown
-    .replace(/^[ ]{0,3}#{1,6}\s+/gm, "")
+  Assert.equal(blocks[3].quote, "Experts favour the harness.");
+});
+
+add_task(function test_buildVerbatimAnswerBlocks_keeps_every_word() {
+  const blocks = buildVerbatimAnswerBlocks(VERBATIM_MARKDOWN);
+  const haystack = collectBlockText(blocks).join(" ");
+
+  const words = VERBATIM_MARKDOWN.replace(/^[ ]{0,3}#{1,6}\s+/gm, "")
     .replace(/\|/g, " ")
     .replace(/[*>`[\]()]/g, " ")
     .split(/\s+/)
-    .filter(word => word && !/^-+$/.test(word) && word !== "-");
-  const haystack = `${blocks.map(b => b.title ?? "").join(" ")} ${rendered}`;
+    // Punctuation may be absorbed into structure — "**Safety:** keep ..."
+    // splits into a claim titled "Safety" plus its body — so compare bare words.
+    .map(word => word.replace(/^[^A-Za-z0-9$]+|[^A-Za-z0-9%$]+$/g, ""))
+    .filter(Boolean);
+
   const missing = words.filter(word => !haystack.includes(word));
-  Assert.deepEqual(
-    missing,
-    [],
-    "Every word of the answer appears in the blocks"
-  );
+  Assert.deepEqual(missing, [], "Every word of the answer appears in a block");
+});
+
+add_task(
+  async function test_buildVerbatimAnswerBlocks_validates_against_schema() {
+    const page = {
+      header: { type: "header", title: "Nuna AACE vs EXEC" },
+      blocks: buildVerbatimAnswerBlocks(VERBATIM_MARKDOWN),
+    };
+    const result = await AITab.validatePage(page);
+    Assert.ok(
+      result.ok,
+      `Generated blocks must satisfy the packaged schemas: ${JSON.stringify(
+        result.errors
+      )}`
+    );
+  }
+);
+
+add_task(function test_buildVerbatimAnswerBlocks_handles_empty_input() {
+  for (const value of ["", "   ", undefined]) {
+    Assert.deepEqual(buildVerbatimAnswerBlocks(value), []);
+  }
 });

@@ -471,25 +471,15 @@ function markdownToPlainParagraphs(markdown = "") {
 }
 
 /**
- * Text blocks reproducing the report's final answer word for word.
+ * Split answer markdown into heading-delimited sections.
  *
- * The composed GenTab is a second model pass that re-authors the answer into
- * blocks, and the shared aitab prompt tells it to trim padding — in practice it
- * lands around half the length. These blocks are built mechanically, with no
- * model involved, so nothing the report says is missing from the page.
- *
- * @param {string} [markdown] - The final answer, in markdown.
- * @returns {object[]} `text` blocks, one per heading of the answer.
+ * @param {string} markdown
+ * @returns {Array<{heading: string, lines: string[]}>}
  */
-export function buildVerbatimAnswerBlocks(markdown = "") {
-  const answer = String(markdown).trim();
-  if (!answer) {
-    return [];
-  }
-
+function splitMarkdownSections(markdown) {
   const sections = [];
   let current = { heading: "", lines: [] };
-  for (const raw of answer.replace(/\r\n?/g, "\n").split("\n")) {
+  for (const raw of String(markdown).replace(/\r\n?/g, "\n").split("\n")) {
     const heading = raw.match(/^ {0,3}#{1,6}\s+(.*)$/);
     if (heading) {
       sections.push(current);
@@ -499,19 +489,211 @@ export function buildVerbatimAnswerBlocks(markdown = "") {
     }
   }
   sections.push(current);
+  return sections;
+}
 
-  const blocks = [];
-  for (const section of sections) {
-    const paragraphs = markdownToPlainParagraphs(section.lines.join("\n"));
-    if (!paragraphs.length) {
+/**
+ * The markdown construct a line belongs to.
+ *
+ * @param {string} line
+ * @returns {string} One of "blank", "table", "bullets", "quote", "prose".
+ */
+function markdownLineKind(line) {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return "blank";
+  }
+  if (trimmed.startsWith("|")) {
+    return "table";
+  }
+  if (/^(?:[-*+]|\d+\.)\s+/.test(trimmed)) {
+    return "bullets";
+  }
+  if (trimmed.startsWith(">")) {
+    return "quote";
+  }
+  return "prose";
+}
+
+/**
+ * Group a section's lines into consecutive runs of a single construct, so each
+ * run can become the block type that fits it.
+ *
+ * @param {string[]} lines
+ * @returns {Array<{kind: string, lines: string[]}>}
+ */
+function groupMarkdownChunks(lines) {
+  const chunks = [];
+  for (const line of lines) {
+    const kind = markdownLineKind(line);
+    const last = chunks[chunks.length - 1];
+    if (kind === "blank") {
+      // A blank line closes a table/list/quote run, but only separates
+      // paragraphs within prose, which the prose renderer splits itself.
+      if (last && last.kind === "prose") {
+        last.lines.push(line);
+      } else if (last) {
+        last.closed = true;
+      }
       continue;
     }
-    const block = { type: "text", layout: "summary", paragraphs };
-    const title = section.heading || (blocks.length ? "" : "Full answer");
-    if (title) {
-      block.title = title;
+    if (last && last.kind === kind && !last.closed) {
+      last.lines.push(line);
+    } else {
+      chunks.push({ kind, lines: [line], closed: false });
     }
-    blocks.push(block);
+  }
+  return chunks;
+}
+
+/**
+ * A markdown table as a record-layout `table` block. Every header cell becomes
+ * a column, so no wording is dropped; the separator row carries no words and is
+ * discarded.
+ *
+ * @param {string[]} lines
+ * @returns {?object}
+ */
+function tableBlockFromMarkdown(lines) {
+  const rows = lines
+    .map(line => line.trim())
+    .filter(line => line.startsWith("|") && !/^\|[\s:|-]+\|?$/.test(line))
+    .map(line =>
+      line
+        .replace(/^\||\|$/g, "")
+        .split("|")
+        .map(cell => markdownInlineToText(cell))
+    );
+  if (rows.length < 2) {
+    return null;
+  }
+
+  const width = Math.max(...rows.map(row => row.length));
+  const pad = row =>
+    Array.from({ length: width }, (_unused, index) => row[index] ?? "");
+  const [header, ...body] = rows;
+
+  const taken = new Set();
+  const fields = pad(header).map((label, index) => {
+    let name = slugify(label) || `col_${index + 1}`;
+    while (taken.has(name)) {
+      name = `${name}_${index + 1}`;
+    }
+    taken.add(name);
+    return {
+      key: name,
+      label,
+      type: "text",
+      role: index === 0 ? "title" : "detail",
+    };
+  });
+
+  const data = body
+    .map(pad)
+    .map(cells => {
+      const row = {};
+      fields.forEach((field, index) => {
+        row[field.key] = cells[index] ?? "";
+      });
+      return row;
+    })
+    .filter(row => Object.values(row).some(Boolean));
+
+  return data.length ? { type: "table", layout: "ranked", fields, data } : null;
+}
+
+/**
+ * A markdown list as a `list` block. A "Lead: detail" item (typically a bolded
+ * lead) splits into the claim and its supporting text.
+ *
+ * @param {string[]} lines
+ * @returns {?object}
+ */
+function listBlockFromMarkdown(lines) {
+  const items = [];
+  for (const line of lines) {
+    const match = line.trim().match(/^(?:[-*+]|\d+\.)\s+(.*)$/);
+    if (!match) {
+      continue;
+    }
+    const text = markdownInlineToText(match[1]);
+    if (!text) {
+      continue;
+    }
+    const item = { number: String(items.length + 1).padStart(2, "0") };
+    const lead = text.match(/^([^:]{1,60}):\s+(.*)$/);
+    if (lead) {
+      item.title = lead[1];
+      item.body = lead[2];
+    } else {
+      item.title = text;
+    }
+    items.push(item);
+  }
+  return items.length ? { type: "list", layout: "takeaways", items } : null;
+}
+
+/**
+ * Turn one chunk into the block that fits its construct.
+ *
+ * @param {{kind: string, lines: string[]}} chunk
+ * @returns {?object}
+ */
+function blockForMarkdownChunk(chunk) {
+  if (chunk.kind === "table") {
+    return tableBlockFromMarkdown(chunk.lines);
+  }
+  if (chunk.kind === "bullets") {
+    return listBlockFromMarkdown(chunk.lines);
+  }
+  if (chunk.kind === "quote") {
+    const quote = markdownToPlainParagraphs(
+      chunk.lines.map(line => line.replace(/^\s*>\s?/, "")).join("\n")
+    ).join(" ");
+    return quote ? { type: "text", layout: "quote", quote } : null;
+  }
+  const paragraphs = markdownToPlainParagraphs(chunk.lines.join("\n"));
+  return paragraphs.length
+    ? { type: "text", layout: "summary", paragraphs }
+    : null;
+}
+
+/**
+ * Blocks reproducing the report's final answer word for word, each construct in
+ * the block type that fits it: tables as tables, lists as lists, prose as text.
+ *
+ * The composed GenTab is a second model pass that re-authors the answer, and
+ * the shared aitab prompt tells it to trim padding — in practice it lands around
+ * half the length. These blocks are built mechanically, with no model in the
+ * loop, so nothing the report says is missing from the page.
+ *
+ * @param {string} [markdown] - The final answer, in markdown.
+ * @returns {object[]}
+ */
+export function buildVerbatimAnswerBlocks(markdown = "") {
+  if (!String(markdown).trim()) {
+    return [];
+  }
+
+  const blocks = [];
+  for (const section of splitMarkdownSections(markdown)) {
+    let isFirstOfSection = true;
+    for (const chunk of groupMarkdownChunks(section.lines)) {
+      const block = blockForMarkdownChunk(chunk);
+      if (!block) {
+        continue;
+      }
+      if (isFirstOfSection) {
+        // The heading labels the section's first block; a leading run with no
+        // heading of its own is where the full answer starts.
+        const title = section.heading || (blocks.length ? "" : "Full answer");
+        if (title) {
+          block.title = title;
+        }
+        isFirstOfSection = false;
+      }
+      blocks.push(block);
+    }
   }
   return blocks;
 }
