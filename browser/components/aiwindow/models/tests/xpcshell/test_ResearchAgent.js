@@ -17,6 +17,7 @@ async function writeIndexedReport({
   description = "A week-long park itinerary.",
   question = "Plan my park week.",
   answer = "Day 1: Park A\n\nDay 2: Rest day",
+  page = null,
 } = {}) {
   const dir = PathUtils.join(PathUtils.profileDir, "smart-window-research");
   await IOUtils.makeDirectory(dir, { ignoreExisting: true });
@@ -61,6 +62,7 @@ async function writeIndexedReport({
           fileUri,
           path,
           status: "Complete",
+          page,
           createdAt: now,
           updatedAt: now,
         },
@@ -228,5 +230,67 @@ add_task(async function test_updateReport_rewrites_answer_and_appends_log() {
   Assert.ok(
     html.includes("Moved the rest day to the middle of the week."),
     "Should append the edit summary to the appendix"
+  );
+});
+
+// writeIndexedReport replaces reports.json wholesale, so each of these writes
+// its own index rather than sharing one.
+add_task(async function test_getReports_preserves_page_config() {
+  const page = {
+    version: "2",
+    header: { type: "header", title: "Strollers under $500" },
+    blocks: [
+      { type: "text", layout: "summary", body: "Two of the three fit." },
+    ],
+  };
+  const written = await writeIndexedReport({
+    title: "Strollers under $500",
+    page,
+  });
+
+  Services.prefs.setStringPref(
+    "browser.smartwindow.aitab.viewerURL",
+    "https://viewer.example/app"
+  );
+  registerCleanupFunction(() =>
+    Services.prefs.clearUserPref("browser.smartwindow.aitab.viewerURL")
+  );
+
+  const report = (await ResearchAgent.getReports()).find(
+    entry => entry.id === written.id
+  );
+
+  Assert.ok(report, "The report should come back from the index");
+  // ResearchReportIndex rebuilds records field by field, so an unlisted field
+  // is dropped on every read. This is the regression that guards it.
+  Assert.deepEqual(
+    report.page,
+    page,
+    "The composed page config must survive the index round trip"
+  );
+  Assert.ok(
+    report.openUrl.startsWith("https://viewer.example/app#"),
+    `openUrl should point at the viewer, got ${report.openUrl}`
+  );
+  Assert.deepEqual(
+    JSON.parse(decodeURIComponent(report.openUrl.split("#")[1])),
+    page,
+    "The viewer URL hash should carry the page config"
+  );
+});
+
+add_task(async function test_getReports_without_page_opens_html_report() {
+  const written = await writeIndexedReport({ title: "No GenTab yet" });
+
+  const report = (await ResearchAgent.getReports()).find(
+    entry => entry.id === written.id
+  );
+
+  Assert.ok(report, "The report should come back from the index");
+  Assert.equal(report.page, null, "A report with no GenTab has a null page");
+  Assert.equal(
+    report.openUrl,
+    report.fileUri,
+    "With no composed page, opening falls back to the HTML report"
   );
 });

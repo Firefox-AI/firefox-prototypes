@@ -51,3 +51,22 @@ add_task(function test_getViewerBaseURL_requires_https() {
     "an https pref is returned with any hash stripped"
   );
 });
+
+add_task(async function test_composePageFromText_requires_source_text() {
+  for (const sourceText of [undefined, "", "   "]) {
+    const result = await AITab.composePageFromText({ sourceText });
+    Assert.ok(
+      result.error,
+      `Empty source text (${JSON.stringify(sourceText)}) should short-circuit ` +
+        `with an error rather than calling the model`
+    );
+  }
+});
+
+add_task(function test_pageBreak_is_the_prompt_separator() {
+  Assert.ok(
+    AITab.pageBreak.includes("PAGE BREAK"),
+    "Callers assembling sourceText join on this marker, which the aitab " +
+      "user-data prompt documents"
+  );
+});

@@ -198,7 +198,7 @@ class ReportsInView extends ViewPage {
             <div class="research-report-actions">
               <a
                 class="research-report-link"
-                href=${report.fileUri}
+                href=${report.openUrl ?? report.fileUri}
                 target="_blank"
                 rel="noopener"
                 data-l10n-id="firefoxview-report-open"

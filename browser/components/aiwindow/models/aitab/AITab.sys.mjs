@@ -250,6 +250,38 @@ export class AITab {
   }
 
   /**
+   * Compose a validated page config from source text the caller assembled.
+   *
+   * This is the same prompt / schema / validation pipeline `generateAITab`
+   * uses, minus the tab-reading step, so callers that already have their own
+   * content (the research agent composes its findings and sources) produce
+   * pages identical in structure and styling to a chat-created AITab.
+   *
+   * @param {object} options
+   * @param {string} options.sourceText - Content in the shape the aitab
+   *   user-data prompt expects: pages separated by the PAGE BREAK marker, each
+   *   optionally led by `## title`, `URL:` and `Image:` lines.
+   * @param {string} [options.focus] - What the page should focus on.
+   * @param {AbortSignal} [options.signal] - Cancels the generation.
+   * @returns {Promise<{page: object} | {error: string}>}
+   */
+  static async composePageFromText({ sourceText, focus = "", signal } = {}) {
+    if (!sourceText?.trim()) {
+      return { error: "no source text was provided to build a page from" };
+    }
+    return AITab.#generateStructuredPage({ sourceText, focus, signal });
+  }
+
+  /**
+   * The PAGE BREAK marker that separates sources in `sourceText`.
+   *
+   * @returns {string}
+   */
+  static get pageBreak() {
+    return PAGE_BREAK;
+  }
+
+  /**
    * Generate an AITab from a list of URLs. Each URL's readable content is
    * pulled via get_page_content, then an LLM composes a structured page config
    * that is validated against the packaged schemas. The validated config and

@@ -30,6 +30,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/models/PromptLoader.sys.mjs",
   ExaSearchProvider:
     "moz-src:///browser/components/aiwindow/models/search/SearchProviders.sys.mjs",
+  AITab: "moz-src:///browser/components/aiwindow/models/aitab/AITab.sys.mjs",
   GetPageContent: "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs",
   setTimeout: "resource://gre/modules/Timer.sys.mjs",
 });
@@ -67,6 +68,13 @@ const SEARCHES_PER_ROUND = 6;
 const RESULTS_PER_SEARCH = 8;
 const CONTENT_URLS_PER_ROUND = 10;
 const PAGE_TEXT_MAX_CHARS = 8000;
+// Character budgets for the text handed to the AITab page composer. The final
+// answer carries the most signal, so it gets the largest share.
+const GENTAB_ANSWER_BUDGET = 10000;
+const GENTAB_FINDINGS_BUDGET = 4000;
+const GENTAB_SOURCES_BUDGET = 8000;
+// Sources listed in the composed page, most recently seen first.
+const GENTAB_MAX_SOURCES = 12;
 const MAX_VISITED_URLS = 45;
 const MAX_MODEL_CONTEXT_CHARS = 28000;
 const MAX_NOTE_CHARS = 5000;
@@ -1017,6 +1025,9 @@ class ResearchReportIndex {
       fileUri,
       path,
       status,
+      // The composed AITab page config. Not text, so it bypasses
+      // normalizeReportText; without this line it would be dropped on read.
+      page: report.page && typeof report.page === "object" ? report.page : null,
       createdAt:
         normalizeReportText(report.createdAt, 80) || new Date().toISOString(),
       updatedAt:
@@ -1065,6 +1076,7 @@ class ResearchReport {
   #sources = [];
   #sections = [];
   #usageEntries = [];
+  #page = null;
   #createdAt = new Date().toISOString();
   #updatedAt = this.#createdAt;
   #deleted = false;
@@ -1170,6 +1182,22 @@ class ResearchReport {
     await this.#write({ updateIndex: true });
   }
 
+  /**
+   * Attach the composed AITab page config. This is the artifact the user
+   * opens; the HTML file remains as the in-progress log.
+   *
+   * @param {?object} page - Validated page config, or null to clear it.
+   */
+  async setPageConfig(page) {
+    this.#page = page && typeof page === "object" ? page : null;
+    this.#updatedAt = new Date().toISOString();
+    await ResearchReportIndex.upsert(this.#toRecord());
+  }
+
+  get pageConfig() {
+    return this.#page;
+  }
+
   #addUsageEntry(usageEntry = null) {
     if (usageEntry) {
       this.#usageEntries.push(usageEntry);
@@ -1206,6 +1234,7 @@ class ResearchReport {
       fileUri: this.#fileUri,
       path: this.#path,
       status: this.#status,
+      page: this.#page,
       createdAt: this.#createdAt,
       updatedAt: this.#updatedAt,
     };
@@ -1383,6 +1412,7 @@ async function updateExistingResearchReport(
     status = REPORT_STATUS.COMPLETE,
     sections = [],
     usageEntry = null,
+    page,
   }
 ) {
   const snapshot = await readReportSnapshot(report);
@@ -1416,6 +1446,9 @@ async function updateExistingResearchReport(
     status,
     updatedAt,
   };
+  if (page !== undefined) {
+    updatedReport.page = page && typeof page === "object" ? page : null;
+  }
   await ResearchReportIndex.upsert(updatedReport);
   return updatedReport;
 }
@@ -1480,6 +1513,7 @@ class ResearchAgentSingleton {
       clarifications: "",
       preliminaryResults: [],
       findings: [],
+      sources: new Map(),
       usageMetrics: createResearchUsageMetrics(),
       visitedUrls: new Set(),
       report: new ResearchReport(text),
@@ -1624,6 +1658,7 @@ class ResearchAgentSingleton {
       followUpRequest: text,
       previousSummary: previousAnswer,
       findings: [],
+      sources: new Map(),
       usageMetrics: createResearchUsageMetrics(),
       modelContextLimit: MAX_CONTINUATION_MODEL_CONTEXT_CHARS,
       visitedUrls: new Set(snapshot.urls),
@@ -1736,6 +1771,14 @@ class ResearchAgentSingleton {
       finalAnswer
     );
     this.#throwIfCancelled(session);
+
+    // Recompose the GenTab so the page reflects the follow-up pass. Falls back
+    // to the page already on the record when composition is unavailable.
+    const page =
+      (await this.#composeGenTabPage(session, finalAnswer)) ??
+      session.reportRecord?.page ??
+      null;
+
     session.reportRecord = await updateExistingResearchReport(
       session.reportRecord,
       {
@@ -1745,11 +1788,18 @@ class ResearchAgentSingleton {
         status: REPORT_STATUS.COMPLETE,
         sections,
         usageEntry: buildUsageEntry(session, "Continuation"),
+        page,
       }
     );
     session.phase = PHASE.COMPLETE;
 
-    const message = `Follow-up research is done.\n\nUpdated report:\n${session.reportRecord.fileUri}`;
+    const message = this.#buildCompletionMessage(
+      session,
+      "Follow-up research is done.",
+      this.#reportViewerURL(session.reportRecord),
+      session.reportRecord.fileUri,
+      metadata?.title || page?.header?.title
+    );
     this.#addAssistantMessage(session.conversation, message);
     await lazy.ChatStore.updateConversation(session.conversation);
     this.#reloadReportTabs(session.reportRecord.fileUri);
@@ -1836,9 +1886,22 @@ class ResearchAgentSingleton {
       metadata,
       buildUsageEntry(session, "Initial research")
     );
+
+    // Render the result as a GenTab. Composition is best-effort: if it fails,
+    // the HTML report below is still a complete answer.
+    const page = await this.#composeGenTabPage(session, finalAnswer);
+    if (page) {
+      await session.report.setPageConfig(page);
+    }
     session.phase = PHASE.COMPLETE;
 
-    const message = `Research is done.\n\nLocal HTML report:\n${session.report.fileUri}`;
+    const message = this.#buildCompletionMessage(
+      session,
+      "Research is done.",
+      this.#reportViewerURL(session.report),
+      session.report.fileUri,
+      metadata?.title || page?.header?.title
+    );
     this.#addAssistantMessage(session.conversation, message);
     await lazy.ChatStore.updateConversation(session.conversation);
     this.#notifyDone(session);
@@ -2397,7 +2460,160 @@ class ResearchAgentSingleton {
         session.visitedUrls.add(url);
       }
     }
+    // Index title + text per URL so the GenTab composition has real source
+    // material to work from, not just a list of links. Page reads (which carry
+    // `text`) overwrite the thinner search-result snippets.
+    if (session.sources) {
+      for (const item of items) {
+        if (!item?.url) {
+          continue;
+        }
+        const existing = session.sources.get(item.url) ?? {};
+        session.sources.set(item.url, {
+          title: item.title || existing.title || "",
+          text: item.text || existing.text || item.snippet || "",
+        });
+      }
+    }
     session.conversation.addSeenUrls(urls);
+  }
+
+  /**
+   * Assemble the text handed to the AITab page composer, in the shape the
+   * aitab user-data prompt expects: pages separated by the PAGE BREAK marker,
+   * each led by a `## title` and a `URL:` line.
+   *
+   * @param {object} session
+   * @param {string} finalAnswer - The research answer, in markdown.
+   * @returns {string}
+   */
+  #buildGenTabSourceText(session, finalAnswer) {
+    const parts = [
+      `## Research answer\n\n${truncate(finalAnswer, GENTAB_ANSWER_BUDGET)}`,
+    ];
+
+    const notes = (session.findings ?? [])
+      .map(entry => entry?.notes)
+      .filter(Boolean)
+      .join("\n\n");
+    if (notes) {
+      parts.push(
+        `## Research findings\n\n${truncate(notes, GENTAB_FINDINGS_BUDGET)}`
+      );
+    }
+
+    const sources = Array.from(session.sources?.entries() ?? [])
+      .filter(([url, info]) => url && info?.text)
+      .slice(-GENTAB_MAX_SOURCES);
+    if (sources.length) {
+      const perSource = Math.floor(GENTAB_SOURCES_BUDGET / sources.length);
+      for (const [url, info] of sources) {
+        parts.push(
+          `## ${info.title || url}\nURL: ${url}\n\n${truncate(info.text, perSource)}`
+        );
+      }
+    }
+
+    return parts.join(lazy.AITab.pageBreak);
+  }
+
+  /**
+   * Compose the research result into an AITab page config so the report
+   * renders in the same UI as a chat-created GenTab.
+   *
+   * Never throws and never fails the run: on any problem this returns null and
+   * the HTML report stays the output.
+   *
+   * @param {object} session
+   * @param {string} finalAnswer
+   * @returns {Promise<?object>} Validated page config, or null.
+   */
+  async #composeGenTabPage(session, finalAnswer) {
+    try {
+      if (!lazy.AITab.getViewerBaseURL()) {
+        console.warn(
+          "Skipping GenTab composition: browser.smartwindow.aitab.viewerURL is not set."
+        );
+        return null;
+      }
+      const result = await lazy.AITab.composePageFromText({
+        sourceText: this.#buildGenTabSourceText(session, finalAnswer),
+        focus: [session.question, session.clarifications]
+          .filter(Boolean)
+          .join("\n"),
+      });
+      if (result.error) {
+        console.warn(`GenTab composition failed: ${result.error}`);
+        return null;
+      }
+      return result.page;
+    } catch (error) {
+      console.warn("GenTab composition threw:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Recompose a stored report's GenTab from its updated answer, so an edit made
+   * through chat shows up in the page the user opens. Uses a synthetic session
+   * because the original research session is long gone by then.
+   *
+   * @param {object} report - The report record.
+   * @param {string} answerMarkdown
+   * @returns {Promise<?object>}
+   */
+  async #recomposeReportPage(report, answerMarkdown) {
+    return this.#composeGenTabPage(
+      {
+        question: report?.question || "",
+        clarifications: "",
+        findings: [],
+        sources: new Map(),
+      },
+      answerMarkdown
+    );
+  }
+
+  /**
+   * The viewer URL for a report's composed page, or null when it has no page
+   * or the viewer is not configured.
+   *
+   * @param {?object} report - A report record or ResearchReport-shaped object.
+   * @returns {?string}
+   */
+  #reportViewerURL(report) {
+    const page = report?.page ?? report?.pageConfig ?? null;
+    if (!page) {
+      return null;
+    }
+    const base = lazy.AITab.getViewerBaseURL();
+    return base ? lazy.AITab.buildViewerURL(base, page) : null;
+  }
+
+  /**
+   * Completion message text, linking the GenTab when one was composed.
+   *
+   * The link carries the real URL because messages added directly (rather than
+   * streamed from the model) never go through the token-expanding stream
+   * parser. A token is still registered so the URL — whose hash holds the whole
+   * page config — is compacted again on the way back to the model, and the URL
+   * is marked seen so the chat renders a labelled link instead of unfurling it.
+   *
+   * @param {object} session
+   * @param {string} label - Lead sentence.
+   * @param {?string} viewerURL
+   * @param {string} fileUri - Fallback when there is no GenTab.
+   * @param {string} title - Link text.
+   * @returns {string}
+   */
+  #buildCompletionMessage(session, label, viewerURL, fileUri, title) {
+    if (!viewerURL) {
+      return `${label}\n\nLocal HTML report:\n${fileUri}`;
+    }
+    session.conversation.addSeenUrls([viewerURL]);
+    session.conversation.convertUrlToToken(viewerURL);
+    const linkText = String(title || "Open the report").replace(/[[\]]/g, "");
+    return `${label}\n\n[${linkText}](${viewerURL})`;
   }
 
   async #appendExistingReportSection(
@@ -2447,6 +2663,20 @@ class ResearchAgentSingleton {
 
   #getSessionReportFileUri(session) {
     return session.report?.fileUri || session.reportRecord?.fileUri || "";
+  }
+
+  /**
+   * What clicking the completion notification should open: the GenTab when the
+   * run produced one, otherwise the HTML report.
+   *
+   * @param {object} session
+   * @returns {string}
+   */
+  #getSessionReportOpenURL(session) {
+    return (
+      this.#reportViewerURL(session.report ?? session.reportRecord) ||
+      this.#getSessionReportFileUri(session)
+    );
   }
 
   async #cancelSession(session, { deleteReport = false } = {}) {
@@ -2602,11 +2832,11 @@ class ResearchAgentSingleton {
         title: "Smart Window research complete",
         text: "Click to open the local research report.",
       });
-      const fileUri = this.#getSessionReportFileUri(session);
+      const openURL = this.#getSessionReportOpenURL(session);
       const observer = {
         observe: (_subject, topic) => {
           if (topic === "alertclickcallback") {
-            this.#openReport(fileUri);
+            this.#openReport(openURL);
           }
         },
       };
@@ -2833,7 +3063,13 @@ class ResearchAgentSingleton {
   }
 
   async getReports() {
-    return ResearchReportIndex.getReports();
+    const reports = await ResearchReportIndex.getReports();
+    // Annotate each record with what "Open report" should point at: the GenTab
+    // when the report has a composed page, otherwise the HTML log.
+    return reports.map(report => ({
+      ...report,
+      openUrl: this.#reportViewerURL(report) || report.fileUri,
+    }));
   }
 
   async isResearchReportUrl(reportUrl) {
@@ -2888,6 +3124,9 @@ class ResearchAgentSingleton {
     const summary =
       normalizeReportText(editSummary, MAX_REPORT_UPDATE_SUMMARY_CHARS) ||
       "The report was updated from a sidebar request.";
+    // Recompose the GenTab from the edited answer. On failure the previous
+    // page is left in place (a stale page beats no page).
+    const page = await this.#recomposeReportPage(report, markdown);
     const updatedReport = await updateExistingResearchReport(report, {
       finalAnswerMarkdown: markdown,
       title,
@@ -2901,6 +3140,7 @@ class ResearchAgentSingleton {
           createdAt: new Date().toISOString(),
         },
       ],
+      ...(page ? { page } : {}),
     });
     this.#reloadReportTabs(updatedReport.fileUri);
     return updatedReport;
