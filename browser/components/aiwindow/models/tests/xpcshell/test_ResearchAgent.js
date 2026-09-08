@@ -2,6 +2,7 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
 const {
+  buildVerbatimAnswerBlocks,
   formatDuration,
   ResearchAgent,
   parseResearchJson,
@@ -312,4 +313,73 @@ add_task(function test_formatDuration_renders_minutes_and_seconds() {
       `${JSON.stringify(bad)} should render as an empty string`
     );
   }
+});
+
+add_task(function test_buildVerbatimAnswerBlocks_keeps_every_word() {
+  const markdown = [
+    "For your **5.5-year-old**, the choice comes down to harness vs booster.",
+    "",
+    "## Core Comparison",
+    "",
+    "| Feature | LUMN | AACE |",
+    "| --- | --- | --- |",
+    "| Primary Mode | 5-point harness | Vehicle seat belt |",
+    "",
+    "### Key Considerations",
+    "",
+    "- **Safety:** keep them harnessed longer.",
+    "- Tesla fit: see the [manual](https://example.com/manual).",
+    "",
+    "> Experts favour the harness.",
+  ].join("\n");
+
+  const blocks = buildVerbatimAnswerBlocks(markdown);
+
+  Assert.greaterOrEqual(blocks.length, 3, "One block per heading section");
+  Assert.ok(
+    blocks.every(block => block.type === "text" && block.layout === "summary"),
+    "Every block is a text/summary block"
+  );
+  Assert.equal(blocks[0].title, "Full answer", "Lead prose is labelled");
+  Assert.deepEqual(
+    blocks.map(block => block.title),
+    ["Full answer", "Core Comparison", "Key Considerations"],
+    "Headings become block titles, in order"
+  );
+
+  const rendered = blocks.flatMap(block => block.paragraphs).join("\n");
+
+  // Table data survives; the |---| separator row carries no words and is gone.
+  Assert.ok(
+    rendered.includes("Primary Mode | 5-point harness | Vehicle seat belt"),
+    "Table rows are preserved as pipe-joined lines"
+  );
+  Assert.ok(!/\|\s*---/.test(rendered), "Separator rows are dropped");
+
+  // Bullets keep their text.
+  Assert.ok(rendered.includes("• Safety: keep them harnessed longer."));
+  Assert.ok(rendered.includes("Experts favour the harness."), "Quote kept");
+
+  // Markup is stripped, never the words it wrapped.
+  Assert.ok(!rendered.includes("**"), "Bold markers removed");
+  Assert.ok(rendered.includes("5.5-year-old"), "Bolded words survive");
+  Assert.ok(
+    rendered.includes("manual (https://example.com/manual)"),
+    "Link text and target both survive"
+  );
+
+  // Word-level coverage: nothing the answer said is missing from the page.
+  const words = markdown
+    .replace(/^[ ]{0,3}#{1,6}\s+/gm, "")
+    .replace(/\|/g, " ")
+    .replace(/[*>`[\]()]/g, " ")
+    .split(/\s+/)
+    .filter(word => word && !/^-+$/.test(word) && word !== "-");
+  const haystack = `${blocks.map(b => b.title ?? "").join(" ")} ${rendered}`;
+  const missing = words.filter(word => !haystack.includes(word));
+  Assert.deepEqual(
+    missing,
+    [],
+    "Every word of the answer appears in the blocks"
+  );
 });

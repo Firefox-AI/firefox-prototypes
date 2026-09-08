@@ -273,6 +273,20 @@ export class AITab {
   }
 
   /**
+   * Validate a page config against the packaged component schemas.
+   *
+   * For callers that assemble or extend a config themselves and need to be
+   * sure the result still conforms before it is stored or rendered.
+   *
+   * @param {object} page
+   * @returns {Promise<{ok: true, page: object} | {ok: false, errors: object[]}>}
+   */
+  static async validatePage(page) {
+    const { env } = await AITab.loadAssets();
+    return AITab.buildPage(page, env);
+  }
+
+  /**
    * The PAGE BREAK marker that separates sources in `sourceText`.
    *
    * @returns {string}

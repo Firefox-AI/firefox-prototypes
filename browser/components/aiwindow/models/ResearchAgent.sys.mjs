@@ -387,6 +387,135 @@ function expandAppendixDetailsForPrint(html = "") {
   );
 }
 
+/**
+ * Strip inline markdown to readable plain text, dropping no words.
+ *
+ * @param {string} [value]
+ * @returns {string}
+ */
+function markdownInlineToText(value = "") {
+  return String(value)
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1 ($2)")
+    .replace(/`{1,3}([^`]*)`{1,3}/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*\n]+)\*/g, "$1")
+    .replace(/(^|\s)_([^_\n]+)_(?=\s|$)/g, "$1$2")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Turn a markdown body into display paragraphs, keeping every word: list items
+ * become their own bulleted paragraph and table rows become pipe-joined lines.
+ *
+ * @param {string} [markdown]
+ * @returns {string[]}
+ */
+function markdownToPlainParagraphs(markdown = "") {
+  const paragraphs = [];
+  let buffer = [];
+  const flush = () => {
+    if (buffer.length) {
+      const joined = buffer.join(" ").trim();
+      if (joined) {
+        paragraphs.push(joined);
+      }
+      buffer = [];
+    }
+  };
+
+  for (const raw of String(markdown).replace(/\r\n?/g, "\n").split("\n")) {
+    const line = raw.trim();
+    if (!line) {
+      flush();
+      continue;
+    }
+    if (line.startsWith("|")) {
+      // A separator row (|---|---|) carries no words.
+      if (/^\|[\s:|-]+\|?$/.test(line)) {
+        continue;
+      }
+      flush();
+      const cells = line
+        .replace(/^\||\|$/g, "")
+        .split("|")
+        .map(cell => markdownInlineToText(cell))
+        .filter(Boolean);
+      if (cells.length) {
+        paragraphs.push(cells.join(" | "));
+      }
+      continue;
+    }
+    const bullet = line.match(/^(?:[-*+]|\d+\.)\s+(.*)$/);
+    if (bullet) {
+      flush();
+      const item = markdownInlineToText(bullet[1]);
+      if (item) {
+        paragraphs.push(`• ${item}`);
+      }
+      continue;
+    }
+    if (line.startsWith(">")) {
+      flush();
+      const quote = markdownInlineToText(line.replace(/^>\s?/, ""));
+      if (quote) {
+        paragraphs.push(quote);
+      }
+      continue;
+    }
+    buffer.push(markdownInlineToText(line));
+  }
+  flush();
+  return paragraphs;
+}
+
+/**
+ * Text blocks reproducing the report's final answer word for word.
+ *
+ * The composed GenTab is a second model pass that re-authors the answer into
+ * blocks, and the shared aitab prompt tells it to trim padding — in practice it
+ * lands around half the length. These blocks are built mechanically, with no
+ * model involved, so nothing the report says is missing from the page.
+ *
+ * @param {string} [markdown] - The final answer, in markdown.
+ * @returns {object[]} `text` blocks, one per heading of the answer.
+ */
+export function buildVerbatimAnswerBlocks(markdown = "") {
+  const answer = String(markdown).trim();
+  if (!answer) {
+    return [];
+  }
+
+  const sections = [];
+  let current = { heading: "", lines: [] };
+  for (const raw of answer.replace(/\r\n?/g, "\n").split("\n")) {
+    const heading = raw.match(/^ {0,3}#{1,6}\s+(.*)$/);
+    if (heading) {
+      sections.push(current);
+      current = { heading: markdownInlineToText(heading[1]), lines: [] };
+    } else {
+      current.lines.push(raw);
+    }
+  }
+  sections.push(current);
+
+  const blocks = [];
+  for (const section of sections) {
+    const paragraphs = markdownToPlainParagraphs(section.lines.join("\n"));
+    if (!paragraphs.length) {
+      continue;
+    }
+    const block = { type: "text", layout: "summary", paragraphs };
+    const title = section.heading || (blocks.length ? "" : "Full answer");
+    if (title) {
+      block.title = title;
+    }
+    blocks.push(block);
+  }
+  return blocks;
+}
+
 export function renderReportMarkdown(value = "") {
   return (
     lazy.parseMarkdown(String(value ?? "")).trim() ||
@@ -2819,11 +2948,42 @@ class ResearchAgentSingleton {
         console.warn(`GenTab composition failed: ${result.error}`);
         return null;
       }
-      return result.page;
+      return this.#withVerbatimAnswer(result.page, finalAnswer);
     } catch (error) {
       console.warn("GenTab composition threw:", error);
       return null;
     }
+  }
+
+  /**
+   * Append the report's answer, word for word, to a composed page so the GenTab
+   * never says less than the HTML report does.
+   *
+   * Falls back to the page as composed if the extended config would not
+   * validate, so a formatting quirk can never cost the whole GenTab.
+   *
+   * @param {object} page - Validated page config.
+   * @param {string} finalAnswer - The answer, in markdown.
+   * @returns {Promise<object>}
+   */
+  async #withVerbatimAnswer(page, finalAnswer) {
+    const blocks = buildVerbatimAnswerBlocks(finalAnswer);
+    if (!blocks.length) {
+      return page;
+    }
+    const extended = {
+      ...page,
+      blocks: [...(page.blocks ?? []), ...blocks],
+    };
+    const validated = await lazy.AITab.validatePage(extended);
+    if (validated.ok) {
+      return validated.page;
+    }
+    console.warn(
+      "Verbatim answer blocks failed validation; keeping the composed page.",
+      validated.errors
+    );
+    return page;
   }
 
   /**
