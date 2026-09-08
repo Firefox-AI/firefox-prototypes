@@ -506,6 +506,118 @@ async function readReportSnapshot(report) {
   };
 }
 
+/**
+ * The GenTab viewer URL for a stored page config, or "" when there is none or
+ * the viewer is not configured.
+ *
+ * @param {?object} page
+ * @returns {string}
+ */
+function genTabUrlForPage(page) {
+  if (!page || typeof page !== "object") {
+    return "";
+  }
+  const base = lazy.AITab.getViewerBaseURL();
+  return base ? lazy.AITab.buildViewerURL(base, page) : "";
+}
+
+/**
+ * The report page's nav block: the reports list, and the GenTab beneath it.
+ *
+ * The list link points at the local index rather than about:firefoxview#reports
+ * because a file:// document is not permitted to navigate to that page — it is
+ * registered IS_SECURE_CHROME_UI without URI_SAFE_FOR_UNTRUSTED_CONTENT, so the
+ * click is simply dropped. The chrome-side entry points still use the about:
+ * URL.
+ *
+ * @param {object} [options]
+ * @param {string} [options.listUri] - file:// URI of the generated index.
+ * @param {string} [options.genTabUrl] - Viewer URL, when the report has a page.
+ * @returns {string}
+ */
+function renderReportNavHtml({ listUri = "", genTabUrl = "" } = {}) {
+  const links = [
+    `<div><a href="${escapeHtml(listUri || REPORT_LIST_URL)}">All research reports</a></div>`,
+  ];
+  if (genTabUrl) {
+    links.push(`<div><a href="${escapeHtml(genTabUrl)}">Open GenTab</a></div>`);
+  }
+  return `<nav class="report-nav">${links.join("")}</nav>`;
+}
+
+/**
+ * Swap the nav block of an already-written report, so an existing file picks up
+ * a newly composed (or refreshed) GenTab link.
+ *
+ * @param {string} html
+ * @param {string} nav
+ * @returns {string}
+ */
+function replaceReportNavHtml(html, nav) {
+  if (/<nav class="report-nav">[\s\S]*?<\/nav>/.test(html)) {
+    return html.replace(/<nav class="report-nav">[\s\S]*?<\/nav>/, nav);
+  }
+  return html.replace("<main>", `<main>\n${nav}`);
+}
+
+/**
+ * The local reports index. A file:// sibling of the reports, so the "All
+ * research reports" link inside a report actually navigates.
+ *
+ * @param {object[]} reports
+ * @returns {string}
+ */
+function renderReportsIndexHtml(reports = []) {
+  const items = reports
+    .map(report => {
+      const genTabUrl = genTabUrlForPage(report.page);
+      const genTab = genTabUrl
+        ? `<a class="gentab" href="${escapeHtml(genTabUrl)}">Open GenTab</a>`
+        : "";
+      const description = report.description
+        ? `<p class="desc">${escapeHtml(report.description)}</p>`
+        : "";
+      return `<li>
+<a class="title" href="${escapeHtml(report.fileUri)}">${escapeHtml(report.title)}</a>
+${description}
+<p class="meta"><span class="status">${escapeHtml(report.status)}</span><span>${escapeHtml(String(report.updatedAt || "").slice(0, 10))}</span></p>
+${genTab}
+</li>`;
+    })
+    .join("\n");
+
+  return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Smart Window research reports</title>
+<style>
+:root { color-scheme: light dark; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.55; background: Canvas; color: CanvasText; }
+body { margin: 0; }
+main { max-width: 900px; margin: 0 auto; padding: 40px 28px 56px; }
+h1 { font-size: 30px; margin: 0 0 6px; }
+.intro { color: GrayText; margin: 0 0 28px; }
+ul { list-style: none; margin: 0; padding: 0; }
+li { border: 1px solid color-mix(in srgb, CanvasText 14%, transparent); border-radius: 10px; margin-block-end: 14px; padding: 16px 18px; }
+a { color: LinkText; overflow-wrap: anywhere; }
+.title { font-size: 18px; font-weight: 650; }
+.desc { color: color-mix(in srgb, CanvasText 72%, transparent); margin: 6px 0 10px; }
+.meta { display: flex; gap: 10px; align-items: center; color: GrayText; font-size: 13px; margin: 0 0 10px; }
+.status { padding: 3px 8px; border-radius: 999px; background: color-mix(in srgb, CanvasText 8%, transparent); }
+.gentab { font-size: 14px; font-weight: 650; }
+.empty { color: GrayText; }
+</style>
+</head>
+<body>
+<main>
+<h1>Smart Window research reports</h1>
+<p class="intro">Every research report on this profile, newest first.</p>
+${items ? `<ul>${items}</ul>` : `<p class="empty">No research reports yet.</p>`}
+</main>
+</body>
+</html>`;
+}
+
 function renderReportSection(section) {
   const sectionTitle = escapeHtml(section.title);
   const time = escapeHtml(section.createdAt || new Date().toISOString());
@@ -780,6 +892,14 @@ class ResearchReportIndex {
 
   static get indexPath() {
     return PathUtils.join(this.dir, REPORTS_INDEX_FILE_NAME);
+  }
+
+  static get listPath() {
+    return PathUtils.join(this.dir, REPORTS_LIST_FILE_NAME);
+  }
+
+  static get listUri() {
+    return PathUtils.toFileURI(this.listPath);
   }
 
   static async getReports() {
@@ -1058,6 +1178,12 @@ class ResearchReportIndex {
         tmpPath: `${this.indexPath}.tmp`,
       }
     );
+
+    // Regenerate the browsable index alongside it so the in-report "All
+    // research reports" link always lands on a current list.
+    await IOUtils.writeUTF8(this.listPath, renderReportsIndexHtml(reports), {
+      tmpPath: `${this.listPath}.tmp`,
+    });
   }
 }
 
@@ -1190,8 +1316,9 @@ class ResearchReport {
    */
   async setPageConfig(page) {
     this.#page = page && typeof page === "object" ? page : null;
-    this.#updatedAt = new Date().toISOString();
-    await ResearchReportIndex.upsert(this.#toRecord());
+    // Rewrite the file too: the nav's "Open GenTab" link is rendered from
+    // this config, and at first write there was not one yet.
+    await this.#write({ updateIndex: true });
   }
 
   get pageConfig() {
@@ -1295,7 +1422,10 @@ class ResearchReport {
     const reportDescription = this.#description
       ? `<p class="description">${escapeHtml(this.#description)}</p>`
       : "";
-    const reportListUri = escapeHtml(REPORT_LIST_URL);
+    const reportNav = renderReportNavHtml({
+      listUri: ResearchReportIndex.listUri,
+      genTabUrl: genTabUrlForPage(this.#page),
+    });
     const html = `<!doctype html>
 <html>
 <head>
@@ -1318,7 +1448,7 @@ h2 { font-size: 22px; margin: 0 0 14px; }
 h3 { font-size: 16px; margin: 16px 0 6px; }
 p { margin: 0 0 14px; }
 a { color: LinkText; overflow-wrap: anywhere; }
-.report-nav { margin-block-end: 22px; }
+.report-nav { margin-block-end: 22px; display: flex; flex-direction: column; align-items: start; gap: 4px; }
 .report-nav a { font-size: 14px; font-weight: 650; }
 .eyebrow { color: GrayText; font-size: 13px; font-weight: 650; letter-spacing: 0; text-transform: uppercase; margin-bottom: 8px; }
 .question { color: color-mix(in srgb, CanvasText 72%, transparent); font-size: 17px; max-width: 780px; }
@@ -1368,7 +1498,7 @@ ol { padding-inline-start: 24px; }
 </head>
 <body>
 <main>
-<nav class="report-nav"><a href="${reportListUri}">All research reports</a></nav>
+${reportNav}
 <header>
 <p class="eyebrow">Smart Window Research</p>
 <h1>${escapeHtml(reportTitle)}</h1>
@@ -1434,6 +1564,13 @@ async function updateExistingResearchReport(
   }
   html = appendReportSectionsHtml(html, sections);
   html = appendReportUsageHtml(html, usageEntry ? [usageEntry] : []);
+  html = replaceReportNavHtml(
+    html,
+    renderReportNavHtml({
+      listUri: ResearchReportIndex.listUri,
+      genTabUrl: genTabUrlForPage(page !== undefined ? page : report.page),
+    })
+  );
 
   await IOUtils.writeUTF8(snapshot.path, html, {
     tmpPath: `${snapshot.path}.tmp`,
