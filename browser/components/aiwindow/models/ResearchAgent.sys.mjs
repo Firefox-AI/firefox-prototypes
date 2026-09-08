@@ -142,6 +142,22 @@ function normalizeReportText(
   return truncate(compactWhitespace(value), maxLength);
 }
 
+/**
+ * A wall-clock duration as minutes and seconds, e.g. "4m 12s" or "48s".
+ *
+ * @param {?number} ms - Elapsed milliseconds.
+ * @returns {string} Formatted duration, or "" when there is nothing to show.
+ */
+export function formatDuration(ms) {
+  if (!Number.isFinite(ms) || ms < 0) {
+    return "";
+  }
+  const totalSeconds = Math.round(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes ? `${minutes}m ${seconds}s` : `${seconds}s`;
+}
+
 function formatReportNumber(value = 0) {
   return new Intl.NumberFormat().format(Math.max(0, Math.round(value)));
 }
@@ -580,7 +596,11 @@ function renderReportsIndexHtml(reports = []) {
       return `<li>
 <a class="title" href="${escapeHtml(report.fileUri)}">${escapeHtml(report.title)}</a>
 ${description}
-<p class="meta"><span class="status">${escapeHtml(report.status)}</span><span>${escapeHtml(String(report.updatedAt || "").slice(0, 10))}</span></p>
+<p class="meta"><span class="status">${escapeHtml(report.status)}</span><span>${escapeHtml(String(report.updatedAt || "").slice(0, 10))}</span>${
+        formatDuration(report.generationMs)
+          ? `<span>${escapeHtml(formatDuration(report.generationMs))}</span>`
+          : ""
+      }</p>
 ${genTab}
 </li>`;
     })
@@ -1145,6 +1165,10 @@ class ResearchReportIndex {
       fileUri,
       path,
       status,
+      completedAt: normalizeReportText(report.completedAt, 80) || null,
+      generationMs: Number.isFinite(report.generationMs)
+        ? report.generationMs
+        : null,
       // The composed AITab page config. Not text, so it bypasses
       // normalizeReportText; without this line it would be dropped on read.
       page: report.page && typeof report.page === "object" ? report.page : null,
@@ -1204,6 +1228,12 @@ class ResearchReport {
   #usageEntries = [];
   #page = null;
   #createdAt = new Date().toISOString();
+  #completedAt = null;
+  // Generation time is accumulated across active segments, so the stretch
+  // spent waiting for the user to answer the clarifying questions is not
+  // counted as time spent generating.
+  #activeMs = 0;
+  #segmentStartedAt = this.#createdAt;
   #updatedAt = this.#createdAt;
   #deleted = false;
 
@@ -1325,6 +1355,54 @@ class ResearchReport {
     return this.#page;
   }
 
+  /**
+   * How long generation took: report creation to the first terminal status.
+   * Null while the run is still going.
+   *
+   * @returns {?number} Milliseconds, or null.
+   */
+  #generationMs() {
+    return this.#completedAt ? this.#activeMs : null;
+  }
+
+  /**
+   * Closes the open timing segment, adding it to the accumulated total.
+   *
+   * @param {string} atISO - When the segment ended.
+   */
+  #closeSegment(atISO) {
+    if (!this.#segmentStartedAt) {
+      return;
+    }
+    const from = Date.parse(this.#segmentStartedAt);
+    const to = Date.parse(atISO);
+    if (Number.isFinite(from) && Number.isFinite(to)) {
+      this.#activeMs += Math.max(0, to - from);
+    }
+    this.#segmentStartedAt = null;
+  }
+
+  /**
+   * Stop the clock while the run waits on the user, so the reported time is
+   * work the agent did rather than time the user spent thinking.
+   */
+  async pauseGeneration() {
+    if (!this.#segmentStartedAt) {
+      return;
+    }
+    this.#closeSegment(new Date().toISOString());
+    await this.#write();
+  }
+
+  /** Restart the clock once the user has replied. */
+  async resumeGeneration() {
+    if (this.#segmentStartedAt) {
+      return;
+    }
+    this.#segmentStartedAt = new Date().toISOString();
+    await this.#write();
+  }
+
   #addUsageEntry(usageEntry = null) {
     if (usageEntry) {
       this.#usageEntries.push(usageEntry);
@@ -1362,6 +1440,8 @@ class ResearchReport {
       path: this.#path,
       status: this.#status,
       page: this.#page,
+      completedAt: this.#completedAt,
+      generationMs: this.#generationMs(),
       createdAt: this.#createdAt,
       updatedAt: this.#updatedAt,
     };
@@ -1394,6 +1474,13 @@ class ResearchReport {
     }
 
     this.#updatedAt = new Date().toISOString();
+    // Stamp the finish line the first time the run reaches a terminal status.
+    // Every terminal setter funnels through here, and later edits (a follow-up
+    // pass, setPageConfig) must not move it.
+    if (this.#status !== REPORT_STATUS.IN_PROGRESS && !this.#completedAt) {
+      this.#completedAt = this.#updatedAt;
+      this.#closeSegment(this.#completedAt);
+    }
     const sources = this.#getSources();
     const sourceList = sources
       .map(source => {
@@ -1422,6 +1509,49 @@ class ResearchReport {
     const reportDescription = this.#description
       ? `<p class="description">${escapeHtml(this.#description)}</p>`
       : "";
+    const runningSince = this.#segmentStartedAt
+      ? Date.parse(this.#segmentStartedAt) || 0
+      : 0;
+    const elapsed = formatDuration(this.#generationMs());
+    let durationHtml = "";
+    if (hasReportSummary && elapsed) {
+      const verb =
+        this.#status === REPORT_STATUS.COMPLETE ? "Generated in" : "Ran for";
+      durationHtml = `<span class="duration">${verb} ${escapeHtml(elapsed)}</span>`;
+    } else if (!hasReportSummary && runningSince) {
+      // Still working: tick up in the page, on top of any time already banked.
+      durationHtml = `<span class="duration" data-started-at="${runningSince}" data-base-ms="${this.#activeMs}">Generating… <span class="elapsed">${escapeHtml(formatDuration(this.#activeMs))}</span></span>`;
+    } else if (!hasReportSummary) {
+      // Paused on the clarifying questions; the clock is not running.
+      durationHtml = `<span class="duration">Waiting on you — ${escapeHtml(formatDuration(this.#activeMs))} spent so far</span>`;
+    }
+    // Only an in-progress report carries script; a finished one is inert.
+    const timerScript =
+      !hasReportSummary && runningSince
+        ? `<script>
+(() => {
+  const el = document.querySelector(".duration[data-started-at]");
+  const out = el && el.querySelector(".elapsed");
+  const started = Number(el && el.dataset.startedAt);
+  const base = Number(el && el.dataset.baseMs) || 0;
+  if (!out || !started) {
+    return;
+  }
+  const format = ms => {
+    const total = Math.max(0, Math.round(ms / 1000));
+    const minutes = Math.floor(total / 60);
+    const seconds = total % 60;
+    return minutes ? minutes + "m " + seconds + "s" : seconds + "s";
+  };
+  const tick = () => {
+    out.textContent = format(base + (Date.now() - started));
+  };
+  tick();
+  setInterval(tick, 1000);
+})();
+</script>`
+        : "";
+
     const reportNav = renderReportNavHtml({
       listUri: ResearchReportIndex.listUri,
       genTabUrl: genTabUrlForPage(this.#page),
@@ -1453,7 +1583,8 @@ a { color: LinkText; overflow-wrap: anywhere; }
 .eyebrow { color: GrayText; font-size: 13px; font-weight: 650; letter-spacing: 0; text-transform: uppercase; margin-bottom: 8px; }
 .question { color: color-mix(in srgb, CanvasText 72%, transparent); font-size: 17px; max-width: 780px; }
 .description { color: color-mix(in srgb, CanvasText 72%, transparent); font-size: 16px; max-width: 780px; }
-.status { display: inline-block; margin-top: 14px; padding: 4px 9px; border-radius: 999px; background: color-mix(in srgb, CanvasText 8%, transparent); font-size: 13px; color: color-mix(in srgb, CanvasText 75%, transparent); }
+.status, .duration { display: inline-block; margin-top: 14px; padding: 4px 9px; border-radius: 999px; background: color-mix(in srgb, CanvasText 8%, transparent); font-size: 13px; color: color-mix(in srgb, CanvasText 75%, transparent); }
+.duration { margin-inline-start: 8px; }
 .answer, .sources, .appendix, .usage { padding-block: 28px; border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent); }
 .answer-body { font-size: 17px; max-width: 840px; }
 .answer-body > :first-child { margin-block-start: 0; }
@@ -1504,7 +1635,7 @@ ${reportNav}
 <h1>${escapeHtml(reportTitle)}</h1>
 ${reportDescription}
 <p class="question">${escapeHtml(this.#question)}</p>
-<span class="status">${escapeHtml(this.#status)}</span>
+<span class="status">${escapeHtml(this.#status)}</span>${durationHtml}
 </header>
 <section class="answer">
 <h2>${answerHeading}</h2>
@@ -1522,6 +1653,7 @@ ${this.#sections.map(section => this.#renderSection(section)).join("\n")}
 </section>
 ${renderResearchUsageSection(this.#usageEntries)}
 </main>
+${timerScript}
 </body>
 </html>`;
     await IOUtils.writeUTF8(this.#path, html, {
@@ -1701,6 +1833,9 @@ class ResearchAgentSingleton {
       const questions = await this.#buildClarifyingQuestions(engine, session);
       this.#throwIfCancelled(session);
       session.phase = PHASE.WAITING_FOR_CLARIFICATIONS;
+      // The clock stops here: whatever the user takes to answer is not
+      // generation time.
+      await session.report.pauseGeneration();
       const body =
         questions ||
         "I have enough direction to start. Add any constraints, preferred sources, or output format you want, and I will continue in the background.";
@@ -1744,6 +1879,7 @@ class ResearchAgentSingleton {
     }
     session.phase = PHASE.RUNNING;
     session.clarifications = text;
+    await session.report.resumeGeneration();
 
     this.#addUserMessage(conversation, text, pageUrl, userOpts);
     session.assistantMessage = this.#addAssistantMessage(

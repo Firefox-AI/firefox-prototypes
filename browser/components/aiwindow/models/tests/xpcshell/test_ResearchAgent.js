@@ -2,6 +2,7 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
 const {
+  formatDuration,
   ResearchAgent,
   parseResearchJson,
   renderReportMarkdown,
@@ -293,4 +294,22 @@ add_task(async function test_getReports_without_page_opens_html_report() {
     report.fileUri,
     "With no composed page, opening falls back to the HTML report"
   );
+});
+
+add_task(function test_formatDuration_renders_minutes_and_seconds() {
+  Assert.equal(formatDuration(0), "0s");
+  Assert.equal(formatDuration(48_000), "48s");
+  Assert.equal(formatDuration(60_000), "1m 0s");
+  Assert.equal(formatDuration(252_000), "4m 12s");
+  // Rounds to the nearest second rather than truncating.
+  Assert.equal(formatDuration(59_600), "1m 0s");
+  Assert.equal(formatDuration(4_325_000), "72m 5s");
+  // Nothing sensible to show.
+  for (const bad of [null, undefined, NaN, -1, "nope"]) {
+    Assert.equal(
+      formatDuration(bad),
+      "",
+      `${JSON.stringify(bad)} should render as an empty string`
+    );
+  }
 });
