@@ -282,6 +282,16 @@ const CANCELED_ERROR = "page generation was canceled";
  */
 
 /**
+ * Spike: the most recently generated page, kept in process memory so a follow-up
+ * generate_aitab call can revise it without AITabStore. Replaced on every
+ * successful generation.
+ *
+ * @typedef {object} AITabLastPage
+ * @property {A2UISurface} surface - The validated surface last shown in the viewer.
+ * @property {AITabMetadata} metadata - Title, slug, and the source URLs/text used.
+ */
+
+/**
  * The aitab prompt set: a conversation wired to the aitab model, and the two
  * prompt templates to render into it.
  *
@@ -292,8 +302,8 @@ const CANCELED_ERROR = "page generation was canceled";
  */
 
 /**
- * The AITab generation service. Everything is static: the class holds no
- * per-instance state and is never constructed.
+ * The AITab generation service. Everything is static: the class is never
+ * constructed. The only process state is the spike last-page cache.
  *
  * Private helpers are referenced as `AITab.#name` rather than `this.#name` so
  * the public methods keep working when callers destructure them off the class.
@@ -301,6 +311,26 @@ const CANCELED_ERROR = "page generation was canceled";
 export class AITab {
   /** @type {Promise<A2UICatalog>|undefined} */
   static #packagedCatalogPromise;
+
+  /** @type {AITabLastPage|null} */
+  static #lastPage = null;
+
+  /**
+   * The most recently generated page, or null when none has succeeded yet.
+   *
+   * @returns {AITabLastPage|null}
+   */
+  static getLastPage() {
+    return AITab.#lastPage;
+  }
+
+  /**
+   * Drop the spike last-page cache. Tests use this so an earlier generation
+   * cannot leak into a later task.
+   */
+  static clearLastPage() {
+    AITab.#lastPage = null;
+  }
 
   /**
    * Load the component catalog: from the browser.smartwindow.aitab.components
@@ -739,15 +769,18 @@ export class AITab {
    * Generate an AITab from a list of URLs. Each URL's readable content is
    * pulled via get_page_content, then an LLM composes a structured A2UI surface
    * that is validated against the packaged catalog. The validated surface and
-   * its derived metadata are returned to the caller — nothing is persisted and
-   * no HTML is assembled here (rendering happens in the external viewer). If
-   * generation fails, an `error` string describing the problem is returned
-   * instead.
+   * its derived metadata are returned to the caller — nothing is persisted to
+   * AITabStore; a successful result is kept as the in-memory last page so a
+   * later call with no URLs can revise it. If generation fails, an `error`
+   * string describing the problem is returned instead.
    *
    * @param {object} options
-   * @param {string[]} options.urlList - The URLs to include, already expanded
+   * @param {string[]} [options.urlList] - The URLs to include, already expanded
    *   from URL tokens by the tool dispatcher. Trims at MAX_AITAB_URLS urls.
-   * @param {string} [options.focus] - What the user wants the page to focus on.
+   *   Omit (or pass empty) to revise the last generated page using its stored
+   *   sources and surface.
+   * @param {string} [options.focus] - What the user wants the page to focus on,
+   *   or the edit request when revising the last page.
    * @param {AbortSignal} [options.signal] - Cancels the generation. Checked at
    *   every await boundary here and in #generateStructuredSurface, and passed to
    *   the page extractions so they can be torn down early.
@@ -763,7 +796,12 @@ export class AITab {
       ? urlList.filter(url => typeof url == "string").slice(0, MAX_AITAB_URLS)
       : [];
 
-    if (!urls.length) {
+    const lastPage = AITab.#lastPage;
+    const storedSources = lastPage?.metadata?.context?.urlsUsed;
+    const isEdit =
+      !urls.length && Array.isArray(storedSources) && storedSources.length;
+
+    if (!urls.length && !isEdit) {
       return { error: "no URLs were provided to build a page from" };
     }
 
@@ -771,52 +809,36 @@ export class AITab {
       return { error: CANCELED_ERROR };
     }
 
-    // Pull the readable content for each requested URL (order-aligned with
-    // urls).
-    const contents = await lazy.GetPageContent.getPageContent(
-      { url_list: urls, signal },
-      conversation
-    );
-
-    if (signal?.aborted) {
-      return { error: CANCELED_ERROR };
-    }
-
-    // Split the source-text budget evenly across the requested tabs so the
-    // model prompt stays bounded no matter how many tabs are included.
-    const perTabBudget = Math.floor(SOURCE_TEXT_BUDGET / urls.length);
-
     /** @type {AITabSource[]} */
-    const urlsUsed = [];
-    const sourceParts = [];
-    for (const [index, url] of urls.entries()) {
-      // Prefer the open tab's title for the heading; fall back to the URL.
-      const tab = lazy.GetPageContent.getTabWithURL(url);
-      const heading = tab?.label || url;
-      const text = contents[index] ?? "";
-      // Best-effort og:image lookup ("" when none cached), gated on the same
-      // access-control decision as the page text so a refused URL leaks no
-      // image either.
-      const imageUrl = lazy.GetPageContent.isContentAllowed(url, conversation)
-        ? await AITab.#getPageImage(url)
-        : "";
-      urlsUsed.push({
-        url,
-        title: heading,
-        favIconUrl: `page-icon:${url}`,
-        imageUrl: imageUrl || null,
-        extractedText: text,
-      });
-      // Trim each page's text to its share of the budget before sending to the
-      // model.
-      const budgetedText =
-        text.length > perTabBudget ? text.slice(0, perTabBudget) : text;
-      // Omit the Image: line when absent so the model never echoes an empty
-      // value.
-      const head = imageUrl
-        ? `## ${heading}\nURL: ${url}\nImage: ${imageUrl}\n\n`
-        : `## ${heading}\nURL: ${url}\n\n`;
-      sourceParts.push(`${head}${budgetedText}`);
+    let urlsUsed;
+    if (isEdit) {
+      urlsUsed = storedSources;
+    } else {
+      const contents = await lazy.GetPageContent.getPageContent(
+        { url_list: urls, signal },
+        conversation
+      );
+
+      if (signal?.aborted) {
+        return { error: CANCELED_ERROR };
+      }
+
+      urlsUsed = [];
+      for (const [index, url] of urls.entries()) {
+        const tab = lazy.GetPageContent.getTabWithURL(url);
+        const heading = tab?.label || url;
+        const text = contents[index] ?? "";
+        const imageUrl = lazy.GetPageContent.isContentAllowed(url, conversation)
+          ? await AITab.#getPageImage(url)
+          : "";
+        urlsUsed.push({
+          url,
+          title: heading,
+          favIconUrl: `page-icon:${url}`,
+          imageUrl: imageUrl || null,
+          extractedText: text,
+        });
+      }
     }
 
     if (signal?.aborted) {
@@ -824,12 +846,12 @@ export class AITab {
     }
 
     const focusText = focus.trim();
+    const existingSurface = isEdit ? lastPage.surface : null;
 
-    // Compose the surface with the LLM. Pages are separated by an explicit
-    // page-break marker in the prompt.
     const structured = await AITab.#generateStructuredSurface({
-      sourceText: sourceParts.join(PAGE_BREAK),
+      sourceText: AITab.#sourcePartsFromUrlsUsed(urlsUsed).join(PAGE_BREAK),
       focus: focusText,
+      existingSurface,
       signal,
     });
 
@@ -841,8 +863,6 @@ export class AITab {
       return { error: structured.error };
     }
 
-    // Fill in link-item favicons from Places, before the surface is linked or
-    // stored.
     await AITab.#hydrateFavicons(structured.surface, signal);
 
     if (signal?.aborted) {
@@ -852,23 +872,51 @@ export class AITab {
     const title =
       AITab.#titleFromSurface(structured.surface) ||
       focusText ||
-      (urls.length === 1 && urlsUsed[0].title) ||
+      (urlsUsed.length === 1 && urlsUsed[0].title) ||
       lazy.l10n.formatValueSync("ai-tab-default-page-title");
 
     /** @type {AITabMetadata} */
     const metadata = {
-      id: AITab.#slugify(title),
+      id: isEdit ? lastPage.metadata.id : AITab.#slugify(title),
       title,
-      howCreated: "chat",
+      howCreated: isEdit ? "chat-edit" : "chat",
       context: {
-        creationPrompt: focusText,
+        creationPrompt: isEdit
+          ? lastPage.metadata.context.creationPrompt
+          : focusText,
         urlsUsed,
-        relevantMemories: [],
+        relevantMemories: isEdit
+          ? lastPage.metadata.context.relevantMemories || []
+          : [],
       },
       components: structured.surface.components || [],
     };
 
+    AITab.#lastPage = { metadata, surface: structured.surface };
     return { metadata, surface: structured.surface };
+  }
+
+  /**
+   * Format stored or freshly extracted source pages for the model prompt.
+   *
+   * @param {AITabSource[]} urlsUsed
+   * @returns {string[]}
+   */
+  static #sourcePartsFromUrlsUsed(urlsUsed) {
+    const perTabBudget = Math.floor(
+      SOURCE_TEXT_BUDGET / Math.max(urlsUsed.length, 1)
+    );
+    return urlsUsed.map(src => {
+      const heading = src.title || src.url;
+      const text = src.extractedText ?? "";
+      const budgetedText =
+        text.length > perTabBudget ? text.slice(0, perTabBudget) : text;
+      const imageUrl = src.imageUrl || "";
+      const head = imageUrl
+        ? `## ${heading}\nURL: ${src.url}\nImage: ${imageUrl}\n\n`
+        : `## ${heading}\nURL: ${src.url}\n\n`;
+      return `${head}${budgetedText}`;
+    });
   }
 
   /**
@@ -1045,12 +1093,19 @@ export class AITab {
    * string describing why generation failed.
    *
    * @param {object} options Options, as detailed in the Tool specification for AITab
-   * @param {string} [options.focus] Focus of page information.
+   * @param {string} [options.focus] Focus of page information, or the edit request.
    * @param {string} options.sourceText Page content separated by PAGE_BREAK_TOKEN
+   * @param {A2UISurface} [options.existingSurface] - When set, the model is asked
+   *   to revise this surface rather than compose a new one.
    * @param {AbortSignal} [options.signal] - Cancels the generation.
    * @returns {Promise<{surface: A2UISurface} | {error: string}>}
    */
-  static async #generateStructuredSurface({ sourceText, focus, signal }) {
+  static async #generateStructuredSurface({
+    sourceText,
+    focus,
+    existingSurface,
+    signal,
+  }) {
     try {
       const { env } = await AITab.loadAssets();
 
@@ -1058,8 +1113,15 @@ export class AITab {
       conversation.setSystemMessage(
         lazy.renderPrompt(system, { schemas: AITab.#schemaText(env) })
       );
+      let focusText = focus ?? "";
+      if (existingSurface) {
+        focusText =
+          "EDIT the existing generated page. Apply this request and return a " +
+          "complete replacement surface. Request: " +
+          `${focusText}\n\nCURRENT SURFACE JSON:\n${JSON.stringify(existingSurface)}`;
+      }
       conversation.addUserMessage(
-        lazy.renderPrompt(user, { focus: focus ?? "", pageContent: sourceText })
+        lazy.renderPrompt(user, { focus: focusText, pageContent: sourceText })
       );
 
       if (signal?.aborted) {

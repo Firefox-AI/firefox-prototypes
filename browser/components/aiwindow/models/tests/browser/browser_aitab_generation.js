@@ -5,9 +5,9 @@
 
 // End-to-end generateAITab() with only the LLM mocked: the source pages are
 // served over HTTP and read through the real GetPageContent, so this covers
-// extraction, prompt assembly, page validation and metadata derivation. The
-// last task goes one step further and drives the create_aitab tool itself, then
-// loads the viewer link it returns in a tab.
+// extraction, prompt assembly, page validation and metadata derivation. Later
+// tasks cover implicit edit from the last-page cache, and the create_aitab
+// tool loading the viewer into the current tab.
 
 const { AITab } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/aitab/AITab.sys.mjs"
@@ -49,6 +49,8 @@ add_setup(async function () {
   await SpecialPowers.pushPrefEnv({
     set: [["browser.smartwindow.conversation.logLevel", "Debug"]],
   });
+  AITab.clearLastPage();
+  registerCleanupFunction(() => AITab.clearLastPage());
 });
 
 // What the mocked model returns. Schema coverage is browser_aitab_validation.js'
@@ -92,7 +94,9 @@ function newConversation() {
 }
 
 add_task(async function test_generateAITab_requires_urls() {
-  // No URLs: rejected before any model call, so no engine is needed.
+  // No URLs and no last page: rejected before any model call, so no engine is
+  // needed. clearLastPage keeps an earlier task from turning this into an edit.
+  AITab.clearLastPage();
   const result = await generateAITab({ urlList: [] }, newConversation());
   Assert.ok(result.error, "an empty urlList is reported as an error");
 });
@@ -520,6 +524,104 @@ add_task(async function test_generateAITab_default_title_is_localized() {
   }
 });
 
+const EDITED_SURFACE = Object.freeze({
+  components: [
+    { id: "root", component: "Page", header: "hdr", children: ["lead"] },
+    { id: "hdr", component: "Header", title: "Hotels in Lisbon" },
+    {
+      id: "lead",
+      component: "TextBlock",
+      lead: "One hotel remains after the edit.",
+    },
+  ],
+  dataModel: {},
+});
+
+add_task(async function test_generateAITab_edit_uses_last_page() {
+  const mockEngine = new MockEngineManager();
+  const { url: GEN_URL, cleanup: stopServing } = servePage();
+  try {
+    const conversation = newConversation();
+    const genPromise = generateAITab(
+      { urlList: [GEN_URL], focus: "hotels in Lisbon" },
+      conversation
+    );
+    await mockEngine.respondTo({
+      purpose: MODEL_FEATURES.AITAB,
+      response: JSON.stringify(GENERATED_SURFACE),
+    });
+    const created = await genPromise;
+    Assert.ok(!created.error, `create should succeed: ${created.error}`);
+    Assert.deepEqual(
+      AITab.getLastPage()?.surface,
+      GENERATED_SURFACE,
+      "a successful generation is kept as the last page"
+    );
+
+    // Stop serving so a mistaken re-fetch of the source URL would fail. The
+    // edit path has to reuse the stored extracted text and surface.
+    await stopServing();
+
+    const editPromise = generateAITab(
+      { focus: "remove the second item" },
+      conversation
+    );
+    const { request, respond } = await mockEngine.captureRequest({
+      purpose: MODEL_FEATURES.AITAB,
+    });
+    const serializedRequest = JSON.stringify(request.args);
+    Assert.ok(
+      serializedRequest.includes("remove the second item"),
+      "the edit request reaches the model prompt"
+    );
+    Assert.ok(
+      serializedRequest.includes("CURRENT SURFACE JSON"),
+      "the last surface is included so the model can revise it"
+    );
+    Assert.ok(
+      serializedRequest.includes("Hotels in Lisbon"),
+      "the stored surface JSON reaches the model prompt"
+    );
+    Assert.ok(
+      serializedRequest.includes("Budget Central Hostel is $72 / night"),
+      "the stored source text is reused without re-fetching"
+    );
+    respond(JSON.stringify(EDITED_SURFACE));
+
+    const edited = await editPromise;
+    Assert.ok(!edited.error, `edit should succeed: ${edited.error}`);
+    Assert.equal(
+      edited.metadata.howCreated,
+      "chat-edit",
+      "an implicit edit is tagged chat-edit"
+    );
+    Assert.equal(
+      edited.metadata.id,
+      created.metadata.id,
+      "the page slug is kept across the edit"
+    );
+    Assert.equal(
+      edited.metadata.context.urlsUsed[0].url,
+      GEN_URL,
+      "the original source URL is kept"
+    );
+    Assert.deepEqual(
+      edited.surface,
+      EDITED_SURFACE,
+      "the edited surface is returned"
+    );
+    Assert.deepEqual(
+      AITab.getLastPage()?.surface,
+      EDITED_SURFACE,
+      "the last page is replaced with the edit"
+    );
+  } finally {
+    await stopServing();
+    mockEngine.cleanupMocks();
+    AITab.clearLastPage();
+  }
+});
+
 // Stands in for the external viewer until its components are in-tree. Served by
 // the mochitest server so the link is a real https page a tab can load.
 const VIEWER_URL =
@@ -532,9 +634,16 @@ add_task(async function test_createAITab_link_loads_config_in_a_tab() {
   const mockEngine = new MockEngineManager();
   const { url, cleanup: stopServing } = servePage();
   const conversation = newConversation();
+  const tab = await BrowserTestUtils.openNewForegroundTab(
+    gBrowser,
+    "about:blank"
+  );
   try {
-    // The tool is the production entry point: it generates the page and returns
-    // a markdown link carrying the viewer URL as a token.
+    const loaded = BrowserTestUtils.browserLoaded(
+      tab.linkedBrowser,
+      false,
+      loadedURL => loadedURL.startsWith(VIEWER_URL)
+    );
     const toolPromise = createAITab(
       { url_list: [url], focus: "hotels in Lisbon" },
       conversation
@@ -544,7 +653,12 @@ add_task(async function test_createAITab_link_loads_config_in_a_tab() {
       response: JSON.stringify(GENERATED_SURFACE),
     });
     const toolResult = await toolPromise;
+    await loaded;
 
+    Assert.ok(
+      toolResult.includes("created"),
+      `the tool reports a create: ${toolResult}`
+    );
     const expanded = expandUrlTokens(toolResult, conversation.tokenToUrl);
     const [, viewerURL] = expanded.match(/\]\((https:\/\/[^\s)]+)\)/) ?? [];
     Assert.ok(viewerURL, `the tool returns a viewer link: ${expanded}`);
@@ -553,29 +667,55 @@ add_task(async function test_createAITab_link_loads_config_in_a_tab() {
       "the link points at the configured viewer, with the config in the hash"
     );
 
-    const tab = await BrowserTestUtils.openNewForegroundTab(
-      gBrowser,
-      viewerURL,
-      true // waitForLoad
+    const [title, hash] = await SpecialPowers.spawn(
+      tab.linkedBrowser,
+      [],
+      () => [content.document.title, content.location.hash]
     );
-    try {
-      const [title, hash] = await SpecialPowers.spawn(
-        tab.linkedBrowser,
-        [],
-        () => [content.document.title, content.location.hash]
-      );
-      Assert.equal(title, "AITab viewer stub", "the viewer page loaded");
-      Assert.deepEqual(
-        JSON.parse(decodeURIComponent(hash.slice(1))),
-        GENERATED_SURFACE,
-        "the surface round-trips through the hash of the loaded URL"
-      );
-    } finally {
-      BrowserTestUtils.removeTab(tab);
-    }
+    Assert.equal(
+      title,
+      "AITab viewer stub",
+      "the current tab loaded the viewer"
+    );
+    Assert.deepEqual(
+      JSON.parse(decodeURIComponent(hash.slice(1))),
+      GENERATED_SURFACE,
+      "the surface round-trips through the hash of the loaded URL"
+    );
+
+    await stopServing();
+
+    const locationChanged = BrowserTestUtils.waitForLocationChange(gBrowser);
+    const editPromise = createAITab(
+      { focus: "remove the second item" },
+      conversation
+    );
+    await mockEngine.respondTo({
+      purpose: MODEL_FEATURES.AITAB,
+      response: JSON.stringify(EDITED_SURFACE),
+    });
+    const editResult = await editPromise;
+    await locationChanged;
+
+    Assert.ok(
+      editResult.includes("updated"),
+      `the tool reports an update: ${editResult}`
+    );
+    const editedHash = await SpecialPowers.spawn(
+      tab.linkedBrowser,
+      [],
+      () => content.location.hash
+    );
+    Assert.deepEqual(
+      JSON.parse(decodeURIComponent(editedHash.slice(1))),
+      EDITED_SURFACE,
+      "the current tab's hash is replaced with the edited surface"
+    );
   } finally {
+    BrowserTestUtils.removeTab(tab);
     await stopServing();
     mockEngine.cleanupMocks();
+    AITab.clearLastPage();
     await SpecialPowers.popPrefEnv();
   }
 });

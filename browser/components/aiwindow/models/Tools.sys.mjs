@@ -42,6 +42,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
   clearTimeout: "resource://gre/modules/Timer.sys.mjs",
   AITab: "moz-src:///browser/components/aiwindow/models/aitab/AITab.sys.mjs",
+  URILoadingHelper: "resource:///modules/URILoadingHelper.sys.mjs",
   setTimeout: "resource://gre/modules/Timer.sys.mjs",
   MemoriesManager:
     "moz-src:///browser/components/aiwindow/models/memories/MemoriesManager.sys.mjs",
@@ -365,14 +366,17 @@ export const toolsConfig = [
     type: "function",
     function: {
       name: GENERATE_AITAB,
-      description: "Design a custom web page with user content",
+      description:
+        "Design a custom web page from user content, or revise the most recently generated page. " +
+        "To edit that page (for example 'remove the second item'), omit url_list and pass the " +
+        "change in focus.",
       parameters: {
         type: "object",
         properties: {
           focus: {
             type: "string",
             description:
-              "The focus on what information the user wants in the generated AITab.",
+              "What information the user wants on a new page, or the change to make when revising the last generated page.",
           },
           url_list: {
             type: "array",
@@ -384,10 +388,9 @@ export const toolsConfig = [
             },
             minItems: 1,
             description:
-              "List of URL tokens to fetch content from. Typically URL tokens are referenced in the conversation or found by searching open tabs.",
+              "List of URL tokens to build a new page from. Omit to revise the most recently generated page using its original sources.",
           },
         },
-        required: ["url_list"],
       },
     },
   },
@@ -1396,9 +1399,6 @@ export async function addMemory(
  */
 export async function createAITab({ url_list, focus }, conversation, signal) {
   lazy.console.log("[Tool] aiTab", JSON.stringify({ url_list, focus }));
-  // Generate the page from the requested URLs. Nothing is persisted; the chat
-  // tool returns a link to the external viewer with the page config in the URL
-  // hash, so the page data never reaches the viewer host.
   const viewerBase = lazy.AITab.getViewerBaseURL();
   if (!viewerBase) {
     return (
@@ -1425,7 +1425,15 @@ export async function createAITab({ url_list, focus }, conversation, signal) {
   const token = conversation.convertUrlToToken(viewerURL);
   // Strip characters that would break the markdown link text and expose the URL.
   const title = (result.metadata?.title || "the page").replace(/[[\]]/g, "");
-  return `The page was created. Link the user to it as [${title}](§url_token: ${token}§).`;
+
+  const win = lazy.BrowserWindowTracker.getTopWindow();
+  if (win) {
+    lazy.URILoadingHelper.openTrustedLinkIn(win, viewerURL, "current");
+  }
+
+  const verb =
+    result.metadata?.howCreated === "chat-edit" ? "updated" : "created";
+  return `The page was ${verb}. Link the user to it as [${title}](§url_token: ${token}§).`;
 }
 
 // No securityProperties / trust flags: skill prompts are Remote Settings
