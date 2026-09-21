@@ -996,6 +996,49 @@ let JSWINDOWACTORS = {
     enablePreference: "browser.smartwindow.smartformfill.enabled",
   },
 
+  SmartWindowBrowser: {
+    parent: {
+      esModuleURI:
+        "moz-src:///browser/components/aiwindow/ui/actors/SmartWindowBrowserParent.sys.mjs",
+    },
+    child: {
+      esModuleURI:
+        "moz-src:///browser/components/aiwindow/ui/actors/SmartWindowBrowserChild.sys.mjs",
+    },
+    safeForUntrustedWebProcess: true,
+    matches: ["http://*/*", "https://*/*"],
+    messageManagerGroups: ["browsers"],
+
+    onAddActor(register, unregister) {
+      let isRegistered = false;
+
+      const maybeRegister = () => {
+        if (
+          Services.prefs.getBoolPref("browser.smartwindow.enabled") &&
+          Services.prefs.getBoolPref(
+            "browser.smartwindow.browserControl.enabled",
+            false
+          )
+        ) {
+          if (!isRegistered) {
+            register();
+            isRegistered = true;
+          }
+        } else if (isRegistered) {
+          unregister();
+          isRegistered = false;
+        }
+      };
+
+      Services.prefs.addObserver("browser.smartwindow.enabled", maybeRegister);
+      Services.prefs.addObserver(
+        "browser.smartwindow.browserControl.enabled",
+        maybeRegister
+      );
+      maybeRegister();
+    },
+  },
+
   SpeechDispatcher: {
     parent: {
       esModuleURI: "resource:///actors/SpeechDispatcherParent.sys.mjs",

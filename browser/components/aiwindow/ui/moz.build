@@ -23,6 +23,8 @@ MOZ_SRC_FILES += [
     "actors/SmartFormFillParent.sys.mjs",
     "actors/SmartFormFillReviewChild.sys.mjs",
     "actors/SmartFormFillReviewParent.sys.mjs",
+    "actors/SmartWindowBrowserChild.sys.mjs",
+    "actors/SmartWindowBrowserParent.sys.mjs",
     "actors/SmartWindowTasksChild.sys.mjs",
     "actors/SmartWindowTasksParent.sys.mjs",
     "modules/AgentUI.sys.mjs",

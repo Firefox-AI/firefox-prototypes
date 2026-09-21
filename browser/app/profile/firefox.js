@@ -2444,6 +2444,10 @@ pref("browser.smartwindow.agent.monitorAnnouncement", false);
 pref("browser.smartwindow.agent.expiry.noMatchDays", 60);
 pref("browser.smartwindow.agent.expiry.maxAgeDays", 90);
 
+// Smart Window browser control. This exposes model-driven page reads and
+// interactions, so it remains an explicit opt-in for local prototyping.
+pref("browser.smartwindow.browserControl.enabled", false);
+
 
 // Smart Window: Exa search endpoint, used by the search_the_web agentic flow (bug 2037948)
 pref("browser.smartwindow.searchQuery.endpointURL", "https://mlpa-prod-prod-mozilla.freetls.fastly.net/v1/search");

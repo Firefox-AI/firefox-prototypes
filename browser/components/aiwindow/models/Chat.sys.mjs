@@ -26,6 +26,15 @@ import {
   SEARCH_THE_WEB_FAST_PREF,
   SEARCH_THE_WEB_TOOL_CONFIG_FAST,
   GET_SKILL,
+  BROWSER_OPEN_TAB,
+  BROWSER_STATE,
+  BROWSER_FIND_TEXT,
+  BROWSER_NAVIGATE,
+  BROWSER_SCROLL,
+  BROWSER_CLICK,
+  BROWSER_TYPE,
+  BROWSER_CONTROL_PREF,
+  BROWSER_CONTROL_TOOLS,
 } from "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs";
 import { runSearchTheWeb } from "moz-src:///browser/components/aiwindow/models/search/SearchWorkflow.sys.mjs";
 
@@ -119,6 +128,55 @@ export async function executeToolByName(
       result = await toolFns.addMemory(toolParams, conversation);
       break;
     }
+    case BROWSER_OPEN_TAB:
+      result = await toolFns.browserOpenTab(
+        toolParams,
+        conversation,
+        browsingContext
+      );
+      break;
+    case BROWSER_STATE:
+      result = await toolFns.browserState(
+        toolParams,
+        conversation,
+        browsingContext
+      );
+      break;
+    case BROWSER_FIND_TEXT:
+      result = await toolFns.browserFindText(
+        toolParams,
+        conversation,
+        browsingContext
+      );
+      break;
+    case BROWSER_NAVIGATE:
+      result = await toolFns.browserNavigate(
+        toolParams,
+        conversation,
+        browsingContext
+      );
+      break;
+    case BROWSER_SCROLL:
+      result = await toolFns.browserScroll(
+        toolParams,
+        conversation,
+        browsingContext
+      );
+      break;
+    case BROWSER_CLICK:
+      result = await toolFns.browserClick(
+        toolParams,
+        conversation,
+        browsingContext
+      );
+      break;
+    case BROWSER_TYPE:
+      result = await toolFns.browserType(
+        toolParams,
+        conversation,
+        browsingContext
+      );
+      break;
     default: {
       const err = new Error(`No such tool: ${toolName}`);
       err.clientReason = "unknownTool";
@@ -170,6 +228,11 @@ function filterFeatureGatedTools(tools) {
   }
   if (!Services.prefs.getBoolPref(AITAB_PREF, false)) {
     filtered = filtered.filter(t => !AITAB_TOOLS.has(t.function?.name));
+  }
+  if (!Services.prefs.getBoolPref(BROWSER_CONTROL_PREF, false)) {
+    filtered = filtered.filter(
+      t => !BROWSER_CONTROL_TOOLS.has(t.function?.name)
+    );
   }
   return filtered;
 }

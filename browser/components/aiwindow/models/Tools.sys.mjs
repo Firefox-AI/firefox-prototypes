@@ -19,6 +19,7 @@ import {
   manageTabsAction,
   TAB_ACTIONS,
 } from "moz-src:///browser/components/aiwindow/models/ManageTabs.sys.mjs";
+import { BrowserControl } from "moz-src:///browser/components/aiwindow/models/BrowserControl.sys.mjs";
 import { PageExtractorParent } from "resource://gre/actors/PageExtractorParent.sys.mjs";
 import {
   ChatStore,
@@ -150,11 +151,29 @@ export const GET_NAVIGATION_INFO = "get_navigation_info";
 export const MANAGE_TABS = "manage_tabs";
 export const GET_SKILL = "get_skill";
 export const ADD_MEMORY = "add_memory";
+export const BROWSER_OPEN_TAB = "browser_open_tab";
+export const BROWSER_STATE = "browser_state";
+export const BROWSER_FIND_TEXT = "browser_find_text";
+export const BROWSER_NAVIGATE = "browser_navigate";
+export const BROWSER_SCROLL = "browser_scroll";
+export const BROWSER_CLICK = "browser_click";
+export const BROWSER_TYPE = "browser_type";
 
 // Tools gated behind a feature pref. Filtered out of the model's tool list
 // in Chat.sys.mjs when the pref is off.
 export const AITAB_PREF = "browser.smartwindow.aitab.enabled";
 export const AITAB_TOOLS = new Set([GENERATE_AITAB]);
+export const BROWSER_CONTROL_PREF =
+  "browser.smartwindow.browserControl.enabled";
+export const BROWSER_CONTROL_TOOLS = new Set([
+  BROWSER_OPEN_TAB,
+  BROWSER_STATE,
+  BROWSER_FIND_TEXT,
+  BROWSER_NAVIGATE,
+  BROWSER_SCROLL,
+  BROWSER_CLICK,
+  BROWSER_TYPE,
+]);
 export const SEARCH_QUERY_ENDPOINT_PREF =
   "browser.smartwindow.searchQuery.endpointURL";
 export const SEARCH_QUERY_APIKEY_PREF =
@@ -176,6 +195,13 @@ export const TOOLS = [
   SEARCH_THE_WEB,
   GET_SKILL,
   GENERATE_AITAB,
+  BROWSER_OPEN_TAB,
+  BROWSER_STATE,
+  BROWSER_FIND_TEXT,
+  BROWSER_NAVIGATE,
+  BROWSER_SCROLL,
+  BROWSER_CLICK,
+  BROWSER_TYPE,
 ];
 
 export const RUN_SEARCH_VERBATIM_QUERY_DESCRIPTION =
@@ -521,6 +547,192 @@ export const toolsConfig = [
           },
         },
         required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: BROWSER_OPEN_TAB,
+      description:
+        "Open and select an HTTP or HTTPS page in a new Firefox tab. Returns a conversation-scoped tab_id. Call browser_state before interacting with the page.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: {
+            type: "string",
+            description: "The absolute HTTP or HTTPS URL to open.",
+          },
+        },
+        required: ["url"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: BROWSER_STATE,
+      description:
+        "Read the current Firefox page as bounded text plus interactive elements. Returns an opaque snapshot_id and element refs. Always call this immediately before browser_click or browser_type; refs expire after one action or a page change.",
+      parameters: {
+        type: "object",
+        properties: {
+          tab_id: {
+            type: "string",
+            description:
+              "A tab_id returned by this tool or browser_open_tab. Omit to read the selected web tab.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: BROWSER_FIND_TEXT,
+      description:
+        "Find text in a Firefox page, scroll the first match into view, and visibly highlight it using the browser's native selection. Returns whether a match was found. This invalidates prior browser_state refs; call browser_state again before clicking or typing.",
+      parameters: {
+        type: "object",
+        properties: {
+          tab_id: {
+            type: "string",
+            description:
+              "A conversation-scoped tab_id. Omit to search the selected web tab.",
+          },
+          text: {
+            type: "string",
+            minLength: 1,
+            maxLength: 500,
+            description: "The text to find and highlight on the page.",
+          },
+          case_sensitive: {
+            type: "boolean",
+            description:
+              "Whether capitalization must match; defaults to false.",
+          },
+          whole_word: {
+            type: "boolean",
+            description:
+              "Whether the match must be a whole word or phrase; defaults to false.",
+          },
+        },
+        required: ["text"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: BROWSER_NAVIGATE,
+      description:
+        "Navigate a controlled Firefox tab to an absolute HTTP or HTTPS URL. Call browser_state after navigation before interacting.",
+      parameters: {
+        type: "object",
+        properties: {
+          tab_id: {
+            type: "string",
+            description:
+              "The target tab_id. Omit to navigate the selected web tab.",
+          },
+          url: {
+            type: "string",
+            description: "The absolute HTTP or HTTPS destination URL.",
+          },
+        },
+        required: ["url"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: BROWSER_SCROLL,
+      description:
+        "Scroll a Firefox page up, down, left, right, to the top, or to the bottom. Directional scrolling defaults to 80 percent of the viewport; optionally provide a CSS-pixel amount. This invalidates prior browser_state refs.",
+      parameters: {
+        type: "object",
+        properties: {
+          tab_id: {
+            type: "string",
+            description:
+              "A conversation-scoped tab_id. Omit to scroll the selected web tab.",
+          },
+          direction: {
+            type: "string",
+            enum: ["up", "down", "left", "right", "top", "bottom"],
+            description: "The direction or page boundary to scroll toward.",
+          },
+          amount: {
+            type: "number",
+            minimum: 1,
+            maximum: 5000,
+            description:
+              "Optional distance in CSS pixels for up, down, left, or right.",
+          },
+        },
+        required: ["direction"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: BROWSER_CLICK,
+      description:
+        "Click an interactive element from the newest browser_state snapshot. The snapshot and all of its refs expire after this action, so read browser_state again before another action.",
+      parameters: {
+        type: "object",
+        properties: {
+          tab_id: {
+            type: "string",
+            description: "The conversation-scoped target tab identifier.",
+          },
+          snapshot_id: {
+            type: "string",
+            description: "The newest snapshot identifier from browser_state.",
+          },
+          ref: {
+            type: "string",
+            description: "An opaque element ref returned by browser_state.",
+          },
+        },
+        required: ["tab_id", "snapshot_id", "ref"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: BROWSER_TYPE,
+      description:
+        "Enter text into an editable element from the newest browser_state snapshot. Password and file fields are never exposed as editable. The snapshot expires after this action.",
+      parameters: {
+        type: "object",
+        properties: {
+          tab_id: {
+            type: "string",
+            description: "The conversation-scoped target tab identifier.",
+          },
+          snapshot_id: {
+            type: "string",
+            description: "The newest snapshot identifier from browser_state.",
+          },
+          ref: {
+            type: "string",
+            description: "An opaque editable element ref from browser_state.",
+          },
+          text: {
+            type: "string",
+            description: "Text to enter. The tool result does not echo it.",
+          },
+          replace: {
+            type: "boolean",
+            description:
+              "Replace the existing value when true (default); append when false.",
+          },
+        },
+        required: ["tab_id", "snapshot_id", "ref", "text"],
       },
     },
   },
@@ -1598,4 +1810,11 @@ export const toolFns = {
   manageTabs,
   addMemory,
   getSkill,
+  browserOpenTab: BrowserControl.openTab.bind(BrowserControl),
+  browserState: BrowserControl.getState.bind(BrowserControl),
+  browserFindText: BrowserControl.findText.bind(BrowserControl),
+  browserNavigate: BrowserControl.navigate.bind(BrowserControl),
+  browserScroll: BrowserControl.scroll.bind(BrowserControl),
+  browserClick: BrowserControl.click.bind(BrowserControl),
+  browserType: BrowserControl.type.bind(BrowserControl),
 };
