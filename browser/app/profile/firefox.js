@@ -2417,6 +2417,9 @@ pref("browser.smartwindow.autoTabGrouping.minCandidateTabs", 4);
 pref("browser.smartwindow.autoTabGrouping.minCohesion", "0.15");
 pref("browser.smartwindow.autoTabGrouping.timeoutMs", 8000);
 pref("browser.smartwindow.autoTabGrouping.loglevel", "Warn");
+// Spike: create groups when tabs open or navigate, without the panel.
+// Set to false to keep grouping behind the Organize Tabs panel.
+pref("browser.smartwindow.autoTabGrouping.autoApply", true);
 
 // Smart Window: Smart Form Fill (bug 2055009).
 pref("browser.smartwindow.smartformfill.enabled", false);

@@ -48,6 +48,10 @@ const PANEL_ID = "smartwindow-group-tabs-panel";
 const FLYOUT_ID = "smartwindow-group-tabs-flyout";
 const CARD_TAG = "smartwindow-group-tabs-card";
 const FLYOUT_HIDE_DELAY_MS = 160;
+// Wait for a burst of opens or navigations to settle, then cluster once.
+const AUTO_GROUP_DEBOUNCE_MS = 1200;
+// A tab that never finishes loading must not block grouping forever.
+const AUTO_BUSY_MAX_DEFERS = 8;
 const GROUPS_CHANGED_TOPICS = [
   "browser-tabgroup-removed-from-dom",
   "sessionstore-saved-tab-groups-changed",
@@ -75,6 +79,10 @@ function titleLength(tabs) {
  * and tab-group work; the panel and flyout markup are rendered by the
  * smartwindow-group-tabs-card / -flyout custom elements, which report user
  * intent back through events.
+ *
+ * With browser.smartwindow.autoTabGrouping.autoApply, a Smart Window also
+ * clusters on its own after tabs open or navigate and creates those groups
+ * without the panel.
  */
 export const AutoTabGrouping = {
   _nextId: 1,
@@ -135,6 +143,13 @@ export const AutoTabGrouping = {
    * @type {WeakMap<ChromeWindow, XULElement>}
    */
   _panels: new WeakMap(),
+
+  /**
+   * Listeners and debounce state for unattended grouping, keyed by window.
+   *
+   * @type {WeakMap<ChromeWindow, object>}
+   */
+  _auto: new WeakMap(),
 
   _getState(win) {
     let state = this._state.get(win);
@@ -869,13 +884,16 @@ export const AutoTabGrouping = {
    * groups one at a time.
    *
    * @param {ChromeWindow} win
-   * @param {XULElement} panel
+   * @param {XULElement|null} panel - Open panel to refresh, or null when the
+   *   groups are created without one.
    * @param {object[]} suggestions
    * @param {object} options
-   * @param {string} options.source - Whether the user picked one group
-   *   ("individual_accept") or created them all at once ("collective_accept").
+   * @param {string} options.source - "individual_accept", "collective_accept",
+   *   or "auto" when groups are created because tabs opened or navigated.
+   * @param {boolean} [options.trackRecent=true] - Keep the groups on the
+   *   panel's "Just created" list.
    */
-  _createSuggestions(win, panel, suggestions, { source }) {
+  _createSuggestions(win, panel, suggestions, { source, trackRecent = true }) {
     const state = this._getState(win);
     const windowTabs = new Set(win.gBrowser.tabs);
     // Our groups arrive fully formed (label and color chosen by the
@@ -911,7 +929,7 @@ export const AutoTabGrouping = {
         lazy.console.warn("addTabGroup failed", e);
         errorType = e.name;
       }
-      if (group) {
+      if (group && trackRecent) {
         state.recent.unshift({
           id: this._nextId++,
           suggestionId: suggestion.id,
@@ -930,9 +948,14 @@ export const AutoTabGrouping = {
     }
 
     const consumed = new Set(suggestions.map(s => s.id));
-    const focusIndex = state.suggestions.findIndex(s => consumed.has(s.id));
+    const focusIndex = panel
+      ? state.suggestions.findIndex(s => consumed.has(s.id))
+      : 0;
     state.suggestions = state.suggestions.filter(s => !consumed.has(s.id));
     this._pruneSuggestions(win);
+    if (!panel) {
+      return;
+    }
     const hidden = this._syncCard(win, panel);
     this._focusAfterRowRemoved(panel, hidden, focusIndex);
   },
@@ -1135,6 +1158,241 @@ export const AutoTabGrouping = {
   },
 
   /**
+   * Watch `win` and group its tabs after they open or navigate. Idempotent.
+   * AIWindow calls this for an active non-private Smart Window while
+   * auto-apply is on; the panel is not involved.
+   *
+   * @param {ChromeWindow} win
+   */
+  watch(win) {
+    if (!win?.gBrowser || win.closed) {
+      return;
+    }
+    if (this._auto.has(win)) {
+      this._scheduleAutoGroup(win);
+      return;
+    }
+
+    const listener = {
+      onLocationChange: (_browser, webProgress, _request, location, flags) => {
+        if (!location || typeof location.schemeIs != "function") {
+          return;
+        }
+        if (!location.schemeIs("http") && !location.schemeIs("https")) {
+          return;
+        }
+        if (
+          flags & Ci.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT ||
+          flags & Ci.nsIWebProgressListener.LOCATION_CHANGE_ERROR_PAGE
+        ) {
+          return;
+        }
+        // Subframe loads also notify. Only a top-level document changes the
+        // tab the model would see. A missing webProgress is a top-level event.
+        if (webProgress && !webProgress.isTopLevel) {
+          return;
+        }
+        this._scheduleAutoGroup(win);
+      },
+    };
+    const onTabEvent = event => {
+      if (event.type === "TabAttrModified") {
+        const changed = event.detail?.changed ?? [];
+        if (!changed.includes("busy") && !changed.includes("label")) {
+          return;
+        }
+      }
+      this._scheduleAutoGroup(win);
+    };
+
+    win.gBrowser.addTabsProgressListener(listener);
+    const { tabContainer } = win.gBrowser;
+    tabContainer.addEventListener("TabOpen", onTabEvent);
+    tabContainer.addEventListener("TabAttrModified", onTabEvent);
+    this._auto.set(win, {
+      listener,
+      onTabEvent,
+      timer: 0,
+      running: false,
+      dirty: false,
+      busyDefers: 0,
+      lastFingerprint: null,
+    });
+    lazy.AutoTabGroupingSuggestions.preloadModels();
+    lazy.console.warn("Auto tab grouping is watching this window");
+    this._scheduleAutoGroup(win);
+  },
+
+  /**
+   * Stop watching `win`. Safe if it was not being watched.
+   *
+   * @param {ChromeWindow} win
+   */
+  unwatch(win) {
+    const auto = this._auto.get(win);
+    if (!auto) {
+      return;
+    }
+    if (auto.timer) {
+      lazy.clearTimeout(auto.timer);
+    }
+    const gBrowser = win?.gBrowser;
+    if (gBrowser) {
+      gBrowser.removeTabsProgressListener(auto.listener);
+      gBrowser.tabContainer.removeEventListener("TabOpen", auto.onTabEvent);
+      gBrowser.tabContainer.removeEventListener(
+        "TabAttrModified",
+        auto.onTabEvent
+      );
+    }
+    this._auto.delete(win);
+  },
+
+  /**
+   * @param {ChromeWindow} win
+   */
+  _scheduleAutoGroup(win) {
+    const auto = this._auto.get(win);
+    if (!auto || win.closed) {
+      return;
+    }
+    if (auto.timer) {
+      lazy.clearTimeout(auto.timer);
+    }
+    auto.timer = lazy.setTimeout(() => {
+      auto.timer = 0;
+      this._runAutoGroup(win).catch(error =>
+        lazy.console.warn("Auto tab grouping failed", error)
+      );
+    }, AUTO_GROUP_DEBOUNCE_MS);
+  },
+
+  /**
+   * Cluster the window's ungrouped web tabs and create every proposed group.
+   * Skips a candidate set that was already handled, and waits out tabs that
+   * are still loading so their titles exist.
+   *
+   * @param {ChromeWindow} win
+   */
+  async _runAutoGroup(win) {
+    const auto = this._auto.get(win);
+    if (!auto || win.closed || !win.gBrowser) {
+      return;
+    }
+    if (auto.running) {
+      auto.dirty = true;
+      return;
+    }
+    if (
+      this._hasBusyUngroupedTab(win) &&
+      auto.busyDefers < AUTO_BUSY_MAX_DEFERS
+    ) {
+      auto.busyDefers++;
+      this._scheduleAutoGroup(win);
+      return;
+    }
+    auto.busyDefers = 0;
+
+    const candidates = lazy.AutoTabGroupingSuggestions.getCandidateTabs(win);
+    const fingerprint = this._candidateFingerprint(candidates);
+    if (fingerprint === auto.lastFingerprint) {
+      return;
+    }
+    if (
+      !lazy.AutoTabGroupingSuggestions.isAvailable ||
+      candidates.length < lazy.minCandidateTabs
+    ) {
+      // Remember an undersized set so opening one more tab is what retries,
+      // but a model that is not available yet should be tried again.
+      if (candidates.length < lazy.minCandidateTabs) {
+        auto.lastFingerprint = fingerprint;
+      }
+      return;
+    }
+
+    const state = this._getState(win);
+    if (state.computePromise) {
+      // A panel open started this run. Apply whatever it produces instead of
+      // clustering a second time.
+      const pending = state.computePromise;
+      pending.finally(() => {
+        if (this._auto.get(win) !== auto || win.closed) {
+          return;
+        }
+        auto.dirty = false;
+        if (state.computed) {
+          const handled = this._candidateFingerprint(
+            lazy.AutoTabGroupingSuggestions.getCandidateTabs(win)
+          );
+          const created = this._applyAutoSuggestions(
+            win,
+            state.suggestions.slice()
+          );
+          this._finishAutoRun(win, auto, created, handled);
+          return;
+        }
+        this._scheduleAutoGroup(win);
+      });
+      return;
+    }
+
+    auto.running = true;
+    auto.dirty = false;
+    // Force a new clustering run. Leave any suggestions already on screen
+    // alone until this run replaces them, so an open panel does not go blank.
+    state.computed = false;
+    try {
+      const suggestions = (await this._computeSuggestions(win)) ?? [];
+      if (!this._auto.get(win) || win.closed) {
+        return;
+      }
+      const created = this._applyAutoSuggestions(win, suggestions);
+      this._finishAutoRun(win, auto, created, fingerprint);
+    } finally {
+      auto.running = false;
+      if (auto.dirty && this._auto.get(win) === auto) {
+        auto.dirty = false;
+        this._scheduleAutoGroup(win);
+      }
+    }
+  },
+
+  /**
+   * Ungrouped tabs that are still loading. Their titles are not ready, and
+   * getCandidateTabs skips them, so clustering now would miss them.
+   *
+   * @param {ChromeWindow} win
+   * @returns {boolean}
+   */
+  _hasBusyUngroupedTab(win) {
+    return win.gBrowser.tabs.some(
+      tab =>
+        !tab.pinned &&
+        !tab.closing &&
+        !tab.group &&
+        !tab.hidden &&
+        tab.hasAttribute("busy")
+    );
+  },
+
+  /**
+   * Identity of a candidate set: which tabs, at which URL, with which title.
+   * Same-document navigations are ignored by the listener, so this changes
+   * when a new page actually loads.
+   *
+   * @param {MozTabbrowserTab[]} tabs
+   * @returns {string}
+   */
+  _candidateFingerprint(tabs) {
+    return tabs
+      .map(tab => {
+        const spec = tab.linkedBrowser?.currentURI?.spec ?? "";
+        return `${tab.linkedPanel}\t${spec}\t${tab.label}`;
+      })
+      .join("\n");
+  },
+
+  /**
    * Run clustering + labeling once and cache the resulting suggestions on the
    * window state. Stays uncomputed when there are too few tabs so a later open
    * retries once more tabs exist.
@@ -1208,7 +1466,65 @@ export const AutoTabGrouping = {
       if (panel?._waitedOut) {
         this._syncCard(win, panel);
       }
+      return suggestions;
     })();
     return state.computePromise;
+  },
+
+  /**
+   * Create every suggestion. An open panel is refreshed and records the groups
+   * so its "Just created" list can still ungroup them.
+   *
+   * @param {ChromeWindow} win
+   * @param {object[]} suggestions
+   * @returns {number} Suggestions handed to _createSuggestions. A suggestion
+   *   whose tabs can no longer be grouped is skipped there.
+   */
+  _applyAutoSuggestions(win, suggestions) {
+    if (!suggestions.length) {
+      lazy.console.info("Auto tab grouping found no groups");
+      return 0;
+    }
+    const panel = this._panels.get(win) ?? null;
+    this._createSuggestions(win, panel, suggestions, {
+      source: "auto",
+      trackRecent: !!panel,
+    });
+    lazy.console.warn(
+      "Auto-created tab groups:",
+      suggestions
+        .map(group => `${group.label} (${group.tabs.length})`)
+        .join(", ")
+    );
+    return suggestions.length;
+  },
+
+  /**
+   * Remember the tabs still ungrouped. If a pass created groups and enough
+   * tabs remain to cluster again, run once more: the first pass only keeps
+   * the strongest groups.
+   *
+   * @param {ChromeWindow} win
+   * @param {object} auto
+   * @param {number} createdCount
+   * @param {string} handledFingerprint - Candidate set this pass clustered.
+   */
+  _finishAutoRun(win, auto, createdCount, handledFingerprint) {
+    if (this._auto.get(win) !== auto || win.closed || auto.dirty) {
+      return;
+    }
+    const remaining = lazy.AutoTabGroupingSuggestions.getCandidateTabs(win);
+    const fingerprint = this._candidateFingerprint(remaining);
+    // A pass that grouped tabs can leave another cluster behind. Only run
+    // again when the pool actually shrank, so a no-op pass cannot spin.
+    if (
+      createdCount > 0 &&
+      fingerprint !== handledFingerprint &&
+      remaining.length >= lazy.minCandidateTabs
+    ) {
+      this._scheduleAutoGroup(win);
+      return;
+    }
+    auto.lastFingerprint = fingerprint;
   },
 };

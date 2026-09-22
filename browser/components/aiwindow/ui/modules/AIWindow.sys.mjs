@@ -28,6 +28,8 @@ const PREF_MEMORIES_HISTORY =
 const PREF_SEMANTIC_HISTORY_SMARTWINDOW_FEATURE_GATE =
   "places.semanticHistory.smartwindow.featureGate";
 const PREF_AUTO_TAB_GROUPING = "browser.smartwindow.autoTabGrouping.enabled";
+const PREF_AUTO_TAB_GROUPING_AUTO_APPLY =
+  "browser.smartwindow.autoTabGrouping.autoApply";
 const PREF_FIRSTRUN_HAS_COMPLETED = "browser.smartwindow.firstrun.hasCompleted";
 const PREF_AGENT = "browser.smartwindow.agent.enabled";
 const PREF_AGENT_TOOLBAR = "browser.smartwindow.agent.toolbar.enabled";
@@ -51,6 +53,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowAccountAuth.sys.mjs",
   AIWindowMenu:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowMenu.sys.mjs",
+  AutoTabGrouping:
+    "moz-src:///browser/components/aiwindow/ui/modules/AutoTabGrouping.sys.mjs",
   AutoTabGroupingSuggestions:
     "moz-src:///browser/components/aiwindow/ui/modules/AutoTabGroupingSuggestions.sys.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
@@ -128,7 +132,18 @@ XPCOMUtils.defineLazyPreferenceGetter(
   "autoTabGroupingEnabled",
   PREF_AUTO_TAB_GROUPING,
   true,
-  () => AIWindow._updateGroupTabsWidgetRegistration()
+  () => {
+    AIWindow._updateGroupTabsWidgetRegistration();
+    AIWindow._updateAutoTabGroupingForAllWindows();
+  }
+);
+
+XPCOMUtils.defineLazyPreferenceGetter(
+  lazy,
+  "autoTabGroupingAutoApply",
+  PREF_AUTO_TAB_GROUPING_AUTO_APPLY,
+  true,
+  () => AIWindow._updateAutoTabGroupingForAllWindows()
 );
 
 // Enrolling mid-session has to light the dot without waiting for a restart.
@@ -197,6 +212,8 @@ export const AIWindow = {
       // so MemoriesManager sees this window as ready before starting the schedulers.
       win.delayedStartupPromise.then(() => this._startSchedulers());
     }
+
+    this._updateAutoTabGrouping(win);
 
     if (this._initialized) {
       return;
@@ -384,6 +401,7 @@ export const AIWindow = {
       PREF_SEMANTIC_HISTORY_SMARTWINDOW_FEATURE_GATE,
       this.isAvailable
     );
+    this._updateAutoTabGroupingForAllWindows();
     if (!this.isAvailable) {
       this._onAccountLogout();
     }
@@ -458,6 +476,35 @@ export const AIWindow = {
     if (!node.hidden) {
       lazy.AutoTabGroupingSuggestions.preloadModels();
     }
+  },
+
+  /**
+   * Start or stop unattended tab grouping in every window that has been
+   * initialized. The auto-apply pref and the feature pref both call this.
+   */
+  _updateAutoTabGroupingForAllWindows() {
+    this._forEachWindow(win => this._updateAutoTabGrouping(win));
+  },
+
+  /**
+   * Group tabs as they open or navigate, without the Organize Tabs panel.
+   * Only an active, non-private Smart Window is watched, and only while the
+   * feature and browser.smartwindow.autoTabGrouping.autoApply are on.
+   *
+   * @param {ChromeWindow} win
+   */
+  _updateAutoTabGrouping(win) {
+    if (
+      lazy.autoTabGroupingEnabled &&
+      lazy.autoTabGroupingAutoApply &&
+      !this.isBlocked &&
+      this.isAIWindowActive(win) &&
+      !lazy.PrivateBrowsingUtils.isWindowPrivate(win)
+    ) {
+      lazy.AutoTabGrouping.watch(win);
+      return;
+    }
+    lazy.AutoTabGrouping.unwatch(win);
   },
 
   /**
@@ -1203,6 +1250,7 @@ export const AIWindow = {
         this._recordSmartWindowUsage();
         Glean.smartWindow.classicSwitch.record({ duration_ms, opened_tabs });
       }
+      this._updateAutoTabGrouping(win);
     }
   },
 
@@ -1241,6 +1289,7 @@ export const AIWindow = {
   },
 
   unloadWindow(win) {
+    lazy.AutoTabGrouping.unwatch(win);
     if (this.isAIWindowActive(win)) {
       const duration_ms = this._consumeActiveDuration(win);
       const opened_tabs = win.gBrowser?.tabs.length ?? 0;

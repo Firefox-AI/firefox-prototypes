@@ -2325,7 +2325,8 @@ smart_window:
         type: string
         description: >
           "individual_accept" when the user picked this one group,
-          "collective_accept" when they created every suggestion at once.
+          "collective_accept" when they created every suggestion at once,
+          "auto" when the group was created because tabs opened or navigated.
 
   auto_tab_group_completed:
     type: event
