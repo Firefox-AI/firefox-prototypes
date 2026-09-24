@@ -35,8 +35,11 @@ import {
   BROWSER_TYPE,
   BROWSER_CONTROL_PREF,
   BROWSER_CONTROL_TOOLS,
+  JEV_BROWSER_ACTION,
+  JEV_BROWSER_ACTION_TOOL_CONFIG,
 } from "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs";
 import { runSearchTheWeb } from "moz-src:///browser/components/aiwindow/models/search/SearchWorkflow.sys.mjs";
+import { compactMessages } from "moz-src:///browser/components/aiwindow/models/PromptOptimizer.sys.mjs";
 
 import { expandUrlTokensInToolParams } from "moz-src:///browser/components/aiwindow/models/ChatUtils.sys.mjs";
 import { runLLMaJTelemetry } from "moz-src:///browser/components/aiwindow/models/TelemetryUtils.sys.mjs";
@@ -186,6 +189,30 @@ export async function executeToolByName(
   return result;
 }
 
+async function executeJevBrowserAction(
+  toolParams,
+  toolCallId,
+  conversation,
+  browsingContext,
+  mode,
+  signal
+) {
+  const engine = new lazy.JevBrowserEngine();
+  return engine.execute({
+    instruction: toolParams.instruction,
+    signal,
+    dispatchTool: (toolName, params) =>
+      executeToolByName(
+        toolName,
+        params,
+        toolCallId,
+        conversation,
+        browsingContext,
+        mode
+      ),
+  });
+}
+
 /**
  * Handlers for tools that are feature-gated by a pref and intended to be
  * added or removed independently of the main tool dispatch. Lookups happen
@@ -215,9 +242,11 @@ const TOOLS_WITH_PENDING_ACTION_LOG = new Set([SEARCH_THE_WEB]);
  * constant, and when no gate applies it is returned by identity.
  *
  * @param {object[]} tools
+ * @param {object} [options]
+ * @param {boolean} [options.useJev=false]
  * @returns {object[]}
  */
-function filterFeatureGatedTools(tools) {
+function filterFeatureGatedTools(tools, { useJev = false } = {}) {
   let filtered = tools;
   // The two search_the_web paths return different shapes, so the description
   // and parameters the model sees have to match the path that will run.
@@ -233,6 +262,14 @@ function filterFeatureGatedTools(tools) {
     filtered = filtered.filter(
       t => !BROWSER_CONTROL_TOOLS.has(t.function?.name)
     );
+  } else if (useJev) {
+    filtered = filtered.flatMap(tool => {
+      const name = tool.function?.name;
+      if (name === BROWSER_OPEN_TAB) {
+        return [JEV_BROWSER_ACTION_TOOL_CONFIG];
+      }
+      return BROWSER_CONTROL_TOOLS.has(name) ? [] : [tool];
+    });
   }
   return filtered;
 }
@@ -241,6 +278,8 @@ const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   AIWindow:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
+  JevBrowserEngine:
+    "moz-src:///browser/components/aiwindow/models/JevBrowserEngine.sys.mjs",
   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
 });
 
@@ -364,6 +403,8 @@ Object.assign(Chat, {
    * @param {Promise<string|null>} [options.fxAccountTokenPromise] - A token
    *   fetch the caller already started, so a cold or expired token resolves
    *   alongside prompt construction rather than after it. Omit to fetch here.
+   * @param {boolean} [options.useJev=false] - Replace direct browser-control
+   *   tools with a single Jev-grounded action tool.
    */
   async fetchWithHistory({
     conversation,
@@ -371,6 +412,7 @@ Object.assign(Chat, {
     mode,
     signal,
     fxAccountTokenPromise,
+    useJev = false,
   }) {
     if (!browsingContext && !Cu.isInAutomation) {
       const err = new Error(
@@ -379,13 +421,16 @@ Object.assign(Chat, {
       err.clientReason = "missingBrowsingContext";
       throw err;
     }
-    const fxAccountToken = await (fxAccountTokenPromise ??
-      openAIEngine.getFxAccountToken());
-    if (!fxAccountToken) {
-      console.error("fetchWithHistory Account Token null or undefined");
-      const fxaError = new Error("FxA token unavailable");
-      fxaError.clientReason = "fxaTokenUnavailable";
-      throw fxaError;
+    let fxAccountToken = null;
+    if (conversation.engine?.requiresFxAccountToken !== false) {
+      fxAccountToken = await (fxAccountTokenPromise ??
+        openAIEngine.getFxAccountToken());
+      if (!fxAccountToken) {
+        console.error("fetchWithHistory Account Token null or undefined");
+        const fxaError = new Error("FxA token unavailable");
+        fxaError.clientReason = "fxaTokenUnavailable";
+        throw fxaError;
+      }
     }
 
     const currentTurn = conversation.currentTurnIndex();
@@ -396,7 +441,7 @@ Object.assign(Chat, {
      * comment above tool execution for further details.
      */
     const isVerbatimQuery = currentTurn === 0;
-    const chatToolsConfig = filterFeatureGatedTools(toolsConfig);
+    const chatToolsConfig = filterFeatureGatedTools(toolsConfig, { useJev });
 
     let fullResponseText = "";
 
@@ -407,7 +452,13 @@ Object.assign(Chat, {
     const searchExecuted = conversation._searchExecutedTurn === currentTurn;
 
     const streamModelResponse = () => {
-      const snapshot = conversation.compactChatCompletions();
+      const snapshot = conversation.engine?.preserveUserURLs
+        ? compactMessages(
+            conversation.getMessagesInChatCompletionsFormat({
+              applyUrlTokens: false,
+            })
+          )
+        : conversation.compactChatCompletions();
 
       lazy.console.log(
         `Request (${conversation.securityProperties.getLogText()})`,
@@ -631,10 +682,10 @@ Object.assign(Chat, {
         let toolCallError = "";
         let isSearchHandoff = false;
         const featureGatedHandler = FEATURE_GATED_HANDLERS.get(toolName);
-        const dispatchTool = name =>
+        const dispatchTool = (name, params = toolParams) =>
           executeToolByName(
             name,
-            toolParams,
+            params,
             id,
             conversation,
             browsingContext,
@@ -654,7 +705,32 @@ Object.assign(Chat, {
         }
 
         try {
-          if (featureGatedHandler) {
+          if (
+            toolName === JEV_BROWSER_ACTION &&
+            (!useJev ||
+              !Services.prefs.getBoolPref(BROWSER_CONTROL_PREF, false))
+          ) {
+            const error = new Error(
+              "Jev browser actions are unavailable for this request."
+            );
+            error.clientReason = "jevActionUnavailable";
+            throw error;
+          } else if (useJev && BROWSER_CONTROL_TOOLS.has(toolName)) {
+            const error = new Error(
+              `Direct browser tool ${toolName} is unavailable in Jev mode.`
+            );
+            error.clientReason = "jevDirectBrowserTool";
+            throw error;
+          } else if (toolName === JEV_BROWSER_ACTION) {
+            result = await executeJevBrowserAction(
+              toolParams,
+              id,
+              conversation,
+              browsingContext,
+              mode,
+              signal
+            );
+          } else if (featureGatedHandler) {
             result = await featureGatedHandler(
               toolParams,
               conversation,

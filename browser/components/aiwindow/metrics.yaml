@@ -1315,7 +1315,7 @@ smart_window:
       current_intent:
         type: string
         description: >
-          The current intent action: chat, search, navigate, or empty string
+          The current intent action: chat, search, navigate, jev, or empty string
       location: *location
       message_seq: *message_seq
 

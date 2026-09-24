@@ -86,6 +86,9 @@ moz-button.input-cta {
   :host([action="chat"]) moz-button.input-cta::part(button) {
     background-image: url("chrome://browser/content/aiwindow/assets/ask-icon.svg");
   }
+  :host([action="jev"]) moz-button.input-cta::part(button) {
+    background-image: url("chrome://browser/content/aiwindow/assets/ask-icon.svg");
+  }
   :host([action="navigate"]) moz-button.input-cta::part(button) {
     background-image: url("chrome://browser/skin/forward.svg");
   }
@@ -201,6 +204,10 @@ panel-item {
 
   &[icon="engine"]::part(button) {
     background-image: var(--engine-icon, var(--search-icon));
+  }
+
+  &[icon="jev"]::part(button) {
+    background-image: url("chrome://browser/content/aiwindow/assets/ask-icon.svg");
   }
 
   &[icon="navigate"]::part(button) {

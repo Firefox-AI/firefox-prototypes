@@ -25,6 +25,7 @@ MOZ_SRC_FILES += [
     "ConversationSuggestions.sys.mjs",
     "HistoryThumbnails.sys.mjs",
     "IntentClassifier.sys.mjs",
+    "JevBrowserEngine.sys.mjs",
     "ManageTabs.sys.mjs",
     "Message.sys.mjs",
     "openAIEngine.sys.mjs",

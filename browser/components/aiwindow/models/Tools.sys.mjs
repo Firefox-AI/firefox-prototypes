@@ -158,6 +158,7 @@ export const BROWSER_NAVIGATE = "browser_navigate";
 export const BROWSER_SCROLL = "browser_scroll";
 export const BROWSER_CLICK = "browser_click";
 export const BROWSER_TYPE = "browser_type";
+export const JEV_BROWSER_ACTION = "jev_browser_action";
 
 // Tools gated behind a feature pref. Filtered out of the model's tool list
 // in Chat.sys.mjs when the pref is off.
@@ -174,6 +175,27 @@ export const BROWSER_CONTROL_TOOLS = new Set([
   BROWSER_CLICK,
   BROWSER_TYPE,
 ]);
+export const JEV_BROWSER_ACTION_TOOL_CONFIG = {
+  type: "function",
+  function: {
+    name: JEV_BROWSER_ACTION,
+    description:
+      "Delegate exactly one next browser action to Jev. The user selected Jev browser control, so use this instead of calling browser tools directly. Give Jev a precise, self-contained instruction for the next action, wait for the result, then reassess the page before planning another action.",
+    parameters: {
+      type: "object",
+      properties: {
+        instruction: {
+          type: "string",
+          minLength: 1,
+          maxLength: 2000,
+          description:
+            "A precise instruction for one browser action, including the target, exact URL, or exact text when applicable.",
+        },
+      },
+      required: ["instruction"],
+    },
+  },
+};
 export const SEARCH_QUERY_ENDPOINT_PREF =
   "browser.smartwindow.searchQuery.endpointURL";
 export const SEARCH_QUERY_APIKEY_PREF =

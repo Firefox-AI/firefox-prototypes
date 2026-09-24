@@ -151,6 +151,7 @@ const MODE = {
 
 const ACTION = {
   CHAT: "chat",
+  JEV: "jev",
   SEARCH: "search",
   NAVIGATE: "navigate",
 };
@@ -1843,6 +1844,12 @@ export class AIWindow extends MozLitElement {
         inlineMentionsCount: inlineMentions.length,
         sourceLocation,
       });
+    } else if (action === ACTION.JEV) {
+      this.submitJevMessage({
+        text: value,
+        contextPageUrl,
+        submitType,
+      });
     } else if (action === ACTION.SEARCH) {
       Glean.smartWindow.searchSubmit.record({
         chat_id: this.conversationId,
@@ -1990,6 +1997,27 @@ export class AIWindow extends MozLitElement {
       ensureAssistantResponse: skipPromptGeneration,
       skipSystemPromptRefresh,
       assistantToolUIData,
+    });
+    this.#dispatchChromeEvent(
+      "ai-window:smartbar-input",
+      this.#getAIWindowEventOptions(lazy.EMPTY_SMARTBAR_INPUT_STATE, true)
+    );
+  }
+
+  submitJevMessage({ text, contextPageUrl, submitType }) {
+    const trimmed = String(text ?? "").trim();
+    if (!trimmed) {
+      return;
+    }
+
+    if (this.#conversation) {
+      this.#conversation.lastSubmitType = submitType;
+    }
+
+    this.#recordChatInteraction();
+    this.#fetchAIResponse(trimmed, {
+      pageUrl: contextPageUrl,
+      useJev: true,
     });
     this.#dispatchChromeEvent(
       "ai-window:smartbar-input",
@@ -2436,6 +2464,8 @@ export class AIWindow extends MozLitElement {
    * ensureAssistantResponse, attached to the empty assistant message so it
    * renders alongside the streamed response (e.g. a tab-selection card for
    * resume-activity starters).
+   * @param {boolean} [options.useJev=false] - Let the configured chat model
+   *   plan browser actions and route their execution through Jev.
    */
   async #fetchAIResponse(
     inputText,
@@ -2446,6 +2476,7 @@ export class AIWindow extends MozLitElement {
       ensureAssistantResponse = false,
       skipSystemPromptRefresh = false,
       assistantToolUIData,
+      useJev = false,
       ...userOpts
     } = {}
   ) {
@@ -2537,6 +2568,7 @@ export class AIWindow extends MozLitElement {
         mode: this.mode,
         signal,
         fxAccountTokenPromise,
+        useJev,
       });
 
       ChromeUtils.addProfilerMarker(

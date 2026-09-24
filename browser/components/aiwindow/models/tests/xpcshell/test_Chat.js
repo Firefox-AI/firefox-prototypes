@@ -12,7 +12,14 @@ const { SYSTEM_PROMPT_TYPE, MESSAGE_ROLE } = ChromeUtils.importESModule(
 const { Chat, executeToolByName } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/Chat.sys.mjs"
 );
-const { RunSearch, GetPageContent, toolFns } = ChromeUtils.importESModule(
+const {
+  RunSearch,
+  GetPageContent,
+  toolFns,
+  BROWSER_CONTROL_PREF,
+  BROWSER_CONTROL_TOOLS,
+  JEV_BROWSER_ACTION,
+} = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs"
 );
 const {
@@ -1406,6 +1413,77 @@ add_task(
     }
   }
 );
+
+add_task(async function test_Chat_fetchWithHistory_jev_uses_planner_tool() {
+  const sb = sinon.createSandbox();
+  try {
+    Services.prefs.setBoolPref(BROWSER_CONTROL_PREF, true);
+    sb.stub(openAIEngine, "getFxAccountToken").resolves("mock_token");
+    const browserState = sb.stub(toolFns, "browserState");
+    let receivedTools;
+    let requestCount = 0;
+    const fakeEngine = {
+      async *runWithGenerator({ tools }) {
+        receivedTools = tools;
+        if (requestCount++ === 0) {
+          yield {
+            toolCalls: [
+              {
+                id: "direct-browser-call",
+                function: {
+                  name: "browser_state",
+                  arguments: "{}",
+                },
+              },
+            ],
+          };
+          return;
+        }
+        yield { text: "Done" };
+      },
+      getConfig() {
+        return {};
+      },
+    };
+    const conversation = new ChatConversation({
+      title: "chat title",
+      description: "chat desc",
+      pageUrl: new URL("https://www.firefox.com"),
+      pageMeta: {},
+    });
+    conversation.setSystemMessage("You are helpful");
+    conversation.addUserMessage(
+      "open https://example.com/",
+      "https://www.firefox.com",
+      0
+    );
+    conversation.addAssistantMessage("text", "");
+    setupConversationForChat(conversation, {
+      model: TEST_MODEL,
+      engine: fakeEngine,
+    });
+
+    await Chat.fetchWithHistory({ conversation, useJev: true });
+
+    Assert.ok(
+      receivedTools.some(tool => tool.function.name === JEV_BROWSER_ACTION),
+      "The planner receives the Jev action tool"
+    );
+    Assert.ok(
+      receivedTools.every(
+        tool => !BROWSER_CONTROL_TOOLS.has(tool.function.name)
+      ),
+      "The planner cannot bypass Jev with direct browser tools"
+    );
+    Assert.ok(
+      browserState.notCalled,
+      "A direct browser tool call is rejected before Firefox executes it"
+    );
+  } finally {
+    Services.prefs.clearUserPref(BROWSER_CONTROL_PREF);
+    sb.restore();
+  }
+});
 
 add_task(
   async function test_Chat_fetchWithHistory_abort_during_tool_stops_generation() {

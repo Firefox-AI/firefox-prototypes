@@ -13,6 +13,8 @@ firefox-appdir = "browser"
 
 ["test_ConversationSuggestions.js"]
 
+["test_JevBrowserEngine.js"]
+
 ["test_ManageTabs.js"]
 
 ["test_Memories.js"]

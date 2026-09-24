@@ -1825,6 +1825,9 @@ ${
       case "search":
         this.#submitSearch(event, value);
         break;
+      case "jev":
+        this.#dispatchSmartbarCommitEvent(event, value);
+        break;
       case "navigate":
         if (this.#goBlocked) {
           return;

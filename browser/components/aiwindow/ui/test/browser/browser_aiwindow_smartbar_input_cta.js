@@ -174,6 +174,27 @@ add_task(async function test_smartbar_cta_default_action_available() {
   await BrowserTestUtils.closeWindow(win);
 });
 
+add_task(async function test_smartbar_jev_action_available() {
+  const win = await openAIWindow();
+  const browser = win.gBrowser.selectedBrowser;
+
+  await typeInSmartbar(browser, "click the Continue button");
+  await selectExplicitSmartbarAction(browser, "jev");
+  await waitForSmartbarAction(browser, "jev");
+
+  const inputCta = BrowserTestUtils.querySelectorDeep(
+    browser.contentDocument,
+    "input-cta"
+  );
+  Assert.equal(
+    inputCta.actionLabelId,
+    "aiwindow-input-cta-submit-label-jev",
+    "The Jev picker option has its own localized submit label"
+  );
+
+  await BrowserTestUtils.closeWindow(win);
+});
+
 add_task(async function test_smartbar_manual_pick_locks_through_typing() {
   const win = await openAIWindow();
   const browser = win.gBrowser.selectedBrowser;

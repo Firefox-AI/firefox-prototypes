@@ -68,6 +68,7 @@ ai-window-toggleview-status-label-inactive = Classic Window
 aiwindow-input-cta-submit-label-chat = Ask
 aiwindow-input-cta-submit-label-navigate = Go
 aiwindow-input-cta-submit-label-search = Search
+aiwindow-input-cta-submit-label-jev = Jev
 aiwindow-input-cta-submit-label-stop = Stop
 
 # Text announced to screen readers when response generation starts.
@@ -78,6 +79,7 @@ aiwindow-input-cta-menu-label-navigate = Go to site
 # $searchEngineName (string) - The name of the default search engine
 aiwindow-input-cta-menu-label-search = Search with { $searchEngineName }
 aiwindow-input-cta-menu-label-search-with = Search with…
+aiwindow-input-cta-menu-label-jev = Jev
 
 aiwindow-input-cta-search-submenu-header = Search
 
