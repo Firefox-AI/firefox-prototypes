@@ -1017,6 +1017,32 @@
         {
           "type": "object",
           "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["SMART_CHAT"]
+            },
+            "prompt": {
+              "type": "string",
+              "description": "Prompt submitted as a Smart Window chat message. data.prompt is also accepted."
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "prompt": {
+                  "type": "string",
+                  "description": "Prompt submitted as a Smart Window chat message, when prompt is not set on the action itself."
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": ["type"],
+          "additionalProperties": true,
+          "description": "Submits a prompt to the Smart Window chat. Uses the open sidebar, otherwise the Smart Window page in the selected tab, and opens the sidebar when neither is showing."
+        },
+        {
+          "type": "object",
+          "properties": {
             "data": {
               "anchor_id": {
                 "type": "string",

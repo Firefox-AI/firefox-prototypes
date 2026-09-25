@@ -71,6 +71,7 @@ export const BLOCKED_ACTION_ONLY_ACTIONS = new Set([
 
   // Sends data off the device, or fabricates a record that the user consented
   // to something.
+  "SMART_CHAT",
   "SUMMARIZE_PAGE",
   "SUBMIT_ONBOARDING_OPT_OUT_PING",
   "SET_TERMS_OF_USE_INTERACTED",

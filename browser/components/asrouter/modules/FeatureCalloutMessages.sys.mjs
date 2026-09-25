@@ -10,6 +10,46 @@ const PDFJS_PREF = "browser.pdfjs.feature-tour";
 // indicator shows the correct number of total steps in the tour
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
 
+// Apex and subdomains, including www. The first four are the sites called out
+// for the meal-prep spike; the rest are other recipe publishers.
+const RECIPE_SITE_PATTERNS = [
+  "spendwithpennies.com",
+  "thepioneerwoman.com",
+  "tasteofhome.com",
+  "thekitchn.com",
+  "allrecipes.com",
+  "ambitiouskitchen.com",
+  "bbcgoodfood.com",
+  "bonappetit.com",
+  "budgetbytes.com",
+  "cafedelites.com",
+  "cookieandkate.com",
+  "cooking.nytimes.com",
+  "damndelicious.net",
+  "delish.com",
+  "eatingwell.com",
+  "epicurious.com",
+  "food.com",
+  "foodnetwork.com",
+  "gimmesomeoven.com",
+  "halfbakedharvest.com",
+  "kingarthurbaking.com",
+  "loveandlemons.com",
+  "minimalistbaker.com",
+  "natashaskitchen.com",
+  "onceuponachef.com",
+  "pinchofyum.com",
+  "recipetineats.com",
+  "sallysbakingaddiction.com",
+  "seriouseats.com",
+  "simplyrecipes.com",
+  "skinnytaste.com",
+  "smittenkitchen.com",
+  "tasty.co",
+  "thespruceeats.com",
+  "yummly.com",
+].map(host => `*://*.${host}/*`);
+
 // Generate a JEXL targeting string based on the `complete` property being true
 // in a given Feature Callout tour progress preference value (which is JSON).
 const matchIncompleteTargeting = (prefName, defaultValue = false) => {
@@ -1305,6 +1345,78 @@ const MESSAGES = () => {
       frequency: {
         lifetime: 1,
       },
+    },
+    {
+      weight: 1,
+      id: "SMARTWINDOW_TRY_GENTAB",
+      template: "feature_callout",
+      groups: ["cfr", "smart-window-message"],
+      content: {
+        id: "SMARTWINDOW_TRY_GENTAB",
+        template: "multistage",
+        backdrop: "transparent",
+        transitions: false,
+        disableHistoryUpdates: true,
+        screens: [
+          {
+            id: "SMARTWINDOW_TRY_GENTAB_SCREEN",
+            force_hide_steps_indicator: true,
+            anchors: [
+              {
+                selector:
+                  "#ai-window-box:not([collapsed]) #ai-window-browser::%document% ai-window::%shadow% #ai-window-smartbar",
+                panel_position: {
+                  anchor_attachment: "topcenter",
+                  callout_attachment: "bottomright",
+                },
+                no_open_on_anchor: true,
+              },
+              {
+                selector: "#smartwindow-ask-button",
+                panel_position: {
+                  anchor_attachment: "bottomcenter",
+                  callout_attachment: "topright",
+                },
+              },
+            ],
+            content: {
+              position: "callout",
+              width: "320px",
+              padding: 16,
+              title: {
+                raw: "Get help with meal prep",
+              },
+              subtitle: {
+                raw: "Turn this and other recipes in a single shopping list.",
+              },
+              dismiss_button: {
+                size: "small",
+                action: { dismiss: true },
+              },
+              primary_button: {
+                label: {
+                  raw: "Try it",
+                },
+                action: {
+                  type: "SMART_CHAT",
+                  prompt:
+                    "Find all my open recipe tabs, and pull out all the ingredients into a smart page",
+                  dismiss: true,
+                },
+              },
+            },
+          },
+        ],
+      },
+      targeting: "isAIWindow",
+      trigger: {
+        id: "openURL",
+        patterns: RECIPE_SITE_PATTERNS,
+      },
+      frequency: {
+        lifetime: 2,
+      },
+      skip_in_tests: "it's not tested in automation",
     },
   ];
   messages = add24HourImpressionJEXLTargeting(

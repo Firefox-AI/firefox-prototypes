@@ -414,6 +414,55 @@ export const AIWindowUI = {
   },
 
   /**
+   * Submit a prompt into the Smart Window chat the user can see.
+   *
+   * An open sidebar wins. Otherwise a Smart Window page in the selected tab
+   * is used. When neither is showing, the sidebar is opened (restoring the
+   * selected tab's conversation when it has one) and the prompt is submitted
+   * there.
+   *
+   * @param {Window} win
+   * @param {string} text
+   */
+  async submitChatPrompt(win, text) {
+    const trimmed = String(text ?? "").trim();
+    if (!trimmed || !win) {
+      return;
+    }
+
+    const aiWindow = await this._chatSurfaceForPrompt(win);
+    if (!aiWindow?.submitChatMessage) {
+      return;
+    }
+
+    aiWindow.updateInput?.({ text: "", mentions: [] });
+    aiWindow.submitChatMessage({
+      text: trimmed,
+      submitType: "button",
+      contextPageUrl: null,
+    });
+  },
+
+  /**
+   * @param {Window} win
+   * @returns {Promise<Element|null>}
+   */
+  async _chatSurfaceForPrompt(win) {
+    if (this.isSidebarOpen(win)) {
+      const browser = win.document.getElementById(this.BROWSER_ID);
+      return browser ? this.getAiWindowElement(win, browser) : null;
+    }
+
+    const selected = win.gBrowser?.selectedBrowser;
+    if (selected && AIWindow.isAIWindowNewTabPage(selected.currentURI)) {
+      return this.getAiWindowElement(win, selected);
+    }
+
+    await this.openSidebar(win, AIWindow.getActiveConversation(win));
+    return this._getSidebarAiWindow(win);
+  },
+
+  /**
    * Gets the ai-window element from the sidebar browser. Polls until the
    * custom element is defined or the timeout is reached.
    *

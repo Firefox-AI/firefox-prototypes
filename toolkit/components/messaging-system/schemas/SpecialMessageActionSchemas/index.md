@@ -611,6 +611,22 @@ Summarize current page content.
 
 * args: optional `string` entry value to identify initiator default "message"
 
+### `SMART_CHAT`
+
+Submits a prompt as a Smart Window chat message. The open sidebar is used when
+there is one. Otherwise the Smart Window page in the selected tab is used, and
+the sidebar is opened when neither is showing.
+
+`prompt` is read from the action. `data.prompt` is accepted as well.
+
+```json
+"action": {
+  "type": "SMART_CHAT",
+  "prompt": "Find all my open recipe tabs, and pull out all the ingredients into a smart page",
+  "dismiss": true
+}
+```
+
 ### `OPEN_ORGANIZE_TABS_PANEL`
 
 Opens the Smart Window "Organize Tabs" panel. Unlike `OPEN_PANEL`, the panel is

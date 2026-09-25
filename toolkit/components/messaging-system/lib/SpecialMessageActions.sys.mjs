@@ -1185,6 +1185,11 @@ export const SpecialMessageActions = {
           source: action.data?.source ?? "message",
         });
         break;
+      case "SMART_CHAT": {
+        const prompt = action.prompt ?? action.data?.prompt;
+        await lazy.AIWindowUI.submitChatPrompt(window, prompt);
+        break;
+      }
       case "OPEN_PANEL": {
         let { anchor_id, widget_id, panel_id, fallback_to_app_menu } =
           action.data;
