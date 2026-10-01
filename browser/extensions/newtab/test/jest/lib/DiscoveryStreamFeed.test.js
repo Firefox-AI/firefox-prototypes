@@ -3144,6 +3144,34 @@ describe("DiscoveryStreamFeed", () => {
       );
     });
 
+    it("adds cosine similarity while preserving article order", async () => {
+      services.prefs.getBoolPref.mockImplementation((name, defaultValue) =>
+        name ===
+        "discoverystream.sections.personalization.user-history-cosine.enabled"
+          ? true
+          : defaultValue
+      );
+      jest
+        .spyOn(feed, "getUserHistoryVector")
+        .mockResolvedValue({ embedding: [1, 0] });
+      jest
+        .spyOn(feed, "getArticleEmbeddings")
+        .mockResolvedValue([
+          [0, 1],
+          [1, 0],
+        ]);
+
+      const first = { id: "first", title: "first" };
+      const second = { id: "second", title: "second" };
+      const scored = await feed.scoreItemsByUserVector([first, second]);
+
+      expect(scored).toEqual([
+        { ...first, cosine_similarity: 0 },
+        { ...second, cosine_similarity: 1 },
+      ]);
+      expect(scored.map(item => item.id)).toEqual(["first", "second"]);
+    });
+
     it("should update to new feed url", async () => {
       await feed.loadLayout(feed.store.dispatch);
       const { layout } = feed.store.getState().DiscoveryStream;

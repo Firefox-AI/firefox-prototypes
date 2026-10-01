@@ -21,6 +21,10 @@ ChromeUtils.defineESModuleGetters(lazy, {
   Region: "resource://gre/modules/Region.sys.mjs",
   RemoteSettings: "resource://services-settings/remote-settings.sys.mjs",
   ProfileAge: "resource://gre/modules/ProfileAge.sys.mjs",
+  PlacesSemanticHistoryManager:
+    "resource://gre/modules/PlacesSemanticHistoryManager.sys.mjs",
+  embeddingsGeneratorFactory:
+    "chrome://global/content/ml/EmbeddingsGenerator.sys.mjs",
 });
 
 // We use importESModule here instead of static import so that
@@ -113,6 +117,8 @@ const PREF_SYSTEM_INFERRED_PERSONALIZATION =
   "discoverystream.sections.personalization.inferred.enabled";
 const PREF_INFERRED_INTERESTS_OVERRIDE =
   "discoverystream.sections.personalization.inferred.interests.override";
+const PREF_USER_HISTORY_COSINE_ENABLED =
+  "discoverystream.sections.personalization.user-history-cosine.enabled";
 
 const PREF_MERINO_OHTTP = "discoverystream.merino-provider.ohttp.enabled";
 const PREF_BILLBOARD_ENABLED = "newtabAdSize.billboard";
@@ -1875,6 +1881,88 @@ export class DiscoveryStreamFeed {
     };
   }
 
+  async getUserHistoryVector() {
+    return lazy.PlacesSemanticHistoryManager
+      .getPlacesSemanticHistoryManager()
+      .getUserHistoryVector();
+  }
+
+  async getArticleEmbeddings(items) {
+    let texts = items.map(item => {
+      let text = `${item.title || ""} ${item.excerpt || ""}`.trim();
+      return text || null;
+    });
+    let indices = texts.reduce((result, text, index) => {
+      if (text) {
+        result.push(index);
+      }
+      return result;
+    }, []);
+    if (!indices.length) {
+      return texts.map(() => null);
+    }
+
+    let embedder = lazy.embeddingsGeneratorFactory.forPlaces();
+    let embeddings = await embedder.embedMany(
+      indices.map(index => texts[index])
+    );
+    let result = texts.map(() => null);
+    for (let i = 0; i < indices.length; i++) {
+      result[indices[i]] = embeddings[i];
+    }
+    return result;
+  }
+
+  async scoreItemsByUserVector(items) {
+    if (
+      !Services.prefs.getBoolPref(PREF_USER_HISTORY_COSINE_ENABLED, false) ||
+      !items.length
+    ) {
+      return items;
+    }
+
+    try {
+      let userHistory = await this.getUserHistoryVector();
+      if (!userHistory?.embedding) {
+        return items;
+      }
+
+      let articleEmbeddings = await this.getArticleEmbeddings(items);
+      return items.map((item, index) => {
+        let article = articleEmbeddings[index];
+        if (!article || article.length != userHistory.embedding.length) {
+          return item;
+        }
+
+        let dot = 0;
+        let userNormSquared = 0;
+        let articleNormSquared = 0;
+        for (let i = 0; i < article.length; i++) {
+          let userValue = Number(userHistory.embedding[i]);
+          let articleValue = Number(article[i]);
+          if (!Number.isFinite(userValue) || !Number.isFinite(articleValue)) {
+            return item;
+          }
+          dot += userValue * articleValue;
+          userNormSquared += userValue * userValue;
+          articleNormSquared += articleValue * articleValue;
+        }
+
+        let denominator = Math.sqrt(userNormSquared * articleNormSquared);
+        if (!Number.isFinite(denominator) || denominator == 0) {
+          return item;
+        }
+        return {
+          ...item,
+          cosine_similarity: dot / denominator,
+        };
+      });
+    } catch (error) {
+      console.error("Unable to score recommendations with user history", error);
+      return items;
+    }
+  }
+
   // eslint-disable-next-line max-statements
   async getComponentFeed(feedUrl, isStartup) {
     const cachedData = (await this.cache.get()) || {};
@@ -1967,8 +2055,11 @@ export class DiscoveryStreamFeed {
           this._applySectionLayouts(sections);
         }
 
+        const cosineScoredItems = await this.scoreItemsByUserVector(
+          recommendations
+        );
         const { data: scoredItems, personalized } =
-          await this.scoreItemsInferred(recommendations);
+          await this.scoreItemsInferred(cosineScoredItems);
 
         if (sections.length) {
           const visibleSections = sections

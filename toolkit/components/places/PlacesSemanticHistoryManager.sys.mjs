@@ -180,6 +180,51 @@ class PlacesSemanticHistoryManager {
   #recentChunkTimes = [];
   #indexingBlocked = false;
   #reportDbSizeModCounter = 0;
+  #userHistoryVectorCache = null;
+
+  async #ensureUserHistoryVectorTable(conn) {
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS user_history_vector (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        embedding BLOB NOT NULL,
+        embedding_dimension INTEGER NOT NULL,
+        feature_id TEXT,
+        model_id TEXT,
+        source_count INTEGER NOT NULL,
+        invalid_source_count INTEGER NOT NULL,
+        generated_at INTEGER NOT NULL
+      )
+    `);
+  }
+
+  #vectorFromBlob(blob, dimension) {
+    if (!blob) {
+      return null;
+    }
+    let bytes = blob instanceof ArrayBuffer ? new Uint8Array(blob) : blob;
+    if (bytes.byteLength != dimension * Float32Array.BYTES_PER_ELEMENT) {
+      return null;
+    }
+    let buffer = bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength
+    );
+    return new Float32Array(buffer);
+  }
+
+  #isValidUserHistoryVector(embedding) {
+    if (!embedding || embedding.length != this.#embeddingSize) {
+      return false;
+    }
+    let normSquared = 0;
+    for (let value of embedding) {
+      if (!Number.isFinite(value)) {
+        return false;
+      }
+      normSquared += value * value;
+    }
+    return Number.isFinite(normSquared) && normSquared > 0;
+  }
 
   /**
    * Checks if a value is an array or a typed array.
@@ -450,12 +495,174 @@ class PlacesSemanticHistoryManager {
     for (const { type } of events) {
       switch (type) {
         case "pages-rank-changed":
-        case "history-cleared":
         case "page-removed":
+          this.onPagesRankChanged();
+          break;
+        case "history-cleared":
+          this.#userHistoryVectorCache = null;
+          this.getConnection()
+            .then(conn =>
+              conn?.execute("DELETE FROM user_history_vector").catch(() => {})
+            )
+            .catch(() => {});
           this.onPagesRankChanged();
           break;
       }
     }
+  }
+
+  /**
+   * Returns a frecency-weighted centroid of the indexed history vectors.
+   *
+   * The result is cached for the local calendar day. A failed refresh leaves a
+   * previous compatible nonzero vector available for consumers.
+   *
+   * @returns {Promise<?object>}
+   */
+  async getUserHistoryVector() {
+    let conn = await this.getConnection();
+    if (!conn) {
+      return null;
+    }
+
+    await this.#ensureUserHistoryVectorTable(conn);
+
+    let model = this.embedder.modelContext;
+    let modelKey = `${model.featureId}|${model.modelId}|${model.embeddingDimension}`;
+    let day = new Date().toLocaleDateString("en-CA");
+    if (
+      this.#userHistoryVectorCache?.day == day &&
+      this.#userHistoryVectorCache?.modelKey == modelKey
+    ) {
+      return this.#userHistoryVectorCache.value;
+    }
+
+    let storedValue = null;
+    let storedRows = await conn.execute(`
+      SELECT embedding, embedding_dimension, feature_id, model_id,
+             source_count, invalid_source_count, generated_at
+      FROM user_history_vector
+      WHERE id = 1
+    `);
+    if (storedRows.length) {
+      let row = storedRows[0];
+      let generatedAt = Number(row.getResultByName("generated_at"));
+      let embedding = this.#vectorFromBlob(
+        row.getResultByName("embedding"),
+        Number(row.getResultByName("embedding_dimension"))
+      );
+      if (
+        row.getResultByName("feature_id") == model.featureId &&
+        row.getResultByName("model_id") == (model.modelId ?? null) &&
+        Number(row.getResultByName("embedding_dimension")) ==
+          this.#embeddingSize &&
+        Number.isFinite(generatedAt) &&
+        this.#isValidUserHistoryVector(embedding)
+      ) {
+        storedValue = {
+          embedding,
+          embeddingDimension: this.#embeddingSize,
+          featureId: model.featureId,
+          modelId: model.modelId,
+          generatedAt,
+          sourceCount: Number(row.getResultByName("source_count")),
+          invalidSourceCount: Number(
+            row.getResultByName("invalid_source_count")
+          ),
+          readMode: "stored",
+        };
+        if (new Date(generatedAt).toLocaleDateString("en-CA") == day) {
+          this.#userHistoryVectorCache = { day, modelKey, value: storedValue };
+          return storedValue;
+        }
+      }
+    }
+
+    let values = new Float64Array(this.#embeddingSize);
+    let totalWeight = 0;
+    let sourceCount = 0;
+    let invalidSourceCount = 0;
+    let rows = await conn.execute(`
+      SELECT vec_to_json(vec_history.embedding) AS embedding,
+             moz_places.frecency AS frecency
+      FROM vec_history_mapping
+      JOIN vec_history USING (rowid)
+      JOIN moz_places USING (url_hash)
+      WHERE moz_places.frecency > 0
+    `);
+
+    for (let row of rows) {
+      let weight = Number(row.getResultByName("frecency"));
+      let embedding;
+      try {
+        embedding = JSON.parse(row.getResultByName("embedding"));
+      } catch (e) {
+        invalidSourceCount++;
+        continue;
+      }
+
+      if (
+        !Number.isFinite(weight) ||
+        weight <= 0 ||
+        !Array.isArray(embedding) ||
+        embedding.length != this.#embeddingSize ||
+        embedding.some(value => !Number.isFinite(value))
+      ) {
+        invalidSourceCount++;
+        continue;
+      }
+
+      sourceCount++;
+      totalWeight += weight;
+      for (let i = 0; i < embedding.length; i++) {
+        values[i] += embedding[i] * weight;
+      }
+    }
+
+    let normSquared = 0;
+    for (let value of values) {
+      normSquared += value * value;
+    }
+    let norm = Math.sqrt(normSquared);
+    if (!Number.isFinite(norm) || norm == 0 || !Number.isFinite(totalWeight)) {
+      this.#userHistoryVectorCache = { day, modelKey, value: storedValue };
+      return storedValue;
+    }
+
+    let embedding = new Float32Array(this.#embeddingSize);
+    for (let i = 0; i < embedding.length; i++) {
+      embedding[i] = values[i] / norm;
+    }
+    let value = {
+      embedding,
+      embeddingDimension: this.#embeddingSize,
+      featureId: model.featureId,
+      modelId: model.modelId,
+      generatedAt: Date.now(),
+      sourceCount,
+      invalidSourceCount,
+      readMode: "stored",
+    };
+    await conn.executeCached(
+      `
+      INSERT OR REPLACE INTO user_history_vector (
+        id, embedding, embedding_dimension, feature_id, model_id,
+        source_count, invalid_source_count, generated_at
+      ) VALUES (1, :embedding, :embedding_dimension, :feature_id, :model_id,
+                :source_count, :invalid_source_count, :generated_at)
+      `,
+      {
+        embedding: lazy.PlacesUtils.tensorToSQLBindable(embedding),
+        embedding_dimension: this.#embeddingSize,
+        feature_id: model.featureId,
+        model_id: model.modelId,
+        source_count: sourceCount,
+        invalid_source_count: invalidSourceCount,
+        generated_at: value.generatedAt,
+      }
+    );
+    this.#userHistoryVectorCache = { day, modelKey, value };
+    return value;
   }
 
   /**

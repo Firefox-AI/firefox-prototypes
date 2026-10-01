@@ -540,6 +540,7 @@ export class PlacesSemanticHistoryDatabase {
     await connection.executeTransaction(async () => {
       await connection.execute(`DROP TABLE IF EXISTS vec_history`);
       await connection.execute(`DROP TABLE IF EXISTS vec_history_mapping`);
+      await connection.execute(`DROP TABLE IF EXISTS user_history_vector`);
       await connection.execute(this.#createVirtualTableSQL);
       await this.#createMappingTable();
       await this.#insertModelConfigRow(modelConfig);
