@@ -1963,6 +1963,38 @@ export class DiscoveryStreamFeed {
     }
   }
 
+  sortItemsWithinSectionsByCosine(items) {
+    let sectionIndexes = new Map();
+    items.forEach((item, index) => {
+      if (item.section === undefined || item.section === null) {
+        return;
+      }
+      let indexes = sectionIndexes.get(item.section) || [];
+      indexes.push(index);
+      sectionIndexes.set(item.section, indexes);
+    });
+
+    let result = items.slice();
+    for (let indexes of sectionIndexes.values()) {
+      let sorted = indexes
+        .map(index => ({ item: items[index], index }))
+        .sort((a, b) => {
+          let aScore = Number(a.item.cosine_similarity);
+          let bScore = Number(b.item.cosine_similarity);
+          let aValid = Number.isFinite(aScore);
+          let bValid = Number.isFinite(bScore);
+          if (aValid != bValid) {
+            return aValid ? -1 : 1;
+          }
+          return aValid ? bScore - aScore : a.index - b.index;
+        });
+      indexes.forEach((index, position) => {
+        result[index] = sorted[position].item;
+      });
+    }
+    return result;
+  }
+
   // eslint-disable-next-line max-statements
   async getComponentFeed(feedUrl, isStartup) {
     const cachedData = (await this.cache.get()) || {};
@@ -2107,9 +2139,12 @@ export class DiscoveryStreamFeed {
         // Rotate is also the only place that uses these impressions.
         await this.cleanUpTopRecImpressions();
         const rotatedItems = await this.rotate(scoredItems);
+        const sectionSortedItems = this.sortItemsWithinSectionsByCosine(
+          rotatedItems
+        );
 
         const { data: filteredResults } =
-          await this.filterBlocked(rotatedItems);
+          await this.filterBlocked(sectionSortedItems);
         this.componentFeedFetched = true;
         feed = {
           lastUpdated: Date.now(),

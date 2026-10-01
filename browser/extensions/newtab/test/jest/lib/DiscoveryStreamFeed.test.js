@@ -3172,6 +3172,46 @@ describe("DiscoveryStreamFeed", () => {
       expect(scored.map(item => item.id)).toEqual(["first", "second"]);
     });
 
+    it("sorts cosine scores within section slots", () => {
+      const firstSectionFirst = {
+        id: "first-section-first",
+        section: "first-section",
+        cosine_similarity: 0.1,
+      };
+      const unsectioned = { id: "unsectioned" };
+      const firstSectionSecond = {
+        id: "first-section-second",
+        section: "first-section",
+        cosine_similarity: 0.9,
+      };
+      const secondSectionFirst = {
+        id: "second-section-first",
+        section: "second-section",
+        cosine_similarity: 0.2,
+      };
+      const secondSectionSecond = {
+        id: "second-section-second",
+        section: "second-section",
+        cosine_similarity: 0.8,
+      };
+
+      const sorted = feed.sortItemsWithinSectionsByCosine([
+        firstSectionFirst,
+        unsectioned,
+        firstSectionSecond,
+        secondSectionFirst,
+        secondSectionSecond,
+      ]);
+
+      expect(sorted.map(item => item.id)).toEqual([
+        "first-section-second",
+        "unsectioned",
+        "first-section-first",
+        "second-section-second",
+        "second-section-first",
+      ]);
+    });
+
     it("should update to new feed url", async () => {
       await feed.loadLayout(feed.store.dispatch);
       const { layout } = feed.store.getState().DiscoveryStream;
