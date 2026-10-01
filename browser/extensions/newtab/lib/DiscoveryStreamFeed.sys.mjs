@@ -21,7 +21,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   Region: "resource://gre/modules/Region.sys.mjs",
   RemoteSettings: "resource://services-settings/remote-settings.sys.mjs",
   ProfileAge: "resource://gre/modules/ProfileAge.sys.mjs",
-  PlacesSemanticHistoryManager:
+  getPlacesSemanticHistoryManager:
     "resource://gre/modules/PlacesSemanticHistoryManager.sys.mjs",
   embeddingsGeneratorFactory:
     "chrome://global/content/ml/EmbeddingsGenerator.sys.mjs",
@@ -1882,9 +1882,13 @@ export class DiscoveryStreamFeed {
   }
 
   async getUserHistoryVector() {
-    return lazy.PlacesSemanticHistoryManager
-      .getPlacesSemanticHistoryManager()
+    return lazy.getPlacesSemanticHistoryManager()
       .getUserHistoryVector();
+  }
+
+  async recomputeUserHistoryVector() {
+    return lazy.getPlacesSemanticHistoryManager()
+      .recomputeUserHistoryVector();
   }
 
   async getArticleEmbeddings(items) {
@@ -1966,16 +1970,16 @@ export class DiscoveryStreamFeed {
   sortItemsWithinSectionsByCosine(items) {
     let sectionIndexes = new Map();
     items.forEach((item, index) => {
-      if (item.section === undefined || item.section === null) {
-        return;
-      }
-      let indexes = sectionIndexes.get(item.section) || [];
+      let section = item.section === undefined || item.section === null
+        ? null
+        : item.section;
+      let indexes = sectionIndexes.get(section) || [];
       indexes.push(index);
-      sectionIndexes.set(item.section, indexes);
+      sectionIndexes.set(section, indexes);
     });
 
     let result = items.slice();
-    for (let indexes of sectionIndexes.values()) {
+    for (let [section, indexes] of sectionIndexes) {
       let sorted = indexes
         .map(index => ({ item: items[index], index }))
         .sort((a, b) => {
@@ -1988,9 +1992,25 @@ export class DiscoveryStreamFeed {
           }
           return aValid ? bScore - aScore : a.index - b.index;
         });
-      indexes.forEach((index, position) => {
-        result[index] = sorted[position].item;
-      });
+      if (section !== null) {
+        indexes.forEach((index, position) => {
+          result[index] = sorted[position].item;
+        });
+      }
+      if (
+        Services.prefs.getBoolPref(PREF_USER_HISTORY_COSINE_ENABLED, false)
+      ) {
+        sorted.forEach(({ item }, position) => {
+          let score = Number(item.cosine_similarity);
+          console.info(
+            `[NewTab cosine] section=${section ?? ""} ` +
+              `original_rank=${item.received_rank ?? ""} ` +
+              `sim_rank=${position + 1} ` +
+              `sim_score=${Number.isFinite(score) ? score : ""} ` +
+              `url=${item.url ?? ""}`
+          );
+        });
+      }
     }
     return result;
   }
@@ -2892,6 +2912,10 @@ export class DiscoveryStreamFeed {
         break;
       case at.DISCOVERY_STREAM_RETRY_FEED:
         this.retryFeed(action.data.feed);
+        break;
+      case at.DISCOVERY_STREAM_DEV_RECOMPUTE_USER_HISTORY_VECTOR:
+        await this.recomputeUserHistoryVector();
+        await this.onPrefChange();
         break;
       case at.DISCOVERY_STREAM_CONFIG_CHANGE:
       case at.DISCOVERY_STREAM_DEV_REFRESH_CACHE:

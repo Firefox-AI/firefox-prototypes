@@ -2731,6 +2731,20 @@ describe("DiscoveryStreamFeed", () => {
     });
   });
 
+  describe("#onAction: DISCOVERY_STREAM_DEV_RECOMPUTE_USER_HISTORY_VECTOR", () => {
+    it("recomputes the vector and reloads the feed", async () => {
+      jest.spyOn(feed, "recomputeUserHistoryVector").mockResolvedValue();
+      jest.spyOn(feed, "onPrefChange").mockResolvedValue();
+
+      await feed.onAction({
+        type: at.DISCOVERY_STREAM_DEV_RECOMPUTE_USER_HISTORY_VECTOR,
+      });
+
+      expect(feed.recomputeUserHistoryVector).toHaveBeenCalledTimes(1);
+      expect(feed.onPrefChange).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("#onAction: DISCOVERY_STREAM_DEV_SYSTEM_TICK", () => {
     it("should refresh if DiscoveryStream has been loaded at least once and a cache has expired", async () => {
       expectConsoleError();
@@ -3173,26 +3187,47 @@ describe("DiscoveryStreamFeed", () => {
     });
 
     it("sorts cosine scores within section slots", () => {
+      services.prefs.getBoolPref.mockImplementation((name, defaultValue) =>
+        name ===
+        "discoverystream.sections.personalization.user-history-cosine.enabled"
+          ? true
+          : defaultValue
+      );
+      const consoleInfo = jest
+        .spyOn(globalThis.console, "info")
+        .mockImplementation(() => {});
       const firstSectionFirst = {
         id: "first-section-first",
         section: "first-section",
         cosine_similarity: 0.1,
+        received_rank: 1,
+        url: "https://example.com/first",
       };
-      const unsectioned = { id: "unsectioned" };
+      const unsectioned = {
+        id: "unsectioned",
+        received_rank: 3,
+        url: "https://example.com/unsectioned",
+      };
       const firstSectionSecond = {
         id: "first-section-second",
         section: "first-section",
         cosine_similarity: 0.9,
+        received_rank: 2,
+        url: "https://example.com/second",
       };
       const secondSectionFirst = {
         id: "second-section-first",
         section: "second-section",
         cosine_similarity: 0.2,
+        received_rank: 4,
+        url: "https://example.com/third",
       };
       const secondSectionSecond = {
         id: "second-section-second",
         section: "second-section",
         cosine_similarity: 0.8,
+        received_rank: 5,
+        url: "https://example.com/fourth",
       };
 
       const sorted = feed.sortItemsWithinSectionsByCosine([
@@ -3210,6 +3245,16 @@ describe("DiscoveryStreamFeed", () => {
         "second-section-second",
         "second-section-first",
       ]);
+      expect(consoleInfo).toHaveBeenCalledWith(
+        "[NewTab cosine] section=first-section original_rank=2 sim_rank=1 sim_score=0.9 url=https://example.com/second"
+      );
+      expect(consoleInfo).toHaveBeenCalledWith(
+        "[NewTab cosine] section=second-section original_rank=5 sim_rank=1 sim_score=0.8 url=https://example.com/fourth"
+      );
+      expect(consoleInfo).toHaveBeenCalledWith(
+        "[NewTab cosine] section= original_rank=3 sim_rank=1 sim_score= url=https://example.com/unsectioned"
+      );
+      consoleInfo.mockRestore();
     });
 
     it("should update to new feed url", async () => {

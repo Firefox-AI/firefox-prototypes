@@ -226,6 +226,16 @@ describe("<DiscoveryStreamAdminUI>", () => {
     );
   });
 
+  it("should fire recomputeUserHistoryVector", () => {
+    const { container, dispatch } = renderUI();
+    fireEvent.click(buttonByText(container, "Recompute User History Vector"));
+    expect(dispatch).toHaveBeenCalledWith(
+      ac.OnlyToMain({
+        type: at.DISCOVERY_STREAM_DEV_RECOMPUTE_USER_HISTORY_VECTOR,
+      })
+    );
+  });
+
   it("should fire expireCache with DISCOVERY_STREAM_DEV_EXPIRE_CACHE", () => {
     const { container, dispatch } = renderUI();
     fireEvent.click(buttonByText(container, "Expire Cache"));

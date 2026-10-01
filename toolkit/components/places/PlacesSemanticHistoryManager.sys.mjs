@@ -517,9 +517,12 @@ class PlacesSemanticHistoryManager {
    * The result is cached for the local calendar day. A failed refresh leaves a
    * previous compatible nonzero vector available for consumers.
    *
+   * @param {object} [options]
+   * @param {boolean} [options.force=false]
+   *   Recompute even when a compatible vector is already cached for today.
    * @returns {Promise<?object>}
    */
-  async getUserHistoryVector() {
+  async getUserHistoryVector({ force = false } = {}) {
     let conn = await this.getConnection();
     if (!conn) {
       return null;
@@ -531,6 +534,7 @@ class PlacesSemanticHistoryManager {
     let modelKey = `${model.featureId}|${model.modelId}|${model.embeddingDimension}`;
     let day = new Date().toLocaleDateString("en-CA");
     if (
+      !force &&
       this.#userHistoryVectorCache?.day == day &&
       this.#userHistoryVectorCache?.modelKey == modelKey
     ) {
@@ -571,7 +575,10 @@ class PlacesSemanticHistoryManager {
           ),
           readMode: "stored",
         };
-        if (new Date(generatedAt).toLocaleDateString("en-CA") == day) {
+        if (
+          !force &&
+          new Date(generatedAt).toLocaleDateString("en-CA") == day
+        ) {
           this.#userHistoryVectorCache = { day, modelKey, value: storedValue };
           return storedValue;
         }
@@ -663,6 +670,10 @@ class PlacesSemanticHistoryManager {
     );
     this.#userHistoryVectorCache = { day, modelKey, value };
     return value;
+  }
+
+  async recomputeUserHistoryVector() {
+    return this.getUserHistoryVector({ force: true });
   }
 
   /**

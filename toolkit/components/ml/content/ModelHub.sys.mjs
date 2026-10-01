@@ -847,12 +847,12 @@ class IndexedDBCache {
    */
   async fileExists({ model, revision, file }) {
     // First, check if the file is in the headers store
-    const fileMedataExists = this.#hasData({
+    const fileMetadataExists = await this.#hasData({
       storeName: this.headersStoreName,
       key: [model, revision, file],
     });
 
-    if (!fileMedataExists) {
+    if (!fileMetadataExists) {
       return false;
     }
 
@@ -2075,6 +2075,15 @@ export class ModelHub {
       file,
     });
 
+    if (useCached && !cachedHeaders) {
+      cachedHeaders = await this.cache.getHeaders({
+        model: modelWithHostname,
+        revision,
+        file,
+      });
+      useCached = !!cachedHeaders;
+    }
+
     if (useCached) {
       if (!fileAllowed.allowed) {
         await this.cache.deleteModels({
@@ -2093,14 +2102,6 @@ export class ModelHub {
           statusText: lazy.Progress.ProgressStatusText.INITIATE,
         })
       );
-
-      if (!cachedHeaders) {
-        cachedHeaders = await this.cache.getHeaders({
-          model: modelWithHostname,
-          revision,
-          file,
-        });
-      }
 
       // Ensure that we indicate that the taskName is stored
       await this.cache.updateTask({
@@ -2121,7 +2122,12 @@ export class ModelHub {
       );
 
       cachedHeaders.lastUsed = Date.now();
-      await this.cache.setHeaders({ model, revision, file, cachedHeaders });
+      await this.cache.setHeaders({
+        model: modelWithHostname,
+        revision,
+        file,
+        cachedHeaders,
+      });
 
       return [localFilePath, cachedHeaders];
     }

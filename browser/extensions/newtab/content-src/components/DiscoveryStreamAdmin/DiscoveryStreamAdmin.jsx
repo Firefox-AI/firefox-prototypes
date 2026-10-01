@@ -250,6 +250,8 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
   constructor(props) {
     super(props);
     this.expireCache = this.expireCache.bind(this);
+    this.recomputeUserHistoryVector =
+      this.recomputeUserHistoryVector.bind(this);
     this.refreshCache = this.refreshCache.bind(this);
     this.showPlaceholder = this.showPlaceholder.bind(this);
     this.idleDaily = this.idleDaily.bind(this);
@@ -305,6 +307,14 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
     this.props.dispatch(
       ac.OnlyToMain({
         type: at.DISCOVERY_STREAM_DEV_REFRESH_CACHE,
+      })
+    );
+  }
+
+  recomputeUserHistoryVector() {
+    this.props.dispatch(
+      ac.OnlyToMain({
+        type: at.DISCOVERY_STREAM_DEV_RECOMPUTE_USER_HISTORY_VECTOR,
       })
     );
   }
@@ -1341,6 +1351,9 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
     return (
       <div>
         <div className="admin-button-row">
+          <moz-button onClick={this.recomputeUserHistoryVector}>
+            Recompute User History Vector
+          </moz-button>
           <moz-button onClick={this.refreshCache}>Refresh Cache</moz-button>
           <moz-button onClick={this.expireCache}>Expire Cache</moz-button>
           <moz-button onClick={this.systemTick}>Trigger System Tick</moz-button>
