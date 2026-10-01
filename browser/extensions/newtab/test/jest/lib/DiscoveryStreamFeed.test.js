@@ -3161,7 +3161,7 @@ describe("DiscoveryStreamFeed", () => {
     it("adds cosine similarity while preserving article order", async () => {
       services.prefs.getBoolPref.mockImplementation((name, defaultValue) =>
         name ===
-        "discoverystream.sections.personalization.user-history-cosine.enabled"
+        "browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.enabled"
           ? true
           : defaultValue
       );
@@ -3186,15 +3186,44 @@ describe("DiscoveryStreamFeed", () => {
       expect(scored.map(item => item.id)).toEqual(["first", "second"]);
     });
 
+    it("unwraps article embeddings returned with output metadata", async () => {
+      const embedMany = jest.fn().mockResolvedValue({
+        output: [
+          [0, 1],
+          [1, 0],
+        ],
+        metrics: {},
+      });
+      const restoreEmbeddings = stubGlobals({
+        embeddingsGeneratorFactory: {
+          forPlaces: () => ({ embedMany }),
+        },
+      });
+
+      try {
+        await expect(
+          feed.getArticleEmbeddings([
+            { title: "first", excerpt: "article" },
+            { title: "second", excerpt: "article" },
+          ])
+        ).resolves.toEqual([
+          [0, 1],
+          [1, 0],
+        ]);
+      } finally {
+        restoreEmbeddings();
+      }
+    });
+
     it("sorts cosine scores within section slots", () => {
       services.prefs.getBoolPref.mockImplementation((name, defaultValue) =>
         name ===
-        "discoverystream.sections.personalization.user-history-cosine.enabled"
+        "browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.enabled"
           ? true
           : defaultValue
       );
-      const consoleInfo = jest
-        .spyOn(globalThis.console, "info")
+      const consoleWarn = jest
+        .spyOn(globalThis.console, "warn")
         .mockImplementation(() => {});
       const firstSectionFirst = {
         id: "first-section-first",
@@ -3245,16 +3274,16 @@ describe("DiscoveryStreamFeed", () => {
         "second-section-second",
         "second-section-first",
       ]);
-      expect(consoleInfo).toHaveBeenCalledWith(
+      expect(consoleWarn).toHaveBeenCalledWith(
         "[NewTab cosine] section=first-section original_rank=2 sim_rank=1 sim_score=0.9 url=https://example.com/second"
       );
-      expect(consoleInfo).toHaveBeenCalledWith(
+      expect(consoleWarn).toHaveBeenCalledWith(
         "[NewTab cosine] section=second-section original_rank=5 sim_rank=1 sim_score=0.8 url=https://example.com/fourth"
       );
-      expect(consoleInfo).toHaveBeenCalledWith(
+      expect(consoleWarn).toHaveBeenCalledWith(
         "[NewTab cosine] section= original_rank=3 sim_rank=1 sim_score= url=https://example.com/unsectioned"
       );
-      consoleInfo.mockRestore();
+      consoleWarn.mockRestore();
     });
 
     it("should update to new feed url", async () => {

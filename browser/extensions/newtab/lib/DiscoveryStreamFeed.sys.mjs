@@ -118,7 +118,7 @@ const PREF_SYSTEM_INFERRED_PERSONALIZATION =
 const PREF_INFERRED_INTERESTS_OVERRIDE =
   "discoverystream.sections.personalization.inferred.interests.override";
 const PREF_USER_HISTORY_COSINE_ENABLED =
-  "discoverystream.sections.personalization.user-history-cosine.enabled";
+  "browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.enabled";
 
 const PREF_MERINO_OHTTP = "discoverystream.merino-provider.ohttp.enabled";
 const PREF_BILLBOARD_ENABLED = "newtabAdSize.billboard";
@@ -1907,9 +1907,30 @@ export class DiscoveryStreamFeed {
     }
 
     let embedder = lazy.embeddingsGeneratorFactory.forPlaces();
-    let embeddings = await embedder.embedMany(
+    let embeddingResult = await embedder.embedMany(
       indices.map(index => texts[index])
     );
+    let embeddings = embeddingResult?.output ?? embeddingResult;
+    if (
+      Array.isArray(embeddings) &&
+      embeddings.length == 1 &&
+      Array.isArray(embeddings[0]) &&
+      (Array.isArray(embeddings[0][0]) ||
+        ArrayBuffer.isView(embeddings[0][0]))
+    ) {
+      embeddings = embeddings[0];
+    }
+    if (ArrayBuffer.isView(embeddings) && indices.length == 1) {
+      embeddings = [embeddings];
+    }
+    if (!embeddings || embeddings.length != indices.length) {
+      console.warn(
+        `[NewTab cosine] article embedding result shape mismatch; ` +
+          `expected_count=${indices.length} ` +
+          `actual_count=${embeddings?.length ?? 0}`
+      );
+      return texts.map(() => null);
+    }
     let result = texts.map(() => null);
     for (let i = 0; i < indices.length; i++) {
       result[indices[i]] = embeddings[i];
@@ -1918,21 +1939,27 @@ export class DiscoveryStreamFeed {
   }
 
   async scoreItemsByUserVector(items) {
-    if (
-      !Services.prefs.getBoolPref(PREF_USER_HISTORY_COSINE_ENABLED, false) ||
-      !items.length
-    ) {
+    let cosineEnabled = Services.prefs.getBoolPref(
+      PREF_USER_HISTORY_COSINE_ENABLED,
+      false
+    );
+    if (!cosineEnabled || !items.length) {
       return items;
     }
 
     try {
       let userHistory = await this.getUserHistoryVector();
       if (!userHistory?.embedding) {
+        console.warn("[NewTab cosine] no user history vector available");
         return items;
       }
 
       let articleEmbeddings = await this.getArticleEmbeddings(items);
-      return items.map((item, index) => {
+      let articleEmbeddingCount = articleEmbeddings.filter(
+        embedding => embedding?.length
+      ).length;
+      let scoredCount = 0;
+      let scoredItems = items.map((item, index) => {
         let article = articleEmbeddings[index];
         if (!article || article.length != userHistory.embedding.length) {
           return item;
@@ -1956,11 +1983,20 @@ export class DiscoveryStreamFeed {
         if (!Number.isFinite(denominator) || denominator == 0) {
           return item;
         }
+        scoredCount++;
         return {
           ...item,
           cosine_similarity: dot / denominator,
         };
       });
+      if (!scoredCount) {
+        console.warn(
+          `[NewTab cosine] no article scores; item_count=${items.length} ` +
+            `article_embedding_count=${articleEmbeddingCount} ` +
+            `user_vector_dimension=${userHistory.embedding.length}`
+        );
+      }
+      return scoredItems;
     } catch (error) {
       console.error("Unable to score recommendations with user history", error);
       return items;
@@ -2002,7 +2038,7 @@ export class DiscoveryStreamFeed {
       ) {
         sorted.forEach(({ item }, position) => {
           let score = Number(item.cosine_similarity);
-          console.info(
+          console.warn(
             `[NewTab cosine] section=${section ?? ""} ` +
               `original_rank=${item.received_rank ?? ""} ` +
               `sim_rank=${position + 1} ` +
@@ -2914,11 +2950,15 @@ export class DiscoveryStreamFeed {
         this.retryFeed(action.data.feed);
         break;
       case at.DISCOVERY_STREAM_DEV_RECOMPUTE_USER_HISTORY_VECTOR:
+        console.warn("[NewTab cosine] recompute requested");
         await this.recomputeUserHistoryVector();
         await this.onPrefChange();
         break;
       case at.DISCOVERY_STREAM_CONFIG_CHANGE:
       case at.DISCOVERY_STREAM_DEV_REFRESH_CACHE:
+        if (action.type == at.DISCOVERY_STREAM_DEV_REFRESH_CACHE) {
+          console.warn("[NewTab cosine] refresh cache requested");
+        }
         // When the config pref changes, load or unload data as needed.
         await this.onPrefChange();
         break;
