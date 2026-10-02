@@ -2428,6 +2428,20 @@ pref("browser.smartwindow.conversation.logLevel", "Error");
 pref("browser.smartwindow.smartbarMentions.loglevel", "Error");
 pref("browser.smartwindow.telemetryLogLevel", "Error");
 
+// Smart Window: Jev browser agent prototype (browse_and_extract tool).
+pref("browser.aiwindow.jev.enabled", true);
+pref("browser.aiwindow.jev.apiKey", "");
+pref("browser.aiwindow.jev.endpoint", "https://api.typesafe.ai/v1/systemone");
+pref("browser.aiwindow.jev.model", "jev-latest");
+pref("browser.aiwindow.jev.maxActions", 20);
+pref("browser.aiwindow.jev.maxDecisions", 40);
+pref("browser.aiwindow.jev.loopTimeoutMs", 45000);
+pref("browser.aiwindow.jev.totalTimeoutMs", 75000);
+pref("browser.aiwindow.jev.seedSearchUrl", "https://html.duckduckgo.com/html/?q=%s");
+pref("browser.aiwindow.jev.seedFallbackUrl", "https://lite.duckduckgo.com/lite/?q=%s");
+pref("browser.aiwindow.jev.debugTrace", false);
+pref("browser.aiwindow.jev.logLevel", "Warn");
+
 // Block insecure active content on https pages
 pref("security.mixed_content.block_active_content", true);
 

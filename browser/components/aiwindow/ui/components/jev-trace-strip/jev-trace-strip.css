@@ -1,0 +1,175 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+:host {
+  display: block;
+  --trace-rule-color: color-mix(in srgb, var(--color-accent-primary) 35%, transparent);
+  --trace-rule-width: 2px;
+}
+
+.trace-summary {
+  background: transparent;
+  border: none;
+  padding: var(--space-xsmall) 0;
+  font: inherit;
+  font-size: var(--font-size-small);
+  color: var(--text-color-deemphasized);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-small);
+  width: 100%;
+  text-align: start;
+  cursor: pointer;
+}
+
+.trace-summary:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-outline-offset);
+}
+
+.trace-summary-dot {
+  flex: none;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  background-image: url("chrome://browser/skin/smart-window-dot.svg");
+  background-size: 8px;
+  background-repeat: no-repeat;
+  background-position: center;
+  -moz-context-properties: fill;
+  fill: var(--color-accent-primary);
+}
+
+.trace-summary-dot.live {
+  animation: tracePulse 1.2s ease-in-out infinite;
+}
+
+.trace-summary-dot.dot-done,
+.trace-summary-dot.dot-empty {
+  fill: var(--icon-color-success);
+}
+
+.trace-summary-dot.dot-blocked,
+.trace-summary-dot.dot-error {
+  fill: var(--text-color-error);
+}
+
+.trace-summary-dot.dot-cancelled {
+  fill: var(--icon-color);
+}
+
+.trace-summary-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.trace-chevron {
+  flex: none;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  background-image: url("chrome://global/skin/icons/arrow-right-12.svg");
+  background-size: 12px;
+  background-repeat: no-repeat;
+  background-position: center;
+  -moz-context-properties: fill;
+  fill: currentColor;
+  transition: transform 150ms ease;
+}
+
+.trace-chevron:dir(rtl) {
+  background-image: url("chrome://global/skin/icons/arrow-left-12.svg");
+}
+
+.trace-summary[aria-expanded="true"] .trace-chevron {
+  transform: rotate(90deg);
+}
+
+.trace-summary[aria-expanded="true"] .trace-chevron:dir(rtl) {
+  transform: rotate(-90deg);
+}
+
+.trace-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 calc(1px + var(--icon-size) + var(--space-small));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xsmall);
+  border-inline-start: var(--trace-rule-width) solid var(--trace-rule-color);
+}
+
+.step-chip {
+  display: grid;
+  grid-template-columns: var(--icon-size) minmax(0, 1fr) auto auto;
+  column-gap: var(--space-xsmall);
+  align-items: center;
+  font-size: var(--font-size-small);
+  color: var(--text-color);
+  min-width: 0;
+}
+
+.step-op {
+  width: 12px;
+  height: 12px;
+  -moz-context-properties: fill;
+  fill: var(--icon-color);
+}
+
+.terminal-done .step-op {
+  fill: var(--icon-color-success);
+}
+
+.terminal-blocked .step-op,
+.terminal-network .step-op {
+  fill: var(--text-color-error);
+}
+
+.terminal-timeout .step-op {
+  fill: var(--icon-color-warning);
+}
+
+.step-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.step-prob,
+.step-latency {
+  color: var(--text-color-deemphasized);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@keyframes tracePulse {
+  50% {
+    opacity: var(--opacity-deemphasized-strong);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trace-summary-dot.live {
+    animation: none;
+  }
+
+  .trace-chevron {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .trace-steps {
+    border-inline-start-color: CanvasText;
+  }
+
+  .step-op,
+  .trace-summary-dot {
+    fill: currentColor;
+  }
+
+  .trace-summary-dot.live {
+    animation: none;
+  }
+}

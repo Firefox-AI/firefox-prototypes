@@ -75,6 +75,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   getCurrentModelName:
     "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
   ToolUI: "moz-src:///browser/components/aiwindow/ui/modules/ToolUI.sys.mjs",
+  JevBrowseLoop:
+    "moz-src:///browser/components/aiwindow/models/JevBrowseLoop.sys.mjs",
   AgentUI: "moz-src:///browser/components/aiwindow/ui/modules/AgentUI.sys.mjs",
   ACTION_LOG_UI_TYPE:
     "moz-src:///browser/components/aiwindow/ui/modules/ToolActionLog.sys.mjs",
@@ -1762,6 +1764,19 @@ export class AIWindow extends MozLitElement {
 
       const { mergedMentions, allUrls, inlineMentions } = currentMentions;
 
+      if (
+        lazy.JevBrowseLoop.tryHandleSmartbar({
+          value,
+          hasTabReferences: allUrls.size > 0 || inlineMentions.length > 0,
+          conversation: this.#conversation,
+          window: this.#topChromeWindow,
+          browsingContext: window.browsingContext,
+          mode: this.mode,
+        })
+      ) {
+        return;
+      }
+
       if (allUrls.size) {
         this.#conversation.addSeenUrls(allUrls);
       }
@@ -3189,6 +3204,10 @@ export class AIWindow extends MozLitElement {
   }
 
   async handleToolUIUpdate(data) {
+    if (lazy.JevBrowseLoop.isJevUpdate(data)) {
+      lazy.JevBrowseLoop.handleUpdate(data);
+      return;
+    }
     if (lazy.AgentUI.isAgentUpdate(data)) {
       await lazy.AgentUI.handleUpdate(
         data,

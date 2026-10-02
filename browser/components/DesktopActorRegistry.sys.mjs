@@ -932,6 +932,22 @@ let JSWINDOWACTORS = {
     },
   },
 
+  JevBrowse: {
+    parent: {
+      esModuleURI:
+        "moz-src:///browser/components/aiwindow/ui/actors/JevBrowseParent.sys.mjs",
+    },
+    child: {
+      esModuleURI:
+        "moz-src:///browser/components/aiwindow/ui/actors/JevBrowseChild.sys.mjs",
+    },
+    safeForUntrustedWebProcess: true,
+    matches: ["https://*/*", "http://*/*", "file:///*"],
+    messageManagerGroups: ["browsers"],
+    allFrames: false,
+    enablePreference: "browser.aiwindow.jev.enabled",
+  },
+
   SpeechDispatcher: {
     parent: {
       esModuleURI: "resource:///actors/SpeechDispatcherParent.sys.mjs",

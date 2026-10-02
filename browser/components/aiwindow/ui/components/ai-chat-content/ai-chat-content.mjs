@@ -23,6 +23,8 @@ import "chrome://browser/content/aiwindow/components/kit-mention.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/agent-monitor-item.mjs";
 // eslint-disable-next-line import/no-unassigned-import
+import "chrome://browser/content/aiwindow/components/recipe-ingredients-card.mjs";
+// eslint-disable-next-line import/no-unassigned-import
 import "chrome://global/content/elements/moz-textarea.mjs";
 import {
   dispatchClientError,
@@ -49,6 +51,7 @@ const UI_TYPES = {
   ACTION_LOG: "action-log",
   RETRY_COMPONENT: "retry-component",
   AGENT_MONITOR: "agent-monitor-item",
+  RECIPE_INGREDIENTS: "recipe-ingredients-card",
 };
 /**
  * UI update types for communicating user interactions with tool UIs back to the actor.
@@ -69,6 +72,9 @@ const UI_UPDATE_TYPES = {
   PAUSE_WATCH: "pause-watch",
   CHECK_WATCH: "check-watch",
   SAVE_WATCH_DRAFT: "save-watch-draft",
+  JEV_CANCEL: "jev-cancel",
+  JEV_OPEN_SOURCE: "jev-open-source",
+  JEV_CARD_SNAPSHOT: "jev-card-snapshot",
 };
 
 const CONFIRMATION_UI_TYPES = [
@@ -170,6 +176,7 @@ export class AIChatContent extends MozLitElement {
       [UI_TYPES.CANCELLED_COMPONENT]: () => this.#renderCancelledComponent(),
       [UI_TYPES.RETRY_COMPONENT]: msg => this.#renderRetryComponent(msg),
       [UI_TYPES.AGENT_MONITOR]: msg => this.#renderAgentMonitorComponent(msg),
+      [UI_TYPES.RECIPE_INGREDIENTS]: msg => this.#renderRecipeIngredients(msg),
     };
 
     /**
@@ -1394,6 +1401,44 @@ export class AIChatContent extends MozLitElement {
       updateData: event.detail,
     });
   };
+
+  #handleRecipeCardEvent = (event, messageId, toolCallId, updateType) => {
+    this.#dispatchToolUIUpdate({
+      messageId,
+      toolCallId,
+      updateType,
+      updateData: event.detail,
+    });
+  };
+
+  #renderRecipeIngredients(msg) {
+    const { messageId, toolUIData } = msg;
+    const toolCallId = toolUIData.toolCallId;
+    return html`<recipe-ingredients-card
+      .data=${toolUIData.properties}
+      @recipe-card-cancel=${event =>
+        this.#handleRecipeCardEvent(
+          event,
+          messageId,
+          toolCallId,
+          UI_UPDATE_TYPES.JEV_CANCEL
+        )}
+      @recipe-card-open-source=${event =>
+        this.#handleRecipeCardEvent(
+          event,
+          messageId,
+          toolCallId,
+          UI_UPDATE_TYPES.JEV_OPEN_SOURCE
+        )}
+      @recipe-card-snapshot=${event =>
+        this.#handleRecipeCardEvent(
+          event,
+          messageId,
+          toolCallId,
+          UI_UPDATE_TYPES.JEV_CARD_SNAPSHOT
+        )}
+    ></recipe-ingredients-card>`;
+  }
 
   #renderAgentMonitorComponent(msg) {
     const { messageId, toolUIData, toolUIDraft } = msg;

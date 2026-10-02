@@ -114,6 +114,9 @@ export const WORLD_CUP_TOOLS = new Set([WORLD_CUP_MATCHES, WORLD_CUP_LIVE]);
 export const WORLD_CUP_PREF = "browser.smartwindow.worldcup.enabled";
 export const AITAB_PREF = "browser.smartwindow.aitab.enabled";
 export const AITAB_TOOLS = new Set([GENERATE_AITAB]);
+export const BROWSE_AND_EXTRACT = "browse_and_extract";
+export const JEV_PREF = "browser.aiwindow.jev.enabled";
+export const JEV_TOOLS = new Set([BROWSE_AND_EXTRACT]);
 export const SEARCH_QUERY_ENDPOINT_PREF =
   "browser.smartwindow.searchQuery.endpointURL";
 export const SEARCH_QUERY_APIKEY_PREF =
@@ -137,6 +140,7 @@ export const TOOLS = [
   SEARCH_THE_WEB,
   GET_SKILL,
   GENERATE_AITAB,
+  BROWSE_AND_EXTRACT,
 ];
 
 export const RUN_SEARCH_VERBATIM_QUERY_DESCRIPTION =
@@ -242,7 +246,47 @@ export const SEARCH_THE_WEB_TOOL_CONFIG_FAST = {
   },
 };
 
+const BROWSE_AND_EXTRACT_TOOL_CONFIG = {
+  type: "function",
+  function: {
+    name: BROWSE_AND_EXTRACT,
+    description:
+      "Browse the web in a visible tab to find a page that satisfies the goal, " +
+      "then extract structured content from it. Use for requests like 'find a " +
+      "recipe and list the ingredients for N people'. Browsing decisions are " +
+      "made by an external choice model; this tool is slower (10 to 60 s) than " +
+      "search_the_web.",
+    parameters: {
+      type: "object",
+      properties: {
+        goal: {
+          type: "string",
+          description:
+            "The user's full natural-language goal, passed verbatim to the browsing model.",
+        },
+        servings: {
+          type: "integer",
+          description:
+            "Target servings for scaling the ingredient list (1 to 24). Omit to list as written.",
+        },
+        start_url: {
+          type: "string",
+          description:
+            "Optional http(s) URL to start at instead of running a seed search.",
+        },
+        seed_query: {
+          type: "string",
+          description:
+            "Optional search query used to build the seed search URL (1 to 200 chars).",
+        },
+      },
+      required: ["goal"],
+    },
+  },
+};
+
 export const toolsConfig = [
+  BROWSE_AND_EXTRACT_TOOL_CONFIG,
   {
     type: "function",
     function: {

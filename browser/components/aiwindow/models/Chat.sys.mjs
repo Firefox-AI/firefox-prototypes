@@ -30,6 +30,9 @@ import {
   SEARCH_THE_WEB_FAST_PREF,
   SEARCH_THE_WEB_TOOL_CONFIG_FAST,
   GET_SKILL,
+  BROWSE_AND_EXTRACT,
+  JEV_PREF,
+  JEV_TOOLS,
 } from "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs";
 import { runSearchTheWeb } from "moz-src:///browser/components/aiwindow/models/search/SearchWorkflow.sys.mjs";
 
@@ -123,6 +126,16 @@ export async function executeToolByName(
       result = await toolFns.addMemory(toolParams, conversation);
       break;
     }
+    case BROWSE_AND_EXTRACT: {
+      result = await lazy.JevBrowseLoop.run(toolParams, {
+        conversation,
+        browsingContext,
+        window: browsingContext?.topChromeWindow ?? null,
+        toolCallId,
+        mode,
+      });
+      break;
+    }
     default: {
       const err = new Error(`No such tool: ${toolName}`);
       err.clientReason = "unknownTool";
@@ -177,6 +190,9 @@ function filterFeatureGatedTools(tools) {
   if (!Services.prefs.getBoolPref(AITAB_PREF, false)) {
     filtered = filtered.filter(t => !AITAB_TOOLS.has(t.function?.name));
   }
+  if (!Services.prefs.getBoolPref(JEV_PREF, false)) {
+    filtered = filtered.filter(t => !JEV_TOOLS.has(t.function?.name));
+  }
   return filtered;
 }
 
@@ -184,6 +200,8 @@ const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   AIWindow:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
+  JevBrowseLoop:
+    "moz-src:///browser/components/aiwindow/models/JevBrowseLoop.sys.mjs",
   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
 });
 
