@@ -17,6 +17,8 @@ const GLYPHS = {
   network: "chrome://global/skin/icons/error.svg",
   timeout: "chrome://global/skin/icons/error.svg",
   cancelled: "chrome://browser/content/aiwindow/assets/stop-generation.svg",
+  gate: "chrome://global/skin/icons/security.svg",
+  done_rejected: "chrome://global/skin/icons/warning.svg",
 };
 
 const BLOCKED_TEXT = {
@@ -26,6 +28,15 @@ const BLOCKED_TEXT = {
   done_unverified: "it said it was done but no ingredient list was visible",
   budget: "it ran out of steps",
   seed_failed: "the search page didn't return results",
+  bot_challenge: "the site asked for human verification",
+};
+
+const GATE_OUTCOME = {
+  approved_executed: "approved",
+  approved_stale: "approved, page had changed",
+  declined: "declined",
+  timeout: "timed out",
+  cancelled: "stopped",
 };
 
 const VERB = {
@@ -65,6 +76,9 @@ export class JevTraceStrip extends MozLitElement {
     elapsedMs: { type: Number, attribute: "elapsed-ms" },
     reobserved: { type: Number },
     errorText: { type: String, attribute: "error-text" },
+    gateEvents: { type: Array },
+    doneLabel: { type: String },
+    blockedText: { type: String },
     expanded: { type: Boolean, reflect: true },
   };
 
@@ -76,11 +90,18 @@ export class JevTraceStrip extends MozLitElement {
     this.elapsedMs = 0;
     this.reobserved = 0;
     this.errorText = "";
+    this.gateEvents = [];
+    this.doneLabel = "";
+    this.blockedText = "";
     this.expanded = false;
   }
 
+  get #actions() {
+    return (this.steps ?? []).filter(s => !s.kind || s.kind === "action");
+  }
+
   willUpdate() {
-    this.dataset.stepCount = String(this.steps?.length ?? 0);
+    this.dataset.stepCount = String(this.#actions.length);
     this.dataset.status = this.status ?? "";
   }
 
@@ -95,15 +116,22 @@ export class JevTraceStrip extends MozLitElement {
   #terminal() {
     switch (this.status) {
       case "done":
-        return { kind: "done", label: "Done: ingredients visible" };
+        return { kind: "done", label: this.doneLabel || "Done: ingredients visible" };
       case "empty":
         return { kind: "done", label: "Done: no ingredient list found" };
       case "blocked":
         return {
           kind: "blocked",
-          label: `Blocked: ${BLOCKED_TEXT[this.reason] ?? this.reason ?? "stuck"}`,
+          label: `Blocked: ${this.blockedText || BLOCKED_TEXT[this.reason] || this.reason || "stuck"}`,
         };
       case "cancelled":
+        if (this.reason === "gate_declined") {
+          const last = (this.gateEvents ?? []).at(-1);
+          return { kind: "cancelled", label: `Stopped before clicking "${last?.label ?? ""}"` };
+        }
+        if (this.reason === "confirmation_timeout") {
+          return { kind: "cancelled", label: "Stopped: no answer in time" };
+        }
         return { kind: "cancelled", label: "Stopped by you" };
       case "error":
         if (this.reason === "timeout") {
@@ -121,23 +149,59 @@ export class JevTraceStrip extends MozLitElement {
   }
 
   #summaryText() {
-    const n = this.steps?.length ?? 0;
+    const n = this.#actions.length;
     if (this.#live && n === 0) {
       return "Starting…";
     }
-    let text = `${n} ${n === 1 ? "step" : "steps"} · ${(Math.max(0, this.elapsedMs || 0) / 1000).toFixed(1)} s`;
+    let text = `${n} ${n === 1 ? "action" : "actions"}, ${(Math.max(0, this.elapsedMs || 0) / 1000).toFixed(1)} s`;
     if (this.#live) {
       text += " so far";
     }
     if (this.reobserved > 0) {
-      text += ` · ${this.reobserved} re-observed`;
+      text += `, ${this.reobserved} re-observed`;
     }
     return text;
   }
 
+  #renderGate(gate) {
+    const word = GATE_OUTCOME[gate.outcome] ?? gate.outcome ?? "";
+    const fullLabel = `Asked before "${gate.label ?? ""}": ${word}`;
+    const label =
+      fullLabel.length > 28 ? `${fullLabel.slice(0, 27)}…` : fullLabel;
+    return html`<li
+      class="step-chip gate"
+      data-outcome=${gate.outcome ?? ""}
+      aria-label=${fullLabel}
+    >
+      <img class="step-op" src=${GLYPHS.gate} title="gate" alt="" aria-hidden="true" />
+      <span class="step-label" title=${fullLabel}>${label}</span>
+      <span class="step-prob"></span>
+      <span class="step-latency">${fmtSeconds(gate.waited_ms)}</span>
+    </li>`;
+  }
+
+  #renderDoneRejected(step) {
+    const missing = step.verifier?.missing?.length
+      ? step.verifier.missing.join(", ")
+      : "results as described";
+    const fullLabel = `Said done, but ${missing} wasn't visible`;
+    const label =
+      fullLabel.length > 28 ? `${fullLabel.slice(0, 27)}…` : fullLabel;
+    const prob =
+      typeof step.probability === "number"
+        ? `${Math.round(step.probability * 100)}%`
+        : "";
+    return html`<li class="step-chip done-rejected" aria-label=${fullLabel}>
+      <img class="step-op" src=${GLYPHS.done_rejected} title="DONE rejected" alt="" aria-hidden="true" />
+      <span class="step-label" title=${fullLabel}>${label}</span>
+      <span class="step-prob">${prob}</span>
+      <span class="step-latency">${fmtSeconds(step.latency_ms)}</span>
+    </li>`;
+  }
+
   #renderStep(step, i) {
     const op = step.operation ?? "CLICK";
-    const fullLabel =
+    let fullLabel =
       op === "SCROLL_DOWN"
         ? "Scrolled down"
         : op === "SCROLL_UP"
@@ -145,6 +209,12 @@ export class JevTraceStrip extends MozLitElement {
           : op === "WAIT"
             ? "Waited"
             : (step.target_label ?? "");
+    let verbLabel = fullLabel;
+    if (op === "TYPE_TEXT" && typeof step.text === "string") {
+      const v = step.text.length > 12 ? `${step.text.slice(0, 11)}…` : step.text;
+      fullLabel = `${step.target_label ?? ""} ← "${v}"`;
+      verbLabel = `"${v}" into ${step.target_label ?? ""}`;
+    }
     const label =
       fullLabel.length > 28 ? `${fullLabel.slice(0, 27)}…` : fullLabel;
     const prob =
@@ -152,7 +222,7 @@ export class JevTraceStrip extends MozLitElement {
         ? `${Math.round(step.probability * 100)}%`
         : "";
     const latency = fmtSeconds(step.latency_ms);
-    const aria = `Step ${i + 1}: ${VERB[op] ?? op.toLowerCase()} ${fullLabel}, ${prob ? `${Math.round(step.probability * 100)} percent, ` : ""}${latency.replace("s", " seconds")}`;
+    const aria = `Step ${i + 1}: ${VERB[op] ?? op.toLowerCase()} ${verbLabel}, ${prob ? `${Math.round(step.probability * 100)} percent, ` : ""}${latency.replace("s", " seconds")}`;
     return html`<li
       class="step-chip"
       data-operation=${op}
@@ -195,8 +265,38 @@ export class JevTraceStrip extends MozLitElement {
     </li>`;
   }
 
-  render() {
+  #renderSequence() {
     const steps = this.steps ?? [];
+    const gates = this.gateEvents ?? [];
+    const approvedByStep = new Map();
+    const terminalGates = [];
+    for (const g of gates) {
+      if (g.outcome === "approved_executed" || g.outcome === "approved_stale") {
+        approvedByStep.set(g.step, g);
+      } else {
+        terminalGates.push(g);
+      }
+    }
+    const out = [];
+    let actionIndex = 0;
+    for (const s of steps) {
+      const gate = approvedByStep.get(s.step);
+      if (gate) {
+        out.push(this.#renderGate(gate));
+      }
+      if (s.kind === "done_rejected") {
+        out.push(this.#renderDoneRejected(s));
+      } else {
+        out.push(this.#renderStep(s, actionIndex++));
+      }
+    }
+    for (const g of terminalGates) {
+      out.push(this.#renderGate(g));
+    }
+    return out;
+  }
+
+  render() {
     return html`
       <link
         rel="stylesheet"
@@ -217,8 +317,7 @@ export class JevTraceStrip extends MozLitElement {
       </button>
       ${this.expanded
         ? html`<ol id="trace-steps" class="trace-steps">
-            ${steps.map((s, i) => this.#renderStep(s, i))}
-            ${this.#renderTerminal()}
+            ${this.#renderSequence()} ${this.#renderTerminal()}
           </ol>`
         : nothing}
     `;

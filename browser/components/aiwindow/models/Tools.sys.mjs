@@ -251,11 +251,12 @@ const BROWSE_AND_EXTRACT_TOOL_CONFIG = {
   function: {
     name: BROWSE_AND_EXTRACT,
     description:
-      "Browse the web in a visible tab to find a page that satisfies the goal, " +
-      "then extract structured content from it. Use for requests like 'find a " +
-      "recipe and list the ingredients for N people'. Browsing decisions are " +
-      "made by an external choice model; this tool is slower (10 to 60 s) than " +
-      "search_the_web.",
+      "Open a website in a visible tab and drive it to the state the user asked " +
+      "for (fill a search form, apply filters, reach a results page), then report " +
+      "what is visible. Use for directions like 'go to google flights and find " +
+      "tickets from SFO to TPE on Nov 6 to Nov 23' or 'find a recipe and list the " +
+      "ingredients for 4'. It stops and asks the user before anything that looks " +
+      "like booking, reserving, or paying. Slower (10 to 120 s) than search_the_web.",
     parameters: {
       type: "object",
       properties: {
@@ -263,6 +264,11 @@ const BROWSE_AND_EXTRACT_TOOL_CONFIG = {
           type: "string",
           description:
             "The user's full natural-language goal, passed verbatim to the browsing model.",
+        },
+        site: {
+          type: "string",
+          description:
+            "Optional site name, bare domain or URL to start at (e.g. 'google flights', 'airbnb', 'skyscanner.net'). 1 to 120 chars.",
         },
         servings: {
           type: "integer",

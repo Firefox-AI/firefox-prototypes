@@ -107,6 +107,8 @@ browser.jar:
   content/browser/aiwindow/components/recipe-ingredients-card.css    (components/recipe-ingredients-card/recipe-ingredients-card.css)
   content/browser/aiwindow/components/jev-trace-strip.mjs            (components/jev-trace-strip/jev-trace-strip.mjs)
   content/browser/aiwindow/components/jev-trace-strip.css            (components/jev-trace-strip/jev-trace-strip.css)
+  content/browser/aiwindow/components/browse-results-card.mjs        (components/browse-results-card/browse-results-card.mjs)
+  content/browser/aiwindow/components/browse-results-card.css        (components/browse-results-card/browse-results-card.css)
   content/browser/aiwindow/components/smartwindow-smartbar-glow.mjs (components/smartwindow-smartbar-glow/smartwindow-smartbar-glow.mjs)
   content/browser/aiwindow/components/smartwindow-smartbar-glow.css (components/smartwindow-smartbar-glow/smartwindow-smartbar-glow.css)
   content/browser/aiwindow/components/smartwindow-topsites.mjs       (components/smartwindow-topsites/smartwindow-topsites.mjs)

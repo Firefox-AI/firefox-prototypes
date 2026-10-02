@@ -16,6 +16,7 @@ const BLOCKED_TEXT = {
   done_unverified: "it said it was done but no ingredient list was visible",
   budget: "it ran out of steps",
   seed_failed: "the search page didn't return results",
+  bot_challenge: "the site asked for human verification",
 };
 
 const SMART_WINDOW_ICON =
@@ -131,6 +132,7 @@ export class RecipeIngredientsCard extends MozLitElement {
         bubbles: true,
         composed: true,
         detail: {
+          card_kind: "recipe",
           card_state: this.#state,
           card_reason: this.#reason,
           card_scaled: Boolean(this.data?.scaled),

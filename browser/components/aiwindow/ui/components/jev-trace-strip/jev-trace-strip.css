@@ -173,3 +173,12 @@
     animation: none;
   }
 }
+
+.step-chip.gate .step-op,
+.step-chip.done-rejected .step-op {
+  fill: var(--icon-color-warning);
+}
+
+.step-chip.gate[data-outcome="approved_executed"] .step-op {
+  fill: var(--icon-color-success);
+}

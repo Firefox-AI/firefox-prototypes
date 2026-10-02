@@ -25,6 +25,8 @@ import "chrome://browser/content/aiwindow/components/agent-monitor-item.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/recipe-ingredients-card.mjs";
 // eslint-disable-next-line import/no-unassigned-import
+import "chrome://browser/content/aiwindow/components/browse-results-card.mjs";
+// eslint-disable-next-line import/no-unassigned-import
 import "chrome://global/content/elements/moz-textarea.mjs";
 import {
   dispatchClientError,
@@ -52,6 +54,7 @@ const UI_TYPES = {
   RETRY_COMPONENT: "retry-component",
   AGENT_MONITOR: "agent-monitor-item",
   RECIPE_INGREDIENTS: "recipe-ingredients-card",
+  BROWSE_RESULTS: "browse-results-card",
 };
 /**
  * UI update types for communicating user interactions with tool UIs back to the actor.
@@ -75,6 +78,8 @@ const UI_UPDATE_TYPES = {
   JEV_CANCEL: "jev-cancel",
   JEV_OPEN_SOURCE: "jev-open-source",
   JEV_CARD_SNAPSHOT: "jev-card-snapshot",
+  JEV_GATE_APPROVE: "jev-gate-approve",
+  JEV_GATE_DECLINE: "jev-gate-decline",
 };
 
 const CONFIRMATION_UI_TYPES = [
@@ -177,6 +182,7 @@ export class AIChatContent extends MozLitElement {
       [UI_TYPES.RETRY_COMPONENT]: msg => this.#renderRetryComponent(msg),
       [UI_TYPES.AGENT_MONITOR]: msg => this.#renderAgentMonitorComponent(msg),
       [UI_TYPES.RECIPE_INGREDIENTS]: msg => this.#renderRecipeIngredients(msg),
+      [UI_TYPES.BROWSE_RESULTS]: msg => this.#renderBrowseResults(msg),
     };
 
     /**
@@ -1438,6 +1444,21 @@ export class AIChatContent extends MozLitElement {
           UI_UPDATE_TYPES.JEV_CARD_SNAPSHOT
         )}
     ></recipe-ingredients-card>`;
+  }
+
+  #renderBrowseResults(msg) {
+    const { messageId, toolUIData } = msg;
+    const toolCallId = toolUIData.toolCallId;
+    const relay = type => event =>
+      this.#handleRecipeCardEvent(event, messageId, toolCallId, type);
+    return html`<browse-results-card
+      .data=${toolUIData.properties}
+      @browse-card-cancel=${relay(UI_UPDATE_TYPES.JEV_CANCEL)}
+      @browse-card-open-source=${relay(UI_UPDATE_TYPES.JEV_OPEN_SOURCE)}
+      @browse-card-snapshot=${relay(UI_UPDATE_TYPES.JEV_CARD_SNAPSHOT)}
+      @browse-card-approve=${relay(UI_UPDATE_TYPES.JEV_GATE_APPROVE)}
+      @browse-card-decline=${relay(UI_UPDATE_TYPES.JEV_GATE_DECLINE)}
+    ></browse-results-card>`;
   }
 
   #renderAgentMonitorComponent(msg) {

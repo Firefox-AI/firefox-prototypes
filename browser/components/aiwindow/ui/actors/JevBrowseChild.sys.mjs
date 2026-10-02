@@ -44,6 +44,7 @@ const NEVER_SEND_AUTOCOMPLETE = new Set([
   "postal-code",
 ]);
 const EXCLUDED_TYPES = new Set(["password", "file", "hidden"]);
+const ROW_PRICE_RE = /[$€£¥]\s?\d[\d,]*(?:\.\d+)?|\d[\d,]*\s?(?:USD|EUR|GBP|TWD|NT\$)/;
 
 const MAX_CANDIDATES = 250;
 const TEXT_LIMIT = 6000;
@@ -135,8 +136,37 @@ export class JevBrowseChild extends JSWindowActorChild {
   // Element table (port of snapshot.js)
   // ---------------------------------------------------------------------
 
+  /** password | payment | otp | null: fields that never enter the element table. */
+  static #sensitiveKind(el) {
+    if (el.tagName !== "INPUT") {
+      return null;
+    }
+    if (el.type === "password") {
+      return "password";
+    }
+    const ac = (el.getAttribute("autocomplete") || "").trim().toLowerCase();
+    if (ac.startsWith("cc-")) {
+      return "payment";
+    }
+    if (ac === "one-time-code") {
+      return "otp";
+    }
+    return null;
+  }
+
   static #safe(el) {
-    return !EXCLUDED_TYPES.has(el.type);
+    return !EXCLUDED_TYPES.has(el.type) && !JevBrowseChild.#sensitiveKind(el);
+  }
+
+  #sensitiveFields() {
+    const counts = { password: 0, payment: 0, otp: 0 };
+    for (const el of this.document.querySelectorAll("input")) {
+      const kind = JevBrowseChild.#sensitiveKind(el);
+      if (kind) {
+        counts[kind]++;
+      }
+    }
+    return counts;
   }
 
   static #visible(el) {
@@ -694,6 +724,8 @@ export class JevBrowseChild extends JSWindowActorChild {
       scroll,
       fingerprint,
       omitted_candidates: omitted,
+      sensitive_fields: this.#sensitiveFields(),
+      has_main: Boolean(doc.querySelector('main,[role="main"]')),
       probe: {
         ingredients_heading: this.#ingredientsHeading(),
         json_ld_recipe: this.#jsonLdRecipe(),
@@ -733,6 +765,7 @@ export class JevBrowseChild extends JSWindowActorChild {
     const allowed = new Set(["id", "kind"]);
     if (action.kind === "TYPE_TEXT") {
       allowed.add("text");
+      allowed.add("suggest");
     }
     if (action.kind === "SELECT") {
       allowed.add("optionIndex");
@@ -747,6 +780,9 @@ export class JevBrowseChild extends JSWindowActorChild {
       return false;
     }
     if (action.kind === "TYPE_TEXT" && typeof action.text !== "string") {
+      return false;
+    }
+    if ("suggest" in action && typeof action.suggest !== "boolean") {
       return false;
     }
     if (
@@ -865,7 +901,12 @@ export class JevBrowseChild extends JSWindowActorChild {
       } else {
         return { ok: false, error: "not_editable" };
       }
-      await this.#settle(current.comboboxIds.has(id));
+      const isCombobox = current.comboboxIds.has(id);
+      await this.#settle(isCombobox);
+      if (action.suggest && isCombobox) {
+        this.#comboboxKeyFallback(nodeWin, node);
+        await this.#settle(true);
+      }
       return { ok: true };
     }
 
@@ -885,6 +926,45 @@ export class JevBrowseChild extends JSWindowActorChild {
       el = root?.host ?? null;
     }
     return false;
+  }
+
+  /**
+   * Pref-gated combobox -> listbox fallback: untrusted ArrowDown (and Enter
+   * only once an option is active) dispatched on the combobox node. Untrusted
+   * key events run framework handlers but never a browser default action, so
+   * Enter cannot implicitly submit a form.
+   */
+  #comboboxKeyFallback(win, node) {
+    const doc = node.ownerDocument;
+    const listId = node.getAttribute("aria-controls") || node.getAttribute("aria-owns");
+    const list =
+      (listId && doc.getElementById(listId)) || doc.querySelector('[role="listbox"]');
+    const open =
+      node.getAttribute("aria-expanded") === "true" &&
+      list &&
+      JevBrowseChild.#visible(list) &&
+      list.querySelector('[role="option"]');
+    if (!open) {
+      return;
+    }
+    JevBrowseChild.#key(win, node, "ArrowDown", 40);
+    if (node.getAttribute("aria-activedescendant")) {
+      JevBrowseChild.#key(win, node, "Enter", 13);
+    }
+  }
+
+  static #key(win, node, key, keyCode) {
+    for (const type of ["keydown", "keyup"]) {
+      node.dispatchEvent(
+        new win.KeyboardEvent(type, {
+          key,
+          code: key,
+          keyCode,
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+    }
   }
 
   static #click(win, node, x, y) {
@@ -952,8 +1032,49 @@ export class JevBrowseChild extends JSWindowActorChild {
     return {
       page_text: text,
       json_ld: this.#jsonLdRecipe(),
+      rows: this.#rows(),
       title: doc.title,
       url: this.contentWindow.location.href,
     };
+  }
+
+  /**
+   * Candidate result rows: innermost visible list-like elements outside ad
+   * containers whose text carries a price. Cap 20, document order.
+   */
+  #rows() {
+    const doc = this.document;
+    const sel = 'article,li,tr,[role="row"],[role="listitem"],[role="article"]';
+    const priced = n =>
+      JevBrowseChild.#visible(n) &&
+      !n.closest(AD_CONTAINER_SELECTOR) &&
+      ROW_PRICE_RE.test(n.innerText || "");
+    let nodes = [...doc.querySelectorAll(sel)].filter(priced);
+    nodes = nodes.filter(n => !nodes.some(m => m !== n && n.contains(m)));
+    if (!nodes.length) {
+      let best = null;
+      let bestCount = 0;
+      for (const c of doc.querySelectorAll("ol,ul,table,section,div")) {
+        const kids = [...c.children].filter(priced);
+        if (kids.length > bestCount) {
+          best = kids;
+          bestCount = kids.length;
+        }
+      }
+      nodes = best ?? [];
+    }
+    return nodes.slice(0, 20).map(n => {
+      const a = n.querySelector("a[href]") || n.closest("a[href]");
+      let href = null;
+      try {
+        href = a ? new URL(a.href, doc.baseURI).href : null;
+      } catch {
+        href = null;
+      }
+      return {
+        text: (n.innerText || "").replace(/\s+/g, " ").trim().slice(0, 240),
+        href,
+      };
+    });
   }
 }

@@ -2441,6 +2441,16 @@ pref("browser.aiwindow.jev.seedSearchUrl", "https://html.duckduckgo.com/html/?q=
 pref("browser.aiwindow.jev.seedFallbackUrl", "https://lite.duckduckgo.com/lite/?q=%s");
 pref("browser.aiwindow.jev.debugTrace", false);
 pref("browser.aiwindow.jev.logLevel", "Warn");
+// General-browse budgets (non-recipe runs), verifier, gate and QA prefs.
+pref("browser.aiwindow.jev.generalMaxActions", 60);
+pref("browser.aiwindow.jev.generalMaxDecisions", 120);
+pref("browser.aiwindow.jev.generalLoopTimeoutMs", 120000);
+pref("browser.aiwindow.jev.generalTotalTimeoutMs", 150000);
+pref("browser.aiwindow.jev.verifierMode", "llm");
+pref("browser.aiwindow.jev.gateTimeoutMs", 60000);
+pref("browser.aiwindow.jev.today", "");
+pref("browser.aiwindow.jev.siteMap", "");
+pref("browser.aiwindow.jev.comboboxKeyFallback", false);
 
 // Block insecure active content on https pages
 pref("security.mixed_content.block_active_content", true);
