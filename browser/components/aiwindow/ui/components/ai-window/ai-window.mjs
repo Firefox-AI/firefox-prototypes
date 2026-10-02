@@ -1774,6 +1774,9 @@ export class AIWindow extends MozLitElement {
           mode: this.mode,
         })
       ) {
+        // Jev added the messages to the conversation directly; leave the
+        // starters view so the user actually sees them (and any card).
+        this.#enterChatActiveState();
         return;
       }
 
@@ -1868,6 +1871,19 @@ export class AIWindow extends MozLitElement {
       return [];
     }
     return editor.getAllMentions();
+  }
+
+  /**
+   * Leaves the starters view and shows the chat browser. Shared by the normal
+   * submit path and the Jev pre-router path, which adds messages directly.
+   */
+  #enterChatActiveState() {
+    this.#starterPromptsAbortController?.abort();
+    this.showStarters = false;
+    this.showFooter = false;
+    this.showDisclaimer = true;
+    this.#updateTabFavicon();
+    this.#setBrowserContainerActiveState(true);
   }
 
   /**
@@ -2321,12 +2337,7 @@ export class AIWindow extends MozLitElement {
     const conversation = this.#conversation;
     const browsingContext = this.#getBrowsingContext();
 
-    this.#starterPromptsAbortController?.abort();
-    this.showStarters = false;
-    this.showFooter = false;
-    this.showDisclaimer = true;
-    this.#updateTabFavicon();
-    this.#setBrowserContainerActiveState(true);
+    this.#enterChatActiveState();
 
     this.#abortController?.abort();
     this.#abortController = new AbortController();

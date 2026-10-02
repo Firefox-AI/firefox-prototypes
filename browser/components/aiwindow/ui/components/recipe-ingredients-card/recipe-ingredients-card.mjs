@@ -236,7 +236,9 @@ export class RecipeIngredientsCard extends MozLitElement {
   #servingsBlock() {
     const d = this.data ?? {};
     let line;
-    if (d.scaled) {
+    if (d.scaled && d.original_servings === d.servings) {
+      line = `Serves ${d.servings}`;
+    } else if (d.scaled) {
       line = `Scaled from ${d.original_servings} servings to ${d.servings}`;
     } else if (Number.isInteger(d.original_servings) && !d.servings) {
       line = `Serves ${d.original_servings} as written`;
@@ -258,7 +260,9 @@ export class RecipeIngredientsCard extends MozLitElement {
           data-corrected=${i.corrected ? "true" : "false"}
         >
           <div class="ingredient-main">
-            <strong class="qty">${i.scaled_text}</strong>
+            ${i.scaled_text
+              ? html`<strong class="qty">${i.scaled_text}</strong>`
+              : nothing}
             <span class="name">${i.name}</span>
             ${!i.scalable && i.note
               ? html`<span class="note-chip">${i.note}</span>`

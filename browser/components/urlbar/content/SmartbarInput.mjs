@@ -1984,7 +1984,25 @@ ${
    * @returns {boolean}
    */
   get #isAgentCommand() {
-    return this.#isSidebarMode && isAgentCommand(this.untrimmedValue);
+    return (
+      (this.#isSidebarMode && isAgentCommand(this.untrimmedValue)) ||
+      this.#isJevBrowseCommand
+    );
+  }
+
+  /**
+   * Whether the current input is a Jev "/browse ..." escape hatch. Gated on
+   * browser.aiwindow.jev.enabled only (no monitor-region or sidebar
+   * requirement) so it is submitted to chat in both full-page and sidebar
+   * modes instead of being loaded as a file path.
+   *
+   * @returns {boolean}
+   */
+  get #isJevBrowseCommand() {
+    if (!Services.prefs.getBoolPref("browser.aiwindow.jev.enabled", false)) {
+      return false;
+    }
+    return /^\/browse(\s|$)/i.test(String(this.untrimmedValue ?? "").trimStart());
   }
 
   /**
