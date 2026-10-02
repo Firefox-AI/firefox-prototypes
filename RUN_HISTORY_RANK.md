@@ -9,7 +9,7 @@ The flow is:
 3. Launch the copied profile once so its `about:config` page is available.
 4. Enable the required preferences in the copied profile.
 5. Restart the build with the copied profile.
-6. Use the New Tab devtools panel to force a vector recompute.
+6. Use the New Tab devtools panel to force a vector recompute or rerank the current recommendation set.
 7. Open the generated HTML report and inspect the console output.
 
 ## Build Firefox
@@ -113,6 +113,8 @@ Keep the terminal open. Firefox console warnings and the ranking lines are print
 5. Wait for the New Tab feed to reload.
 
 The button forces a recompute immediately. Normal recommendation loads reuse the stored vector for the local calendar day. **Refresh Cache** reloads the recommendation data but does not force a vector recompute.
+
+The **Article Reranking** section contains **Cosine: Rerank Within Sections**. It fetches a fresh recommendation response and applies the default cosine ranking within each existing section. Section order is unchanged.
 
 ## Open the HTML report
 

@@ -2746,6 +2746,18 @@ describe("DiscoveryStreamFeed", () => {
     });
   });
 
+  describe("#onAction: DISCOVERY_STREAM_DEV_COSINE_RERANK_WITHIN_SECTIONS", () => {
+    it("reloads the feed with within-section cosine ranking enabled", async () => {
+      jest.spyOn(feed, "onPrefChange").mockResolvedValue();
+
+      await feed.onAction({
+        type: at.DISCOVERY_STREAM_DEV_COSINE_RERANK_WITHIN_SECTIONS,
+      });
+
+      expect(feed.onPrefChange).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("#onAction: DISCOVERY_STREAM_DEV_SYSTEM_TICK", () => {
     it("should refresh if DiscoveryStream has been loaded at least once and a cache has expired", async () => {
       expectConsoleError();

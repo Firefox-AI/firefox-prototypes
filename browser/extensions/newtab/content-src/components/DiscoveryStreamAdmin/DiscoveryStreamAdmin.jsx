@@ -252,6 +252,8 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
     this.expireCache = this.expireCache.bind(this);
     this.recomputeUserHistoryVector =
       this.recomputeUserHistoryVector.bind(this);
+    this.cosineRerankWithinSections =
+      this.cosineRerankWithinSections.bind(this);
     this.refreshCache = this.refreshCache.bind(this);
     this.showPlaceholder = this.showPlaceholder.bind(this);
     this.idleDaily = this.idleDaily.bind(this);
@@ -315,6 +317,14 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
     this.props.dispatch(
       ac.OnlyToMain({
         type: at.DISCOVERY_STREAM_DEV_RECOMPUTE_USER_HISTORY_VECTOR,
+      })
+    );
+  }
+
+  cosineRerankWithinSections() {
+    this.props.dispatch(
+      ac.OnlyToMain({
+        type: at.DISCOVERY_STREAM_DEV_COSINE_RERANK_WITHIN_SECTIONS,
       })
     );
   }
@@ -1376,6 +1386,14 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
             label="Toggle DS Sections"
           />
         </div>
+        <details className="details-section">
+          <summary>Article Reranking</summary>
+          <div className="admin-button-row">
+            <moz-button onClick={this.cosineRerankWithinSections}>
+              Cosine: Rerank Within Sections
+            </moz-button>
+          </div>
+        </details>
         {/* Collapsible Sections for experiments for easy on/off */}
         <details className="details-section">
           <summary>Train Hop</summary>

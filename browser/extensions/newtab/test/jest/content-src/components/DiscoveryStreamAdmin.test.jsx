@@ -236,6 +236,16 @@ describe("<DiscoveryStreamAdminUI>", () => {
     );
   });
 
+  it("should fire cosineRerankWithinSections", () => {
+    const { container, dispatch } = renderUI();
+    fireEvent.click(buttonByText(container, "Cosine: Rerank Within Sections"));
+    expect(dispatch).toHaveBeenCalledWith(
+      ac.OnlyToMain({
+        type: at.DISCOVERY_STREAM_DEV_COSINE_RERANK_WITHIN_SECTIONS,
+      })
+    );
+  });
+
   it("should fire expireCache with DISCOVERY_STREAM_DEV_EXPIRE_CACHE", () => {
     const { container, dispatch } = renderUI();
     fireEvent.click(buttonByText(container, "Expire Cache"));

@@ -2975,6 +2975,10 @@ export class DiscoveryStreamFeed {
         await this.recomputeUserHistoryVector();
         await this.onPrefChange();
         break;
+      case at.DISCOVERY_STREAM_DEV_COSINE_RERANK_WITHIN_SECTIONS:
+        console.warn("[NewTab cosine] rerank within sections requested");
+        await this.onPrefChange();
+        break;
       case at.DISCOVERY_STREAM_CONFIG_CHANGE:
       case at.DISCOVERY_STREAM_DEV_REFRESH_CACHE:
         if (action.type == at.DISCOVERY_STREAM_DEV_REFRESH_CACHE) {
