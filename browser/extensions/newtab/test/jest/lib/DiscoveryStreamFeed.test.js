@@ -139,6 +139,7 @@ describe("DiscoveryStreamFeed", () => {
       IOUtils: {
         readJSON: () => Promise.resolve({}),
         writeJSON: () => Promise.resolve(0),
+        writeUTF8: () => Promise.resolve(0),
       },
       NewTabUtils: fakeNewTabUtils,
       ContextId: {
@@ -3168,12 +3169,10 @@ describe("DiscoveryStreamFeed", () => {
       jest
         .spyOn(feed, "getUserHistoryVector")
         .mockResolvedValue({ embedding: [1, 0] });
-      jest
-        .spyOn(feed, "getArticleEmbeddings")
-        .mockResolvedValue([
-          [0, 1],
-          [1, 0],
-        ]);
+      jest.spyOn(feed, "getArticleEmbeddings").mockResolvedValue([
+        [0, 1],
+        [1, 0],
+      ]);
 
       const first = { id: "first", title: "first" };
       const second = { id: "second", title: "second" };

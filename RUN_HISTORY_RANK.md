@@ -10,7 +10,7 @@ The flow is:
 4. Enable the required preferences in the copied profile.
 5. Restart the build with the copied profile.
 6. Use the New Tab devtools panel to force a vector recompute.
-7. Inspect the cosine ranking in the terminal or Browser Console.
+7. Open the generated HTML report and inspect the console output.
 
 ## Build Firefox
 
@@ -114,7 +114,37 @@ Keep the terminal open. Firefox console warnings and the ranking lines are print
 
 The button forces a recompute immediately. Normal recommendation loads reuse the stored vector for the local calendar day. **Refresh Cache** reloads the recommendation data but does not force a vector recompute.
 
-## Read the ranking output
+## Open the HTML report
+
+When a new Merino response produces at least one valid cosine score, Firefox writes:
+
+```text
+newtab-history-rank.html
+```
+
+The file is stored in the running profile's local profile directory. Firefox prints the full path:
+
+```text
+[NewTab cosine] report=/path/to/profile/newtab-history-rank.html
+```
+
+For the copied-profile launch command in this guide, this is normally:
+
+```text
+/absolute/path/to/nightly-profile-YYYYMMDD-HHMMSS/newtab-history-rank.html
+```
+
+Open that path after the feed reloads. On macOS, for example:
+
+```bash
+open '/absolute/path/to/nightly-profile-YYYYMMDD-HHMMSS/newtab-history-rank.html'
+```
+
+If the console prints a different path after `report=`, use that path.
+
+The report is one global list sorted by raw cosine similarity. Articles without a valid score appear at the end. It includes the cosine rank, global Merino rank, server score, section, topic, image, title, excerpt, and URL. The topic histograms compare the global Merino and cosine rank distributions.
+
+## Read the console ranking output
 
 Filter the terminal or Browser Console for:
 

@@ -25,6 +25,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "resource://gre/modules/PlacesSemanticHistoryManager.sys.mjs",
   embeddingsGeneratorFactory:
     "chrome://global/content/ml/EmbeddingsGenerator.sys.mjs",
+  buildHistoryRankReport: "resource://newtab/lib/HistoryRankReport.sys.mjs",
 });
 
 // We use importESModule here instead of static import so that
@@ -1882,13 +1883,11 @@ export class DiscoveryStreamFeed {
   }
 
   async getUserHistoryVector() {
-    return lazy.getPlacesSemanticHistoryManager()
-      .getUserHistoryVector();
+    return lazy.getPlacesSemanticHistoryManager().getUserHistoryVector();
   }
 
   async recomputeUserHistoryVector() {
-    return lazy.getPlacesSemanticHistoryManager()
-      .recomputeUserHistoryVector();
+    return lazy.getPlacesSemanticHistoryManager().recomputeUserHistoryVector();
   }
 
   async getArticleEmbeddings(items) {
@@ -1915,8 +1914,7 @@ export class DiscoveryStreamFeed {
       Array.isArray(embeddings) &&
       embeddings.length == 1 &&
       Array.isArray(embeddings[0]) &&
-      (Array.isArray(embeddings[0][0]) ||
-        ArrayBuffer.isView(embeddings[0][0]))
+      (Array.isArray(embeddings[0][0]) || ArrayBuffer.isView(embeddings[0][0]))
     ) {
       embeddings = embeddings[0];
     }
@@ -1936,6 +1934,23 @@ export class DiscoveryStreamFeed {
       result[indices[i]] = embeddings[i];
     }
     return result;
+  }
+
+  async writeHistoryRankReport(items, sections) {
+    let reportPath = PathUtils.join(
+      PathUtils.localProfileDir,
+      "newtab-history-rank.html"
+    );
+    try {
+      await IOUtils.writeUTF8(
+        reportPath,
+        lazy.buildHistoryRankReport(items, sections),
+        { tmpPath: `${reportPath}.tmp` }
+      );
+      console.warn(`[NewTab cosine] report=${reportPath}`);
+    } catch (error) {
+      console.error("Unable to write New Tab history rank report", error);
+    }
   }
 
   async scoreItemsByUserVector(items) {
@@ -2006,9 +2021,10 @@ export class DiscoveryStreamFeed {
   sortItemsWithinSectionsByCosine(items) {
     let sectionIndexes = new Map();
     items.forEach((item, index) => {
-      let section = item.section === undefined || item.section === null
-        ? null
-        : item.section;
+      let section =
+        item.section === undefined || item.section === null
+          ? null
+          : item.section;
       let indexes = sectionIndexes.get(section) || [];
       indexes.push(index);
       sectionIndexes.set(section, indexes);
@@ -2033,9 +2049,7 @@ export class DiscoveryStreamFeed {
           result[index] = sorted[position].item;
         });
       }
-      if (
-        Services.prefs.getBoolPref(PREF_USER_HISTORY_COSINE_ENABLED, false)
-      ) {
+      if (Services.prefs.getBoolPref(PREF_USER_HISTORY_COSINE_ENABLED, false)) {
         sorted.forEach(({ item }, position) => {
           let score = Number(item.cosine_similarity);
           console.warn(
@@ -2088,6 +2102,7 @@ export class DiscoveryStreamFeed {
           publisher: item.publisher,
           raw_image_src: item.imageUrl,
           received_rank: item.receivedRank,
+          server_score: item.serverScore,
           recommended_at: feedResponse.recommendedAt,
           title: item.title,
           topic: item.topic,
@@ -2143,9 +2158,16 @@ export class DiscoveryStreamFeed {
           this._applySectionLayouts(sections);
         }
 
-        const cosineScoredItems = await this.scoreItemsByUserVector(
-          recommendations
-        );
+        const cosineScoredItems =
+          await this.scoreItemsByUserVector(recommendations);
+        if (
+          Services.prefs.getBoolPref(PREF_USER_HISTORY_COSINE_ENABLED, false) &&
+          cosineScoredItems.some(item =>
+            Number.isFinite(Number(item.cosine_similarity))
+          )
+        ) {
+          await this.writeHistoryRankReport(cosineScoredItems, sections);
+        }
         const { data: scoredItems, personalized } =
           await this.scoreItemsInferred(cosineScoredItems);
 
@@ -2195,9 +2217,8 @@ export class DiscoveryStreamFeed {
         // Rotate is also the only place that uses these impressions.
         await this.cleanUpTopRecImpressions();
         const rotatedItems = await this.rotate(scoredItems);
-        const sectionSortedItems = this.sortItemsWithinSectionsByCosine(
-          rotatedItems
-        );
+        const sectionSortedItems =
+          this.sortItemsWithinSectionsByCosine(rotatedItems);
 
         const { data: filteredResults } =
           await this.filterBlocked(sectionSortedItems);
