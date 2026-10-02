@@ -7,7 +7,9 @@
 :host,
 :root {
   color: var(--button-text-color);
-  font-family: -apple-system, "Ubuntu Sans", "Noto Sans", Inter, Roboto, "Helvetica Neue", "Arial Nova", "Nimbus Sans", Arial, sans-serif;
+  /* h1 and h2 prepend "Inter 28pt", which AITabPage installs from parent bytes. */
+  --aitab-font-family: -apple-system, "Ubuntu Sans", "Noto Sans", Inter, Roboto, "Helvetica Neue", "Arial Nova", "Nimbus Sans", Arial, sans-serif;
+  font-family: var(--aitab-font-family);
 
   @media (forced-colors) {
     --aitab-eyebrow-text-color: ButtonText;
@@ -57,12 +59,9 @@ h1,
 h2,
 .aitab-heading-1,
 .aitab-heading-2 {
-  /* TODO Bug 2072395
-  Commenting out for now until we can make a decision regarding implementation that is secure and performant. */
-  /* font-family: "Mozilla Headline", sans-serif; */
+  font-family: "Inter 28pt", var(--aitab-font-family);
   font-weight: var(--font-weight-semibold);
   font-style: normal;
-  /* font-variation-settings: "wdth" 75; */
 }
 
 h3,

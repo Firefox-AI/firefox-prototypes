@@ -24,6 +24,11 @@ import "chrome://browser/content/aiwindow/components/aitab-text-block.mjs";
 // straight through without a translation table.
 const GET_PAGE_EVENT = "AITab:GetPage";
 const DELETE_PAGE_EVENT = "AITab:DeletePage";
+const GET_HEADING_FONT_EVENT = "AITab:GetHeadingFont";
+
+// Family for h1 and h2 in aitab-base.css. The parent fetches the file; this
+// page installs the bytes because its origin cannot read the CDN response.
+const HEADING_FONT_FAMILY = "Inter 28pt";
 
 /**
  * Root component for about:smartpage. Looks up the page config for the
@@ -40,6 +45,8 @@ export class AITabPage extends MozLitElement {
     page: { type: Object },
     status: { type: String },
   };
+
+  #headingFontPromise = null;
 
   constructor() {
     super();
@@ -58,6 +65,7 @@ export class AITabPage extends MozLitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    this.#loadHeadingFont();
     this.#loadPage().catch(error => {
       console.error("Failed to load AI Tab page:", error);
       this.status = "error";
@@ -129,6 +137,33 @@ export class AITabPage extends MozLitElement {
 
       this.dispatchEvent(new CustomEvent(eventType, { bubbles: true, detail }));
     });
+  }
+
+  /**
+   * Installs the heading face from bytes fetched in the parent.
+   * A miss leaves headings on the system font.
+   */
+  #loadHeadingFont() {
+    if (this.#headingFontPromise) {
+      return;
+    }
+    this.#headingFontPromise = this.#installHeadingFont().catch(error => {
+      console.error("Failed to load the AI Tab heading font:", error);
+    });
+  }
+
+  async #installHeadingFont() {
+    const response = await this.#request(GET_HEADING_FONT_EVENT);
+    if (!response?.bytes) {
+      return;
+    }
+
+    const face = new FontFace(HEADING_FONT_FAMILY, response.bytes, {
+      weight: "100 900",
+      display: "swap",
+    });
+    await face.load();
+    document.fonts.add(face);
   }
 
   #renderHeader(header) {

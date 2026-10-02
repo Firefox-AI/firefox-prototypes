@@ -7,6 +7,15 @@ import { ConversationStore } from "moz-src:///browser/components/aiwindow/ui/mod
 import { getSmartPageName } from "chrome://browser/content/aiwindow/modules/TrustedInternalURLs.mjs";
 import { A2UI } from "../modules/A2UI.mjs";
 
+// Pinned here so content cannot choose the URL. about:smartpage is a null
+// origin, so it cannot read this response itself.
+const HEADING_FONT_URL =
+  "https://firefox-settings-attachments.cdn.mozilla.net/main-workspace/ai-window-aitab/20261004224852--ffa1d95e-a351-4607-b953-49e9bbcdff6e--84eec28e-c3d7-425f-b655-31dd2f3b238d.ttf";
+
+// One download for every about:smartpage in the process. Cleared on failure
+// so a later page can try again.
+let headingFontBytesPromise;
+
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -53,6 +62,28 @@ export function formatCreatedAt(createdAt, now = Date.now()) {
 }
 
 /**
+ * Fetches the heading font, sharing one request across actor instances.
+ *
+ * @returns {Promise<ArrayBuffer>}
+ */
+function headingFontBytes() {
+  if (!headingFontBytesPromise) {
+    headingFontBytesPromise = fetch(HEADING_FONT_URL)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`AI Tab heading font responded ${response.status}`);
+        }
+        return response.arrayBuffer();
+      })
+      .catch(error => {
+        headingFontBytesPromise = null;
+        throw error;
+      });
+  }
+  return headingFontBytesPromise;
+}
+
+/**
  * Parent actor for about:smartpage. Resolves the page name from the page URL
  * into the stored page config that content renders, and owns the destructive
  * actions the page offers.
@@ -62,6 +93,8 @@ export class AITabParent extends JSWindowActorParent {
     switch (name) {
       case "AITab:GetPage":
         return this.#handleGetPage();
+      case "AITab:GetHeadingFont":
+        return this.#handleGetHeadingFont();
       case "AITab:DeletePage":
         return this.#handleDeletePage();
       case "AITab:OpenLink":
@@ -88,6 +121,21 @@ export class AITabParent extends JSWindowActorParent {
     }
 
     return getSmartPageName(URL.parse(spec));
+  }
+
+  /**
+   * Bytes for the heading face used by h1 and h2. A failure leaves those
+   * headings on the system font; it does not fail the page.
+   *
+   * @returns {Promise<{ bytes: ?ArrayBuffer }>}
+   */
+  async #handleGetHeadingFont() {
+    try {
+      return { bytes: await headingFontBytes() };
+    } catch (error) {
+      console.error("Failed to fetch the AI Tab heading font:", error);
+      return { bytes: null };
+    }
   }
 
   async #handleGetPage() {

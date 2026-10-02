@@ -286,6 +286,7 @@ let JSWINDOWACTORS = {
       events: {
         "AITab:GetPage": { wantUntrusted: true },
         "AITab:DeletePage": { wantUntrusted: true },
+        "AITab:GetHeadingFont": { wantUntrusted: true },
         "AITab:OpenLink": { wantUntrusted: true },
       },
     },

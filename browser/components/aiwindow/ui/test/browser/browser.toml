@@ -6,7 +6,11 @@ prefs = [
   "browser.newtab.preload=false",
   "browser.search.suggest.enabled=false",
   "browser.urlbar.suggest.searches=false",
-  "browser.smartwindow.endpoint=http://localhost:0/v1"
+  "browser.smartwindow.endpoint=http://localhost:0/v1",
+  # The parent fetches the heading font for every about:smartpage. Resolve
+  # that host to localhost so MOZ_DISABLE_NONLOCAL_CONNECTIONS does not abort
+  # those tests. The face fails to load and the fallback is used.
+  "network.dns.localDomains=firefox-settings-attachments.cdn.mozilla.net",
 ]
 support-files = [
   "head.js",
