@@ -44,6 +44,7 @@ const NEVER_SEND_AUTOCOMPLETE = new Set([
   "postal-code",
 ]);
 const EXCLUDED_TYPES = new Set(["password", "file", "hidden"]);
+const CONSENT_TEXT_RE = /cookies?|consent|privacy choices|personali[sz]ed ads|accept all|only necessary/i;
 const ROW_PRICE_RE = /[$€£¥]\s?\d[\d,]*(?:\.\d+)?|\d[\d,]*\s?(?:USD|EUR|GBP|TWD|NT\$)/;
 
 const MAX_CANDIDATES = 250;
@@ -726,11 +727,28 @@ export class JevBrowseChild extends JSWindowActorChild {
       omitted_candidates: omitted,
       sensitive_fields: this.#sensitiveFields(),
       has_main: Boolean(doc.querySelector('main,[role="main"]')),
+      consent_dialog: this.#consentDialogPresent(),
       probe: {
         ingredients_heading: this.#ingredientsHeading(),
         json_ld_recipe: this.#jsonLdRecipe(),
       },
     };
+  }
+
+  /** A visible dialog-like region whose text reads like a cookie/consent prompt. */
+  #consentDialogPresent() {
+    const doc = this.document;
+    const sel =
+      'dialog[open],[role="dialog"],[aria-modal="true"],[id*="cookie" i],[class*="cookie" i],[id*="consent" i],[class*="consent" i]';
+    for (const el of doc.querySelectorAll(sel)) {
+      if (!JevBrowseChild.#visible(el) || !el.querySelector('button,[role="button"]')) {
+        continue;
+      }
+      if (CONSENT_TEXT_RE.test((el.innerText || "").slice(0, 1500))) {
+        return true;
+      }
+    }
+    return false;
   }
 
   #fresh(snapshot_id) {
@@ -903,17 +921,71 @@ export class JevBrowseChild extends JSWindowActorChild {
       }
       const isCombobox = current.comboboxIds.has(id);
       await this.#settle(isCombobox);
+      // Sites like Google Flights open an overlay dialog on focus whose own
+      // input takes focus; the text we wrote into the page-level node never
+      // reaches it. If focus moved to a different editable field and the
+      // original either vanished or did not keep our text, retype there.
+      let retargeted = false;
+      const active = JevBrowseChild.#deepActiveElement(nodeWin.document);
+      if (
+        active &&
+        active !== node &&
+        !node.contains(active) &&
+        JevBrowseChild.#retargetable(active) &&
+        (!JevBrowseChild.#visible(node) || node.value !== action.text)
+      ) {
+        if (typeof active.setUserInput === "function") {
+          active.setUserInput(action.text);
+          retargeted = true;
+        } else if (active.isContentEditable) {
+          const selection = nodeWin.getSelection();
+          selection.selectAllChildren(active);
+          nodeWin.windowUtils.sendContentCommandEvent(
+            "insertText",
+            null,
+            action.text
+          );
+          active.dispatchEvent(new nodeWin.Event("input", { bubbles: true }));
+          retargeted = true;
+        }
+        if (retargeted) {
+          await this.#settle(true);
+        }
+      }
       if (action.suggest && isCombobox) {
-        this.#comboboxKeyFallback(nodeWin, node);
+        this.#comboboxKeyFallback(nodeWin, retargeted ? active : node);
         await this.#settle(true);
       }
-      return { ok: true };
+      return retargeted ? { ok: true, retargeted: true } : { ok: true };
     }
 
     // CLICK
     JevBrowseChild.#click(nodeWin, node, x, y);
     await this.#settle(false);
     return { ok: true };
+  }
+
+  /** document.activeElement, followed down through open shadow roots. */
+  static #deepActiveElement(doc) {
+    let el = doc?.activeElement ?? null;
+    while (el?.shadowRoot?.activeElement) {
+      el = el.shadowRoot.activeElement;
+    }
+    return el;
+  }
+
+  /** An editable, non-sensitive text field we may retype into after a focus move. */
+  static #retargetable(el) {
+    if (!el || el.readOnly || el.getAttribute("aria-readonly") === "true") {
+      return false;
+    }
+    if (JevBrowseChild.#sensitiveKind(el)) {
+      return false;
+    }
+    if (el.tagName === "INPUT") {
+      return !EXCLUDED_TYPES.has(el.type) && typeof el.setUserInput === "function";
+    }
+    return el.tagName === "TEXTAREA" || !!el.isContentEditable;
   }
 
   static #composedContains(node, hit) {

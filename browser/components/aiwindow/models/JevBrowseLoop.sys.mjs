@@ -113,6 +113,8 @@ const MAX_RESULTS = 5;
 const NOTIFICATION_VALUE = "jev-agent-running";
 const TAB_ATTRIBUTE = "jev-agent";
 const CONSENT_RE = /accept|agree|consent|got it/i;
+const CONSENT_PRIORITY_RE =
+  /^\s*(?:accept all|accept(?: all)? cookies|accept|i agree|agree|only necessary|reject all|got it|allow all)\b/i;
 const CHALLENGE_TITLE_RE =
   /bots|challenge|verify|anomaly|captcha|unusual traffic|access denied|are you a robot|press and hold/i;
 const COUNT_UNIT_RE =
@@ -139,8 +141,9 @@ const STOP_HINT =
 // Confirmation gate (G7). Button-role names match anywhere; link names only
 // at the start; the allow-list wins over both; a checkout-shaped URL path
 // gates every click on that page.
+// Bare "checkout"/"check out" is handled separately (date-context exclusion).
 const COMMIT_ALTERNATION =
-  "book(?:ing)?|reserve|reservation|buy|purchase|pay(?:ment)?|check\\s?out|place order|" +
+  "book(?:ing)?|reserve|reservation|buy|purchase|pay(?:ment)?|place order|" +
   "confirm (?:booking|reservation|purchase|order|and pay)|" +
   "continue to (?:payment|checkout|book(?:ing)?)|proceed to (?:payment|checkout)|" +
   "go to (?:payment|checkout)|complete (?:your )?(?:booking|purchase|order|reservation)|" +
@@ -155,7 +158,14 @@ const COMMIT_LINK_RE = new RegExp(
   `^\\s*(?:${COMMIT_ALTERNATION})(?![\\p{L}])`,
   "iu"
 );
-const COMMIT_ALLOW_RE = /booking\.com|bookings\b|book a demo|guidebook|bookmark|facebook/i;
+const COMMIT_ALLOW_RE =
+  /booking\.com|bookings\b|book a demo|guidebook|bookmark|facebook|check-?(?:in|out) date|select as check-?(?:in|out)|as checkout/i;
+const CHECKOUT_BARE_RE = /(?:^|[^\p{L}])check\s?-?out(?![\p{L}])/iu;
+const CHECKOUT_LINK_RE = /^\s*check\s?-?out(?![\p{L}])/iu;
+// A label that names a date field or a date range: "Check in / Check out
+// Nov 6 - 7", "Checkout date", "23, Monday, November 2026 ... checkout".
+const DATE_CONTEXT_RE =
+  /check[\s-]?in\b|\bcheckin\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s*\d|\b(?:mon|tues?|wed(?:nes)?|thu(?:rs)?|fri|sat(?:ur)?|sun)(?:day)?\b|\d\s*[-\u2013\u2014]\s*\d|\bdates?\b/iu;
 const CHECKOUT_PATH_RE =
   /\/(checkout|book(ing)?|payment|pay|reserve|purchase)(\/|$|\?)/i;
 
@@ -604,8 +614,20 @@ export function resolveSite(siteText, { siteMap = {} } = {}) {
 export function gateMatch({ role, label, url } = {}) {
   const name = String(label ?? "");
   const isLink = role === "link";
+  // Calendar day cells are never commit controls.
+  if (role === "gridcell") {
+    return null;
+  }
   if (!COMMIT_ALLOW_RE.test(name)) {
     if (isLink ? COMMIT_LINK_RE.test(name) : COMMIT_WORD_RE.test(name)) {
+      return "label";
+    }
+    // The checkout family only counts as a commit verb outside date/field
+    // context ("Proceed to checkout" is in the main alternation).
+    if (
+      !DATE_CONTEXT_RE.test(name) &&
+      (isLink ? CHECKOUT_LINK_RE.test(name) : CHECKOUT_BARE_RE.test(name))
+    ) {
       return "label";
     }
   }
@@ -638,7 +660,24 @@ export class JevClient {
     const elements = [];
     const targets = { CLICK: {}, TYPE_TEXT: {}, SELECT: {} };
 
+    // No-op suppression: when the previous step was a CLICK that changed
+    // nothing, or a stale hit, withhold that target for one round so the
+    // model cannot re-pick it (as long as another element remains).
+    const last = history.length ? history[history.length - 1] : null;
+    let suppressId = null;
+    if (
+      last &&
+      last.target_id != null &&
+      ((last.kind === "click" && last.page_changed === false) || last.kind === "stale") &&
+      observation.elements.length > 1
+    ) {
+      suppressId = String(last.target_id);
+    }
+
     for (const el of observation.elements) {
+      if (suppressId !== null && String(el.id) === suppressId) {
+        continue;
+      }
       const entry = {
         index: el.id,
         role: el.role,
@@ -1394,15 +1433,20 @@ export class DoneVerifier {
    * Pure precheck over page text, title and decoded URL. Field values never
    * satisfy a requirement (review MAJOR 1).
    */
-  static precheck(plan, observation, rows) {
+  static precheck(plan, observation, rows, pageText = "") {
     let url = String(observation?.url ?? "");
     try {
       url = decodeURIComponent(url);
     } catch {
       // keep raw
     }
+    // Two text sources: the viewport-visible text Jev sees and the Extract
+    // reply's body innerText (sites like Google Flights render the route and
+    // dates outside the first viewport / behind aria-hidden). Field values
+    // are never in the haystack.
     const sources = [
       ["text", String(observation?.text ?? "")],
+      ["text", String(pageText ?? "")],
       ["title", String(observation?.title ?? "")],
       ["url", url],
     ];
@@ -1467,8 +1511,8 @@ export class DoneVerifier {
    *   `missing` is always code-owned (plan displays / fixed phrases); `note`
    *   is the chat model's text and is display-only (G12).
    */
-  static async verify({ plan, observation, rows, mode, signal, flowId }) {
-    const precheck = DoneVerifier.precheck(plan, observation, rows);
+  static async verify({ plan, observation, rows, mode, signal, flowId, page_text = "" }) {
+    const precheck = DoneVerifier.precheck(plan, observation, rows, page_text);
     const base = {
       mode,
       satisfied: precheck.passed,
@@ -1503,7 +1547,7 @@ export class DoneVerifier {
             page: {
               title: observation?.title ?? "",
               url: observation?.url ?? "",
-              text_untrusted: String(observation?.text ?? "").slice(0, 6000),
+              text_untrusted: String(page_text || observation?.text || "").slice(0, 6000),
             },
             rows_untrusted: (rows ?? []).slice(0, 20).map(r => r.text),
             field_values_untrusted: (observation?.elements ?? [])
@@ -3408,19 +3452,39 @@ export class JevBrowseLoop {
         return { status: "error", reason: "timeout" };
       }
 
-      // Ask Jev.
-      run.jev_request_count++;
-      run.decision_count++;
-      const decision = await JevClient.choose({
-        observation,
-        goal: goalForJev,
-        history: run.history,
-        endpoint: config.endpoint,
-        key,
-        model: config.model,
-        signal: run.signal,
-      });
-      run.request_sample = decision.body;
+      // Code-owned consent priority: a consent dialog is covering the page
+      // (or just made a click stale), so take the consent click ourselves
+      // before asking Jev again. Bounded by the existing 2-click cap.
+      let decision = null;
+      const consentEl = this.#consentPriority(run, observation);
+      if (consentEl) {
+        decision = {
+          validated: true,
+          operation: "CLICK",
+          target: consentEl.id,
+          element: consentEl,
+          option: null,
+          probability: null,
+          confidence: null,
+          latency_ms: 0,
+          body: run.request_sample,
+          consent_priority: true,
+        };
+      } else {
+        // Ask Jev.
+        run.jev_request_count++;
+        run.decision_count++;
+        decision = await JevClient.choose({
+          observation,
+          goal: goalForJev,
+          history: run.history,
+          endpoint: config.endpoint,
+          key,
+          model: config.model,
+          signal: run.signal,
+        });
+        run.request_sample = decision.body;
+      }
       this.#debugTrace(run, config, observation, decision.validated ? decision : null);
 
       if (!decision.validated) {
@@ -3463,11 +3527,13 @@ export class JevBrowseLoop {
         run.progress.phase = "verifying";
         this.#pushCard(run);
         const extract = await this.#extractReply(run);
+        run.pageTextExcerpt = String(extract?.page_text ?? "");
         const verifyStart = Date.now();
         const verdict = await DoneVerifier.verify({
           plan: run.plan,
           observation,
           rows: Array.isArray(extract?.rows) ? extract.rows : [],
+          page_text: extract?.page_text ?? "",
           mode: config.verifierMode,
           signal: run.signal,
           flowId: run.conversation?.id,
@@ -3660,10 +3726,28 @@ export class JevBrowseLoop {
             gateEvent.outcome = "approved_stale";
             run.gate_events.push(gateEvent);
           }
-          this.#stepRecord(run, "stale", decision, observation, { text, text_helper: textHelper });
+          const staleRecord = this.#stepRecord(run, "stale", decision, observation, {
+            text,
+            text_helper: textHelper,
+            why: actResult?.why ?? null,
+          });
+          // Stale hits count as no progress (code-owned text only, G12).
+          run.history.push({
+            step: staleRecord.step,
+            action: staleRecord.target_label ?? OPERATION_LABELS[op],
+            kind: "stale",
+            text: null,
+            page_changed: false,
+            target_id: decision.target ?? null,
+            why: actResult?.why ?? null,
+            url: beforeUrl,
+          });
           run.reobserved++;
           await this.#waitForLoadSettle(run);
           observation = await this.#observe(run);
+          if (this.#noProgress(run)) {
+            return { status: "blocked", reason: "no_progress" };
+          }
           continue;
         }
         throw new JevNetworkError(`action failed (${actResult?.error ?? "unknown"})`);
@@ -3691,6 +3775,7 @@ export class JevBrowseLoop {
         kind: op.toLowerCase(),
         text,
         page_changed: null,
+        target_id: decision.target ?? null,
         url: beforeUrl,
       };
       run.history.push(historyEntry);
@@ -3724,10 +3809,44 @@ export class JevBrowseLoop {
   }
 
   static #noProgress(run) {
-    const last = run.history.filter(h => h.kind !== "done_rejected").slice(-3);
+    const entries = run.history.filter(h => h.kind !== "done_rejected");
+    const noop = h => h.page_changed === false && h.kind !== "wait";
+    const last3 = entries.slice(-3);
+    if (last3.length === 3 && last3.every(noop)) {
+      return true;
+    }
+    // A/B ping-pong: 4 consecutive no-ops across at most 2 distinct targets.
+    const last4 = entries.slice(-4);
+    if (last4.length === 4 && last4.every(noop)) {
+      const targets = new Set(last4.map(h => String(h.target_id ?? h.action ?? "")));
+      if (targets.size <= 2) {
+        return true;
+      }
+    }
+    // Sliding window: 5 of the last 6 decisions changed nothing.
+    const last6 = entries.slice(-6);
+    return last6.length === 6 && last6.filter(noop).length >= 5;
+  }
+
+  static #consentPriority(run, observation) {
+    if (run.consentClicks >= 2 || !observation?.elements?.length) {
+      return null;
+    }
+    const last = run.history.at(-1);
+    const occluded = last?.kind === "stale" && last?.why === "node_occluded";
+    if (!occluded && !observation.consent_dialog) {
+      return null;
+    }
+    const candidates = observation.elements.filter(
+      e => e.role === "button" && CONSENT_PRIORITY_RE.test(e.label ?? "")
+    );
+    if (!candidates.length) {
+      return null;
+    }
+    // Prefer the minimal-consent wording when offered.
     return (
-      last.length === 3 &&
-      last.every(h => h.page_changed === false && h.kind !== "wait")
+      candidates.find(e => /only necessary|reject|essential|decline/i.test(e.label)) ??
+      candidates[0]
     );
   }
 
