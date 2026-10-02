@@ -246,6 +246,18 @@ describe("<DiscoveryStreamAdminUI>", () => {
     );
   });
 
+  it("should fire cosineRerankAcrossSections", () => {
+    const { container, dispatch } = renderUI();
+    fireEvent.click(
+      buttonByText(container, "Cosine: Promote Top 6 to Popular Today")
+    );
+    expect(dispatch).toHaveBeenCalledWith(
+      ac.OnlyToMain({
+        type: at.DISCOVERY_STREAM_DEV_COSINE_RERANK_ACROSS_SECTIONS,
+      })
+    );
+  });
+
   it("should fire expireCache with DISCOVERY_STREAM_DEV_EXPIRE_CACHE", () => {
     const { container, dispatch } = renderUI();
     fireEvent.click(buttonByText(container, "Expire Cache"));

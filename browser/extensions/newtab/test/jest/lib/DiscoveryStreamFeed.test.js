@@ -134,6 +134,7 @@ describe("DiscoveryStreamFeed", () => {
       PersistentCache,
       PathUtils: {
         join: (...parts) => parts[parts.length - 1],
+        toFileURI: path => `file://${path}`,
         localProfileDir: "localProfileDir",
       },
       IOUtils: {
@@ -141,6 +142,7 @@ describe("DiscoveryStreamFeed", () => {
         writeJSON: () => Promise.resolve(0),
         writeUTF8: () => Promise.resolve(0),
       },
+      buildHistoryRankReport: () => "<html></html>",
       NewTabUtils: fakeNewTabUtils,
       ContextId: {
         request: () => "ContextId",
@@ -2758,6 +2760,19 @@ describe("DiscoveryStreamFeed", () => {
     });
   });
 
+  describe("#onAction: DISCOVERY_STREAM_DEV_COSINE_RERANK_ACROSS_SECTIONS", () => {
+    it("selects cross-section cosine ranking and reloads the feed", async () => {
+      jest.spyOn(feed, "onPrefChange").mockResolvedValue();
+
+      await feed.onAction({
+        type: at.DISCOVERY_STREAM_DEV_COSINE_RERANK_ACROSS_SECTIONS,
+      });
+
+      expect(feed._cosineRerankMode).toBe("across-sections");
+      expect(feed.onPrefChange).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("#onAction: DISCOVERY_STREAM_DEV_SYSTEM_TICK", () => {
     it("should refresh if DiscoveryStream has been loaded at least once and a cache has expired", async () => {
       expectConsoleError();
@@ -3226,6 +3241,23 @@ describe("DiscoveryStreamFeed", () => {
       }
     });
 
+    it("opens the report in the current browser window after writing it", async () => {
+      const openTrustedLinkIn = jest.fn();
+      services.wm = {
+        getMostRecentWindow: () => ({ openTrustedLinkIn }),
+      };
+
+      await feed.writeHistoryRankReport(
+        [{ title: "article", cosine_similarity: 0.5 }],
+        []
+      );
+
+      expect(openTrustedLinkIn).toHaveBeenCalledWith(
+        "file://newtab-history-rank.html",
+        "tab"
+      );
+    });
+
     it("sorts cosine scores within section slots", () => {
       services.prefs.getBoolPref.mockImplementation((name, defaultValue) =>
         name ===
@@ -3295,6 +3327,65 @@ describe("DiscoveryStreamFeed", () => {
         "[NewTab cosine] section= original_rank=3 sim_rank=1 sim_score= url=https://example.com/unsectioned"
       );
       consoleWarn.mockRestore();
+    });
+
+    it("promotes the global top six into Popular Today", () => {
+      services.prefs.getBoolPref.mockImplementation((name, defaultValue) =>
+        name ===
+        "browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.enabled"
+          ? true
+          : defaultValue
+      );
+      jest.spyOn(globalThis.console, "warn").mockImplementation(() => {});
+
+      const items = [
+        {
+          id: "popular-1",
+          section: "top_stories_section",
+          cosine_similarity: 0.2,
+        },
+        {
+          id: "popular-2",
+          section: "top_stories_section",
+          cosine_similarity: 0.1,
+        },
+        { id: "sports-1", section: "sports", cosine_similarity: 0.9 },
+        { id: "sports-2", section: "sports", cosine_similarity: 0.8 },
+        { id: "sports-3", section: "sports", cosine_similarity: 0.7 },
+        { id: "sports-4", section: "sports", cosine_similarity: 0.4 },
+        { id: "tech-1", section: "tech", cosine_similarity: 0.6 },
+        { id: "tech-2", section: "tech", cosine_similarity: 0.5 },
+        { id: "tech-3", section: "tech", cosine_similarity: 0.3 },
+      ];
+
+      const reranked = feed.sortItemsAcrossSectionsByCosine(items, [
+        { sectionKey: "top_stories_section", title: "Popular Today" },
+        { sectionKey: "sports", title: "Sports" },
+        { sectionKey: "tech", title: "Tech" },
+      ]);
+
+      expect(reranked.slice(0, 6).map(item => item.id)).toEqual([
+        "sports-1",
+        "sports-2",
+        "sports-3",
+        "tech-1",
+        "tech-2",
+        "sports-4",
+      ]);
+      expect(reranked.slice(6).map(item => item.id)).toEqual([
+        "popular-1",
+        "popular-2",
+        "tech-3",
+      ]);
+      expect(
+        reranked
+          .slice(0, 6)
+          .every(item => item.section === "top_stories_section")
+      ).toBe(true);
+      expect(reranked.find(item => item.id === "sports-1").section).toBe(
+        "top_stories_section"
+      );
+      globalThis.console.warn.mockRestore();
     });
 
     it("should update to new feed url", async () => {

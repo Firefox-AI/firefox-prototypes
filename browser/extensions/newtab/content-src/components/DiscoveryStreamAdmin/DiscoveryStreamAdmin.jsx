@@ -254,6 +254,8 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
       this.recomputeUserHistoryVector.bind(this);
     this.cosineRerankWithinSections =
       this.cosineRerankWithinSections.bind(this);
+    this.cosineRerankAcrossSections =
+      this.cosineRerankAcrossSections.bind(this);
     this.refreshCache = this.refreshCache.bind(this);
     this.showPlaceholder = this.showPlaceholder.bind(this);
     this.idleDaily = this.idleDaily.bind(this);
@@ -325,6 +327,14 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
     this.props.dispatch(
       ac.OnlyToMain({
         type: at.DISCOVERY_STREAM_DEV_COSINE_RERANK_WITHIN_SECTIONS,
+      })
+    );
+  }
+
+  cosineRerankAcrossSections() {
+    this.props.dispatch(
+      ac.OnlyToMain({
+        type: at.DISCOVERY_STREAM_DEV_COSINE_RERANK_ACROSS_SECTIONS,
       })
     );
   }
@@ -1391,6 +1401,9 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
           <div className="admin-button-row">
             <moz-button onClick={this.cosineRerankWithinSections}>
               Cosine: Rerank Within Sections
+            </moz-button>
+            <moz-button onClick={this.cosineRerankAcrossSections}>
+              Cosine: Promote Top 6 to Popular Today
             </moz-button>
           </div>
         </details>

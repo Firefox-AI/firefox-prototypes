@@ -120,6 +120,10 @@ const PREF_INFERRED_INTERESTS_OVERRIDE =
   "discoverystream.sections.personalization.inferred.interests.override";
 const PREF_USER_HISTORY_COSINE_ENABLED =
   "browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.enabled";
+const COSINE_RERANK_WITHIN_SECTIONS = "within-sections";
+const COSINE_RERANK_ACROSS_SECTIONS = "across-sections";
+const COSINE_PROMOTION_COUNT = 6;
+const POPULAR_TODAY_SECTION_KEY = "top_stories_section";
 
 const PREF_MERINO_OHTTP = "discoverystream.merino-provider.ohttp.enabled";
 const PREF_BILLBOARD_ENABLED = "newtabAdSize.billboard";
@@ -168,6 +172,7 @@ export class DiscoveryStreamFeed {
     // Internal in-memory cache for parsing json prefs.
     this._prefCache = {};
     this.adsClient = null;
+    this._cosineRerankMode = COSINE_RERANK_WITHIN_SECTIONS;
 
     this.onPocketExperimentUpdated = this.onPocketExperimentUpdated.bind(this);
   }
@@ -1948,6 +1953,12 @@ export class DiscoveryStreamFeed {
         { tmpPath: `${reportPath}.tmp` }
       );
       console.warn(`[NewTab cosine] report=${reportPath}`);
+      let win = Services.wm?.getMostRecentWindow("navigator:browser");
+      if (win?.openTrustedLinkIn) {
+        win.openTrustedLinkIn(PathUtils.toFileURI(reportPath), "tab");
+      } else {
+        console.warn("[NewTab cosine] no browser window available for report");
+      }
     } catch (error) {
       console.error("Unable to write New Tab history rank report", error);
     }
@@ -2018,7 +2029,7 @@ export class DiscoveryStreamFeed {
     }
   }
 
-  sortItemsWithinSectionsByCosine(items) {
+  sortItemsWithinSectionsByCosine(items, { log = true } = {}) {
     let sectionIndexes = new Map();
     items.forEach((item, index) => {
       let section =
@@ -2049,8 +2060,111 @@ export class DiscoveryStreamFeed {
           result[index] = sorted[position].item;
         });
       }
-      if (Services.prefs.getBoolPref(PREF_USER_HISTORY_COSINE_ENABLED, false)) {
+      if (
+        log &&
+        Services.prefs.getBoolPref(PREF_USER_HISTORY_COSINE_ENABLED, false)
+      ) {
         sorted.forEach(({ item }, position) => {
+          let score = Number(item.cosine_similarity);
+          console.warn(
+            `[NewTab cosine] section=${section ?? ""} ` +
+              `original_rank=${item.received_rank ?? ""} ` +
+              `sim_rank=${position + 1} ` +
+              `sim_score=${Number.isFinite(score) ? score : ""} ` +
+              `url=${item.url ?? ""}`
+          );
+        });
+      }
+    }
+    return result;
+  }
+
+  sortItemsAcrossSectionsByCosine(items, sections) {
+    let withinSectionItems = this.sortItemsWithinSectionsByCosine(items, {
+      log: false,
+    });
+    let targetSection = sections.find(
+      section =>
+        section.sectionKey === POPULAR_TODAY_SECTION_KEY ||
+        section.title?.trim().toLowerCase() === "popular today"
+    )?.sectionKey;
+    if (targetSection === undefined) {
+      targetSection = withinSectionItems.some(
+        item => item.section === undefined || item.section === null
+      )
+        ? null
+        : undefined;
+    }
+    if (targetSection === undefined) {
+      console.warn("[NewTab cosine] popular today section not found");
+      return withinSectionItems;
+    }
+
+    let indexedItems = withinSectionItems.map((item, index) => ({
+      item,
+      index,
+    }));
+    let promoted = indexedItems
+      .filter(({ item }) => Number.isFinite(Number(item.cosine_similarity)))
+      .sort((a, b) => {
+        let scoreDifference =
+          Number(b.item.cosine_similarity) - Number(a.item.cosine_similarity);
+        return scoreDifference || a.index - b.index;
+      })
+      .slice(0, COSINE_PROMOTION_COUNT);
+    let promotedItems = promoted.map(({ item }) => ({
+      ...item,
+      section: targetSection,
+    }));
+    let promotedSet = new Set(promoted.map(({ item }) => item));
+    let groups = new Map();
+    let groupOrder = [];
+    for (let entry of indexedItems) {
+      let group =
+        entry.item.section === undefined || entry.item.section === null
+          ? null
+          : entry.item.section;
+      if (!groups.has(group)) {
+        groups.set(group, []);
+        groupOrder.push(group);
+      }
+      groups.get(group).push(entry.item);
+    }
+
+    let result = [];
+    for (let group of groupOrder) {
+      let remaining = groups
+        .get(group)
+        .filter(item => !promotedSet.has(item))
+        .sort((a, b) => {
+          let aScore = Number(a.cosine_similarity);
+          let bScore = Number(b.cosine_similarity);
+          let aValid = Number.isFinite(aScore);
+          let bValid = Number.isFinite(bScore);
+          if (aValid !== bValid) {
+            return aValid ? -1 : 1;
+          }
+          return aValid ? bScore - aScore : 0;
+        });
+      result.push(
+        ...(group === targetSection
+          ? promotedItems.concat(remaining)
+          : remaining)
+      );
+    }
+    if (Services.prefs.getBoolPref(PREF_USER_HISTORY_COSINE_ENABLED, false)) {
+      let sectionRanks = new Map();
+      for (let item of result) {
+        let section =
+          item.section === undefined || item.section === null
+            ? null
+            : item.section;
+        let sectionItems = sectionRanks.get(section) || [];
+        sectionItems.push(item);
+        sectionRanks.set(section, sectionItems);
+      }
+      for (let [section, sectionItems] of sectionRanks) {
+        sectionItems.forEach((item, position) => {
           let score = Number(item.cosine_similarity);
           console.warn(
             `[NewTab cosine] section=${section ?? ""} ` +
@@ -2218,7 +2332,9 @@ export class DiscoveryStreamFeed {
         await this.cleanUpTopRecImpressions();
         const rotatedItems = await this.rotate(scoredItems);
         const sectionSortedItems =
-          this.sortItemsWithinSectionsByCosine(rotatedItems);
+          this._cosineRerankMode === COSINE_RERANK_ACROSS_SECTIONS
+            ? this.sortItemsAcrossSectionsByCosine(rotatedItems, sections)
+            : this.sortItemsWithinSectionsByCosine(rotatedItems);
 
         const { data: filteredResults } =
           await this.filterBlocked(sectionSortedItems);
@@ -2972,11 +3088,18 @@ export class DiscoveryStreamFeed {
         break;
       case at.DISCOVERY_STREAM_DEV_RECOMPUTE_USER_HISTORY_VECTOR:
         console.warn("[NewTab cosine] recompute requested");
+        this._cosineRerankMode = COSINE_RERANK_WITHIN_SECTIONS;
         await this.recomputeUserHistoryVector();
+        await this.onPrefChange();
+        break;
+      case at.DISCOVERY_STREAM_DEV_COSINE_RERANK_ACROSS_SECTIONS:
+        console.warn("[NewTab cosine] rerank across sections requested");
+        this._cosineRerankMode = COSINE_RERANK_ACROSS_SECTIONS;
         await this.onPrefChange();
         break;
       case at.DISCOVERY_STREAM_DEV_COSINE_RERANK_WITHIN_SECTIONS:
         console.warn("[NewTab cosine] rerank within sections requested");
+        this._cosineRerankMode = COSINE_RERANK_WITHIN_SECTIONS;
         await this.onPrefChange();
         break;
       case at.DISCOVERY_STREAM_CONFIG_CHANGE:

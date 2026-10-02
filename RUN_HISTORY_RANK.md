@@ -116,6 +116,8 @@ The button forces a recompute immediately. Normal recommendation loads reuse the
 
 The **Article Reranking** section contains **Cosine: Rerank Within Sections**. It fetches a fresh recommendation response and applies the default cosine ranking within each existing section. Section order is unchanged.
 
+The same section also contains **Cosine: Promote Top 6 to Popular Today**. It fetches fresh recommendations, moves the six highest-scoring articles across the response into the first six Popular Today slots, and cosine-ranks the remaining articles within their existing sections.
+
 ## Open the HTML report
 
 When a new Merino response produces at least one valid cosine score, Firefox writes:
