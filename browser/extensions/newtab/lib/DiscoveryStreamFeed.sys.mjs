@@ -2074,6 +2074,13 @@ export class DiscoveryStreamFeed {
       if (item.section === undefined || item.section === null) {
         return;
       }
+      if (
+        item.cosine_similarity === null ||
+        item.cosine_similarity === undefined ||
+        item.cosine_similarity === ""
+      ) {
+        return;
+      }
       let score = Number(item.cosine_similarity);
       if (!Number.isFinite(score)) {
         return;

@@ -3399,7 +3399,7 @@ describe("DiscoveryStreamFeed", () => {
       globalThis.console.warn.mockRestore();
     });
 
-    it("orders sections by their top cosine score with Popular Today first", () => {
+    it("orders sections by the sum of their top four cosine scores", () => {
       const sections = [
         {
           sectionKey: "sports",
@@ -3425,8 +3425,12 @@ describe("DiscoveryStreamFeed", () => {
       const items = [
         { section: "sports", cosine_similarity: 0.4 },
         { section: "sports", cosine_similarity: 0.8 },
+        { section: "sports", cosine_similarity: 0.3 },
+        { section: "sports", cosine_similarity: 0.2 },
+        { section: "sports", cosine_similarity: 0.1 },
         { section: "top_stories_section", cosine_similarity: 0.1 },
         { section: "tech", cosine_similarity: 0.9 },
+        { section: "tech", cosine_similarity: null },
         { section: "culture" },
       ];
 
