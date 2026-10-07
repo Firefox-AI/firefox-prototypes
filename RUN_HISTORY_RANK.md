@@ -78,8 +78,9 @@ Open `about:config` in the copied profile and verify these values:
 
 | Preference | Value | Purpose |
 | --- | --- | --- |
-| `browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.enabled` | `true` | Enables cosine scoring and article reranking. This branch defaults it to `true`. |
-| `browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.section-ordering.enabled` | `true` | Orders sections by the sum of their four highest article cosine scores, with Popular Today always first. This branch defaults it to `true`. |
+| `browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.enabled` | `true` | Enables cosine scoring, combined scoring, and article reranking. This branch defaults it to `true`. |
+| `browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.personal-weight` | `0.5` | Weight for the normalized cosine score in `combined_score`. The server score weight is `1 - personal-weight`. |
+| `browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.section-ordering.enabled` | `true` | Orders sections by the sum of their four highest article combined scores, with Popular Today always first. This branch defaults it to `true`. |
 | `places.semanticHistory.featureGate` | `true` | Allows the semantic history database and user vector. Nightly normally defaults this to `true`; a profile override can still disable it. |
 | `browser.ml.enable` | `true` | Allows the local embedding model to run. |
 | `places.history.enabled` | `true` | Provides the browsing history and frecency data used to build the vector. |
@@ -129,8 +130,8 @@ The **Article Reranking** section contains two buttons:
 
 ![Article reranking buttons](rerank_pics/rerank_option_buttons.jpeg)
 
-- **Cosine: Rerank Within Sections** is the default. It fetches a fresh recommendation response and sorts articles by cosine similarity within each existing section. With section ordering enabled, sections are then ordered by the sum of their four highest article cosine scores, with Popular Today kept first.
-- **Cosine: Promote Top 6 to Popular Today** fetches a fresh response, moves the six highest-scoring articles across the response into the first six Popular Today slots, and sorts the remaining articles within their existing sections. Section ordering follows the section-ordering pref described below.
+- **Cosine: Rerank Within Sections** is the default. It fetches a fresh recommendation response, computes `combined_score`, and sorts articles by it within each existing section. With section ordering enabled, sections are then ordered by the sum of their four highest combined scores, with Popular Today kept first.
+- **Cosine: Promote Top 6 to Popular Today** fetches a fresh response, moves the six highest combined scores across the response into the first six Popular Today slots, and sorts the remaining articles within their existing sections. Section ordering follows the section-ordering pref described below.
 
 The selected reranking mode remains active for later refreshes during the current Firefox run. Click **Cosine: Rerank Within Sections** to return to the default mode. Recomputing the user vector also returns to the default mode.
 
@@ -164,33 +165,35 @@ open '/absolute/path/to/nightly-profile-YYYYMMDD-HHMMSS/newtab-history-rank.html
 
 If the console prints a different path after `report=`, use that path.
 
-The report is one global list sorted by raw cosine similarity, regardless of the selected UI reranking mode. Articles without a valid score appear at the end. It includes the cosine rank, global Merino rank, server score, section, topic, image, title, excerpt, and URL. The topic histograms compare the global Merino and cosine rank distributions.
+The report is one global list sorted by `combined_score`, regardless of the selected UI reranking mode. Articles without a valid combined score appear at the end. It includes combined rank, global Merino rank, combined score, cosine score, server score, section, topic, image, title, excerpt, and URL. The topic histograms compare the global Merino and combined rank distributions.
 
-[Example HTML report](rerank_pics/rerank_report_example.html)
+[Example HTML report](rerank_pics/rerank_report_example.html) (the checked-in snapshot predates combined scoring; newly generated reports use the columns described above.)
 
 ## Read the console ranking output
 
 Filter the terminal or Browser Console for:
 
 ```text
-[NewTab cosine]
+[NewTab combined]
 ```
 
 Successful scoring produces one line per article:
 
 ```text
-[NewTab cosine] section=travel original_rank=6 sim_rank=2 sim_score=0.1298 url=https://example.com/article
+[NewTab combined] section=travel original_rank=6 combined_rank=2 combined_score=0.73 cosine_score=0.91 server_score=0.55 url=https://example.com/article
 ```
 
 The fields mean:
 
 - `section`: the New Tab section containing the article;
 - `original_rank`: the article's rank in the incoming feed;
-- `sim_rank`: its final rank within the section after the selected reranking mode;
-- `sim_score`: cosine similarity to the user vector;
+- `combined_rank`: its final rank within the section after the selected reranking mode;
+- `combined_score`: the score used for reranking;
+- `cosine_score`: cosine similarity to the user vector;
+- `server_score`: Merino's server score;
 - `url`: the article URL.
 
-Section ordering is controlled by `browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.section-ordering.enabled`. When enabled, the section with the highest sum of its four highest finite cosine scores comes first after Popular Today, followed by the other scored sections in descending sum. Sections with fewer than four scored articles use the scores they have. Sections without a finite score stay after scored sections in their original order. Within-section mode reorders articles inside their sections. Promote Top 6 moves the six global leaders into Popular Today and reorders the remaining articles inside their sections.
+`combined_score` is calculated for the complete fetched article list. Each signal is min-max normalized across the articles that have that signal, so its minimum is `0` and maximum is `1`. The score is `personal-weight * normalized cosine + (1 - personal-weight) * normalized server score`. A signal with one constant value contributes `0.5`; if one signal is missing for an article, the available normalized signal is used. Section ordering is controlled by `browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.section-ordering.enabled`. When enabled, the section with the highest sum of its four highest finite combined scores comes first after Popular Today, followed by the other scored sections in descending sum. Sections with fewer than four scored articles use the scores they have. Sections without a finite score stay after scored sections in their original order. Within-section mode reorders articles inside their sections. Promote Top 6 moves the six global leaders into Popular Today and reorders the remaining articles inside their sections.
 
 ## Fallback messages
 
@@ -208,8 +211,8 @@ The screenshots used in this guide are stored in [`rerank_pics/`](rerank_pics/).
 
 ## TODO
 
-- Modify Merino so `server_score` is available for every article.
-- Combine `server_score` and cosine similarity to make explicit ranking tradeoffs.
+- Verify the Merino experiment sends `server_score` for every article and measure coverage in the client.
+- Tune the default `personal-weight` and evaluate how different weights change ranking outcomes.
 - Track representations of articles the user clicks in New Tab.
-- Combine the history representation, the New Tab article-click representation, cosine similarity, and `server_score` in a unified ranking strategy.
+- Combine the history representation, the New Tab article-click representation, and `server_score` in a unified ranking strategy.
 - Add client-side learning or adaptation for the three ranking signals: history similarity, article-click similarity, and `server_score`.

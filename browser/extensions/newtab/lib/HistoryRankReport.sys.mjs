@@ -10,7 +10,7 @@ const REPORT_STYLE = `
   .histogram-label { font-variant-numeric: tabular-nums; }
   .bar { min-height: 8px; border-radius: 2px; }
   .merino { background: #e67e22; opacity: .45; }
-  .cosine { background: #3498db; opacity: .45; }
+  .combined { background: #3498db; opacity: .45; }
   .legend { color: GrayText; font-size: 12px; margin-top: 8px; }
   .legend span { margin-right: 14px; }
   .legend .swatch { display: inline-block; height: 10px; margin-right: 4px; width: 10px; }
@@ -36,6 +36,9 @@ function escapeHtml(value) {
 }
 
 function numberValue(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
   let number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
@@ -58,7 +61,7 @@ function rankItems(items, sections) {
   let rows = items.map((item, index) => ({
     item,
     index,
-    cosineScore: numberValue(item.cosine_similarity),
+    combinedScore: numberValue(item.combined_score),
   }));
   let originalRows = rows.slice().sort((a, b) => {
     let aOriginalSection = originalSection(a.item);
@@ -92,19 +95,19 @@ function rankItems(items, sections) {
   });
 
   rows.sort((a, b) => {
-    if (a.cosineScore !== null && b.cosineScore !== null) {
-      if (a.cosineScore != b.cosineScore) {
-        return b.cosineScore - a.cosineScore;
+    if (a.combinedScore !== null && b.combinedScore !== null) {
+      if (a.combinedScore != b.combinedScore) {
+        return b.combinedScore - a.combinedScore;
       }
-    } else if (a.cosineScore !== null) {
+    } else if (a.combinedScore !== null) {
       return -1;
-    } else if (b.cosineScore !== null) {
+    } else if (b.combinedScore !== null) {
       return 1;
     }
     return a.merinoRank - b.merinoRank;
   });
   rows.forEach((row, index) => {
-    row.cosineRank = index + 1;
+    row.combinedRank = index + 1;
   });
   return rows;
 }
@@ -112,25 +115,25 @@ function rankItems(items, sections) {
 function renderHistogram(topic, rows, maxRank) {
   let binCount = Math.min(10, Math.max(1, maxRank));
   let merinoCounts = Array(binCount).fill(0);
-  let cosineCounts = Array(binCount).fill(0);
+  let combinedCounts = Array(binCount).fill(0);
   let rankToBin = rank =>
     Math.min(binCount - 1, Math.floor(((rank - 1) * binCount) / maxRank));
 
   for (let row of rows) {
     merinoCounts[rankToBin(row.merinoRank)]++;
-    cosineCounts[rankToBin(row.cosineRank)]++;
+    combinedCounts[rankToBin(row.combinedRank)]++;
   }
-  let maxCount = Math.max(...merinoCounts, ...cosineCounts, 1);
+  let maxCount = Math.max(...merinoCounts, ...combinedCounts, 1);
   let histogramRows = merinoCounts.map((count, index) => {
     let start = Math.floor((index * maxRank) / binCount) + 1;
     let end = Math.floor(((index + 1) * maxRank) / binCount);
     let merinoWidth = (count / maxCount) * 100;
-    let cosineWidth = (cosineCounts[index] / maxCount) * 100;
+    let combinedWidth = (combinedCounts[index] / maxCount) * 100;
     return `<div class="histogram-row">
       <span class="histogram-label">${start}-${end}</span>
       <div>
         <div class="bar merino" style="width:${merinoWidth}%" title="Merino: ${count}"></div>
-        <div class="bar cosine" style="width:${cosineWidth}%" title="Cosine: ${cosineCounts[index]}"></div>
+        <div class="bar combined" style="width:${combinedWidth}%" title="Combined: ${combinedCounts[index]}"></div>
       </div>
     </div>`;
   });
@@ -181,9 +184,10 @@ export function buildHistoryRankReport(
   let tableRows = rows.map(row => {
     let item = row.item;
     return `<tr>
-      <td class="rank">${row.cosineRank}</td>
+      <td class="rank">${row.combinedRank}</td>
       <td class="rank">${row.merinoRank}</td>
-      <td class="score">${escapeHtml(displayNumber(row.cosineScore))}</td>
+      <td class="score">${escapeHtml(displayNumber(row.combinedScore))}</td>
+      <td class="score">${escapeHtml(displayNumber(item.cosine_similarity))}</td>
       <td class="score">${escapeHtml(displayNumber(item.server_score))}</td>
       <td>${escapeHtml(item.section || "")}</td>
       <td>${escapeHtml(item.topic || "untagged")}</td>
@@ -201,19 +205,20 @@ export function buildHistoryRankReport(
 </head>
 <body>
   <h1>Firefox New Tab History Rank</h1>
-  <div class="summary">Generated ${escapeHtml(generatedAt)} · ${rows.length} articles · sorted by raw cosine similarity</div>
+  <div class="summary">Generated ${escapeHtml(generatedAt)} · ${rows.length} articles · sorted by combined score</div>
   <h2>Rank distributions by topic</h2>
   <div class="histograms">${histograms.join("")}</div>
   <div class="legend">
     <span><span class="swatch merino"></span>Merino rank</span>
-    <span><span class="swatch cosine"></span>Cosine rank</span>
+    <span><span class="swatch combined"></span>Combined rank</span>
   </div>
   <h2>Articles</h2>
   <div class="table-wrap">
     <table>
       <thead><tr>
-        <th>Cosine rank</th><th>Merino rank</th><th>Cosine score</th>
-        <th>Server score</th><th>Section</th><th>Topic</th><th>Article</th>
+        <th>Combined rank</th><th>Merino rank</th><th>Combined score</th>
+        <th>Cosine score</th><th>Server score</th><th>Section</th>
+        <th>Topic</th><th>Article</th>
       </tr></thead>
       <tbody>${tableRows.join("")}</tbody>
     </table>

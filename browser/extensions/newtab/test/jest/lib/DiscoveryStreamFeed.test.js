@@ -3223,6 +3223,21 @@ describe("DiscoveryStreamFeed", () => {
       expect(scored.map(item => item.id)).toEqual(["first", "second"]);
     });
 
+    it("normalizes cosine and server scores into a combined score", () => {
+      services.prefs.getBoolPref.mockReturnValue(true);
+      services.prefs.getFloatPref = jest.fn().mockReturnValue(0.25);
+      const scored = feed.scoreItemsByCombinedScore([
+        { id: "history", cosine_similarity: 1, server_score: 0 },
+        { id: "server", cosine_similarity: 0, server_score: 1 },
+        { id: "balanced", cosine_similarity: 0.5, server_score: 0.5 },
+        { id: "missing-server", cosine_similarity: 0.75, server_score: null },
+      ]);
+
+      expect(scored.map(item => item.combined_score)).toEqual([
+        0.25, 0.75, 0.5, 0.75,
+      ]);
+    });
+
     it("unwraps article embeddings returned with output metadata", async () => {
       const embedMany = jest.fn().mockResolvedValue({
         output: [
@@ -3269,7 +3284,7 @@ describe("DiscoveryStreamFeed", () => {
       );
     });
 
-    it("sorts cosine scores within section slots", () => {
+    it("sorts combined scores within section slots", () => {
       services.prefs.getBoolPref.mockImplementation((name, defaultValue) =>
         name ===
         "browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.enabled"
@@ -3283,6 +3298,7 @@ describe("DiscoveryStreamFeed", () => {
         id: "first-section-first",
         section: "first-section",
         cosine_similarity: 0.1,
+        combined_score: 0.1,
         received_rank: 1,
         url: "https://example.com/first",
       };
@@ -3295,6 +3311,7 @@ describe("DiscoveryStreamFeed", () => {
         id: "first-section-second",
         section: "first-section",
         cosine_similarity: 0.9,
+        combined_score: 0.9,
         received_rank: 2,
         url: "https://example.com/second",
       };
@@ -3302,6 +3319,7 @@ describe("DiscoveryStreamFeed", () => {
         id: "second-section-first",
         section: "second-section",
         cosine_similarity: 0.2,
+        combined_score: 0.2,
         received_rank: 4,
         url: "https://example.com/third",
       };
@@ -3309,11 +3327,12 @@ describe("DiscoveryStreamFeed", () => {
         id: "second-section-second",
         section: "second-section",
         cosine_similarity: 0.8,
+        combined_score: 0.8,
         received_rank: 5,
         url: "https://example.com/fourth",
       };
 
-      const sorted = feed.sortItemsWithinSectionsByCosine([
+      const sorted = feed.sortItemsWithinSectionsByCombinedScore([
         firstSectionFirst,
         unsectioned,
         firstSectionSecond,
@@ -3329,18 +3348,18 @@ describe("DiscoveryStreamFeed", () => {
         "second-section-first",
       ]);
       expect(consoleWarn).toHaveBeenCalledWith(
-        "[NewTab cosine] section=first-section original_rank=2 sim_rank=1 sim_score=0.9 url=https://example.com/second"
+        "[NewTab combined] section=first-section original_rank=2 combined_rank=1 combined_score=0.9 cosine_score=0.9 server_score= url=https://example.com/second"
       );
       expect(consoleWarn).toHaveBeenCalledWith(
-        "[NewTab cosine] section=second-section original_rank=5 sim_rank=1 sim_score=0.8 url=https://example.com/fourth"
+        "[NewTab combined] section=second-section original_rank=5 combined_rank=1 combined_score=0.8 cosine_score=0.8 server_score= url=https://example.com/fourth"
       );
       expect(consoleWarn).toHaveBeenCalledWith(
-        "[NewTab cosine] section= original_rank=3 sim_rank=1 sim_score= url=https://example.com/unsectioned"
+        "[NewTab combined] section= original_rank=3 combined_rank=1 combined_score= cosine_score= server_score= url=https://example.com/unsectioned"
       );
       consoleWarn.mockRestore();
     });
 
-    it("promotes the global top six into Popular Today", () => {
+    it("promotes the global top six combined scores into Popular Today", () => {
       services.prefs.getBoolPref.mockImplementation((name, defaultValue) =>
         name ===
         "browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.enabled"
@@ -3354,22 +3373,24 @@ describe("DiscoveryStreamFeed", () => {
           id: "popular-1",
           section: "top_stories_section",
           cosine_similarity: 0.2,
+          combined_score: 0.2,
         },
         {
           id: "popular-2",
           section: "top_stories_section",
           cosine_similarity: 0.1,
+          combined_score: 0.1,
         },
-        { id: "sports-1", section: "sports", cosine_similarity: 0.9 },
-        { id: "sports-2", section: "sports", cosine_similarity: 0.8 },
-        { id: "sports-3", section: "sports", cosine_similarity: 0.7 },
-        { id: "sports-4", section: "sports", cosine_similarity: 0.4 },
-        { id: "tech-1", section: "tech", cosine_similarity: 0.6 },
-        { id: "tech-2", section: "tech", cosine_similarity: 0.5 },
-        { id: "tech-3", section: "tech", cosine_similarity: 0.3 },
+        { id: "sports-1", section: "sports", combined_score: 0.9 },
+        { id: "sports-2", section: "sports", combined_score: 0.8 },
+        { id: "sports-3", section: "sports", combined_score: 0.7 },
+        { id: "sports-4", section: "sports", combined_score: 0.4 },
+        { id: "tech-1", section: "tech", combined_score: 0.6 },
+        { id: "tech-2", section: "tech", combined_score: 0.5 },
+        { id: "tech-3", section: "tech", combined_score: 0.3 },
       ];
 
-      const reranked = feed.sortItemsAcrossSectionsByCosine(items, [
+      const reranked = feed.sortItemsAcrossSectionsByCombinedScore(items, [
         { sectionKey: "top_stories_section", title: "Popular Today" },
         { sectionKey: "sports", title: "Sports" },
         { sectionKey: "tech", title: "Tech" },
@@ -3423,18 +3444,18 @@ describe("DiscoveryStreamFeed", () => {
         },
       ];
       const items = [
-        { section: "sports", cosine_similarity: 0.4 },
-        { section: "sports", cosine_similarity: 0.8 },
-        { section: "sports", cosine_similarity: 0.3 },
-        { section: "sports", cosine_similarity: 0.2 },
-        { section: "sports", cosine_similarity: 0.1 },
-        { section: "top_stories_section", cosine_similarity: 0.1 },
-        { section: "tech", cosine_similarity: 0.9 },
-        { section: "tech", cosine_similarity: null },
+        { section: "sports", combined_score: 0.4 },
+        { section: "sports", combined_score: 0.8 },
+        { section: "sports", combined_score: 0.3 },
+        { section: "sports", combined_score: 0.2 },
+        { section: "sports", combined_score: 0.1 },
+        { section: "top_stories_section", combined_score: 0.1 },
+        { section: "tech", combined_score: 0.9 },
+        { section: "tech", combined_score: null },
         { section: "culture" },
       ];
 
-      feed.sortSectionsByCosine(sections, items);
+      feed.sortSectionsByCombinedScore(sections, items);
 
       expect(sections.map(section => section.sectionKey)).toEqual([
         "top_stories_section",
