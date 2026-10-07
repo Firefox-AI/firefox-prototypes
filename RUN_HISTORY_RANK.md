@@ -78,7 +78,8 @@ Open `about:config` in the copied profile and verify these values:
 
 | Preference | Value | Purpose |
 | --- | --- | --- |
-| `browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.enabled` | `true` | Enables cosine scoring and within-section sorting. This branch defaults it to `true`. |
+| `browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.enabled` | `true` | Enables cosine scoring and article reranking. This branch defaults it to `true`. |
+| `browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.section-ordering.enabled` | `true` | Orders sections by their highest article cosine score, with Popular Today always first. This branch defaults it to `true`. |
 | `places.semanticHistory.featureGate` | `true` | Allows the semantic history database and user vector. Nightly normally defaults this to `true`; a profile override can still disable it. |
 | `browser.ml.enable` | `true` | Allows the local embedding model to run. |
 | `places.history.enabled` | `true` | Provides the browsing history and frecency data used to build the vector. |
@@ -89,6 +90,8 @@ If `places.semanticHistory.removeOnStartup` exists, it must not be `true`. Clear
 The semantic-history manager also requires a supported region and locale, enough physical memory and CPU capacity, and a working local ML model. The current supported combinations include English in the US, Canada, Australia, the UK, Ireland, New Zealand, and the Philippines, plus English or French in France.
 
 The profile must contain enough history for the semantic database to produce a valid, nonzero vector. The first run may need time to index history and initialize the model.
+
+Every Merino content request from this prototype includes the fixed experiment metadata `newtab-cosine-ranking` / `all-article-server-scores`, regardless of the profile's experiment enrollment. Merino must be configured to recognize that experiment branch before it will return `server_score` for all articles.
 
 ## Restart Firefox
 
@@ -126,8 +129,8 @@ The **Article Reranking** section contains two buttons:
 
 ![Article reranking buttons](rerank_pics/rerank_option_buttons.jpeg)
 
-- **Cosine: Rerank Within Sections** is the default. It fetches a fresh recommendation response and sorts articles by cosine similarity within each existing section. Section order stays unchanged.
-- **Cosine: Promote Top 6 to Popular Today** fetches a fresh response, moves the six highest-scoring articles across the response into the first six Popular Today slots, and sorts the remaining articles within their existing sections. Section order stays unchanged.
+- **Cosine: Rerank Within Sections** is the default. It fetches a fresh recommendation response and sorts articles by cosine similarity within each existing section. With section ordering enabled, sections are then ordered by the highest cosine score among their articles, with Popular Today kept first.
+- **Cosine: Promote Top 6 to Popular Today** fetches a fresh response, moves the six highest-scoring articles across the response into the first six Popular Today slots, and sorts the remaining articles within their existing sections. Section ordering follows the section-ordering pref described below.
 
 The selected reranking mode remains active for later refreshes during the current Firefox run. Click **Cosine: Rerank Within Sections** to return to the default mode. Recomputing the user vector also returns to the default mode.
 
@@ -187,7 +190,7 @@ The fields mean:
 - `sim_score`: cosine similarity to the user vector;
 - `url`: the article URL.
 
-Sections keep their original order. Within-section mode only reorders articles inside their existing sections. Promote Top 6 moves the six global leaders into Popular Today and reorders the remaining articles inside their sections.
+Section ordering is controlled by `browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.section-ordering.enabled`. When enabled, the section with the highest article cosine score comes first after Popular Today, followed by the other scored sections in descending top article score. Sections without a finite score stay after scored sections in their original order. Within-section mode reorders articles inside their sections. Promote Top 6 moves the six global leaders into Popular Today and reorders the remaining articles inside their sections.
 
 ## Fallback messages
 

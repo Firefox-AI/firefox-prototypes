@@ -85,8 +85,6 @@ const PREF_CONTEXTUAL_SPOC_COUNTS =
 const PREF_SPOC_PLACEMENTS = "discoverystream.placements.spocs";
 const PREF_SPOC_COUNTS = "discoverystream.placements.spocs.counts";
 const PREF_SPOC_POSITIONS = "discoverystream.spoc-positions";
-const PREF_MERINO_FEED_EXPERIMENT =
-  "browser.newtabpage.activity-stream.discoverystream.merino-feed-experiment";
 const PREF_ENABLED = "discoverystream.enabled";
 const PREF_HARDCODED_BASIC_LAYOUT = "discoverystream.hardcoded-basic-layout";
 const PREF_SPOCS_ENDPOINT = "discoverystream.spocs-endpoint";
@@ -120,6 +118,12 @@ const PREF_INFERRED_INTERESTS_OVERRIDE =
   "discoverystream.sections.personalization.inferred.interests.override";
 const PREF_USER_HISTORY_COSINE_ENABLED =
   "browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.enabled";
+const PREF_USER_HISTORY_COSINE_SECTION_ORDERING_ENABLED =
+  "browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.section-ordering.enabled";
+const MERINO_PROTOTYPE_EXPERIMENT = {
+  experimentName: "newtab-cosine-ranking",
+  experimentBranch: "all-article-server-scores",
+};
 const COSINE_RERANK_WITHIN_SECTIONS = "within-sections";
 const COSINE_RERANK_ACROSS_SECTIONS = "across-sections";
 const COSINE_PROMOTION_COUNT = 6;
@@ -1872,21 +1876,6 @@ export class DiscoveryStreamFeed {
     );
   }
 
-  getExperimentInfo() {
-    // We want to know if the user is in an experiment or rollout,
-    // but we prioritize experiments over rollouts.
-    const experimentMetadata =
-      lazy.NimbusFeatures.pocketNewtab.getEnrollmentMetadata();
-
-    let experimentName = experimentMetadata?.slug ?? "";
-    let experimentBranch = experimentMetadata?.branch ?? "";
-
-    return {
-      experimentName,
-      experimentBranch,
-    };
-  }
-
   async getUserHistoryVector() {
     return lazy.getPlacesSemanticHistoryManager().getUserHistoryVector();
   }
@@ -2079,6 +2068,47 @@ export class DiscoveryStreamFeed {
     return result;
   }
 
+  sortSectionsByCosine(sections, items) {
+    let sectionScores = new Map();
+    items.forEach(item => {
+      if (item.section === undefined || item.section === null) {
+        return;
+      }
+      let score = Number(item.cosine_similarity);
+      if (!Number.isFinite(score)) {
+        return;
+      }
+      let currentScore = sectionScores.get(item.section);
+      if (currentScore === undefined || score > currentScore) {
+        sectionScores.set(item.section, score);
+      }
+    });
+
+    sections.sort((a, b) => {
+      let aPopular =
+        a.sectionKey === POPULAR_TODAY_SECTION_KEY ||
+        a.title?.trim().toLowerCase() === "popular today";
+      let bPopular =
+        b.sectionKey === POPULAR_TODAY_SECTION_KEY ||
+        b.title?.trim().toLowerCase() === "popular today";
+      if (aPopular !== bPopular) {
+        return aPopular ? -1 : 1;
+      }
+
+      let aScore = sectionScores.get(a.sectionKey);
+      let bScore = sectionScores.get(b.sectionKey);
+      let aHasScore = Number.isFinite(aScore);
+      let bHasScore = Number.isFinite(bScore);
+      if (aHasScore !== bHasScore) {
+        return aHasScore ? -1 : 1;
+      }
+      if (aHasScore && aScore !== bScore) {
+        return bScore - aScore;
+      }
+      return a.receivedRank - b.receivedRank;
+    });
+  }
+
   sortItemsAcrossSectionsByCosine(items, sections) {
     let withinSectionItems = this.sortItemsWithinSectionsByCosine(items, {
       log: false,
@@ -2268,8 +2298,6 @@ export class DiscoveryStreamFeed {
               });
             }
           }
-
-          this._applySectionLayouts(sections);
         }
 
         const cosineScoredItems =
@@ -2282,18 +2310,26 @@ export class DiscoveryStreamFeed {
         ) {
           await this.writeHistoryRankReport(cosineScoredItems, sections);
         }
+        if (
+          sections.length &&
+          Services.prefs.getBoolPref(
+            PREF_USER_HISTORY_COSINE_SECTION_ORDERING_ENABLED,
+            false
+          )
+        ) {
+          this.sortSectionsByCosine(sections, cosineScoredItems);
+        }
+        this._applySectionLayouts(sections);
         const { data: scoredItems, personalized } =
           await this.scoreItemsInferred(cosineScoredItems);
 
         if (sections.length) {
           const visibleSections = sections
             .filter(({ visible }) => visible)
-            .sort((a, b) => a.receivedRank - b.receivedRank)
             .map(section => section.sectionKey)
             .join(",");
 
-          // after the request only show the sections that are
-          // initially visible and only keep the initial order (determined by the server)
+          // After the request only show the sections that are initially visible.
           this.store.dispatch(
             ac.SetPref(PREF_VISIBLE_SECTIONS, visibleSections)
           );
@@ -2393,11 +2429,6 @@ export class DiscoveryStreamFeed {
           .filter(item => item)
       : [];
 
-    // Should we pass the experiment branch and slug to the Merino feed request.
-    const prefMerinoFeedExperiment = Services.prefs.getBoolPref(
-      PREF_MERINO_FEED_EXPERIMENT
-    );
-
     // convert section to array to match what merino is expecting
     const sections = Object.entries(sectionPersonalization).map(
       ([sectionId, data]) => ({
@@ -2436,7 +2467,7 @@ export class DiscoveryStreamFeed {
     };
     headers.append("content-type", "application/json");
     let body = {
-      ...(prefMerinoFeedExperiment ? this.getExperimentInfo() : {}),
+      ...MERINO_PROTOTYPE_EXPERIMENT,
       ...requestMetadata,
       locale: this.locale,
       region: this.region,

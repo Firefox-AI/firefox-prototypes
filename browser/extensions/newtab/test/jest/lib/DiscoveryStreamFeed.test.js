@@ -3186,6 +3186,17 @@ describe("DiscoveryStreamFeed", () => {
       );
     });
 
+    it("always attaches the prototype Merino experiment metadata", () => {
+      const body = JSON.parse(feed.formatComponentFeedRequest().body);
+
+      expect(body).toEqual(
+        expect.objectContaining({
+          experimentName: "newtab-cosine-ranking",
+          experimentBranch: "all-article-server-scores",
+        })
+      );
+    });
+
     it("adds cosine similarity while preserving article order", async () => {
       services.prefs.getBoolPref.mockImplementation((name, defaultValue) =>
         name ===
@@ -3386,6 +3397,47 @@ describe("DiscoveryStreamFeed", () => {
         "top_stories_section"
       );
       globalThis.console.warn.mockRestore();
+    });
+
+    it("orders sections by their top cosine score with Popular Today first", () => {
+      const sections = [
+        {
+          sectionKey: "sports",
+          title: "Sports",
+          receivedRank: 1,
+        },
+        {
+          sectionKey: "top_stories_section",
+          title: "Popular Today",
+          receivedRank: 0,
+        },
+        {
+          sectionKey: "tech",
+          title: "Tech",
+          receivedRank: 2,
+        },
+        {
+          sectionKey: "culture",
+          title: "Culture",
+          receivedRank: 3,
+        },
+      ];
+      const items = [
+        { section: "sports", cosine_similarity: 0.4 },
+        { section: "sports", cosine_similarity: 0.8 },
+        { section: "top_stories_section", cosine_similarity: 0.1 },
+        { section: "tech", cosine_similarity: 0.9 },
+        { section: "culture" },
+      ];
+
+      feed.sortSectionsByCosine(sections, items);
+
+      expect(sections.map(section => section.sectionKey)).toEqual([
+        "top_stories_section",
+        "tech",
+        "sports",
+        "culture",
+      ]);
     });
 
     it("should update to new feed url", async () => {
