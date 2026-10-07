@@ -70,6 +70,8 @@ const RECORDS_HISTORY_PREFS = [
   "places.history.enabled",
   "browser.privatebrowsing.autostart",
 ];
+const PREF_PERSONALIZATION_WEIGHT =
+  "discoverystream.sections.personalization.user-history-cosine.personal-weight";
 
 function recordsHistory() {
   return (
@@ -1147,7 +1149,14 @@ export class PrefsFeed {
         // switching it off writes the value the pref already holds, no observer
         // fires and the opt-out never gets recorded. See bug 2068165.
         this._mirrorSpaceOptOut(action.data.name, action.data.value);
-        this._prefs.set(action.data.name, action.data.value);
+        if (action.data.name === PREF_PERSONALIZATION_WEIGHT) {
+          Services.prefs.setStringPref(
+            this._prefs._branchStr + action.data.name,
+            String(action.data.value)
+          );
+        } else {
+          this._prefs.set(action.data.name, action.data.value);
+        }
         break;
       case at.SET_MULTIPLE_PREFS: {
         // Set all prefs in a transaction, then flush one combined MULTIPLE_PREFS_CHANGED.

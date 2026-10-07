@@ -44,6 +44,8 @@ const PREF_ALLOWED_ENDPOINTS = "discoverystream.endpoints";
 const PREF_OHTTP_CONFIG = "discoverystream.ohttp.configURL";
 const PREF_OHTTP_RELAY = "discoverystream.ohttp.relayURL";
 const PREF_WIDGETS_SYSTEM_ENABLED = "widgets.system.enabled";
+const PREF_PERSONALIZATION_WEIGHT =
+  "discoverystream.sections.personalization.user-history-cosine.personal-weight";
 
 // Internal, pref-gated widget features that default off but we want to test in
 // devtools. Hand-maintained (outside the automatic registry-driven toggles).
@@ -257,6 +259,8 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
     this.cosineRerankAcrossSections =
       this.cosineRerankAcrossSections.bind(this);
     this.refreshCache = this.refreshCache.bind(this);
+    this.handlePersonalizationChange =
+      this.handlePersonalizationChange.bind(this);
     this.showPlaceholder = this.showPlaceholder.bind(this);
     this.idleDaily = this.idleDaily.bind(this);
     this.systemTick = this.systemTick.bind(this);
@@ -298,6 +302,7 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
       weatherQuery: "",
       pendingOverrides: {},
       overridesTogglePressed: null,
+      personalizationWeight: null,
       // null means "show the pref", so an external change is picked up.
       spacesConfigDraft: null,
     };
@@ -313,6 +318,12 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
         type: at.DISCOVERY_STREAM_DEV_REFRESH_CACHE,
       })
     );
+  }
+
+  handlePersonalizationChange(event) {
+    const value = Number(event.target.value);
+    this.setState({ personalizationWeight: value });
+    this.props.dispatch(ac.SetPref(PREF_PERSONALIZATION_WEIGHT, value));
   }
 
   recomputeUserHistoryVector() {
@@ -1354,6 +1365,13 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
   render() {
     const { layout } = this.props.state.DiscoveryStream;
     const sectionsEnabled = this.props.otherPrefs[PREF_SECTIONS_ENABLED];
+    const rawPersonalizationWeight = Number(
+      this.state.personalizationWeight ??
+        this.props.otherPrefs[PREF_PERSONALIZATION_WEIGHT]
+    );
+    const personalizationWeight = Number.isFinite(rawPersonalizationWeight)
+      ? Math.min(1, Math.max(0, rawPersonalizationWeight))
+      : 0.5;
 
     // Prefs for IAB Banners
     const mediumRectangleEnabled =
@@ -1398,6 +1416,31 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
         </div>
         <details className="details-section">
           <summary>Article Reranking</summary>
+          <div className="personalization-weight-control">
+            <label htmlFor="personalization-weight">
+              Personalization: {personalizationWeight.toFixed(1)}
+            </label>
+            <input
+              id="personalization-weight"
+              type="range"
+              min="0"
+              max="1"
+              step="0.1"
+              list="personalization-weight-ticks"
+              value={String(personalizationWeight)}
+              onChange={this.handlePersonalizationChange}
+              aria-label="Personalization"
+            />
+            <datalist id="personalization-weight-ticks">
+              {Array.from({ length: 11 }, (_, index) => (
+                <option key={index} value={index / 10} />
+              ))}
+            </datalist>
+            <div className="personalization-weight-labels">
+              <span>Server score</span>
+              <span>Personal score</span>
+            </div>
+          </div>
           <div className="admin-button-row">
             <moz-button onClick={this.cosineRerankWithinSections}>
               Cosine: Rerank Within Sections

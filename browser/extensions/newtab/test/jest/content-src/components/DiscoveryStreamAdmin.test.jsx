@@ -226,6 +226,28 @@ describe("<DiscoveryStreamAdminUI>", () => {
     );
   });
 
+  it("should set the personalization weight from the slider", () => {
+    const { container, dispatch } = renderUI({
+      otherPrefs: {
+        ...CONTEXTUAL_PREFS,
+        "discoverystream.sections.personalization.user-history-cosine.personal-weight": 0.5,
+      },
+    });
+    const slider = container.querySelector(
+      'input[aria-label="Personalization"]'
+    );
+
+    fireEvent.change(slider, { target: { value: "0.7" } });
+
+    expect(slider).toHaveValue("0.7");
+    expect(dispatch).toHaveBeenCalledWith(
+      ac.SetPref(
+        "discoverystream.sections.personalization.user-history-cosine.personal-weight",
+        0.7
+      )
+    );
+  });
+
   it("should fire recomputeUserHistoryVector", () => {
     const { container, dispatch } = renderUI();
     fireEvent.click(buttonByText(container, "Recompute User History Vector"));

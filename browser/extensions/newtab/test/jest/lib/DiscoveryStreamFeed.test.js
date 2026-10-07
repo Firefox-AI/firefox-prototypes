@@ -3225,7 +3225,7 @@ describe("DiscoveryStreamFeed", () => {
 
     it("normalizes cosine and server scores into a combined score", () => {
       services.prefs.getBoolPref.mockReturnValue(true);
-      services.prefs.getFloatPref = jest.fn().mockReturnValue(0.25);
+      services.prefs.getStringPref = jest.fn().mockReturnValue("0.25");
       const scored = feed.scoreItemsByCombinedScore([
         { id: "history", cosine_similarity: 1, server_score: 0 },
         { id: "server", cosine_similarity: 0, server_score: 1 },
@@ -3234,8 +3234,38 @@ describe("DiscoveryStreamFeed", () => {
       ]);
 
       expect(scored.map(item => item.combined_score)).toEqual([
-        0.25, 0.75, 0.5, 0.75,
+        0.25,
+        0.75,
+        0.5,
+        undefined,
       ]);
+      expect(scored[3]).toEqual({
+        id: "missing-server",
+        cosine_similarity: 0.75,
+        server_score: null,
+      });
+    });
+
+    it("uses only the server score at zero personal weight", () => {
+      services.prefs.getBoolPref.mockReturnValue(true);
+      services.prefs.getStringPref = jest.fn().mockReturnValue("0");
+      const scored = feed.scoreItemsByCombinedScore([
+        { id: "lower-server", cosine_similarity: 1, server_score: 0.2 },
+        { id: "higher-server", cosine_similarity: 0, server_score: 0.9 },
+      ]);
+
+      expect(scored.map(item => item.combined_score)).toEqual([0, 1]);
+    });
+
+    it("uses only the cosine score at one personal weight", () => {
+      services.prefs.getBoolPref.mockReturnValue(true);
+      services.prefs.getStringPref = jest.fn().mockReturnValue("1");
+      const scored = feed.scoreItemsByCombinedScore([
+        { id: "lower-cosine", cosine_similarity: 0.2, server_score: 1 },
+        { id: "higher-cosine", cosine_similarity: 0.9, server_score: 0 },
+      ]);
+
+      expect(scored.map(item => item.combined_score)).toEqual([0, 1]);
     });
 
     it("unwraps article embeddings returned with output metadata", async () => {

@@ -744,6 +744,13 @@ export const PREFS_CONFIG = new Map([
     },
   ],
   [
+    "discoverystream.sections.personalization.user-history-cosine.personal-weight",
+    {
+      title: "Weight for the normalized user-history score",
+      value: "0.5",
+    },
+  ],
+  [
     "unifiedAds.ohttp.enabled",
     {
       title: "Enables the MARS requests and images sent over OHTTP",

@@ -147,6 +147,29 @@
     margin-block: var(--space-large);
   }
 
+  .personalization-weight-control {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-small);
+    margin-block: var(--space-large);
+    max-width: 360px;
+
+    label {
+      font-weight: var(--font-weight-bold);
+    }
+
+    input[type="range"] {
+      width: 100%;
+    }
+  }
+
+  .personalization-weight-labels {
+    display: flex;
+    justify-content: space-between;
+    color: var(--newtab-text-secondary-color);
+    font-size: var(--font-size-small);
+  }
+
   .inferred-personalization-overrides {
     margin-block: var(--space-large);
   }

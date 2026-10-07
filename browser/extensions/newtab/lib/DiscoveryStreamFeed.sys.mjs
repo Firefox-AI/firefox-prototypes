@@ -2039,13 +2039,25 @@ export class DiscoveryStreamFeed {
       return items;
     }
 
-    let personalWeight =
-      typeof Services.prefs.getFloatPref === "function"
-        ? Services.prefs.getFloatPref(
-            PREF_USER_HISTORY_COSINE_PERSONAL_WEIGHT,
-            0.5
-          )
-        : 0.5;
+    let personalWeight;
+    try {
+      personalWeight = Services.prefs.getStringPref(
+        PREF_USER_HISTORY_COSINE_PERSONAL_WEIGHT,
+        "0.5"
+      );
+    } catch {
+      personalWeight =
+        typeof Services.prefs.getFloatPref === "function"
+          ? Services.prefs.getFloatPref(
+              PREF_USER_HISTORY_COSINE_PERSONAL_WEIGHT,
+              0.5
+            )
+          : Services.prefs.getIntPref(
+              PREF_USER_HISTORY_COSINE_PERSONAL_WEIGHT,
+              0
+            );
+    }
+    personalWeight = Number(personalWeight);
     if (!Number.isFinite(personalWeight)) {
       personalWeight = 0.5;
     }
@@ -2072,19 +2084,12 @@ export class DiscoveryStreamFeed {
     return items.map((item, index) => {
       let cosineScore = normalizedCosineScores[index];
       let serverScore = normalizedServerScores[index];
-      if (cosineScore === null && serverScore === null) {
+      if (cosineScore === null || serverScore === null) {
         return item;
       }
 
-      let combinedScore;
-      if (cosineScore === null) {
-        combinedScore = serverScore;
-      } else if (serverScore === null) {
-        combinedScore = cosineScore;
-      } else {
-        combinedScore =
-          personalWeight * cosineScore + (1 - personalWeight) * serverScore;
-      }
+      let combinedScore =
+        personalWeight * cosineScore + (1 - personalWeight) * serverScore;
       return { ...item, combined_score: combinedScore };
     });
   }

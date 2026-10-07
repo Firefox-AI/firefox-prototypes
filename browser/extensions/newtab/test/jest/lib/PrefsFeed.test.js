@@ -106,6 +106,18 @@ describe("PrefsFeed", () => {
     feed.onAction(ac.SetPref("foo", 2));
     expect(feed._prefs.set).toHaveBeenCalledWith("foo", 2);
   });
+  it("should preserve fractional precision for the personalization weight", () => {
+    const prefName =
+      "discoverystream.sections.personalization.user-history-cosine.personal-weight";
+
+    feed.onAction(ac.SetPref(prefName, 0.7));
+
+    expect(services.prefs.setStringPref).toHaveBeenCalledWith(
+      "branch.str." + prefName,
+      "0.7"
+    );
+    expect(feed._prefs.set).not.toHaveBeenCalledWith(prefName, 0.7);
+  });
   it("should set every pref when a SET_MULTIPLE_PREFS action is received", () => {
     feed.onAction(ac.SetMultiplePrefs({ foo: 2, bar: 3 }));
     expect(feed._prefs.set).toHaveBeenCalledWith("foo", 2);
