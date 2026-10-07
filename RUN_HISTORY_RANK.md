@@ -79,7 +79,7 @@ Open `about:config` in the copied profile and verify these values:
 | Preference | Value | Purpose |
 | --- | --- | --- |
 | `browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.enabled` | `true` | Enables cosine scoring and article reranking. This branch defaults it to `true`. |
-| `browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.section-ordering.enabled` | `true` | Orders sections by their highest article cosine score, with Popular Today always first. This branch defaults it to `true`. |
+| `browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.section-ordering.enabled` | `true` | Orders sections by the sum of their four highest article cosine scores, with Popular Today always first. This branch defaults it to `true`. |
 | `places.semanticHistory.featureGate` | `true` | Allows the semantic history database and user vector. Nightly normally defaults this to `true`; a profile override can still disable it. |
 | `browser.ml.enable` | `true` | Allows the local embedding model to run. |
 | `places.history.enabled` | `true` | Provides the browsing history and frecency data used to build the vector. |
@@ -129,7 +129,7 @@ The **Article Reranking** section contains two buttons:
 
 ![Article reranking buttons](rerank_pics/rerank_option_buttons.jpeg)
 
-- **Cosine: Rerank Within Sections** is the default. It fetches a fresh recommendation response and sorts articles by cosine similarity within each existing section. With section ordering enabled, sections are then ordered by the highest cosine score among their articles, with Popular Today kept first.
+- **Cosine: Rerank Within Sections** is the default. It fetches a fresh recommendation response and sorts articles by cosine similarity within each existing section. With section ordering enabled, sections are then ordered by the sum of their four highest article cosine scores, with Popular Today kept first.
 - **Cosine: Promote Top 6 to Popular Today** fetches a fresh response, moves the six highest-scoring articles across the response into the first six Popular Today slots, and sorts the remaining articles within their existing sections. Section ordering follows the section-ordering pref described below.
 
 The selected reranking mode remains active for later refreshes during the current Firefox run. Click **Cosine: Rerank Within Sections** to return to the default mode. Recomputing the user vector also returns to the default mode.
@@ -190,7 +190,7 @@ The fields mean:
 - `sim_score`: cosine similarity to the user vector;
 - `url`: the article URL.
 
-Section ordering is controlled by `browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.section-ordering.enabled`. When enabled, the section with the highest article cosine score comes first after Popular Today, followed by the other scored sections in descending top article score. Sections without a finite score stay after scored sections in their original order. Within-section mode reorders articles inside their sections. Promote Top 6 moves the six global leaders into Popular Today and reorders the remaining articles inside their sections.
+Section ordering is controlled by `browser.newtabpage.activity-stream.discoverystream.sections.personalization.user-history-cosine.section-ordering.enabled`. When enabled, the section with the highest sum of its four highest finite cosine scores comes first after Popular Today, followed by the other scored sections in descending sum. Sections with fewer than four scored articles use the scores they have. Sections without a finite score stay after scored sections in their original order. Within-section mode reorders articles inside their sections. Promote Top 6 moves the six global leaders into Popular Today and reorders the remaining articles inside their sections.
 
 ## Fallback messages
 

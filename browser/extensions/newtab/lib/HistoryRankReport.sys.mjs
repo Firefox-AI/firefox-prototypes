@@ -45,6 +45,12 @@ function displayNumber(value) {
   return number === null ? "" : String(number);
 }
 
+function originalSection(item) {
+  return Object.hasOwn(item, "original_section")
+    ? item.original_section
+    : item.section;
+}
+
 function rankItems(items, sections) {
   let sectionRanks = new Map(
     sections.map((section, index) => [section.sectionKey, index])
@@ -55,14 +61,16 @@ function rankItems(items, sections) {
     cosineScore: numberValue(item.cosine_similarity),
   }));
   let originalRows = rows.slice().sort((a, b) => {
+    let aOriginalSection = originalSection(a.item);
+    let bOriginalSection = originalSection(b.item);
     let aSection =
-      a.item.section === undefined || a.item.section === null
+      aOriginalSection === undefined || aOriginalSection === null
         ? -1
-        : (sectionRanks.get(a.item.section) ?? sections.length);
+        : (sectionRanks.get(aOriginalSection) ?? sections.length);
     let bSection =
-      b.item.section === undefined || b.item.section === null
+      bOriginalSection === undefined || bOriginalSection === null
         ? -1
-        : (sectionRanks.get(b.item.section) ?? sections.length);
+        : (sectionRanks.get(bOriginalSection) ?? sections.length);
     if (aSection != bSection) {
       return aSection - bSection;
     }
@@ -152,8 +160,12 @@ function renderArticle(row) {
   </div>`;
 }
 
-export function buildHistoryRankReport(items, sections = []) {
-  let rows = rankItems(items, sections);
+export function buildHistoryRankReport(
+  items,
+  sections = [],
+  originalSections = sections
+) {
+  let rows = rankItems(items, originalSections);
   let topics = new Map();
   for (let row of rows) {
     let topic = row.item.topic || "untagged";

@@ -3434,8 +3434,8 @@ describe("DiscoveryStreamFeed", () => {
 
       expect(sections.map(section => section.sectionKey)).toEqual([
         "top_stories_section",
-        "tech",
         "sports",
+        "tech",
         "culture",
       ]);
     });

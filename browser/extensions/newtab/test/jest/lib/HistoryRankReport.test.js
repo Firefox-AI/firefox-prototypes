@@ -37,4 +37,36 @@ describe("HistoryRankReport", () => {
     expect(html).toContain("science");
     expect(html).toContain("https://example.com/higher");
   });
+
+  it("shows final sections while preserving original Merino ranks", () => {
+    let html = buildHistoryRankReport(
+      [
+        {
+          title: "promoted article",
+          section: "top_stories_section",
+          original_section: "tech",
+          received_rank: 0,
+          cosine_similarity: 0.9,
+          url: "https://example.com/promoted",
+        },
+        {
+          title: "other article",
+          section: "tech",
+          received_rank: 1,
+          cosine_similarity: 0.1,
+          url: "https://example.com/other",
+        },
+      ],
+      [{ sectionKey: "top_stories_section" }, { sectionKey: "tech" }],
+      [{ sectionKey: "tech" }, { sectionKey: "top_stories_section" }]
+    );
+
+    expect(html.indexOf("promoted article")).toBeLessThan(
+      html.indexOf("other article")
+    );
+    expect(html).toContain(
+      "<td>top_stories_section</td>\n      <td>untagged</td>"
+    );
+    expect(html).toContain('<td class="rank">1</td>');
+  });
 });

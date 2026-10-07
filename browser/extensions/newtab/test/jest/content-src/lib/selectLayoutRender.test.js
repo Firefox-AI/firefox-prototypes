@@ -70,6 +70,57 @@ describe("selectLayoutRender", () => {
     });
   });
 
+  it("should preserve the section order delivered by the feed", () => {
+    const layout = [
+      {
+        width: 3,
+        components: [{ type: "CardGrid", feed: { url: "foo.com" } }],
+      },
+    ];
+    const sections = [
+      {
+        sectionKey: "tech",
+        receivedRank: 2,
+        allowAds: true,
+        layout: { responsiveLayouts: [{ columnCount: 1, tiles: [] }] },
+      },
+      {
+        sectionKey: "top_stories_section",
+        receivedRank: 0,
+        allowAds: true,
+        layout: { responsiveLayouts: [{ columnCount: 1, tiles: [] }] },
+      },
+    ];
+
+    store.dispatch({
+      type: at.DISCOVERY_STREAM_LAYOUT_UPDATE,
+      data: { layout },
+    });
+    store.dispatch({
+      type: at.DISCOVERY_STREAM_FEED_UPDATE,
+      data: {
+        feed: { data: { recommendations: [], sections } },
+        url: "foo.com",
+      },
+    });
+    store.dispatch({ type: at.DISCOVERY_STREAM_FEEDS_UPDATE });
+
+    const { layoutRender } = selectLayoutRender({
+      state: store.getState().DiscoveryStream,
+      prefs: {
+        "discoverystream.sections.enabled": true,
+        "feeds.section.topstories": true,
+        "feeds.system.topstories": true,
+      },
+    });
+
+    expect(
+      layoutRender[0].components[0].data.sections.map(
+        section => section.sectionKey
+      )
+    ).toEqual(["tech", "top_stories_section"]);
+  });
+
   it("should return layout with placeholder data if feed doesn't have data", () => {
     store.dispatch({
       type: at.DISCOVERY_STREAM_LAYOUT_UPDATE,

@@ -227,7 +227,7 @@ export const selectLayoutRender = ({ state = {}, prefs = {} }) => {
   };
 
   const handleSections = (sections = [], recommendations = []) => {
-    let result = sections.sort((a, b) => a.receivedRank - b.receivedRank);
+    let result = [...sections];
 
     const sectionsMap = recommendations.reduce((acc, recommendation) => {
       const { section } = recommendation;

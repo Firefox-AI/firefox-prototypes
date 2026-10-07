@@ -127,6 +127,7 @@ const MERINO_PROTOTYPE_EXPERIMENT = {
 const COSINE_RERANK_WITHIN_SECTIONS = "within-sections";
 const COSINE_RERANK_ACROSS_SECTIONS = "across-sections";
 const COSINE_PROMOTION_COUNT = 6;
+const COSINE_SECTION_SCORE_COUNT = 4;
 const POPULAR_TODAY_SECTION_KEY = "top_stories_section";
 
 const PREF_MERINO_OHTTP = "discoverystream.merino-provider.ohttp.enabled";
@@ -390,7 +391,6 @@ export class DiscoveryStreamFeed {
         : override.slice(1);
 
     const allowedRanks = this.sectionsAdAllowedRanks;
-    sections.sort((a, b) => a.receivedRank - b.receivedRank);
     // Pin the first layout to the top section and exclude it from the cycle: it's
     // typically a distinct, larger "headline" layout, so repeating it partway
     // down the page would look out of place. The rest cycle through cycleLayouts.
@@ -1288,7 +1288,7 @@ export class DiscoveryStreamFeed {
     // In this situation, we don't fill iabPlacements,
     // and go with the non IAB default contextual placement prefs.
     if (recsFeed) {
-      iabSections = recsFeed.data.sections.sort(
+      iabSections = [...recsFeed.data.sections].sort(
         (a, b) => a.receivedRank - b.receivedRank
       );
 
@@ -1930,7 +1930,7 @@ export class DiscoveryStreamFeed {
     return result;
   }
 
-  async writeHistoryRankReport(items, sections) {
+  async writeHistoryRankReport(items, sections, originalSections = sections) {
     let reportPath = PathUtils.join(
       PathUtils.localProfileDir,
       "newtab-history-rank.html"
@@ -1938,7 +1938,7 @@ export class DiscoveryStreamFeed {
     try {
       await IOUtils.writeUTF8(
         reportPath,
-        lazy.buildHistoryRankReport(items, sections),
+        lazy.buildHistoryRankReport(items, sections, originalSections),
         { tmpPath: `${reportPath}.tmp` }
       );
       console.warn(`[NewTab cosine] report=${reportPath}`);
@@ -2078,10 +2078,18 @@ export class DiscoveryStreamFeed {
       if (!Number.isFinite(score)) {
         return;
       }
-      let currentScore = sectionScores.get(item.section);
-      if (currentScore === undefined || score > currentScore) {
-        sectionScores.set(item.section, score);
-      }
+      let scores = sectionScores.get(item.section) || [];
+      scores.push(score);
+      sectionScores.set(item.section, scores);
+    });
+    sectionScores.forEach((scores, section) => {
+      sectionScores.set(
+        section,
+        scores
+          .sort((a, b) => b - a)
+          .slice(0, COSINE_SECTION_SCORE_COUNT)
+          .reduce((sum, score) => sum + score, 0)
+      );
     });
 
     sections.sort((a, b) => {
@@ -2144,6 +2152,7 @@ export class DiscoveryStreamFeed {
       .slice(0, COSINE_PROMOTION_COUNT);
     let promotedItems = promoted.map(({ item }) => ({
       ...item,
+      original_section: item.section,
       section: targetSection,
     }));
     let promotedSet = new Set(promoted.map(({ item }) => item));
@@ -2302,14 +2311,7 @@ export class DiscoveryStreamFeed {
 
         const cosineScoredItems =
           await this.scoreItemsByUserVector(recommendations);
-        if (
-          Services.prefs.getBoolPref(PREF_USER_HISTORY_COSINE_ENABLED, false) &&
-          cosineScoredItems.some(item =>
-            Number.isFinite(Number(item.cosine_similarity))
-          )
-        ) {
-          await this.writeHistoryRankReport(cosineScoredItems, sections);
-        }
+        const originalSections = sections.slice();
         if (
           sections.length &&
           Services.prefs.getBoolPref(
@@ -2371,6 +2373,19 @@ export class DiscoveryStreamFeed {
           this._cosineRerankMode === COSINE_RERANK_ACROSS_SECTIONS
             ? this.sortItemsAcrossSectionsByCosine(rotatedItems, sections)
             : this.sortItemsWithinSectionsByCosine(rotatedItems);
+
+        if (
+          Services.prefs.getBoolPref(PREF_USER_HISTORY_COSINE_ENABLED, false) &&
+          sectionSortedItems.some(item =>
+            Number.isFinite(Number(item.cosine_similarity))
+          )
+        ) {
+          await this.writeHistoryRankReport(
+            sectionSortedItems,
+            sections,
+            originalSections
+          );
+        }
 
         const { data: filteredResults } =
           await this.filterBlocked(sectionSortedItems);
