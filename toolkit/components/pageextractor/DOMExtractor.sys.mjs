@@ -9,7 +9,7 @@
  */
 
 /**
- * @import { GetTextOptions, DOMExtractionResult, ExtractionStrategy } from './PageExtractor.d.ts'
+ * @import { GetTextOptions, DOMExtractionResult, ExtractionStrategy, TextBlock } from './PageExtractor.d.ts'
  */
 
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
@@ -102,6 +102,13 @@ class ExtractionContext {
   #linkTargetAdjustment = 0;
 
   /**
+   * The extracted blocks, only collected when the includeBlocks option is set.
+   *
+   * @type {TextBlock[] | null}
+   */
+  #blocks = null;
+
+  /**
    * @type {Set<string>}
    */
   #links = new Set();
@@ -141,6 +148,9 @@ class ExtractionContext {
    */
   constructor(document, options) {
     this.#options = options;
+    if (options.includeBlocks) {
+      this.#blocks = [];
+    }
     this.#minCanvasSize = options.minCanvasSize ?? 50;
     this.#maxCanvasCount = options.includeCanvasSnapshots
       ? (options.maxCanvasCount ?? 10)
@@ -170,21 +180,39 @@ class ExtractionContext {
   }
 
   /**
-   * Returns true if the element should be filtered based on current site strategy.
+   * Landmarks extraction also keeps code and skips template comments; the
+   * other strategies extract as before.
+   *
+   * @returns {boolean}
+   */
+  get landmarksMode() {
+    return Boolean(this.#options.excludeLandmarks);
+  }
+
+  /**
+   * Returns true if the element should be filtered based on current site strategy,
+   * or because it is a page-level landmark when landmarks are excluded.
    *
    * @param {Node} node
    * @returns {boolean}
    */
   shouldFilterNode(node) {
     const filterSelector = this.#strategy.filterSelector;
-    if (!filterSelector) {
+    const { excludeLandmarks } = this.#options;
+    if (!filterSelector && !excludeLandmarks) {
       return false;
     }
     const element = asElement(node);
     if (!element) {
       return false;
     }
-    return element.matches(filterSelector);
+    if (filterSelector && element.matches(filterSelector)) {
+      return true;
+    }
+    return (
+      Boolean(excludeLandmarks) &&
+      (isBoilerplateLandmark(element) || isActionButton(element))
+    );
   }
 
   /**
@@ -194,6 +222,13 @@ class ExtractionContext {
    */
   get textContent() {
     return this.#textContent;
+  }
+
+  /**
+   * @returns {TextBlock[] | null}
+   */
+  get blocks() {
+    return this.#blocks;
   }
 
   /**
@@ -507,6 +542,27 @@ class ExtractionContext {
         // automatically get collapsed.
         this.#textContent = collapseWhitespace(innerText, this.#textContent);
       }
+      const block = {
+        text: node.documentGlobal
+          ? innerText
+          : innerText.replace(WHITESPACE_REGEX, " "),
+        headingLevel: getHeadingLevel(node),
+      };
+      // A heading styled inline inside a block wrapper, e.g. Wikipedia's
+      // <div class="mw-heading"><h2>History</h2>[edit]</div>.
+      const wrapped =
+        !block.headingLevel && element ? wrappedHeading(element) : null;
+      if (wrapped) {
+        block.text = wrapped.innerText.trim();
+        block.headingLevel = getHeadingLevel(wrapped);
+      }
+      if (
+        this.landmarksMode &&
+        (element ?? node.parentElement)?.closest("pre")
+      ) {
+        block.kind = "code";
+      }
+      this.#blocks?.push(block);
     }
   }
 
@@ -549,8 +605,12 @@ class ExtractionContext {
 
     const parts = [];
     this.#walkAndExtract(element, parts);
+    const text = parts.join("");
+    if (this.landmarksMode && element.closest("pre")) {
+      return text.trim();
+    }
     // Normalize whitespace for clean output
-    return parts.join("").replace(WHITESPACE_REGEX, " ").trim();
+    return text.replace(WHITESPACE_REGEX, " ").trim();
   }
 
   /**
@@ -755,7 +815,151 @@ export function extractTextFromDOM(document, rootNode, options) {
     links: context.links,
     canvases: context.canvases,
     siteStrategy: context.siteStrategy,
+    ...(context.blocks ? { blocks: context.blocks } : {}),
   };
+}
+
+const ANY_HEADING_SELECTOR = "h1, h2, h3, h4, h5, h6, [role=heading]";
+
+/**
+ * @param {Node} node
+ * @returns {number} The heading level of the node or its closest heading
+ *   ancestor, or 0 when it isn't part of a heading.
+ */
+function getHeadingLevel(node) {
+  const element = asElement(node) ?? node.parentElement;
+  const heading = element?.closest(ANY_HEADING_SELECTOR);
+  if (!heading) {
+    return 0;
+  }
+  if (heading.getAttribute("role") == "heading") {
+    const level = parseInt(heading.getAttribute("aria-level"), 10);
+    return level >= 1 && level <= 6 ? level : 2;
+  }
+  return Number(heading.tagName[1]);
+}
+
+/**
+ * @param {Element} element - A block without a heading around it.
+ * @returns {Element | null} A heading inside the block that carries its text,
+ *   when the rest of the block is only links or buttons, such as an "[edit]"
+ *   link next to the heading.
+ */
+function wrappedHeading(element) {
+  const heading = element.querySelector(ANY_HEADING_SELECTOR);
+  const headingText = heading?.innerText?.trim();
+  const blockText = element.innerText.trim();
+  if (!headingText || !blockText.startsWith(headingText)) {
+    return null;
+  }
+  const controls = [...element.querySelectorAll("a, button")]
+    .filter(control => !heading.contains(control))
+    .map(control => control.innerText)
+    .join("");
+  const bare = text => text.replace(/[\s[\]|·]/g, "");
+  return bare(blockText.slice(headingText.length)) == bare(controls)
+    ? heading
+    : null;
+}
+
+/**
+ * Landmarks that hold page chrome rather than page content. Element to role
+ * mappings mirror Gecko's (accessible/base/HTMLMarkupMap.inc, ARIAMap.cpp),
+ * which are C++ and only exist while accessibility is active.
+ */
+const BOILERPLATE_LANDMARK_SELECTOR = [
+  "nav",
+  "aside",
+  "dialog",
+  "search",
+  "[role=navigation]",
+  "[role=banner]",
+  "[role=contentinfo]",
+  "[role=complementary]",
+  "[role=search]",
+  "[role=dialog]",
+  "[role=alertdialog]",
+  "[aria-modal=true]",
+].join(",");
+
+/**
+ * A <header> or <footer> scoped to one of these is part of that section's content,
+ * and not a page-level banner or content info. Mirrors Gecko's
+ * HTMLHeaderOrFooterAccessible::NativeRole, plus the ARIA roles HTML-AAM lists.
+ * https://www.w3.org/TR/html-aam-1.0/#el-header
+ */
+const SECTIONING_SELECTOR = [
+  "article",
+  "aside",
+  "main",
+  "nav",
+  "section",
+  "blockquote",
+  "details",
+  "dialog",
+  "fieldset",
+  "figure",
+  "td",
+  "[role=article]",
+  "[role=complementary]",
+  "[role=main]",
+  "[role=navigation]",
+  "[role=region]",
+].join(",");
+
+/**
+ * @param {Element} element
+ * @returns {boolean}
+ */
+function isBoilerplateLandmark(element) {
+  const { localName } = element;
+  if (localName === "header" || localName === "footer") {
+    return !element.parentElement?.closest(SECTIONING_SELECTOR);
+  }
+  return element.matches(BOILERPLATE_LANDMARK_SELECTOR);
+}
+
+/**
+ * Buttons such as "Copy" or "Share" label actions, not content. This includes
+ * custom elements named like buttons (e.g. <mdn-copy-button>). Buttons inside
+ * headings or with aria-expanded usually toggle a section (e.g. FAQ accordions)
+ * and carry its title, so they are kept.
+ *
+ * @param {Element} element
+ * @returns {boolean}
+ */
+function isActionButton(element) {
+  const { localName } = element;
+  return (
+    (localName === "button" ||
+      localName.endsWith("-button") ||
+      element.getAttribute("role") === "button") &&
+    !element.hasAttribute("aria-expanded") &&
+    !element.closest("h1, h2, h3, h4, h5, h6, [role=heading]")
+  );
+}
+
+/**
+ * Find the visible main landmark with the most text, which is where a page declares
+ * its primary content to be.
+ *
+ * @param {Document} document
+ * @returns {HTMLElement | null}
+ */
+export function findMainLandmark(document) {
+  let mainLandmark = null;
+  let mainLength = 0;
+  for (const element of document.querySelectorAll("main, [role=main]")) {
+    if (!element.checkVisibility()) {
+      continue;
+    }
+    const { length } = element.textContent;
+    if (length > mainLength) {
+      mainLandmark = asHTMLElement(element);
+      mainLength = length;
+    }
+  }
+  return mainLandmark;
 }
 
 /**
@@ -795,6 +999,9 @@ const CONTENT_EXCLUDED_TAGS = new Set([
 ]);
 
 const CONTENT_EXCLUDED_NODE_SELECTOR = [...CONTENT_EXCLUDED_TAGS].join(",");
+const LANDMARKS_EXCLUDED_NODE_SELECTOR = [...CONTENT_EXCLUDED_TAGS]
+  .filter(tag => tag != "CODE")
+  .join(",");
 
 /**
  * Get the ShadowRoot from the chrome-only openOrClosedShadowRoot API.
@@ -885,20 +1092,32 @@ function determineBlockStatus(node, context) {
     return NodeFilter.FILTER_ACCEPT;
   }
 
-  if (isExcludedNode(node)) {
+  if (isExcludedNode(node, context)) {
     // This is an explicit.
     return NodeFilter.FILTER_REJECT;
   }
 
+  if (context.landmarksMode && asElement(node)?.localName === "pre") {
+    // Preformatted text is one block, however its highlighting is marked up.
+    return node.textContent.trim()
+      ? NodeFilter.FILTER_ACCEPT
+      : NodeFilter.FILTER_REJECT;
+  }
+
   if (
-    containsExcludedNode(node, CONTENT_EXCLUDED_NODE_SELECTOR) &&
+    containsExcludedNode(
+      node,
+      context.landmarksMode
+        ? LANDMARKS_EXCLUDED_NODE_SELECTOR
+        : CONTENT_EXCLUDED_NODE_SELECTOR
+    ) &&
     !hasNonWhitespaceTextNodes(node)
   ) {
     // Skip this node, and dig deeper into its tree to cut off smaller pieces to extract.
     return NodeFilter.FILTER_SKIP;
   }
 
-  if (nodeNeedsSubdividing(node)) {
+  if (nodeNeedsSubdividing(node, context.landmarksMode)) {
     // Skip this node, and dig deeper into its tree to cut off smaller pieces
     // to extract. It is presumed to be a wrapper of block elements.
     return NodeFilter.FILTER_SKIP;
@@ -929,9 +1148,11 @@ function determineBlockStatus(node, context) {
  * Determine if this element is an inline element or a block element.
  *
  * @param {Node} node
+ * @param {boolean} skipComments - Comments that templating libraries leave
+ *   inside inline content don't make it a wrapper of blocks.
  * @returns {boolean}
  */
-function nodeNeedsSubdividing(node) {
+function nodeNeedsSubdividing(node, skipComments) {
   const element = asElement(node);
   if (!element) {
     // Only elements need to be further subdivided.
@@ -940,6 +1161,9 @@ function nodeNeedsSubdividing(node) {
 
   for (let childNode of element.childNodes) {
     if (!childNode) {
+      continue;
+    }
+    if (skipComments && childNode.nodeType === Node.COMMENT_NODE) {
       continue;
     }
     switch (childNode.nodeType) {
@@ -951,7 +1175,7 @@ function nodeNeedsSubdividing(node) {
         if (getIsBlockLike(childNode)) {
           // This node is a block node, so it needs further subdividing.
           return true;
-        } else if (nodeNeedsSubdividing(childNode)) {
+        } else if (nodeNeedsSubdividing(childNode, skipComments)) {
           // This non-block-like node may contain other block-like nodes.
           return true;
         }
@@ -1076,8 +1300,9 @@ function isNodeHidden(node) {
 
 /**
  * @param {Node} node
+ * @param {ExtractionContext} context
  */
-function isExcludedNode(node) {
+function isExcludedNode(node, context) {
   // Property access be expensive, so destructure required properties so they are
   // not accessed multiple times.
   const { nodeType } = node;
@@ -1094,10 +1319,11 @@ function isExcludedNode(node) {
 
   const { nodeName } = element;
 
-  if (CONTENT_EXCLUDED_TAGS.has(nodeName.toUpperCase())) {
+  const tagName = nodeName.toUpperCase();
+  if (CONTENT_EXCLUDED_TAGS.has(tagName)) {
     // SVG tags can be lowercased, so ensure everything is uppercased.
     // This is an excluded tag.
-    return true;
+    return !(tagName == "CODE" && context.landmarksMode);
   }
 
   return false;

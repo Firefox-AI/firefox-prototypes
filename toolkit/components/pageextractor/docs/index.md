@@ -8,8 +8,8 @@ features such as Smart Window use it to access the page the user is viewing.
 
 Web pages mix their main content with navigation, layout markup, frames, PDF
 viewers, and canvases. Page Extractor handles these cases in one place. It
-reads the rendered DOM, runs Reader Mode to remove boilerplate, extracts PDF
-text, and applies limited site-specific handling.
+reads the rendered DOM, removes boilerplate with Reader Mode or the page's
+landmarks, extracts PDF text, and applies limited site-specific handling.
 
 The code lives in `toolkit/components/pageextractor`. File bugs under
 [Core :: Machine Learning: On Device](https://bugzilla.mozilla.org/enter_bug.cgi?product=Core&component=Machine%20Learning%3A%20On%20Device).
@@ -28,7 +28,7 @@ flowchart TD
     hidden["Load a URL in a<br/>hidden browser"]
     parent["Choose extraction path"]
     pdf["Read PDF text"]
-    child["Select page or<br/>Reader Mode content"]
+    child["Select page, main landmark<br/>or Reader Mode content"]
     dom["Read DOM content<br/>Text, links and canvases"]
     site["Site-specific extraction<br/>Optional, in parallel"]
     assemble["Assemble text, links<br/>and canvas snapshots"]
@@ -54,10 +54,20 @@ extraction. The child actor waits for page readiness, chooses an extraction
 strategy, and reads the page.
 
 The extractor picks a strategy from the document and the request. PDFs use the
-PDF viewer's text. Reader Mode simplifies suitable articles. Other pages use the
-live DOM. A few sites get extra handling where a general DOM walk produces poor
-output. Keep your caller independent of the chosen strategy, and handle an empty
-or unavailable result.
+PDF viewer's text. Reader Mode simplifies suitable articles when boilerplate
+removal is requested. Other pages use the live DOM.
+
+Reader Mode keeps a single block of the page and drops content such as reviews,
+forum answers and link-heavy sections. Callers that need the whole main content
+can ask for the `"landmarks"` boilerplate strategy instead: extraction starts
+from the page's main landmark, or from `<body>` when the page has none or it
+holds almost no text. It skips navigation, banner, footer, sidebar, search and
+dialog landmarks, as well as action buttons such as "Copy". This strategy also
+keeps code: a `<pre>` block keeps its line breaks.
+
+A few sites get extra handling where a general DOM walk produces poor output.
+Keep your caller independent of the chosen strategy, and handle an empty or
+unavailable result.
 
 ## Extract from an existing tab
 
@@ -81,7 +91,7 @@ can replace the page while your request is pending, so handle all of these
 outcomes.
 
 The type definitions in the component list the options and result fields.
-Options can request Reader Mode cleanup, viewport-only extraction, simple text,
+Options can request boilerplate removal, viewport-only extraction, simple text,
 early stopping, or canvas capture.
 
 (pageextractor-hidden)=

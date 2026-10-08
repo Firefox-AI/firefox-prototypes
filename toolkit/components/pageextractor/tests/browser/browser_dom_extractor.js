@@ -1529,3 +1529,182 @@ add_task(async function test_dom_extractor_block_anchor_without_text() {
 
   return cleanup();
 });
+
+add_task(async function test_dom_extractor_include_blocks() {
+  const { html } = await MLTestUtils.serveHTMLInTab({ browser: gBrowser });
+  const { getPageExtractor, cleanup } = await html`
+    <article>
+      <h1>Title</h1>
+      <p>Intro paragraph.</p>
+      <h2><span>Section</span> <em>one</em></h2>
+      <p>First paragraph.</p>
+      <div role="heading" aria-level="3">Sub</div>
+      <p>Second paragraph.</p>
+    </article>
+  `;
+  const actor = getPageExtractor();
+
+  const expected = [
+    { text: "Title", headingLevel: 1 },
+    { text: "Intro paragraph.", headingLevel: 0 },
+    { text: "Section one", headingLevel: 2 },
+    { text: "First paragraph.", headingLevel: 0 },
+    { text: "Sub", headingLevel: 3 },
+    { text: "Second paragraph.", headingLevel: 0 },
+  ];
+
+  const result = await actor.getText({ includeBlocks: true });
+  Assert.deepEqual(result.blocks, expected, "Blocks carry heading levels.");
+  is(
+    result.text,
+    expected.map(block => block.text).join("\n"),
+    "The text is the blocks joined by newlines."
+  );
+
+  const readerResult = await actor.getText({
+    includeBlocks: true,
+    removeBoilerplate: true,
+    _forceRemoveBoilerplate: true,
+  });
+  Assert.deepEqual(
+    readerResult.blocks.filter(block => block.headingLevel).map(b => b.text),
+    ["Title", "Section one"],
+    "Reader mode output keeps the heading elements it preserves."
+  );
+
+  ok(
+    !("blocks" in (await actor.getText())),
+    "Blocks are only returned when requested."
+  );
+
+  return cleanup();
+});
+
+add_task(async function test_dom_extractor_code() {
+  const { html } = await MLTestUtils.serveHTMLInTab({ browser: gBrowser });
+  const { getPageExtractor, cleanup } = await html`
+    <article>
+      <h2><code>Array.prototype.at()</code></h2>
+      <p>Use <code>at()</code> to read from the end.</p>
+      <p><span>Call</span> <code>arr.at(-1)</code></p>
+      <ul>
+        <li><code>npm install</code></li>
+      </ul>
+      <pre><code>const last = arr.at(-1);
+console.log(last);</code></pre>
+      <pre><code>see <a href="https://example.com/at">docs</a>
+for more</code></pre>
+      <pre><code><!--lit-->arr<span class="token">.</span><span class="token">at</span>(<span>-1</span>);</code></pre>
+    </article>
+  `;
+
+  const { text, blocks } = await getPageExtractor().getText({
+    includeBlocks: true,
+    removeBoilerplate: true,
+    boilerplateStrategy: "landmarks",
+  });
+
+  is(
+    text,
+    [
+      "Array.prototype.at()",
+      "Use at() to read from the end.",
+      "Call arr.at(-1)",
+      "npm install",
+      "const last = arr.at(-1);\nconsole.log(last);",
+      "see [docs](https://example.com/at)\nfor more",
+      "arr.at(-1);",
+    ].join("\n"),
+    "Code is extracted, and preformatted code keeps its line breaks."
+  );
+  Assert.deepEqual(
+    blocks.map(({ headingLevel, kind }) => ({ headingLevel, kind })),
+    [
+      { headingLevel: 2, kind: undefined },
+      { headingLevel: 0, kind: undefined },
+      { headingLevel: 0, kind: undefined },
+      { headingLevel: 0, kind: undefined },
+      { headingLevel: 0, kind: "code" },
+      { headingLevel: 0, kind: "code" },
+      { headingLevel: 0, kind: "code" },
+    ],
+    "A code-only heading is a heading block, and preformatted blocks are code."
+  );
+
+  const { text: defaultText } = await getPageExtractor().getText();
+  Assert.ok(
+    !defaultText.includes("console.log(last);"),
+    "Without landmarks extraction, code blocks are still left out."
+  );
+
+  return cleanup();
+});
+
+add_task(async function test_dom_extractor_comments_in_inline_content() {
+  const { html } = await MLTestUtils.serveHTMLInTab({ browser: gBrowser });
+  const { getPageExtractor, cleanup } = await html`
+    <article>
+      <p>
+        <!--?lit$1$-->Rendered by <b>a template</b
+        ><!--?lit$1$-->
+        library.
+      </p>
+    </article>
+  `;
+  is(
+    (
+      await getPageExtractor().getText({
+        removeBoilerplate: true,
+        boilerplateStrategy: "landmarks",
+      })
+    ).text,
+    "Rendered by a template library.",
+    "Template comments don't split a paragraph into pieces."
+  );
+  return cleanup();
+});
+
+add_task(async function test_blocks_heading_inline_in_wrapper() {
+  const { html } = await MLTestUtils.serveHTMLInTab({ browser: gBrowser });
+  const { getPageExtractor, cleanup } = await html`
+    <style>
+      h2 {
+        display: inline;
+      }
+    </style>
+    <main>
+      <h1>Cookies</h1>
+      <p>A cookie is a baked snack.</p>
+      <div class="mw-heading mw-heading2">
+        <h2 id="History">History</h2>
+        <span class="mw-editsection">[<a href="#edit">edit</a>]</span>
+      </div>
+      <p>Cookies were first made long ago.</p>
+      <div>
+        <h3 style="display: inline">Price</h3>
+        5 dollars a box
+      </div>
+    </main>
+  `;
+  const { blocks } = await getPageExtractor().getText({
+    includeBlocks: true,
+    removeBoilerplate: true,
+    boilerplateStrategy: "landmarks",
+  });
+  info(JSON.stringify(blocks));
+  Assert.deepEqual(
+    blocks
+      .filter(block => block.headingLevel)
+      .map(b => [b.text, b.headingLevel]),
+    [
+      ["Cookies", 1],
+      ["History", 2],
+    ],
+    "A heading styled inline inside a wrapper is a heading, without its edit link."
+  );
+  Assert.ok(
+    blocks.some(block => block.text.includes("5 dollars a box")),
+    "Text next to a heading that isn't a link stays."
+  );
+  await cleanup();
+});

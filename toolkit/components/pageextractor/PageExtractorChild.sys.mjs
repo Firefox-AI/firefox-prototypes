@@ -19,6 +19,12 @@
  */
 const MAX_REQUEST_IDLE_CALLBACK_DELAY_MS = 2000;
 
+/**
+ * When the main landmark yields less text than this, it is treated as a placeholder
+ * and the whole body is extracted instead.
+ */
+const MIN_MAIN_LANDMARK_TEXT_LENGTH = 200;
+
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
 const lazy = XPCOMUtils.declareLazy({
@@ -29,6 +35,8 @@ const lazy = XPCOMUtils.declareLazy({
     }),
   ReaderMode: "moz-src:///toolkit/components/reader/ReaderMode.sys.mjs",
   extractTextFromDOM:
+    "moz-src:///toolkit/components/pageextractor/DOMExtractor.sys.mjs",
+  findMainLandmark:
     "moz-src:///toolkit/components/pageextractor/DOMExtractor.sys.mjs",
   shouldExtractYouTube:
     "moz-src:///toolkit/components/pageextractor/YouTubeExtraction.sys.mjs",
@@ -511,9 +519,20 @@ export class PageExtractorChild extends JSWindowActorChild {
             event.finish({ status: "unavailable" });
             return null;
           }
+        } else if (
+          options.removeBoilerplate &&
+          options.boilerplateStrategy === "landmarks" &&
+          !options._forceRemoveBoilerplate
+        ) {
+          // Reader mode keeps a single best-scoring container and drops link-dense
+          // blocks, which loses content such as recipe ingredients or READMEs. Use
+          // the page's own landmarks instead: extract from the main landmark, and
+          // skip navigation, banners, sidebars and dialogs.
+          strategy = "landmarks";
+          event.addData({ strategy });
+          rootNode = lazy.findMainLandmark(document) ?? document?.body;
         } else if (options.removeBoilerplate) {
-          // Boilerplate removal is requested. See if reader mode can be applied, and then
-          // use that for boilerplate removal.
+          // Reader mode was requested for boilerplate removal. See if it can be applied.
 
           if (
             (document && lazy.isProbablyReaderable(document)) ||
@@ -575,21 +594,43 @@ export class PageExtractorChild extends JSWindowActorChild {
 
         // All of the content gets extracted using the DOMExtractor, which
         // knows how to apply certain settings in GetTextOptions.
-        const extraction = await this.#trace(
-          lazy.Phase.domExtract,
-          { traceId: event.traceId, strategy },
-          domEvent => {
-            const result = lazy.extractTextFromDOM(document, rootNode, options);
-            domEvent.addData({
-              textLength: result.text.length,
-              linkCount: result.links.length,
-              canvasCount: result.canvases.length,
-              siteStrategy: result.siteStrategy,
-            });
-            return result;
-          }
-        );
+        const extractionOptions =
+          strategy === "landmarks"
+            ? { ...options, excludeLandmarks: true }
+            : options;
+        const extract = root =>
+          this.#trace(
+            lazy.Phase.domExtract,
+            { traceId: event.traceId, strategy },
+            domEvent => {
+              const result = lazy.extractTextFromDOM(
+                document,
+                root,
+                extractionOptions
+              );
+              domEvent.addData({
+                textLength: result.text.length,
+                linkCount: result.links.length,
+                canvasCount: result.canvases.length,
+                siteStrategy: result.siteStrategy,
+              });
+              return result;
+            }
+          );
+        let extraction = await extract(rootNode);
+        if (
+          strategy === "landmarks" &&
+          rootNode !== document.body &&
+          extraction.text.length < MIN_MAIN_LANDMARK_TEXT_LENGTH
+        ) {
+          // Some pages render their content outside of a placeholder main landmark.
+          lazy.console.log(
+            "The main landmark has little text, using the body."
+          );
+          extraction = await extract(document.body);
+        }
         const { text, links, canvases } = extraction;
+        let { blocks } = extraction;
         if (extraction.siteStrategy) {
           event.addData({ siteStrategy: extraction.siteStrategy });
         }
@@ -618,6 +659,7 @@ export class PageExtractorChild extends JSWindowActorChild {
           strategy = youtube.replacesContent
             ? "youtube-transcript"
             : "youtube-dom";
+          blocks = undefined;
           event.addData({ strategy });
         }
 
@@ -630,7 +672,12 @@ export class PageExtractorChild extends JSWindowActorChild {
           linkCount: links.length,
           canvasCount: canvasSnapshots.length,
         });
-        return { text: finalText, links, canvasSnapshots };
+        return {
+          text: finalText,
+          links,
+          canvasSnapshots,
+          ...(blocks ? { blocks } : {}),
+        };
       }
     );
   }

@@ -14,6 +14,8 @@ support-files = [
 
 ["browser_dom_extractor.js"]
 
+["browser_dom_extractor_boilerplate.js"]
+
 ["browser_dom_extractor_pdf.js"]
 
 ["browser_dom_extractor_reader_mode.js"]

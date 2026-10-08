@@ -24,18 +24,38 @@ export type GetTextOptions = Partial<{
   maxCanvasDimension: number;
   // WebP quality 0-1
   canvasQuality: number;
-  // Make two attempts to extract the text content. First prefer reader mode for the
-  // content as it will remove boilerplate, but then fall back to the DOMExtractor.
+  // Remove page chrome such as navigation, banners and sidebars from the extracted
+  // text. See boilerplateStrategy for how this is done.
   removeBoilerplate: boolean;
-  // A test-only option for forcing this behavior.
+  // How boilerplate is removed when removeBoilerplate is set. "reader" (the
+  // default) uses reader mode when the page is readerable, and otherwise extracts
+  // the whole page. "landmarks" extracts the page's main landmark (or <body>
+  // when there is none or it holds almost no text), skips navigation, banner,
+  // footer, sidebar, search and dialog landmarks, and keeps code.
+  boilerplateStrategy: "landmarks" | "reader";
+  // A test-only option for forcing the "reader" strategy, even when the page is not
+  // readerable.
   _forceRemoveBoilerplate: boolean;
+  // Internal, set by the "landmarks" boilerplate strategy: skip page chrome
+  // landmarks during DOM extraction and keep code.
+  excludeLandmarks: boolean;
   // The URL of the page being extracted. Used to apply custom extraction strategies for specific sites.
   sourceUrl: string;
   // Return plain prose instead of the default markdown-annotated text. Anchors
   // keep their text but lose their target, and whitespace within a block
   // collapses to single spaces. Paragraph breaks between blocks are preserved.
   useSimpleText: boolean;
+  // Also return the extracted text split into the blocks it was built from.
+  includeBlocks: boolean;
 }>;
+
+export type TextBlock = {
+  text: string;
+  // 1-6 when the block is a heading, otherwise 0.
+  headingLevel: number;
+  // Set when the block is preformatted code, whose line breaks are meaningful.
+  kind?: "code";
+};
 
 export type CanvasSnapshot = {
   blob: Blob;
@@ -48,12 +68,17 @@ export type DOMExtractionResult = {
   links: string[];
   canvases: HTMLCanvasElement[];
   siteStrategy: string | null;
+  // Only set when GetTextOptions.includeBlocks is set.
+  blocks?: TextBlock[];
 };
 
 export type ExtractionResult = {
   text: string;
   links: string[];
   canvasSnapshots: CanvasSnapshot[];
+  // Only set when GetTextOptions.includeBlocks is set and the text comes
+  // from the DOM walk.
+  blocks?: TextBlock[];
 };
 
 export type ExtractionStrategy = Partial<{
