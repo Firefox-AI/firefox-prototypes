@@ -18,28 +18,91 @@ ChromeUtils.defineESModuleGetters(lazy, {
   Sqlite: "resource://gre/modules/Sqlite.sys.mjs",
 });
 
-export const CHUNK_TARGET_CHARS = 500;
+// Chunks: visible characters per chunk, and the longest heading kept in a
+// chunk's heading path.
+const CHUNK_TARGET_CHARS = 500;
 const MAX_HEADING_CHARS = 120;
-const MAX_QUERY_CHARS = 200;
+const HEADING_SEPARATOR = " › ";
+// Heading levels whose sections average fewer characters than this, on pages
+// with at least this many such headings (teasers on a news front page), are
+// treated as text, so a chunk holds several entries.
+const MIN_AVERAGE_SECTION_CHARS = 200;
+const MIN_DENSE_HEADINGS = 20;
+const MARKDOWN_LINK_REGEX = /\[((?:\\.|[^\]\\])*)\]\([^)\s]*\)/g;
+const MARKDOWN_ESCAPE_REGEX = /\\([\[\]()])/g;
+
+// First reads: the share of the budget for the start of the page and for the
+// opening of each section, and the fewest characters an opening gets (with
+// and without a query).
 const LEAD_BUDGET_SHARE = 0.3;
 const SKELETON_BUDGET_SHARE = 0.3;
 const MIN_SKELETON_SHARE = 120;
-const NEIGHBOUR_HITS = 3;
 const MIN_SECTION_SHARE = 250;
 // A page with more of its text than this before its first heading, like an
 // article whose only heading is a box after it, is spread out like a page
 // without headings.
 const HEADINGLESS_LEAD_SHARE = 0.5;
-const MIN_AVERAGE_SECTION_CHARS = 200;
-const MIN_DENSE_HEADINGS = 20;
-const OTHER_SECTIONS_CHARS = 400;
-const OTHER_SECTIONS_QUERY_CHARS = 250;
-const HEADING_SEPARATOR = " › ";
-const MARKDOWN_LINK_REGEX = /\[((?:\\.|[^\]\\])*)\]\([^)\s]*\)/g;
-const MARKDOWN_ESCAPE_REGEX = /\\([\[\]()])/g;
+
+// Search: how many of the best chunks also get their neighbours, and typo
+// correction for words of at least FUZZY_MIN_LENGTH letters, up to
+// FUZZY_MAX_EDITS edits.
+const NEIGHBOUR_HITS = 3;
 const FUZZY_MIN_LENGTH = 5;
 const FUZZY_MAX_EDITS = 2;
+// Alternate queries a follow-up read may add, unless the caller sets
+// maxAlternateQueries.
+const DEFAULT_ALTERNATE_QUERIES = 3;
+
+// The lines a read adds: the query as quoted in its header, the headings of
+// sections without an opening, and the length of each section.
+const MAX_QUERY_CHARS = 200;
+const OTHER_SECTIONS_CHARS = 400;
+const OTHER_SECTIONS_QUERY_CHARS = 250;
+const SECTION_LENGTHS_CHARS = 400;
+
+// Follow-up reads: how much of a chunk's start identifies it in earlier
+// results, the share of the best score that still counts as a match, and the
+// least rest of the page worth adding after the matches.
+const UNSEEN_PREFIX_CHARS = 40;
 const REMAINING_MATCH_SHARE = 0.3;
+const MIN_FILLER_CHARS = 500;
+
+/**
+ * How results that only make sense together with an earlier read of the same
+ * page start. Prompt compaction keeps the earlier read when it sees one.
+ */
+const FOLLOW_UP_HEADERS = Object.freeze([
+  "[More of this page",
+  "[Showing more of this page",
+  "[No other part of this page",
+  "[This page was already read",
+  "[The whole page was already returned",
+  "[Characters ",
+  "[Nothing from character ",
+]);
+
+const PARTIAL_READ_HEADERS = [
+  "[This page has ",
+  "[More of this page",
+  "[Showing more of this page",
+  "[Characters ",
+];
+
+/**
+ * @param {string} text - A get_page_content result.
+ * @returns {boolean} Whether it continues an earlier read of the page.
+ */
+export function isFollowUpRead(text) {
+  return FOLLOW_UP_HEADERS.some(header => text.includes("\n" + header));
+}
+
+/**
+ * @param {string} text - A get_page_content result.
+ * @returns {boolean} Whether it holds only part of the page.
+ */
+export function isPartialRead(text) {
+  return PARTIAL_READ_HEADERS.some(header => text.includes("\n" + header));
+}
 
 /**
  * The options get_page_content's chunked reads use. Tests and evals can turn
@@ -537,6 +600,68 @@ function listLine(label, items, maxChars) {
 }
 
 /**
+ * How long each top-level section of the page is, which a read can't show,
+ * for questions about the page's structure.
+ *
+ * @param {Chunk[]} chunks
+ * @returns {string} A "[Section lengths in characters: …]" line, longest
+ *   first, or "" for a page with fewer than two sections.
+ */
+function sectionLengths(chunks) {
+  const levels = chunks
+    .filter((chunk, i) => chunk.startsSection && i > 0)
+    .map(chunk => chunk.level);
+  // The highest heading level with at least two sections, so that the page
+  // title isn't a section of its own.
+  const level = [...new Set(levels)]
+    .sort((a, b) => a - b)
+    .find(l => levels.filter(other => other == l).length > 1);
+  if (level === undefined) {
+    return "";
+  }
+  const sections = [];
+  for (const [i, chunk] of chunks.entries()) {
+    if (i == 0 || (chunk.startsSection && chunk.level <= level)) {
+      sections.push({
+        heading:
+          chunk.startsSection && chunk.level == level
+            ? chunk.headings.at(-1)
+            : "Start of the page",
+        length: 0,
+      });
+    }
+    if (sections.length) {
+      sections.at(-1).length += chunk.text.length;
+    }
+  }
+  const lengths = sections
+    .filter(({ heading }) => /\p{L}/u.test(heading ?? ""))
+    .sort((a, b) => b.length - a.length)
+    .map(
+      ({ heading, length }) =>
+        `${heading} ${(Math.round(length / 100) * 100).toLocaleString("en-US")}`
+    );
+  return lengths.length > 1
+    ? listLine("Section lengths in characters", lengths, SECTION_LENGTHS_CHARS)
+    : "";
+}
+
+/**
+ * @param {string} read - A first read of a page, starting with its header.
+ * @param {string} line - A line to add after the header, or "".
+ * @returns {string}
+ */
+function withLineAfterHeader(read, line) {
+  if (!line) {
+    return read;
+  }
+  const end = read.indexOf("\n");
+  return end < 0
+    ? `${line}\n${read}`
+    : `${read.slice(0, end)}\n${line}${read.slice(end)}`;
+}
+
+/**
  * Pick the chunks that open a section, at the deepest heading level where
  * every section still gets at least minShare characters of the budget. Pages
  * without headings, or with most of their text before the first one, get
@@ -631,25 +756,107 @@ function otherSections(
  * @param {number} options.budget
  * @param {string} options.query
  * @param {number} options.totalLength
+ * @param {number} [options.neighbourHits] - How many top chunks also get
+ *   their neighbours.
+ * @param {number} [options.maxAlternateQueries] - How many alternate queries a
+ *   follow-up read may add, as the header tells the model.
+ * @param {Set<number>} [options.shown] - Chunks an earlier call already
+ *   returned. When set, this is a follow-up: no lead or section openings,
+ *   only the best chunks not shown before.
+ * @param {Map<number, string>} [options.partial] - For chunks an earlier
+ *   call returned only the start of, the rest of their text.
  * @returns {string}
  */
-export function selectForQuery(chunks, scores, { budget, query, totalLength }) {
+export function selectForQuery(
+  chunks,
+  scores,
+  {
+    budget,
+    query,
+    totalLength,
+    neighbourHits = NEIGHBOUR_HITS,
+    maxAlternateQueries = DEFAULT_ALTERNATE_QUERIES,
+    shown,
+    partial,
+  }
+) {
   const quoted = `"${truncate(query.replace(/\s+/g, " "), MAX_QUERY_CHARS)}"`;
   const order = scores
     .map((score, i) => ({ score, i }))
     .sort((a, b) => b.score - a.score)
     .map(({ i }) => i);
-  const header = (shownLength, unshownMatches) =>
-    `[This page has ${totalLength} characters, more than fit. Showing ` +
-    `${shownLength} of them: the start of the page, the opening of each ` +
-    `section, and the parts most relevant to ${quoted}; omitted parts are ` +
-    `marked with […].` +
-    (unshownMatches
-      ? ` ${unshownMatches} more parts of the page match well and are not shown.]`
-      : `]`);
+  if (shown && chunks.every((_, i) => shown.has(i))) {
+    return `[No other part of this page is left; earlier results showed all of it.]`;
+  }
+  const about = length => `about ${Math.ceil(length / 100) * 100}`;
+  const header = (
+    shownLength,
+    filler,
+    unshownMatches,
+    matchLength,
+    unread,
+    weakMatches
+  ) => {
+    let text;
+    if (!shown) {
+      text =
+        `[This page has ${totalLength} characters, more than fit. Showing ` +
+        `${shownLength} of them: the start of the page, the opening of each ` +
+        `section, and the parts most relevant to ${quoted}; omitted parts ` +
+        `are marked with […].`;
+    } else if (filler == shownLength) {
+      text =
+        `[More of this page (${totalLength} characters): ${shownLength} ` +
+        `characters that earlier results did not include. None of them ` +
+        `contain the words of ${quoted}; they are the rest of the page in ` +
+        `page order. Omitted parts are marked with […].`;
+    } else {
+      text =
+        `[More of this page (${totalLength} characters): ${shownLength} ` +
+        `characters that earlier results did not include: the parts most ` +
+        `relevant to ${quoted}` +
+        (filler
+          ? `, then ${filler} characters of the rest of the page in page order.`
+          : `.`) +
+        ` Omitted parts are marked with […].`;
+    }
+    if (unshownMatches) {
+      text +=
+        ` ${unshownMatches} more parts of the page (${about(matchLength)} ` +
+        `characters) match well and are not shown.`;
+    } else if (weakMatches) {
+      text +=
+        ` ${weakMatches} more parts contain some of these words but match ` +
+        `less well; ${about(unread)} characters are not shown.`;
+    } else if (unread) {
+      text += ` No other part uses these words, but ${about(unread)} characters are not shown.`;
+    } else {
+      text += ` Nothing else on the page is left to read.`;
+    }
+    if (!shown) {
+      return (
+        text +
+        ` To read more of it, call get_page_content again for this page ` +
+        `with a query, up to ${maxAlternateQueries} alternate_queries in other ` +
+        `words the page may use, and max_characters for how much to return; ` +
+        `earlier results are kept and not repeated.]`
+      );
+    }
+    return unshownMatches || unread
+      ? text +
+          ` To read the rest in page order, call get_page_content again ` +
+          `with start_at; a negative number counts from the end.]`
+      : text + `]`;
+  };
 
-  let remaining =
-    budget - header(totalLength, chunks.length).length - "\n[…]".length;
+  const longestHeader = Math.max(
+    ...[0, 1, totalLength].map(
+      filler => header(totalLength, filler, 0, 0, totalLength).length
+    ),
+    header(totalLength, 1, chunks.length, totalLength, 0).length,
+    header(totalLength, 1, 0, 0, totalLength, chunks.length).length
+  );
+  let remaining = budget - longestHeader - "\n[…]".length;
   /** @type {Map<number, string>} */
   const selected = new Map();
   // Each part costs its newline, plus a "[…]" line before it and, for a
@@ -658,8 +865,9 @@ export function selectForQuery(chunks, scores, { budget, query, totalLength }) {
     chunks[i].startsSection
       ? 5
       : 17 + chunks[i].headings.join(HEADING_SEPARATOR).length;
-  const take = (i, text = chunks[i]?.text) => {
-    if (i < 0 || i >= chunks.length) {
+  const fullText = i => partial?.get(i) ?? chunks[i]?.text;
+  const take = (i, text = fullText(i)) => {
+    if (i < 0 || i >= chunks.length || shown?.has(i)) {
       return;
     }
     const previous = selected.get(i);
@@ -675,48 +883,77 @@ export function selectForQuery(chunks, scores, { budget, query, totalLength }) {
     }
   };
 
-  take(0);
-  const skeletonBudget = remaining * SKELETON_BUDGET_SHARE;
-  const openings = pickOpenings(chunks, skeletonBudget, MIN_SKELETON_SHARE);
-  const outline = otherSections(
-    chunks,
-    openings,
-    [],
-    OTHER_SECTIONS_QUERY_CHARS
-  );
-  if (outline) {
-    remaining -= outline.length + 1;
-  }
-  const share = Math.floor(skeletonBudget / Math.max(1, openings.length));
-  for (const i of openings) {
-    const room = share - marker(i);
-    if (room >= MIN_SKELETON_SHARE / 2) {
-      take(i, truncate(chunks[i].text, room));
+  let outlineOpenings = null;
+  if (!shown) {
+    take(0);
+    const skeletonBudget = remaining * SKELETON_BUDGET_SHARE;
+    const openings = pickOpenings(chunks, skeletonBudget, MIN_SKELETON_SHARE);
+    const outline = otherSections(
+      chunks,
+      openings,
+      [],
+      OTHER_SECTIONS_QUERY_CHARS
+    );
+    if (outline) {
+      // Listed at the end, without the sections the hits come from.
+      outlineOpenings = openings;
+      remaining -= outline.length + 1;
+    }
+    const share = Math.floor(skeletonBudget / Math.max(1, openings.length));
+    for (const i of openings) {
+      const room = share - marker(i);
+      if (room >= MIN_SKELETON_SHARE / 2) {
+        take(i, truncate(chunks[i].text, room));
+      }
     }
   }
 
-  for (const i of order.slice(0, NEIGHBOUR_HITS)) {
-    take(i);
-    if (selected.get(i) == chunks[i].text) {
+  const withNeighbours = i => {
+    if (selected.get(i) == fullText(i)) {
       take(i + 1);
       if (!chunks[i].startsSection) {
         take(i - 1);
       }
     }
+  };
+  for (const i of order.slice(0, neighbourHits)) {
+    take(i);
+    withNeighbours(i);
   }
+  // Ties keep page order, so parts that match none of the words fill the
+  // rest of the budget in page order.
   for (const i of order) {
     take(i);
   }
 
   const minMatch = Math.max(...scores) * REMAINING_MATCH_SHARE;
-  const unshown = order.filter(
-    i => scores[i] > 0 && scores[i] >= minMatch && !selected.has(i)
-  ).length;
-  const shownLength = [...selected.values()].reduce(
-    (sum, text) => sum + text.length,
-    0
+  const unshownMatches = order.filter(
+    i => scores[i] > 0 && !selected.has(i) && !shown?.has(i)
   );
-  const parts = [header(shownLength, unshown)];
+  const unshown = unshownMatches.filter(i => scores[i] >= minMatch);
+  const length = texts => texts.reduce((sum, text) => sum + text.length, 0);
+  const unread = chunks
+    .map((_, i) => i)
+    .filter(i => !shown?.has(i))
+    .reduce(
+      (sum, i) => sum + fullText(i).length - (selected.get(i)?.length ?? 0),
+      0
+    );
+  const shownLength = length([...selected.values()]);
+  const filler = length(
+    [...selected].filter(([i]) => !(scores[i] > 0)).map(([, t]) => t)
+  );
+  const parts = [
+    header(
+      shownLength,
+      // A short part next to a match is context, not the rest of the page.
+      filler < MIN_FILLER_CHARS && filler < shownLength ? 0 : filler,
+      unshown.length,
+      length(unshown.map(fullText)),
+      unread,
+      unshownMatches.length - unshown.length
+    ),
+  ];
   for (let i = 0; i < chunks.length; i++) {
     if (!selected.has(i)) {
       if (selected.has(i - 1) || i == 0) {
@@ -731,10 +968,10 @@ export function selectForQuery(chunks, scores, { budget, query, totalLength }) {
     parts.push(selected.get(i));
   }
   const others =
-    outline &&
+    outlineOpenings &&
     otherSections(
       chunks,
-      openings,
+      outlineOpenings,
       selected.keys(),
       OTHER_SECTIONS_QUERY_CHARS
     );
@@ -752,15 +989,21 @@ export function selectForQuery(chunks, scores, { budget, query, totalLength }) {
  * @param {object} options
  * @param {number} options.budget
  * @param {number} options.totalLength
+ * @param {Map<number, string>} [options.unseen] - When set, continue each
+ *   section after what earlier results showed instead (see selectCoverage).
  * @returns {string}
  */
-export function selectOverview(chunks, { budget, totalLength }) {
+export function selectOverview(chunks, { budget, totalLength, unseen }) {
+  if (unseen) {
+    return selectCoverage(chunks, { budget, totalLength, unseen });
+  }
   const header = shown =>
     `[This page has ${totalLength} characters, more than fit. Showing the ` +
     `start of the page and the beginning of each section, about ` +
     `${Math.max(1, Math.round((100 * shown) / totalLength))}% of the page. ` +
     `If the answer needs more detail than this, call get_page_content again ` +
-    `with a query instead of answering from general knowledge.]`;
+    `with a query and max_characters instead of answering from general ` +
+    `knowledge.]`;
   let remaining = budget - header(totalLength).length;
   const parts = [];
 
@@ -819,6 +1062,157 @@ export function selectOverview(chunks, { budget, totalLength }) {
 }
 
 /**
+ * Follow-up for broad questions: continue every section where earlier
+ * results stopped, sharing the budget evenly.
+ *
+ * @param {Chunk[]} chunks
+ * @param {object} options
+ * @param {number} options.budget
+ * @param {number} options.totalLength
+ * @param {Map<number, string>} options.unseen - Text of each chunk that
+ *   earlier results did not include, empty when fully shown.
+ * @returns {string}
+ */
+function selectCoverage(chunks, { budget, totalLength, unseen }) {
+  const header =
+    `[Showing more of this page (${totalLength} characters): the next part ` +
+    `of each section that earlier results did not include; omitted parts ` +
+    `are marked with […].]`;
+  const openings = pickOpenings(chunks, budget, MIN_SECTION_SHARE);
+  const starts = openings[0] > 0 ? [0, ...openings] : openings;
+  const sections = starts
+    .map((start, k) => {
+      const end = starts[k + 1] ?? chunks.length;
+      const text = chunks
+        .slice(start, end)
+        .map((chunk, i) => unseen.get(start + i) ?? chunk.text)
+        .filter(Boolean)
+        .join("\n");
+      const path = chunks[start].headings.join(HEADING_SEPARATOR);
+      return { text, label: path ? `[section: ${path}]` : "" };
+    })
+    .filter(section => section.text);
+  let remaining = budget - header.length - "\n[…]".length;
+  const parts = [header];
+  const share = Math.floor(remaining / Math.max(1, sections.length));
+  for (const { text, label } of sections) {
+    const room = share - label.length - "\n[…]\n\n".length;
+    if (room < MIN_SKELETON_SHARE) {
+      continue;
+    }
+    parts.push("[…]", ...(label ? [label] : []), truncate(text, room));
+  }
+  parts.push("[…]");
+  return parts.join("\n");
+}
+
+/**
+ * Read the page in order from a position instead of by relevance, skipping
+ * what earlier results showed.
+ *
+ * @param {Chunk[]} chunks
+ * @param {object} options
+ * @param {number} options.budget
+ * @param {number} options.totalLength
+ * @param {number} options.start - Where to start in the page text.
+ * @param {number[]} options.offsets - Where each chunk starts in the page text.
+ * @param {string[]} options.unseen - Text of each chunk earlier results did
+ *   not include, empty when fully shown.
+ * @returns {string}
+ */
+function selectInOrder(
+  chunks,
+  { budget, totalLength, start, offsets, unseen }
+) {
+  const end = i => offsets[i + 1] ?? totalLength;
+  const first = chunks.findIndex((_, i) => end(i) > start);
+  const header = (from, to, skipped) =>
+    `[Characters ${from}–${to} of this page (${totalLength} characters), ` +
+    `in page order${skipped ? ", skipping parts shown earlier" : ""}; ` +
+    `omitted parts are marked with […]. ` +
+    (to < totalLength
+      ? `To read on, call get_page_content again with start_at ${to}.]`
+      : `This is the end of the page.]`);
+  if (first < 0 || !unseen.slice(first).some(Boolean)) {
+    return (
+      `[Nothing from character ${start} on that earlier results didn't ` +
+      `already show; this page has ${totalLength} characters.]`
+    );
+  }
+  const marker = i =>
+    chunks[i].startsSection
+      ? 5
+      : 17 + chunks[i].headings.join(HEADING_SEPARATOR).length;
+  let remaining =
+    budget - header(totalLength, totalLength, true).length - "\n[…]".length;
+  /** @type {Map<number, string>} */
+  const selected = new Map();
+  let to = offsets[first];
+  let skipped = false;
+  for (let i = first; i < chunks.length; i++) {
+    const text = unseen[i];
+    if (!text) {
+      skipped = true;
+      to = end(i);
+      continue;
+    }
+    const cost = text.length + marker(i);
+    if (cost > remaining) {
+      const room = remaining - marker(i);
+      if (room >= MIN_SKELETON_SHARE) {
+        selected.set(i, truncate(text, room));
+        to = offsets[i] + Math.round(((end(i) - offsets[i]) * room) / cost);
+      }
+      break;
+    }
+    selected.set(i, text);
+    remaining -= cost;
+    to = end(i);
+  }
+  const parts = [header(offsets[first], to, skipped)];
+  for (let i = first; i < chunks.length; i++) {
+    if (!selected.has(i)) {
+      if (selected.has(i - 1) || i == first) {
+        parts.push("[…]");
+      }
+      continue;
+    }
+    const chunk = chunks[i];
+    if (!selected.has(i - 1) && !chunk.startsSection && chunk.headings.length) {
+      parts.push(`[section: ${chunk.headings.join(HEADING_SEPARATOR)}]`);
+    }
+    parts.push(selected.get(i));
+  }
+  return parts.join("\n");
+}
+
+/**
+ * @param {Chunk} chunk
+ * @param {string} previous - Earlier results with whitespace squashed.
+ * @returns {string} The part of the chunk not in previous.
+ */
+function unseenText(chunk, previous) {
+  const text = chunk.text.replace(/\s+/g, " ");
+  if (previous.includes(text)) {
+    return "";
+  }
+  if (!previous.includes(text.slice(0, UNSEEN_PREFIX_CHARS))) {
+    return chunk.text;
+  }
+  let shown = UNSEEN_PREFIX_CHARS;
+  let high = text.length;
+  while (shown < high) {
+    const mid = (shown + high + 1) >> 1;
+    if (previous.includes(text.slice(0, mid))) {
+      shown = mid;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return text.slice(shown).trim();
+}
+
+/**
  * Fit extracted page text into the budget. Text that already fits is
  * returned unchanged.
  *
@@ -829,9 +1223,15 @@ export function selectOverview(chunks, { budget, totalLength }) {
  *   one, an overview of the page is returned.
  * @param {number} options.budget
  * @param {object} [options.options] - DEFAULT_PAGE_STRATEGIES has what
- *   get_page_content uses: stripLinks (send link labels without URLs) and
- *   fuzzy (match query words that are not on the page to the closest page
- *   word).
+ *   get_page_content uses on a first read: stripLinks (send link labels
+ *   without URLs) and fuzzy (match query words that are not on the page to
+ *   the closest page word). Follow-ups add previous (the text of earlier
+ *   results for this page: return only chunks they did not include, without
+ *   lead or section openings), queries (up to maxAlternateQueries more queries,
+ *   whose BM25 scores add to the query's), coverage (with previous: continue every section
+ *   where previous stopped instead of matching the query) and startAt (read
+ *   the page in order from this character, negative from the end).
+ *   maxAlternateQueries sets how many queries a follow-up may add.
  * @returns {Promise<string>}
  */
 export async function fitPageContent({
@@ -851,20 +1251,101 @@ export async function fitPageContent({
     blocks = blocks?.map(block => ({ ...block, text: stripLinks(block.text) }));
   }
   const chunks = buildChunks(blocks ?? blocksFromText(text));
+  // Where each chunk starts in the page text.
+  const offsets = [];
+  let cursor = 0;
+  for (const chunk of chunks) {
+    const at = text.indexOf(chunk.text.slice(0, 40), cursor);
+    offsets.push(at < 0 ? cursor : at);
+    // A chunk is never longer than the page text it comes from, so the next
+    // one starts after it, even where the page repeats itself.
+    cursor = at < 0 ? cursor : at + chunk.text.length;
+  }
   if (!chunks.length) {
     return text.slice(0, budget);
   }
   const totalLength = text.length;
-  if (!query?.trim()) {
-    return selectOverview(chunks, { budget, totalLength });
+  if (Number.isInteger(options.startAt)) {
+    const previous = (options.previous ?? "").replace(/\s+/g, " ");
+    return selectInOrder(chunks, {
+      budget,
+      totalLength,
+      start:
+        options.startAt < 0
+          ? Math.max(0, totalLength + options.startAt)
+          : Math.min(options.startAt, totalLength),
+      offsets,
+      unseen: chunks.map(chunk =>
+        previous ? unseenText(chunk, previous) : chunk.text
+      ),
+    });
   }
-  const index = await PageIndex.create(chunks.map(textForRanking));
-  try {
-    const tokens = tokenize(query);
-    const scores = await index.scores(
-      options.fuzzy ? await index.correctTypos(tokens) : tokens
+  if (options.coverage && options.previous) {
+    const previous = options.previous.replace(/\s+/g, " ");
+    return selectOverview(chunks, {
+      budget,
+      totalLength,
+      unseen: new Map(
+        chunks.map((chunk, i) => [i, unseenText(chunk, previous)])
+      ),
+    });
+  }
+  // A first read says how long each section is; follow-ups already did.
+  const lengthsLine = options.previous ? "" : sectionLengths(chunks);
+  const firstBudget = budget - (lengthsLine ? lengthsLine.length + 1 : 0);
+  if (!query?.trim()) {
+    return withLineAfterHeader(
+      selectOverview(chunks, { budget: firstBudget, totalLength }),
+      lengthsLine
     );
-    return selectForQuery(chunks, scores, { budget, query, totalLength });
+  }
+  const maxAlternateQueries =
+    options.maxAlternateQueries ?? DEFAULT_ALTERNATE_QUERIES;
+  // A follow-up also carries over the earlier query.
+  const extraQueries = (options.queries ?? [])
+    .filter(q => q?.trim())
+    .slice(0, maxAlternateQueries + 1);
+  const texts = chunks.map(textForRanking);
+  const index = await PageIndex.create(texts);
+  try {
+    const tokenLists = await Promise.all(
+      [query, ...extraQueries].map(q => {
+        const tokens = tokenize(q);
+        return options.fuzzy ? index.correctTypos(tokens) : tokens;
+      })
+    );
+    const selection = {
+      budget: firstBudget,
+      query,
+      totalLength,
+      maxAlternateQueries,
+    };
+    if (options.previous) {
+      const previous = options.previous.replace(/\s+/g, " ");
+      selection.shown = new Set();
+      selection.partial = new Map();
+      chunks.forEach((chunk, i) => {
+        const unseen = unseenText(chunk, previous);
+        if (!unseen) {
+          selection.shown.add(i);
+        } else if (unseen != chunk.text) {
+          selection.partial.set(i, unseen);
+        }
+      });
+    }
+    // Raw BM25 keeps how well each query matches, so a vague query cannot
+    // push out the strong matches of another.
+    const raw = await Promise.all(
+      tokenLists.map(tokens => index.scores(tokens, false))
+    );
+    const scores = raw[0].map((_, i) => raw.reduce((sum, s) => sum + s[i], 0));
+    return withLineAfterHeader(
+      selectForQuery(chunks, scores, {
+        ...selection,
+        neighbourHits: Math.max(NEIGHBOUR_HITS, tokenLists.length),
+      }),
+      lengthsLine
+    );
   } finally {
     await index.close();
   }

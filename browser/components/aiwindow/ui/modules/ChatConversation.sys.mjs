@@ -90,6 +90,23 @@ const RESTORABLE_ROLES = [...CHAT_ROLES, MESSAGE_ROLE.TOOL];
 const NO_PAGE_CONTEXT = "No page context is available for this message.";
 
 let _savedLoadPromptDescriptor = null;
+// After a refused page read, Chat stops offering get_page_content for the turn
+// (see _pageReadsUsedTurn). Some models (seen with Qwen) still try to call it
+// and, with no tool to call, write the call into their answer as text in
+// their own syntax, e.g. "<function=get_page_content>...</function>". This
+// keeps that text out of the answer shown to the user, only in such turns.
+const LEAKED_TOOL_CALL =
+  /<tool_call>[\s\S]*?<\/tool_call>|<function=[\w-]+>[\s\S]*?<\/function>(?:\s*<\/tool_call>)?|<\/?tool_call>/g;
+
+/**
+ * @param {string} text
+ * @returns {string} The text without tool calls written into it.
+ */
+export function stripLeakedToolCalls(text) {
+  const stripped = text.replace(LEAKED_TOOL_CALL, "");
+  return stripped == text ? text : stripped.trim();
+}
+
 export function _setLoadPromptForTesting(fn) {
   if (fn !== null) {
     _savedLoadPromptDescriptor = Object.getOwnPropertyDescriptor(
@@ -167,6 +184,14 @@ export class ChatConversation extends Conversation {
    * @type {UrlTokenizer}
    */
   urlTokenizer = null;
+
+  /**
+   * The turn in which get_page_content refused a read for being over the
+   * follow-up limits. Chat stops offering the tool for the rest of that turn.
+   *
+   * @type {?number}
+   */
+  _pageReadsUsedTurn = null;
 
   /**
    * Conversation-level pool of history results keyed by URL, accumulated across
@@ -388,6 +413,11 @@ export class ChatConversation extends Conversation {
       // Expand URL tokens and remove any hallucinated ones.
       if (this.urlTokenizer.urlToToken.size) {
         result.currentMessage.content.body = stripUnresolvedUrlTokens(
+          result.currentMessage.content.body
+        );
+      }
+      if (this._pageReadsUsedTurn === this.currentTurnIndex()) {
+        result.currentMessage.content.body = stripLeakedToolCalls(
           result.currentMessage.content.body
         );
       }
@@ -894,6 +924,8 @@ export class ChatConversation extends Conversation {
       throw err;
     }
     this.#pendingCitationUrls.clear();
+    // The retried turn gets the same index and may read pages again.
+    this._pageReadsUsedTurn = null;
     // splice() bypasses our setter; refresh branch-tip manually.
     this.#updateActiveBranchTipMessageId();
     return removed;

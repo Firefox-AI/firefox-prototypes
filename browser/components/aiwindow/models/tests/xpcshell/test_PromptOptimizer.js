@@ -298,3 +298,54 @@ add_task(async function test_granular_failsafe_bad_json() {
     "Optimizer should skip malformed tools and return the array structurally intact."
   );
 });
+
+// test: A follow-up read only shows what earlier reads of the page did not, so
+// the reads it continues are kept until a fresh read of the page replaces them.
+add_task(async function test_follow_up_reads_kept() {
+  const url = "https://example.com/long";
+  const read = (id, text, args = {}) => [
+    {
+      role: "assistant",
+      content: "",
+      tool_calls: [
+        {
+          id,
+          type: "function",
+          function: {
+            name: "get_page_content",
+            arguments: JSON.stringify({ url_list: [url], ...args }),
+          },
+        },
+      ],
+    },
+    {
+      role: "tool",
+      name: "get_page_content",
+      tool_call_id: id,
+      content: JSON.stringify([`Content from ${url}:\n\n${text}`]),
+    },
+  ];
+  const first = "[This page has 50000 characters, more than fit.] Part A";
+  const more = "[More of this page (50000 characters): ...] Part B";
+
+  let optimized = compactMessages([
+    ...read("call_1", first, { query: "a" }),
+    ...read("call_2", more, { query: "b" }),
+  ]);
+  Assert.stringContains(optimized[1].content, "Part A", "The base read stays.");
+  Assert.stringContains(optimized[3].content, "Part B", "The follow-up stays.");
+
+  optimized = compactMessages([
+    ...read("call_1", first, { query: "a" }),
+    ...read("call_2", more, { query: "b" }),
+    { role: "user", content: "Something else about the page" },
+    ...read("call_3", first.replace("Part A", "Part C"), { query: "c" }),
+  ]);
+  Assert.stringContains(optimized[1].content, "Content omitted");
+  Assert.stringContains(optimized[3].content, "Content omitted");
+  Assert.stringContains(
+    optimized[6].content,
+    "Part C",
+    "The fresh read stays."
+  );
+});

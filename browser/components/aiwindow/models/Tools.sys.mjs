@@ -41,6 +41,7 @@ import {
   DEFAULT_PAGE_STRATEGIES,
   fitPageContent,
   stripSamePageLinks,
+  isPartialRead,
 } from "moz-src:///browser/components/aiwindow/models/PageContentChunker.sys.mjs";
 import { SmartTabGroupingManager } from "moz-src:///browser/components/tabbrowser/SmartTabGrouping.sys.mjs";
 import { UI_TYPES } from "moz-src:///browser/components/aiwindow/ui/modules/ToolUI.sys.mjs";
@@ -127,6 +128,22 @@ export const PAGE_CONTENT_CHUNKING_PREF =
   "browser.smartwindow.pageContent.chunking.enabled";
 const PAGE_CONTENT_MAX_EXTRACTED_PREF =
   "browser.smartwindow.pageContent.maxExtractedCharacters";
+const PAGE_CONTENT_FOLLOW_UPS_PREF =
+  "browser.smartwindow.pageContent.followUps.max";
+const PAGE_CONTENT_FIRST_BUDGET_PREF =
+  "browser.smartwindow.pageContent.firstBudget";
+const PAGE_CONTENT_FOLLOW_UP_BUDGET_PREF =
+  "browser.smartwindow.pageContent.followUps.budget";
+const MIN_FOLLOW_UP_BUDGET = 1000;
+const PAGE_CONTENT_ALTERNATE_QUERIES_PREF =
+  "browser.smartwindow.pageContent.alternateQueries.max";
+
+/**
+ * @returns {number} How many alternate queries a follow-up read may add.
+ */
+function maxAlternateQueries() {
+  return Services.prefs.getIntPref(PAGE_CONTENT_ALTERNATE_QUERIES_PREF, 3);
+}
 
 const MAX_KNOWN_TOKENS = 5;
 
@@ -377,41 +394,98 @@ export function searchTheWebToolConfig(conversation) {
   }
 }
 
-export const GET_PAGE_CONTENT_TOOL_CONFIG_CHUNKED = {
-  type: "function",
-  function: {
-    name: GET_PAGE_CONTENT,
-    description:
-      "Retrieve cleaned text content of all the provided browser page URL Tokens in the list. " +
-      "Long pages don't fit: pass a query to get the parts relevant to it, or omit the query " +
-      "to get an overview (the start of the page and the beginning of each section), e.g. to " +
-      "summarize the page. Write the query in the language of the page, and use a section's " +
-      "heading to get that section.",
-    parameters: {
-      type: "object",
-      properties: {
-        url_list: {
-          type: "array",
-          items: {
+/**
+ * @returns {object} The get_page_content tool with chunked and follow-up
+ *   reads, described with the current budgets.
+ */
+export function getPageContentToolConfigChunked() {
+  const firstBudget = Services.prefs.getIntPref(
+    PAGE_CONTENT_FIRST_BUDGET_PREF,
+    10000
+  );
+  const followUps = Services.prefs.getIntPref(PAGE_CONTENT_FOLLOW_UPS_PREF, 1);
+  const followUpBudget = Services.prefs.getIntPref(
+    PAGE_CONTENT_FOLLOW_UP_BUDGET_PREF,
+    5000
+  );
+  const alternates = maxAlternateQueries();
+  const characters = n => n.toLocaleString("en-US");
+  return {
+    type: "function",
+    function: {
+      name: GET_PAGE_CONTENT,
+      description:
+        "Retrieve cleaned text content of all the provided browser page URL Tokens in the list. " +
+        `Long pages don't fit. The first read of a long page returns about ${characters(firstBudget)} characters: ` +
+        "the start of the page, the opening of each section and the parts most relevant to the " +
+        "query (without a query, an overview, e.g. to summarize the page). Its header says how " +
+        "long the page is and how many more parts, and roughly how many characters, match the " +
+        "query but were not shown. You can then read the same page " +
+        (followUps == 1 ? "once more" : `up to ${followUps} more times`) +
+        " in this turn: " +
+        "that read skips everything already returned and gives the best remaining matches for " +
+        "the query and alternate_queries, the earlier query included, then the rest of the " +
+        `unread page in page order, up to max_characters (at most ${characters(followUpBudget)}). Decide from the ` +
+        "first result and the remaining matches: when one specific fact is missing, ask for " +
+        "little; when much more matches or the question needs most of the page, ask for more. " +
+        "If the first result does not cover everything the user asked and its header reports " +
+        "more matching or unread parts, read again before answering instead of saying the " +
+        "page lacks it. To read on in page order or see how the page " +
+        "ends, pass start_at instead of a query. Write the query and alternate_queries in the " +
+        "language of the page, and use a section's heading to get that section. Answer from " +
+        "every relevant point in the results.",
+      parameters: {
+        type: "object",
+        properties: {
+          url_list: {
+            type: "array",
+            items: {
+              type: "string",
+              description:
+                "A URL token that appeared in the conversation, formatted as §url_token: DOMAIN_TLD_PATH_n§. " +
+                "Do NOT fabricate tokens. Only use tokens from user messages and tool results.",
+            },
+            minItems: 1,
+            description: "List of URL tokens to fetch content from.",
+          },
+          query: {
             type: "string",
             description:
-              "A URL token that appeared in the conversation, formatted as §url_token: DOMAIN_TLD_PATH_n§. " +
-              "Do NOT fabricate tokens. Only use tokens from user messages and tool results.",
+              "What you are looking for on the pages, as a short self-contained question or " +
+              "description. Omit it when you need the whole page, e.g. for a summary.",
           },
-          minItems: 1,
-          description: "List of URL tokens to fetch content from.",
+          start_at: {
+            type: "integer",
+            description:
+              "Read the page in order from this character instead of searching it: 0 for the " +
+              "top, a negative number to count from the end (-5000 for the last 5,000 " +
+              "characters). Parts shown earlier are skipped, and the result says where to " +
+              "continue. Use it to keep reading or for things a search can't find, such as " +
+              "how the page ends.",
+          },
+          max_characters: {
+            type: "integer",
+            minimum: MIN_FOLLOW_UP_BUDGET,
+            maximum: followUpBudget,
+            description:
+              "Only when reading a page again: how many characters to return, from what the " +
+              `earlier result says still matches. Defaults to ${followUpBudget}.`,
+          },
+          alternate_queries: {
+            type: "array",
+            items: { type: "string" },
+            maxItems: alternates,
+            description:
+              `Only when reading a page again: up to ${alternates} other ways to say what you are looking ` +
+              "for, in words the page may use (synonyms, related terms, likely section " +
+              "headings). The earlier query is kept automatically.",
+          },
         },
-        query: {
-          type: "string",
-          description:
-            "What you are looking for on the pages, as a short self-contained question or " +
-            "description. Omit it when you need the whole page, e.g. for a summary.",
-        },
+        required: ["url_list"],
       },
-      required: ["url_list"],
     },
-  },
-};
+  };
+}
 
 export const toolsConfig = [
   {
@@ -1150,6 +1224,14 @@ function raceAbort(promise, signal) {
 /**
  * @typedef {object} PageRead
  * @property {string} query - What the model is looking for on the page.
+ * @property {number} [budget] - Characters this read may return.
+ * @property {string} [previous] - Earlier results for the page in this turn,
+ *   set when this read is a follow-up.
+ * @property {string[]} [earlierQueries] - The queries of those results.
+ * @property {string[]} [alternateQueries] - Other phrasings for a follow-up.
+ * @property {number} [startAt] - Where to read the page in order from;
+ *   negative counts from the end.
+ * @property {string} [note] - Returned instead of reading the page.
  */
 
 /**
@@ -1180,12 +1262,14 @@ export class GetPageContent {
    * @param {string[]} toolParams.url_list
    * @param {AbortSignal} [toolParams.signal]
    * @param {ChatConversation} conversation
+   * @param {object} [options] - See getPageContent.
    * @returns {Promise<Array<string>>}
    */
-  static async getPageContentText(toolParams, conversation) {
+  static async getPageContentText(toolParams, conversation, options) {
     const results = await GetPageContent.getPageContent(
       toolParams,
-      conversation
+      conversation,
+      options
     );
     return results.map(result => result.content);
   }
@@ -1202,15 +1286,34 @@ export class GetPageContent {
    * @param {string[]} toolParams.url_list
    * @param {string} [toolParams.query] - What the model is looking for, used
    *   to pick the relevant parts of long pages when chunking is enabled.
+   * @param {string[]} [toolParams.alternate_queries] - Other phrasings, used
+   *   when the page was already read in this turn.
+   * @param {number} [toolParams.max_characters] - How much a follow-up read
+   *   returns, up to the follow-up budget.
+   * @param {number} [toolParams.start_at] - Read the page in order from this
+   *   character instead of by relevance; negative counts from the end.
    * @param {AbortSignal} [toolParams.signal] - Cancels in-flight extractions
    *   (and tears down any headless browser) when it aborts.
    * @param {number} [toolParams.settleDelayMs] - Extra wait for headless loads.
    * @param {ChatConversation} conversation
+   * @param {object} [options]
+   * @param {boolean} [options.followUps] - Treat another read of a page in
+   *   the same turn as a follow-up of the earlier ones. Only for the model's
+   *   own tool calls, since other callers need the page on its own.
    * @returns {Promise<Array<{url: ?string, ok: boolean, content: string}>>}
    */
   static async getPageContent(
-    { url_list, query, signal, settleDelayMs },
-    conversation
+    {
+      url_list,
+      query,
+      alternate_queries,
+      max_characters,
+      start_at,
+      signal,
+      settleDelayMs,
+    },
+    conversation,
+    { followUps = false } = {}
   ) {
     // Sanitize the inputs from the language model:
     if (!Array.isArray(url_list)) {
@@ -1262,6 +1365,23 @@ export class GetPageContent {
         if (!isAllowedURLProtocol(url) && !isSmartPageURL(URL.parse(url))) {
           return { url, ok: false, content: "This URL is not allowed: " + url };
         }
+        const read = GetPageContent.#planRead(
+          url,
+          conversation,
+          typeof query == "string" ? query : "",
+          followUps ? (alternate_queries ?? []) : null,
+          max_characters
+        );
+        if (Number.isInteger(start_at)) {
+          read.startAt = start_at;
+        }
+        if (read.note) {
+          return {
+            url,
+            ok: true,
+            content: `Content from ${url}:\n\n${read.note}`,
+          };
+        }
         const startTime = ChromeUtils.now();
         try {
           const { ok, content } =
@@ -1271,7 +1391,7 @@ export class GetPageContent {
               conversation,
               signal,
               settleDelayMs,
-              { query: typeof query == "string" ? query : "" }
+              read
             );
           ChromeUtils.addProfilerMarker(
             "SmartWindow",
@@ -1315,6 +1435,120 @@ export class GetPageContent {
     lazy.console.log("[Tool] getPageContent", results);
 
     return results;
+  }
+
+  /**
+   * Decide how to read a page: a first read gets the first budget, a later
+   * read of the same page in this turn continues the earlier results, up to
+   * the follow-up cap and budget.
+   *
+   * @param {string} url
+   * @param {ChatConversation} conversation
+   * @param {string} query
+   * @param {?string[]} alternateQueries - null when follow-ups are off.
+   * @param {number} [maxCharacters] - What the model asked a follow-up for.
+   * @returns {PageRead}
+   */
+  static #planRead(url, conversation, query, alternateQueries, maxCharacters) {
+    if (!Services.prefs.getBoolPref(PAGE_CONTENT_CHUNKING_PREF, false)) {
+      return { query };
+    }
+    const firstBudget = Services.prefs.getIntPref(
+      PAGE_CONTENT_FIRST_BUDGET_PREF,
+      GetPageContent.MAX_CHARACTERS
+    );
+    const earlier = alternateQueries
+      ? GetPageContent.#earlierReads(url, conversation)
+      : [];
+    if (!earlier.length) {
+      return { query, budget: firstBudget };
+    }
+    if (!earlier.some(read => isPartialRead(read.text))) {
+      return {
+        query,
+        note: "[The whole page was already returned in an earlier result.]",
+      };
+    }
+    const budget = Math.min(
+      Number.isFinite(maxCharacters)
+        ? Math.max(MIN_FOLLOW_UP_BUDGET, maxCharacters)
+        : Infinity,
+      Services.prefs.getIntPref(PAGE_CONTENT_FOLLOW_UP_BUDGET_PREF, 5000)
+    );
+    if (
+      earlier.length >
+        Services.prefs.getIntPref(PAGE_CONTENT_FOLLOW_UPS_PREF, 1) ||
+      budget < MIN_FOLLOW_UP_BUDGET
+    ) {
+      // Chat stops offering the tool for the rest of the turn.
+      conversation._pageReadsUsedTurn = conversation.currentTurnIndex();
+      return {
+        query,
+        note:
+          "[This page was already read this turn. Answer from the earlier " +
+          "results and say what is missing.]",
+      };
+    }
+    return {
+      query,
+      budget,
+      previous: earlier.map(read => read.text).join("\n"),
+      earlierQueries: earlier.map(read => read.query).filter(Boolean),
+      alternateQueries: (Array.isArray(alternateQueries)
+        ? alternateQueries
+        : []
+      )
+        .filter(q => typeof q == "string" && q.trim())
+        .slice(0, maxAlternateQueries()),
+    };
+  }
+
+  /**
+   * The results of earlier get_page_content calls for `url` in the current
+   * turn.
+   *
+   * @param {string} url
+   * @param {ChatConversation} conversation
+   * @returns {Array<{text: string, query: string}>}
+   */
+  static #earlierReads(url, conversation) {
+    const { messages } = conversation;
+    const turn = conversation.currentTurnIndex();
+    const calls = new Map();
+    for (const { content } of messages) {
+      for (const call of content?.body?.tool_calls ??
+        content?.tool_calls ??
+        []) {
+        if (call.function?.name == GET_PAGE_CONTENT) {
+          calls.set(call.id, call);
+        }
+      }
+    }
+    const reads = [];
+    for (const { role, turnIndex, content } of messages) {
+      if (
+        role != MESSAGE_ROLE.TOOL ||
+        turnIndex != turn ||
+        content?.name != GET_PAGE_CONTENT ||
+        !Array.isArray(content.body)
+      ) {
+        continue;
+      }
+      let args;
+      try {
+        args = JSON.parse(calls.get(content.tool_call_id)?.function.arguments);
+      } catch {
+        continue;
+      }
+      const text = content.body[args?.url_list?.indexOf(url) ?? -1];
+      if (typeof text == "string" && text.startsWith("Content from ")) {
+        reads.push({
+          text,
+          query: typeof args.query == "string" ? args.query.trim() : "",
+        });
+      }
+    }
+    return reads;
   }
 
   /**
@@ -1573,15 +1807,42 @@ export class GetPageContent {
       text: stripSamePageLinks(block.text, sourceUrl),
     }));
 
-    const { query } = read;
+    const {
+      budget = GetPageContent.MAX_CHARACTERS,
+      previous,
+      earlierQueries = [],
+      alternateQueries = [],
+    } = read;
+    let { query } = read;
+    let options = DEFAULT_PAGE_STRATEGIES;
+    if (Number.isInteger(read.startAt)) {
+      options = {
+        ...DEFAULT_PAGE_STRATEGIES,
+        previous,
+        startAt: read.startAt,
+      };
+    } else if (previous) {
+      // Keep the earlier query so a vague follow-up doesn't lose what the
+      // first read was about.
+      const queries = [...new Set([...earlierQueries, ...alternateQueries])];
+      query ||= queries.shift() ?? "";
+      options = query
+        ? {
+            ...DEFAULT_PAGE_STRATEGIES,
+            previous,
+            queries: queries.filter(q => q != query),
+          }
+        : { ...DEFAULT_PAGE_STRATEGIES, previous, coverage: true };
+    }
+    options = { ...options, maxAlternateQueries: maxAlternateQueries() };
     const startTime = ChromeUtils.now();
     const content = await raceAbort(
       fitPageContent({
         text: pageText,
         blocks,
         query,
-        budget: GetPageContent.MAX_CHARACTERS,
-        options: DEFAULT_PAGE_STRATEGIES,
+        budget,
+        options,
       }),
       signal
     );

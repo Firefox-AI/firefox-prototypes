@@ -1661,3 +1661,193 @@ add_task(
     );
   }
 );
+
+add_task(async function test_Chat_get_page_content_follow_up_through_chat() {
+  const sb = sinon.createSandbox();
+  const pageUrl = "https://example.com/long";
+  Services.prefs.setBoolPref(
+    "browser.smartwindow.pageContent.chunking.enabled",
+    true
+  );
+  try {
+    const blocks = [{ text: "Long page", headingLevel: 1 }];
+    for (let i = 0; i < 400; i++) {
+      blocks.push({
+        text: `Part ${i} talks about topic ${i % 7} at some length, adding filler words to the page.`,
+        headingLevel: 0,
+      });
+    }
+    blocks.push({ text: "The walrus ledger opened in 1998.", headingLevel: 0 });
+    const text = blocks.map(b => b.text).join("\n");
+    sb.stub(GetPageContent, "getTabWithURL").returns({
+      label: "Long page",
+      linkedBrowser: {
+        browsingContext: {
+          currentWindowContext: {
+            getActor: async () => ({
+              getText: async () => ({ text, blocks, links: [] }),
+            }),
+          },
+        },
+      },
+    });
+    let callCount = 0;
+    const fakeEngine = {
+      runWithGenerator() {
+        callCount++;
+        async function* gen() {
+          if (callCount <= 2) {
+            yield {
+              toolCalls: [
+                {
+                  id: `call_read_${callCount}`,
+                  function: {
+                    name: "get_page_content",
+                    arguments: JSON.stringify({
+                      url_list: [pageUrl],
+                      query: callCount == 1 ? "topic 3" : "walrus ledger",
+                    }),
+                  },
+                },
+              ],
+            };
+          } else {
+            yield { text: "Done." };
+          }
+        }
+        return gen();
+      },
+      getConfig() {
+        return {};
+      },
+    };
+    sb.stub(AuthProvider, "getToken").resolves("mock_token");
+
+    const conversation = new ChatConversation({
+      title: "follow-up",
+      description: "",
+      pageUrl: new URL(pageUrl),
+      pageMeta: {},
+    });
+    conversation.addUserMessage("When did the ledger open?", pageUrl, 0);
+    conversation.addAssistantMessage("text", "");
+    setupConversationForChat(conversation, {
+      model: TEST_MODEL,
+      engine: fakeEngine,
+    });
+    await Chat.fetchWithHistory({ conversation });
+
+    const reads = conversation.messages
+      .filter(m => m.role === MESSAGE_ROLE.TOOL)
+      .map(m => m.content.body[0]);
+    Assert.equal(reads.length, 2);
+    Assert.stringContains(reads[0], "[This page has");
+    Assert.stringContains(
+      reads[1],
+      "[More of this page",
+      "The second read of the page in a turn is a follow-up."
+    );
+    const parts = read => read.match(/Part \d+ talks/g) ?? [];
+    const firstParts = new Set(parts(reads[0]));
+    Assert.deepEqual(
+      parts(reads[1]).filter(part => firstParts.has(part)),
+      [],
+      "The follow-up repeats nothing from the first read."
+    );
+  } finally {
+    Services.prefs.clearUserPref(
+      "browser.smartwindow.pageContent.chunking.enabled"
+    );
+    sb.restore();
+  }
+});
+
+add_task(async function test_Chat_stops_offering_page_reads_after_limit() {
+  const sb = sinon.createSandbox();
+  const pageUrl = "https://example.com/long";
+  Services.prefs.setBoolPref(
+    "browser.smartwindow.pageContent.chunking.enabled",
+    true
+  );
+  try {
+    const blocks = [{ text: "Long page", headingLevel: 1 }];
+    for (let i = 0; i < 400; i++) {
+      blocks.push({
+        text: `Part ${i} talks about topic ${i % 7} at some length, adding filler words to the page.`,
+        headingLevel: 0,
+      });
+    }
+    const text = blocks.map(b => b.text).join("\n");
+    sb.stub(GetPageContent, "getTabWithURL").returns({
+      label: "Long page",
+      linkedBrowser: {
+        browsingContext: {
+          currentWindowContext: {
+            getActor: async () => ({
+              getText: async () => ({ text, blocks, links: [] }),
+            }),
+          },
+        },
+      },
+    });
+    const offered = [];
+    const fakeEngine = {
+      runWithGenerator({ tools }) {
+        const names = tools.map(t => t.function?.name);
+        offered.push(names.includes("get_page_content"));
+        const call = offered.length;
+        async function* gen() {
+          if (names.includes("get_page_content")) {
+            yield {
+              toolCalls: [
+                {
+                  id: `call_read_${call}`,
+                  function: {
+                    name: "get_page_content",
+                    arguments: JSON.stringify({
+                      url_list: [pageUrl],
+                      query: `topic ${call}`,
+                    }),
+                  },
+                },
+              ],
+            };
+          } else {
+            yield { text: "Done." };
+          }
+        }
+        return gen();
+      },
+      getConfig() {
+        return {};
+      },
+    };
+    sb.stub(AuthProvider, "getToken").resolves("mock_token");
+
+    const conversation = new ChatConversation({
+      title: "limit",
+      description: "",
+      pageUrl: new URL(pageUrl),
+      pageMeta: {},
+    });
+    conversation.addUserMessage("Tell me everything.", pageUrl, 0);
+    conversation.addAssistantMessage("text", "");
+    setupConversationForChat(conversation, {
+      model: TEST_MODEL,
+      engine: fakeEngine,
+    });
+    await Chat.fetchWithHistory({ conversation });
+
+    Assert.deepEqual(
+      offered,
+      [true, true, true, false],
+      "After a read is refused, the model answers instead of asking again."
+    );
+    Assert.equal(getLastAssistantResponse(conversation).content.body, "Done.");
+  } finally {
+    Services.prefs.clearUserPref(
+      "browser.smartwindow.pageContent.chunking.enabled"
+    );
+    sb.restore();
+  }
+});

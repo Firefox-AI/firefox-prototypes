@@ -19,6 +19,8 @@
  * ===================================================================
  */
 
+import { isFollowUpRead } from "moz-src:///browser/components/aiwindow/models/PageContentChunker.sys.mjs";
+
 /**
  * Scans the conversation history, tracks the latest fetch for each URL, and
  * replaces older redundant page content with a lightweight placeholder.
@@ -33,7 +35,7 @@
  */
 function deduplicatePageContent(messages) {
   const callIdToUrls = new Map();
-  const urlToLatestCallId = new Map();
+  const urlToCallIds = new Map();
   const pageContents = new Map();
 
   // PASS 1: Match the Assistant's requests to completed page-content responses.
@@ -76,10 +78,15 @@ function deduplicatePageContent(messages) {
             contentArray.length === requestedUrls.length
           ) {
             pageContents.set(msg, contentArray);
-            // Continually overwrite to guarantee we only store the LATEST ID for each URL
+            // Every read of each URL in order, so a follow-up read can keep the
+            // reads it continues.
             contentArray.forEach((textContent, index) => {
               if (typeof textContent === "string" && textContent.trim()) {
-                urlToLatestCallId.set(requestedUrls[index], msg.tool_call_id);
+                const url = requestedUrls[index];
+                urlToCallIds.set(url, [
+                  ...(urlToCallIds.get(url) ?? []),
+                  { callId: msg.tool_call_id, textContent },
+                ]);
               }
             });
           }
@@ -93,6 +100,18 @@ function deduplicatePageContent(messages) {
     }
   }
 
+  // Keep the latest read of each URL, plus the earlier reads that a follow-up
+  // read continues, since it skips what those already showed.
+  const keptReads = new Set();
+  for (const [url, reads] of urlToCallIds) {
+    for (let i = reads.length - 1; i >= 0; i--) {
+      keptReads.add(`${reads[i].callId} ${url}`);
+      if (!isFollowUpRead(reads[i].textContent)) {
+        break;
+      }
+    }
+  }
+
   // PASS 2: Execute the replacement on the Tool responses
   for (const [msg, contentArray] of pageContents) {
     const requestedUrls = callIdToUrls.get(msg.tool_call_id);
@@ -100,11 +119,11 @@ function deduplicatePageContent(messages) {
       // Relies on the assumption that contentArray[index] maps perfectly to requestedUrls[index]
       const url = requestedUrls[index];
 
-      // If we tracked this URL, and this tool_call_id is NOT the newest one, drop the heavy text
+      // If we tracked this URL and no longer need this read, drop the heavy text
       if (
         url &&
-        urlToLatestCallId.has(url) &&
-        urlToLatestCallId.get(url) !== msg.tool_call_id
+        urlToCallIds.has(url) &&
+        !keptReads.has(`${msg.tool_call_id} ${url}`)
       ) {
         return `[System Note: Content omitted for ${url}. A fresher read occurs later in context.]`;
       }

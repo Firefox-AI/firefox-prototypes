@@ -2461,6 +2461,14 @@ pref("browser.smartwindow.auth.guest.mode", "fetch");
 pref("browser.smartwindow.pageContent.chunking.enabled", false);
 // With chunking: how much of a page is extracted before it is chunked.
 pref("browser.smartwindow.pageContent.maxExtractedCharacters", 300000);
+// With chunking: characters the first read of a page returns, and how many
+// more reads of the same page a turn may make.
+pref("browser.smartwindow.pageContent.firstBudget", 10000);
+pref("browser.smartwindow.pageContent.followUps.max", 1);
+// The most a follow-up read returns; the model picks less with max_characters.
+pref("browser.smartwindow.pageContent.followUps.budget", 5000);
+// How many alternate queries a follow-up read may add to its query.
+pref("browser.smartwindow.pageContent.alternateQueries.max", 3);
 pref("browser.smartwindow.memories.generateFromHistory", true);
 pref("browser.smartwindow.memories.generateFromConversation", true);
 pref("browser.smartwindow.memories.hasSeenMemories", false);

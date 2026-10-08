@@ -10,6 +10,10 @@ const { ChatConversation, MESSAGE_ROLE, ChatMessage } =
     "moz-src:///browser/components/aiwindow/ui/modules/ChatStore.sys.mjs"
   );
 
+const { stripLeakedToolCalls } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/aiwindow/ui/modules/ChatConversation.sys.mjs"
+);
+
 const { SecurityProperties } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/SecurityProperties.sys.mjs"
 );
@@ -63,6 +67,60 @@ function addLegacySystemMessage(conversation, type, body, version) {
     conversation.currentTurnIndex()
   );
 }
+
+add_task(function test_stripLeakedToolCalls() {
+  Assert.equal(
+    stripLeakedToolCalls(
+      "<function=get_page_content>\n<parameter=start_at>\n15193\n</parameter>\n</function>\n</tool_call>\n\nAbout 100 articles."
+    ),
+    "About 100 articles.",
+    "A tool call written into the answer is removed."
+  );
+  Assert.equal(
+    stripLeakedToolCalls("Use <b>bold</b> text."),
+    "Use <b>bold</b> text.",
+    "Other markup stays."
+  );
+});
+
+add_task(async function test_leaked_tool_calls_only_stripped_after_refusal() {
+  const leaked = "Write <tool_call>{}</tool_call> to call a tool.";
+  const answer = async (conversation, refusedRead = false) => {
+    conversation.addUserMessage("How do tool calls look?");
+    if (refusedRead) {
+      conversation._pageReadsUsedTurn = conversation.currentTurnIndex();
+    }
+    conversation.addAssistantMessage("text", "");
+    await conversation.receiveResponse(
+      (async function* () {
+        yield { text: leaked };
+      })()
+    );
+    return conversation.messages.at(-1).content.body;
+  };
+
+  Assert.equal(
+    await answer(new ChatConversation({})),
+    leaked,
+    "Answers are left alone in turns without a refused page read."
+  );
+
+  const refused = new ChatConversation({});
+  Assert.equal(
+    await answer(refused, true),
+    "Write  to call a tool.",
+    "After a refused page read, tool calls are removed from the answer."
+  );
+
+  await refused.retryMessage(
+    refused.messages.find(m => m.role === MESSAGE_ROLE.USER)
+  );
+  Assert.equal(
+    refused._pageReadsUsedTurn,
+    null,
+    "A retried turn may read pages again."
+  );
+});
 
 add_task(function test_ChatConversation_constructor_defaults() {
   const conversation = new ChatConversation({});

@@ -52,6 +52,40 @@ function newConversation(question) {
   return conversation;
 }
 
+/**
+ * Reads a page as Chat does: with follow-up reads, recording the call and its
+ * result in the conversation.
+ *
+ * @param {object} GetPageContent
+ * @param {ChatConversation} conversation
+ * @param {string} id - The tool call id.
+ * @param {object} params - The tool call arguments.
+ * @returns {Promise<string>} The content returned for the first URL.
+ */
+async function readLikeChat(GetPageContent, conversation, id, params) {
+  conversation.addAssistantMessage("function", {
+    tool_calls: [
+      {
+        id,
+        type: "function",
+        function: {
+          name: "get_page_content",
+          arguments: JSON.stringify(params),
+        },
+      },
+    ],
+  });
+  const results = await GetPageContent.getPageContent(params, conversation, {
+    followUps: true,
+  });
+  conversation.addToolCallMessage({
+    tool_call_id: id,
+    body: results.map(result => result.content),
+    name: "get_page_content",
+  });
+  return results[0].content;
+}
+
 add_task(async function test_chunked_read_finds_a_late_fact() {
   await SpecialPowers.pushPrefEnv({ set: [[CHUNKING_PREF, true]] });
   const { url_list, GetPageContent, cleanup } =
@@ -80,5 +114,76 @@ add_task(async function test_chunked_read_finds_a_late_fact() {
   );
 
   await cleanup();
+  await SpecialPowers.popPrefEnv();
+});
+
+add_task(async function test_follow_up_reads() {
+  await SpecialPowers.pushPrefEnv({ set: [[CHUNKING_PREF, true]] });
+  const { url_list, GetPageContent, cleanup } =
+    await setupGetPageContentTests(longPage());
+  const conversation = newConversation("When did the walrus ledger open?");
+
+  const first = await readLikeChat(GetPageContent, conversation, "call_1", {
+    url_list,
+    query: "security sandboxing",
+  });
+  Assert.ok(!first.includes("walrus"), "The first read misses the fact.");
+
+  const followUp = await readLikeChat(GetPageContent, conversation, "call_2", {
+    url_list,
+    query: "walrus ledger",
+    max_characters: 1500,
+  });
+  Assert.stringContains(followUp, "[More of this page");
+  Assert.stringContains(followUp, "opened in 1998", "The follow-up finds it.");
+  Assert.lessOrEqual(
+    followUp.length,
+    1500 + 100,
+    "The follow-up returns no more than the model asked for."
+  );
+  const firstLines = new Set(
+    first
+      .split("\n")
+      .filter(line => line.length > 60 && !line.startsWith("Content from"))
+  );
+  Assert.deepEqual(
+    followUp.split("\n").filter(line => firstLines.has(line)),
+    [],
+    "The follow-up repeats nothing from the first read."
+  );
+
+  const capped = await readLikeChat(GetPageContent, conversation, "call_3", {
+    url_list,
+    query: "appendix",
+  });
+  Assert.stringContains(
+    capped,
+    "already read this turn",
+    "One follow-up per turn, so the model can't read the page in a loop."
+  );
+
+  await cleanup();
+  await SpecialPowers.popPrefEnv();
+});
+
+add_task(async function test_description_follows_the_budgets() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.smartwindow.pageContent.followUps.budget", 4000],
+      ["browser.smartwindow.pageContent.alternateQueries.max", 2],
+    ],
+  });
+  const { getPageContentToolConfigChunked } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs"
+  );
+  const { description, parameters } =
+    getPageContentToolConfigChunked().function;
+  Assert.stringContains(description, "at most 4,000");
+  Assert.equal(parameters.properties.max_characters.maximum, 4000);
+  Assert.equal(parameters.properties.alternate_queries.maxItems, 2);
+  Assert.stringContains(
+    parameters.properties.alternate_queries.description,
+    "up to 2 other ways"
+  );
   await SpecialPowers.popPrefEnv();
 });

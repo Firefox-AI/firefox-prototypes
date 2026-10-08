@@ -8,6 +8,8 @@ const {
   blocksFromText,
   buildChunks,
   fitPageContent,
+  isFollowUpRead,
+  isPartialRead,
   selectForQuery,
   selectOverview,
   tokenize,
@@ -229,6 +231,45 @@ add_task(function test_selectOverview_too_many_sections() {
   );
 });
 
+add_task(async function test_first_reads_give_section_lengths() {
+  const blocks = longPage();
+  const text = blocks.map(block => block.text).join("\n");
+  for (const query of ["", "sandbox"]) {
+    const read = await fitPageContent({
+      text,
+      blocks,
+      query,
+      budget: 3000,
+      options: DEFAULT_PAGE_STRATEGIES,
+    });
+    Assert.lessOrEqual(read.length, 3000, `The read fits ("${query}").`);
+    const line = read.split("\n")[1];
+    info(line);
+    Assert.ok(
+      line.startsWith("[Section lengths in characters: Security ") &&
+        line.endsWith("]"),
+      "The line after the header lists the sections, longest first: " +
+        "Security has a subsection."
+    );
+    Assert.ok(
+      line.includes("Start of the page") && !line.includes("Sandbox details"),
+      "The lead is the start of the page and subsections count to their section."
+    );
+
+    const followUp = await fitPageContent({
+      text,
+      blocks,
+      query: query || "market",
+      budget: 3000,
+      options: { ...DEFAULT_PAGE_STRATEGIES, previous: read },
+    });
+    Assert.ok(
+      !followUp.includes("[Section lengths"),
+      "A follow-up doesn't repeat the lengths."
+    );
+  }
+});
+
 add_task(async function test_selectForQuery_broad_query_keeps_skeleton() {
   const blocks = longPage();
   const chunks = buildChunks(blocks, 400);
@@ -307,6 +348,24 @@ function pageWithBuriedFact() {
   });
   return blocks;
 }
+
+add_task(async function test_extra_queries_cover_every_part() {
+  const blocks = pageWithBuriedFact();
+  const text = blocks.map(b => b.text).join("\n");
+  const query = "When did the zebra-crossing sandbox ship?";
+  const fit = options =>
+    fitPageContent({ text, blocks, query, budget: 2500, options });
+
+  const single = await fit({});
+  Assert.ok(!single.includes("walrus"), "One query misses the other part.");
+
+  const output = await fit({ queries: ["walrus ledger opened", "", "  "] });
+  info(output);
+  Assert.lessOrEqual(output.length, 2500);
+  Assert.stringContains(output, "version 57", "The query is still answered.");
+  Assert.stringContains(output, "walrus ledger", "The extra query is too.");
+  Assert.stringContains(output, query, "The header shows the query.");
+});
 
 add_task(async function test_fuzzy_matches_typos() {
   const blocks = pageWithBuriedFact();
@@ -395,6 +454,83 @@ add_task(async function test_overview_of_article_with_late_heading() {
   );
 });
 
+add_task(async function test_extra_queries_fit_budget() {
+  const blocks = pageWithBuriedFact();
+  const text = blocks.map(b => b.text).join("\n");
+  for (let budget = 1200; budget <= 4000; budget += 211) {
+    const output = await fitPageContent({
+      text,
+      blocks,
+      query: "sandbox",
+      budget,
+      options: {
+        queries: [
+          "market share",
+          "walrus",
+          "early years",
+          "appendix",
+          "ignored fifth",
+        ],
+        fuzzy: true,
+      },
+    });
+    Assert.lessOrEqual(output.length, budget, `Fits ${budget}`);
+  }
+});
+
+add_task(async function test_follow_up_skips_earlier_results() {
+  const blocks = pageWithBuriedFact();
+  const text = blocks.map(b => b.text).join("\n");
+  const first = await fitPageContent({
+    text,
+    blocks,
+    query: "zebra-crossing sandbox",
+    budget: 2500,
+  });
+  const followUp = await fitPageContent({
+    text,
+    blocks,
+    query: "zebra-crossing sandbox",
+    budget: 2500,
+    options: { previous: first, queries: ["walrus ledger"] },
+  });
+  info(followUp);
+  Assert.lessOrEqual(followUp.length, 2500);
+  Assert.stringContains(followUp, "walrus ledger", "New parts are added.");
+  Assert.ok(!followUp.includes("version 57"), "Earlier results are skipped.");
+  Assert.ok(
+    !followUp.includes("the introduction"),
+    "The lead is not repeated."
+  );
+});
+
+add_task(async function test_coverage_continues_sections() {
+  const blocks = pageWithBuriedFact();
+  const text = blocks.map(b => b.text).join("\n");
+  const first = await fitPageContent({
+    text,
+    blocks,
+    query: "What is this page about?",
+    budget: 2000,
+  });
+  const more = await fitPageContent({
+    text,
+    blocks,
+    query: "What is this page about?",
+    budget: 2000,
+    options: { previous: first, coverage: true },
+  });
+  info(more);
+  Assert.lessOrEqual(more.length, 2000);
+  Assert.stringContains(more, "[section: Intro › History]");
+  Assert.stringContains(more, "[section: Intro › Reception]");
+  const firstLines = new Set(first.split("\n").filter(l => l.length > 40));
+  Assert.ok(
+    more.split("\n").every(l => !firstLines.has(l)),
+    "No line is repeated from the first result."
+  );
+});
+
 add_task(function test_buildChunks_keeps_code_with_its_introduction() {
   const listing = Array.from({ length: 200 }, (_, i) => `  step${i}();`).join(
     "\n"
@@ -421,6 +557,126 @@ add_task(function test_buildChunks_keeps_code_with_its_introduction() {
       "Code is only split between lines."
     );
   }
+});
+
+add_task(async function test_header_reports_unshown_matches() {
+  const blocks = longPage();
+  for (let i = 0; i < 12; i++) {
+    blocks.push({
+      text: `Zebra-crossing note ${i}. ${paragraph("zebras")}`,
+      headingLevel: 0,
+    });
+  }
+  const text = blocks.map(b => b.text).join("\n");
+  const output = await fitPageContent({
+    text,
+    blocks,
+    query: "zebra-crossing",
+    budget: 2500,
+    options: DEFAULT_PAGE_STRATEGIES,
+  });
+  info(output);
+  Assert.lessOrEqual(output.length, 2500);
+  Assert.ok(
+    /more parts of the page \(about \d+ characters\) match well and are not shown/.test(
+      output
+    ),
+    "The header says how many matching parts are left."
+  );
+  Assert.stringContains(output, "alternate_queries");
+  Assert.stringContains(output, "max_characters");
+
+  const narrow = await fitPageContent({
+    text: pageWithBuriedFact()
+      .map(b => b.text)
+      .join("\n"),
+    blocks: pageWithBuriedFact(),
+    query: "walrus ledger",
+    budget: 2500,
+    options: DEFAULT_PAGE_STRATEGIES,
+  });
+  Assert.stringContains(
+    narrow,
+    "No other part uses these words, but about",
+    "The header doesn't claim the unread rest of the page is irrelevant."
+  );
+});
+
+add_task(async function test_follow_up_without_new_matches() {
+  const blocks = pageWithBuriedFact();
+  const text = blocks.map(b => b.text).join("\n");
+  const first = await fitPageContent({
+    text,
+    blocks,
+    query: "walrus ledger",
+    budget: 2500,
+  });
+  const followUp = await fitPageContent({
+    text,
+    blocks,
+    query: "walrus ledger",
+    budget: 2500,
+    options: { previous: first, queries: ["ledger walrus"] },
+  });
+  info(followUp);
+  Assert.ok(followUp.startsWith("[More of this page"), "Continues the read.");
+  Assert.stringContains(
+    followUp,
+    "None of them contain the words of",
+    "The header says nothing new matches."
+  );
+  Assert.greater(
+    followUp.length,
+    2000,
+    "The rest of the page fills the budget the model asked for."
+  );
+  Assert.lessOrEqual(followUp.length, 2500);
+  const shown = first.split("\n").filter(line => line.length > 40);
+  const repeated = shown.filter(line => followUp.includes(line));
+  Assert.ok(
+    repeated.every(line => text.split(line).length > 2),
+    `Only lines the page itself repeats come back: ${JSON.stringify(repeated)}`
+  );
+
+  const everything = await fitPageContent({
+    text,
+    blocks,
+    query: "walrus ledger",
+    budget: 2500,
+    options: { previous: text, queries: ["ledger walrus"] },
+  });
+  Assert.stringContains(
+    everything,
+    "No other part of this page is left",
+    "A follow-up after the whole page was shown says so."
+  );
+});
+
+add_task(async function test_follow_up_fills_after_matches() {
+  const blocks = pageWithBuriedFact();
+  const text = blocks.map(b => b.text).join("\n");
+  const first = await fitPageContent({
+    text,
+    blocks,
+    query: "sandbox",
+    budget: 2500,
+  });
+  const followUp = await fitPageContent({
+    text,
+    blocks,
+    query: "walrus ledger",
+    budget: 2500,
+    options: { previous: first, queries: ["sandbox"] },
+  });
+  info(followUp);
+  Assert.stringContains(followUp, "walrus");
+  Assert.ok(
+    /the parts most relevant to "walrus ledger", then \d+ characters of the rest of the page in page order/.test(
+      followUp
+    ),
+    "The header separates matches from the rest of the page."
+  );
+  Assert.lessOrEqual(followUp.length, 2500);
 });
 
 add_task(async function test_default_strategies_fit_budget() {
@@ -506,6 +762,98 @@ add_task(async function test_overview_lists_sections_that_do_not_fit() {
     /\[Other sections: .*Ticker\]/.test(output),
     "Sections without an opening are listed by heading."
   );
+});
+
+add_task(async function test_start_at_reads_in_page_order() {
+  const blocks = pageWithBuriedFact();
+  const text = blocks.map(b => b.text).join("\n");
+  const first = await fitPageContent({
+    text,
+    blocks,
+    query: "zebra-crossing sandbox",
+    budget: 2500,
+  });
+
+  const top = await fitPageContent({
+    text,
+    blocks,
+    budget: 2500,
+    options: { previous: first, startAt: 0 },
+  });
+  info(top);
+  Assert.lessOrEqual(top.length, 2500);
+  Assert.ok(/^\[Characters 0–\d+ of this page/.test(top));
+  Assert.stringContains(top, "skipping parts shown earlier");
+  Assert.ok(
+    isFollowUpRead("\n" + top),
+    "Compaction keeps the earlier read a start_at read skips."
+  );
+  const firstLines = new Set(first.split("\n").filter(l => l.length > 40));
+  Assert.ok(
+    top.split("\n").every(l => !firstLines.has(l)),
+    "Nothing shown earlier is repeated."
+  );
+
+  // Paging: continue where the result says.
+  const next = Number(top.match(/start_at (\d+)/)[1]);
+  const page2 = await fitPageContent({
+    text,
+    blocks,
+    budget: 2500,
+    options: { previous: first + "\n" + top, startAt: next },
+  });
+  Assert.ok(
+    page2.startsWith(`[Characters ${next}–`) ||
+      Number(page2.match(/^\[Characters (\d+)/)[1]) >= next - 1000,
+    "The next page starts where the previous one ended."
+  );
+  const topLines = new Set(top.split("\n").filter(l => l.length > 40));
+  Assert.ok(page2.split("\n").every(l => !topLines.has(l)));
+
+  const end = await fitPageContent({
+    text,
+    blocks,
+    budget: 2500,
+    options: { startAt: -300 },
+  });
+  info(end);
+  Assert.stringContains(end, "This is the end of the page.");
+  Assert.stringContains(end, "version 57", "The end of the page is read.");
+  Assert.ok(
+    isPartialRead("\n" + end),
+    "A first read with start_at leaves room for a follow-up."
+  );
+});
+
+add_task(async function test_start_at_when_everything_was_shown() {
+  const blocks = pageWithBuriedFact();
+  const text = blocks.map(b => b.text).join("\n");
+  const output = await fitPageContent({
+    text,
+    blocks,
+    budget: 2500,
+    options: { previous: text, startAt: 0 },
+  });
+  Assert.stringContains(output, "already show");
+});
+
+add_task(async function test_follow_up_suggests_start_at_for_the_rest() {
+  const blocks = pageWithBuriedFact();
+  const text = blocks.map(b => b.text).join("\n");
+  const first = await fitPageContent({
+    text,
+    blocks,
+    query: "walrus ledger",
+    budget: 2500,
+  });
+  const followUp = await fitPageContent({
+    text,
+    blocks,
+    query: "last word of the entire page",
+    budget: 2500,
+    options: { previous: first, queries: [] },
+  });
+  Assert.stringContains(followUp, "call get_page_content again with start_at");
 });
 
 add_task(async function test_long_blocks_are_split_without_breaking_links() {

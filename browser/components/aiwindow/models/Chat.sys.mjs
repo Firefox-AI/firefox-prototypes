@@ -14,7 +14,7 @@ import {
   GET_OPEN_TABS,
   SEARCH_BROWSING_HISTORY,
   GET_PAGE_CONTENT,
-  GET_PAGE_CONTENT_TOOL_CONFIG_CHUNKED,
+  getPageContentToolConfigChunked,
   PAGE_CONTENT_CHUNKING_PREF,
   RUN_SEARCH,
   GET_USER_MEMORIES,
@@ -65,7 +65,8 @@ export async function executeToolByName(
       const startTime = new Date();
       result = await GetPageContent.getPageContentText(
         toolParams,
-        conversation
+        conversation,
+        { followUps: true }
       );
       Glean.smartWindow.getPageContent.record({
         location: mode,
@@ -318,7 +319,7 @@ function filterFeatureGatedTools(tools, conversation) {
   if (Services.prefs.getBoolPref(PAGE_CONTENT_CHUNKING_PREF, false)) {
     filtered = filtered.map(t =>
       t.function?.name === GET_PAGE_CONTENT
-        ? GET_PAGE_CONTENT_TOOL_CONFIG_CHUNKED
+        ? getPageContentToolConfigChunked()
         : t
     );
   }
@@ -537,7 +538,12 @@ Object.assign(Chat, {
         streamOptions: { enabled: true },
         token,
         chatId: conversation.id,
-        tools: chatToolsConfig,
+        // Once a page was read as often as a turn allows, the model answers
+        // instead of asking again.
+        tools:
+          conversation._pageReadsUsedTurn === currentTurn
+            ? chatToolsConfig.filter(t => t.function?.name !== GET_PAGE_CONTENT)
+            : chatToolsConfig,
         args: snapshot,
         inferenceParams: { tool_choice: "auto" },
         signal,
