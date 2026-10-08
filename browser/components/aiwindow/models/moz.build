@@ -29,6 +29,7 @@ MOZ_SRC_FILES += [
     "ManageTabs.sys.mjs",
     "Message.sys.mjs",
     "openAIEngine.sys.mjs",
+    "PageContentChunker.sys.mjs",
     "PreferencesNavMap.sys.mjs",
     "PromptLoader.sys.mjs",
     "PromptOptimizer.sys.mjs",

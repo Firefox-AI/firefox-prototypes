@@ -2456,6 +2456,11 @@ pref("browser.smartwindow.actionsToolbar.refreshDelayMs", 400);
 pref("browser.smartwindow.endpoint", "https://mlpa-prod-prod-mozilla.freetls.fastly.net/v1");
 pref("browser.smartwindow.auth.impl", "fxa");
 pref("browser.smartwindow.auth.guest.mode", "fetch");
+// Proof of concept: fit long pages into get_page_content's budget by query
+// relevance.
+pref("browser.smartwindow.pageContent.chunking.enabled", false);
+// With chunking: how much of a page is extracted before it is chunked.
+pref("browser.smartwindow.pageContent.maxExtractedCharacters", 300000);
 pref("browser.smartwindow.memories.generateFromHistory", true);
 pref("browser.smartwindow.memories.generateFromConversation", true);
 pref("browser.smartwindow.memories.hasSeenMemories", false);

@@ -37,6 +37,11 @@ import {
   cosSim,
 } from "chrome://global/content/ml/NLPUtils.sys.mjs";
 import { embeddingsGeneratorFactory } from "chrome://global/content/ml/EmbeddingsGenerator.sys.mjs";
+import {
+  DEFAULT_PAGE_STRATEGIES,
+  fitPageContent,
+  stripSamePageLinks,
+} from "moz-src:///browser/components/aiwindow/models/PageContentChunker.sys.mjs";
 import { SmartTabGroupingManager } from "moz-src:///browser/components/tabbrowser/SmartTabGrouping.sys.mjs";
 import { UI_TYPES } from "moz-src:///browser/components/aiwindow/ui/modules/ToolUI.sys.mjs";
 
@@ -117,6 +122,11 @@ function keywordRecall(topicTokens, titleTokens) {
 
   return hits / topicTokens.size;
 }
+
+export const PAGE_CONTENT_CHUNKING_PREF =
+  "browser.smartwindow.pageContent.chunking.enabled";
+const PAGE_CONTENT_MAX_EXTRACTED_PREF =
+  "browser.smartwindow.pageContent.maxExtractedCharacters";
 
 const MAX_KNOWN_TOKENS = 5;
 
@@ -366,6 +376,42 @@ export function searchTheWebToolConfig(conversation) {
       return null;
   }
 }
+
+export const GET_PAGE_CONTENT_TOOL_CONFIG_CHUNKED = {
+  type: "function",
+  function: {
+    name: GET_PAGE_CONTENT,
+    description:
+      "Retrieve cleaned text content of all the provided browser page URL Tokens in the list. " +
+      "Long pages don't fit: pass a query to get the parts relevant to it, or omit the query " +
+      "to get an overview (the start of the page and the beginning of each section), e.g. to " +
+      "summarize the page. Write the query in the language of the page, and use a section's " +
+      "heading to get that section.",
+    parameters: {
+      type: "object",
+      properties: {
+        url_list: {
+          type: "array",
+          items: {
+            type: "string",
+            description:
+              "A URL token that appeared in the conversation, formatted as §url_token: DOMAIN_TLD_PATH_n§. " +
+              "Do NOT fabricate tokens. Only use tokens from user messages and tool results.",
+          },
+          minItems: 1,
+          description: "List of URL tokens to fetch content from.",
+        },
+        query: {
+          type: "string",
+          description:
+            "What you are looking for on the pages, as a short self-contained question or " +
+            "description. Omit it when you need the whole page, e.g. for a summary.",
+        },
+      },
+      required: ["url_list"],
+    },
+  },
+};
 
 export const toolsConfig = [
   {
@@ -1102,10 +1148,21 @@ function raceAbort(promise, signal) {
 }
 
 /**
+ * @typedef {object} PageRead
+ * @property {string} query - What the model is looking for on the page.
+ */
+
+/**
  * Class for handling page content extraction with configurable modes and limits.
  */
 export class GetPageContent {
   static MAX_CHARACTERS = 10000;
+  /**
+   * @returns {number} How much of a page is extracted for chunking.
+   */
+  static get MAX_EXTRACTED_CHARACTERS() {
+    return Services.prefs.getIntPref(PAGE_CONTENT_MAX_EXTRACTED_PREF, 300000);
+  }
 
   /**
    * Generous until telemetry shows real transcript lengths. 2^16
@@ -1143,6 +1200,8 @@ export class GetPageContent {
    *
    * @param {object} toolParams
    * @param {string[]} toolParams.url_list
+   * @param {string} [toolParams.query] - What the model is looking for, used
+   *   to pick the relevant parts of long pages when chunking is enabled.
    * @param {AbortSignal} [toolParams.signal] - Cancels in-flight extractions
    *   (and tears down any headless browser) when it aborts.
    * @param {number} [toolParams.settleDelayMs] - Extra wait for headless loads.
@@ -1150,7 +1209,7 @@ export class GetPageContent {
    * @returns {Promise<Array<{url: ?string, ok: boolean, content: string}>>}
    */
   static async getPageContent(
-    { url_list, signal, settleDelayMs },
+    { url_list, query, signal, settleDelayMs },
     conversation
   ) {
     // Sanitize the inputs from the language model:
@@ -1211,7 +1270,8 @@ export class GetPageContent {
               mentionedUrls,
               conversation,
               signal,
-              settleDelayMs
+              settleDelayMs,
+              { query: typeof query == "string" ? query : "" }
             );
           ChromeUtils.addProfilerMarker(
             "SmartWindow",
@@ -1330,6 +1390,7 @@ export class GetPageContent {
    * @param {AbortSignal} [signal] - Cancels the extraction (and tears down any
    *   headless browser) when it aborts.
    * @param {number} [settleDelayMs] - Extra wait for headless loads.
+   * @param {PageRead} read
    *
    * @returns {Promise<{ok: boolean, content: string}>}
    *   ok is false when content is a failure description rather than page text.
@@ -1339,7 +1400,8 @@ export class GetPageContent {
     mentionedUrls,
     conversation,
     signal,
-    settleDelayMs
+    settleDelayMs,
+    read
   ) {
     if (signal?.aborted) {
       throw new DOMException("Aborted", "AbortError");
@@ -1369,7 +1431,8 @@ export class GetPageContent {
         conversation,
         `${sanitizeUntrustedContent(tab.label)} (${url})`,
         url,
-        signal
+        signal,
+        read
       );
     }
 
@@ -1395,6 +1458,7 @@ export class GetPageContent {
               label,
               url,
               signal,
+              read,
               traceId
             ),
           anonymousFetch: true,
@@ -1419,6 +1483,7 @@ export class GetPageContent {
           label,
           url,
           signal,
+          read,
           traceId
         ),
       settleDelayMs,
@@ -1436,6 +1501,7 @@ export class GetPageContent {
    * @param {string} sourceUrl
    * @param {AbortSignal} [signal] - Rejects the extraction early if it aborts,
    *   which lets the headless browser hosting the read be torn down promptly.
+   * @param {PageRead} read
    * @param {TraceId} [traceId] - Correlates this extraction with the enclosing
    *   headless-extractor profiler marker.
    * @returns {Promise<{ok: boolean, content: string}>}
@@ -1449,16 +1515,25 @@ export class GetPageContent {
     label,
     sourceUrl,
     signal,
+    read,
     traceId
   ) {
+    const chunking = Services.prefs.getBoolPref(
+      PAGE_CONTENT_CHUNKING_PREF,
+      false
+    );
     const extraction = await raceAbort(
       pageExtractor.getText(
         {
-          sufficientLength: GetPageContent.MAX_CHARACTERS,
+          sufficientLength: chunking
+            ? GetPageContent.MAX_EXTRACTED_CHARACTERS
+            : GetPageContent.MAX_CHARACTERS,
           sufficientTranscriptLength: GetPageContent.MAX_TRANSCRIPT_CHARACTERS,
           cleanWhitespace: true,
           removeBoilerplate: true,
           sourceUrl,
+          boilerplateStrategy: chunking ? "landmarks" : "reader",
+          includeBlocks: chunking,
         },
         traceId
       ),
@@ -1488,7 +1563,34 @@ export class GetPageContent {
       };
     }
 
-    return { ok: true, content: `Content from ${label}:\n\n${text}` };
+    if (!chunking) {
+      return { ok: true, content: `Content from ${label}:\n\n${text}` };
+    }
+
+    const pageText = stripSamePageLinks(text, sourceUrl);
+    const blocks = extraction.blocks?.map(block => ({
+      ...block,
+      text: stripSamePageLinks(block.text, sourceUrl),
+    }));
+
+    const { query } = read;
+    const startTime = ChromeUtils.now();
+    const content = await raceAbort(
+      fitPageContent({
+        text: pageText,
+        blocks,
+        query,
+        budget: GetPageContent.MAX_CHARACTERS,
+        options: DEFAULT_PAGE_STRATEGIES,
+      }),
+      signal
+    );
+    ChromeUtils.addProfilerMarker(
+      "SmartWindow",
+      { startTime },
+      `Tool:get_page_content:fit(${text.length})`
+    );
+    return { ok: true, content: `Content from ${label}:\n\n${content}` };
   }
 }
 

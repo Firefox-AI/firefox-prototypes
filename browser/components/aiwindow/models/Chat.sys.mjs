@@ -14,6 +14,8 @@ import {
   GET_OPEN_TABS,
   SEARCH_BROWSING_HISTORY,
   GET_PAGE_CONTENT,
+  GET_PAGE_CONTENT_TOOL_CONFIG_CHUNKED,
+  PAGE_CONTENT_CHUNKING_PREF,
   RUN_SEARCH,
   GET_USER_MEMORIES,
   GET_NAVIGATION_INFO,
@@ -312,6 +314,13 @@ function filterFeatureGatedTools(tools, conversation) {
         },
       };
     });
+  }
+  if (Services.prefs.getBoolPref(PAGE_CONTENT_CHUNKING_PREF, false)) {
+    filtered = filtered.map(t =>
+      t.function?.name === GET_PAGE_CONTENT
+        ? GET_PAGE_CONTENT_TOOL_CONFIG_CHUNKED
+        : t
+    );
   }
   return filtered;
 }
