@@ -118,6 +118,8 @@ function keywordRecall(topicTokens, titleTokens) {
   return hits / topicTokens.size;
 }
 
+const MAX_KNOWN_TOKENS = 5;
+
 // this exists only to make writing tests easier
 export const _embeddingFunctions = { embedTexts, keywordRecall };
 
@@ -1182,6 +1184,22 @@ export class GetPageContent {
 
     const results = await Promise.all(
       url_list.map(async (url, index) => {
+        if (typeof url == "string" && url.includes("§url_token:")) {
+          // A token the conversation doesn't know, usually one the model
+          // made up. Say so, rather than that the URL is not allowed, which
+          // reads like a restriction.
+          const known = [...(conversation.tokenToUrl?.keys() ?? [])]
+            .slice(0, MAX_KNOWN_TOKENS)
+            .map(token => `§url_token: ${token}§`);
+          return {
+            url,
+            ok: false,
+            content:
+              `Unknown URL token ${url}. Use a token exactly as it appears in the ` +
+              `conversation` +
+              (known.length ? `, for example: ${known.join(", ")}.` : "."),
+          };
+        }
         if (!isAllowedURLProtocol(url) && !isSmartPageURL(URL.parse(url))) {
           return { url, ok: false, content: "This URL is not allowed: " + url };
         }

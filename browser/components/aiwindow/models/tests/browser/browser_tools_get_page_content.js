@@ -140,3 +140,36 @@ add_task(async function test_get_page_content_block_anchor_links() {
 
   await cleanup();
 });
+
+add_task(async function test_unknown_url_token() {
+  const { GetPageContent } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs"
+  );
+  const { ChatConversation } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/aiwindow/ui/modules/ChatConversation.sys.mjs"
+  );
+  const conversation = new ChatConversation({
+    title: "",
+    description: "",
+    pageUrl: new URL("https://example.com"),
+    pageMeta: {},
+  });
+  const known = conversation.convertUrlToToken(
+    "https://en.wikipedia.org/wiki/Firefox"
+  );
+  const [result] = await GetPageContent.getPageContent(
+    { url_list: ["§url_token: WIKIPEDIA_ORG_1§"] },
+    conversation
+  );
+  Assert.ok(!result.ok, "The read fails.");
+  Assert.stringContains(
+    result.content,
+    "Unknown URL token",
+    "The model learns the token is unknown, not that the URL is restricted."
+  );
+  Assert.stringContains(
+    result.content,
+    `§url_token: ${known}§`,
+    "The tokens the conversation knows are listed."
+  );
+});
