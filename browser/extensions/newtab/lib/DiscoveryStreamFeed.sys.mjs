@@ -187,7 +187,7 @@ export class DiscoveryStreamFeed {
     // Internal in-memory cache for parsing json prefs.
     this._prefCache = {};
     this.adsClient = null;
-    this._cosineRerankMode = COSINE_RERANK_WITHIN_SECTIONS;
+    this._cosineRerankMode = COSINE_RERANK_ACROSS_SECTIONS;
 
     this.onPocketExperimentUpdated = this.onPocketExperimentUpdated.bind(this);
   }
@@ -3223,7 +3223,7 @@ export class DiscoveryStreamFeed {
         break;
       case at.DISCOVERY_STREAM_DEV_RECOMPUTE_USER_HISTORY_VECTOR:
         console.warn("[NewTab cosine] recompute requested");
-        this._cosineRerankMode = COSINE_RERANK_WITHIN_SECTIONS;
+        this._cosineRerankMode = COSINE_RERANK_ACROSS_SECTIONS;
         await this.recomputeUserHistoryVector();
         await this.onPrefChange();
         break;

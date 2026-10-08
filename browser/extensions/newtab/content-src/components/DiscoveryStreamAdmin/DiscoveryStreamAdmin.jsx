@@ -321,7 +321,7 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
   }
 
   handlePersonalizationChange(event) {
-    const value = Number(event.target.value);
+    const value = 1 - Number(event.target.value);
     this.setState({ personalizationWeight: value });
     this.props.dispatch(ac.SetPref(PREF_PERSONALIZATION_WEIGHT, value));
   }
@@ -1372,6 +1372,7 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
     const personalizationWeight = Number.isFinite(rawPersonalizationWeight)
       ? Math.min(1, Math.max(0, rawPersonalizationWeight))
       : 0.5;
+    const sliderPosition = (1 - personalizationWeight).toFixed(1);
 
     // Prefs for IAB Banners
     const mediumRectangleEnabled =
@@ -1427,7 +1428,7 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
               max="1"
               step="0.1"
               list="personalization-weight-ticks"
-              value={String(personalizationWeight)}
+              value={String(sliderPosition)}
               onChange={this.handlePersonalizationChange}
               aria-label="Personalization"
             />
@@ -1437,16 +1438,16 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
               ))}
             </datalist>
             <div className="personalization-weight-labels">
-              <span>Server score</span>
               <span>Personal score</span>
+              <span>Crowd score</span>
             </div>
           </div>
           <div className="admin-button-row">
-            <moz-button onClick={this.cosineRerankWithinSections}>
-              Cosine: Rerank Within Sections
-            </moz-button>
             <moz-button onClick={this.cosineRerankAcrossSections}>
               Cosine: Promote Top 6 to Popular Today
+            </moz-button>
+            <moz-button onClick={this.cosineRerankWithinSections}>
+              Cosine: Rerank Within Sections
             </moz-button>
           </div>
         </details>

@@ -220,6 +220,10 @@ describe("DiscoveryStreamFeed", () => {
     restoreGlobals();
   });
 
+  it("defaults to cross-section cosine ranking", () => {
+    expect(feed._cosineRerankMode).toBe("across-sections");
+  });
+
   describe("#fetchFromEndpoint", () => {
     beforeEach(() => {
       fetchStub.mockResolvedValue({
@@ -2745,6 +2749,7 @@ describe("DiscoveryStreamFeed", () => {
 
       expect(feed.recomputeUserHistoryVector).toHaveBeenCalledTimes(1);
       expect(feed.onPrefChange).toHaveBeenCalledTimes(1);
+      expect(feed._cosineRerankMode).toBe("across-sections");
     });
   });
 
@@ -2756,6 +2761,7 @@ describe("DiscoveryStreamFeed", () => {
         type: at.DISCOVERY_STREAM_DEV_COSINE_RERANK_WITHIN_SECTIONS,
       });
 
+      expect(feed._cosineRerankMode).toBe("within-sections");
       expect(feed.onPrefChange).toHaveBeenCalledTimes(1);
     });
   });

@@ -130,12 +130,16 @@ The **Article Reranking** section contains two buttons:
 
 ![Article reranking buttons](rerank_pics/rerank_option_buttons.jpeg)
 
-- **Cosine: Rerank Within Sections** is the default. It fetches a fresh recommendation response, computes `combined_score`, and sorts articles by it within each existing section. With section ordering enabled, sections are then ordered by the sum of their four highest combined scores, with Popular Today kept first.
-- **Cosine: Promote Top 6 to Popular Today** fetches a fresh response, moves the six highest combined scores across the response into the first six Popular Today slots, and sorts the remaining articles within their existing sections. Section ordering follows the section-ordering pref described below.
+- **Cosine: Promote Top 6 to Popular Today** is the default. It fetches a fresh recommendation response, moves the six highest combined scores across the response into the first six Popular Today slots, and sorts the remaining articles within their existing sections. Section ordering follows the section-ordering pref described below.
+- **Cosine: Rerank Within Sections** fetches a fresh recommendation response, computes `combined_score`, and sorts articles by it within each existing section. With section ordering enabled, sections are then ordered by the sum of their four highest combined scores, with Popular Today kept first.
 
-The **Personalization** slider controls `personal-weight` in steps of `0.1`. `0.0` uses only the normalized server score, `1.0` uses only the normalized personal score, and intermediate values blend the two. The slider only writes the pref; use a reranking button or **Refresh Cache** to fetch and rank with the new value. An article must have both scores to receive a combined score; articles missing either score remain after scored articles in their incoming order.
+The **Personalization** slider controls `personal-weight` in steps of `0.1`. `0.0` uses only the normalized crowd score (`server_score`), `1.0` uses only the normalized personal score, and intermediate values blend the two. The slider only writes the pref; use a reranking button or **Refresh Cache** to fetch and rank with the new value. An article must have both scores to receive a combined score; articles missing either score remain after scored articles in their incoming order.
 
-The selected reranking mode remains active for later refreshes during the current Firefox run. Click **Cosine: Rerank Within Sections** to return to the default mode. Recomputing the user vector also returns to the default mode.
+![Personalization slider](rerank_pics/personalization_slider.jpeg)
+
+The slider runs from **Personal score** on the left to **Crowd score** on the right. Set it to the left for `personal-weight=1.0`, to the right for `personal-weight=0.0`, or use an intermediate notch to blend the two signals. Changing the slider does not rerank the current feed; after choosing a value, click a reranking button or **Refresh Cache**.
+
+The selected reranking mode remains active for later refreshes during the current Firefox run. Click **Cosine: Promote Top 6 to Popular Today** to return to the default mode. Recomputing the user vector also returns to the default mode.
 
 Each button triggers a fresh recommendation fetch and reranking pass.
 

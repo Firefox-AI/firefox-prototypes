@@ -236,10 +236,13 @@ describe("<DiscoveryStreamAdminUI>", () => {
     const slider = container.querySelector(
       'input[aria-label="Personalization"]'
     );
+    expect(
+      container.querySelector(".personalization-weight-labels")
+    ).toHaveTextContent("Personal scoreCrowd score");
 
-    fireEvent.change(slider, { target: { value: "0.7" } });
+    fireEvent.change(slider, { target: { value: "0.3" } });
 
-    expect(slider).toHaveValue("0.7");
+    expect(slider).toHaveValue("0.3");
     expect(dispatch).toHaveBeenCalledWith(
       ac.SetPref(
         "discoverystream.sections.personalization.user-history-cosine.personal-weight",
