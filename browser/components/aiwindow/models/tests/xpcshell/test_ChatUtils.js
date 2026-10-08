@@ -460,7 +460,14 @@ add_task(function test_replaceUrlsWithTokens_assistant_tool_calls() {
       ],
     },
   ];
+  const storedToolCalls = messages[1].tool_calls;
+  const storedArguments = storedToolCalls[0].function.arguments;
   replaceUrlsWithTokens(conversation, messages);
+  Assert.equal(
+    storedToolCalls[0].function.arguments,
+    storedArguments,
+    "The stored tool calls keep their full URLs"
+  );
 
   const contentToken = conversation.urlToToken.get(contentUrl);
   const toolOnlyToken = conversation.urlToToken.get(toolOnlyUrl);

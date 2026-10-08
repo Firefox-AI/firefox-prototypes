@@ -482,13 +482,19 @@ export function replaceUrlsWithTokens(conversation, messages) {
         msg.content = tokenizeUrls(msg.content);
       }
       if (Array.isArray(msg.tool_calls)) {
-        for (const toolCall of msg.tool_calls) {
-          if (typeof toolCall.function?.arguments === "string") {
-            toolCall.function.arguments = tokenizeUrls(
-              toolCall.function.arguments
-            );
-          }
-        }
+        // The tool calls are shared with the stored conversation, which keeps
+        // full URLs, so replace them instead of changing them.
+        msg.tool_calls = msg.tool_calls.map(toolCall =>
+          typeof toolCall.function?.arguments === "string"
+            ? {
+                ...toolCall,
+                function: {
+                  ...toolCall.function,
+                  arguments: tokenizeUrls(toolCall.function.arguments),
+                },
+              }
+            : toolCall
+        );
       }
     }
   }
