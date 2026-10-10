@@ -1133,6 +1133,38 @@ add_task(async function test_readOnly_clone() {
   await clone.close();
 });
 
+add_task(async function test_wrapStorageConnection_in_memory() {
+  let c = await new Promise((resolve, reject) => {
+    Services.storage.openAsyncDatabase(
+      "memory",
+      Ci.mozIStorageService.OPEN_DEFAULT,
+      Ci.mozIStorageService.CONNECTION_DEFAULT,
+      (status, db) => {
+        if (Components.isSuccessCode(status)) {
+          resolve(db.QueryInterface(Ci.mozIStorageAsyncConnection));
+        } else {
+          reject(new Error(status));
+        }
+      }
+    );
+  });
+
+  let wrapper = await Sqlite.wrapStorageConnection({ connection: c });
+  await wrapper.execute("CREATE TABLE test (id INTEGER, name TEXT)");
+  await wrapper.execute("INSERT INTO test VALUES (:id, :name)", [
+    { id: 1, name: "one" },
+    { id: 2, name: "two" },
+  ]);
+  let rows = await wrapper.execute("SELECT name FROM test ORDER BY id");
+  Assert.deepEqual(
+    rows.map(row => row.getResultByName("name")),
+    ["one", "two"],
+    "An in-memory database can be wrapped and used."
+  );
+  await wrapper.close();
+  await new Promise(resolve => c.asyncClose(resolve));
+});
+
 // Test Sqlite.wrapStorageConnection.
 add_task(async function test_wrapStorageConnection() {
   let file = new FileUtils.File(

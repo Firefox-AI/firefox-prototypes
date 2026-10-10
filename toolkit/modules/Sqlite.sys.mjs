@@ -1718,14 +1718,16 @@ function wrapStorageConnection(options) {
     throw new TypeError("connection not specified or invalid.");
   }
 
+  // An in-memory database has no file.
+  let fileName = connection.databaseFile?.leafName ?? "memory";
   if (isClosed()) {
     throw new Error(
       "Sqlite.sys.mjs has been shutdown. Cannot wrap connection to: " +
-        connection.databaseFile.path
+        (connection.databaseFile?.path ?? fileName)
     );
   }
 
-  let identifier = getIdentifierByFileName(connection.databaseFile.leafName);
+  let identifier = getIdentifierByFileName(fileName);
 
   logger.debug("Wrapping database: " + identifier);
   return new Promise(resolve => {
