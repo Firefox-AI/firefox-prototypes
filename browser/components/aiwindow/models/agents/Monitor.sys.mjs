@@ -5,10 +5,10 @@
 import {
   FEATURE_MAJOR_VERSIONS,
   MODEL_FEATURES,
-  openAIEngine,
   renderPrompt,
   makeJSONSchemaBlob,
 } from "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs";
+import { AuthProvider } from "moz-src:///browser/components/aiwindow/models/AuthProvider.sys.mjs";
 import { Schedule } from "moz-src:///browser/components/aiwindow/models/agents/Schedule.sys.mjs";
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
@@ -520,10 +520,7 @@ export class Monitor {
     conversation.addUserMessage(userPrompt);
 
     // run the conversation
-    const fxAccountToken = await withAbortSignal(
-      openAIEngine.getFxAccountToken(),
-      signal
-    );
+    const token = await withAbortSignal(AuthProvider.getToken(), signal);
     throwIfAborted(signal);
     if (runStats) {
       recordRunStart(this, runStats);
@@ -533,7 +530,7 @@ export class Monitor {
     try {
       response = await withAbortSignal(
         conversation.run({
-          fxAccountToken,
+          token,
           inferenceParams: {
             response_format: makeJSONSchemaBlob(
               "MonitorResult",

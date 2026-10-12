@@ -11,6 +11,9 @@ const { sinon } = ChromeUtils.importESModule(
   "resource://testing-common/Sinon.sys.mjs"
 );
 
+const { AuthProvider } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/aiwindow/models/AuthProvider.sys.mjs"
+);
 const { openAIEngine } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs"
 );
@@ -298,14 +301,14 @@ async function withServer(serverOptions, task) {
     set: [["browser.smartwindow.endpoint", `http://localhost:${port}/v1`]],
   });
 
-  const getFxAccountTokenStub = sinon
-    .stub(openAIEngine, "getFxAccountToken")
+  const getTokenStub = sinon
+    .stub(AuthProvider, "getToken")
     .resolves("mock-fxa-token");
 
   try {
     await task({ port });
   } finally {
-    getFxAccountTokenStub.restore();
+    getTokenStub.restore();
     await SpecialPowers.popPrefEnv();
     await stopMockOpenAI(server);
   }

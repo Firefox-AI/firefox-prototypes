@@ -7,6 +7,8 @@ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
+  AuthProvider:
+    "moz-src:///browser/components/aiwindow/models/AuthProvider.sys.mjs",
   BrowserUtils: "resource://gre/modules/BrowserUtils.sys.mjs",
   SMART_TAB_GROUPING_CONFIG:
     "moz-src:///browser/components/tabbrowser/SmartTabGrouping.sys.mjs",
@@ -18,8 +20,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/models/PromptLoader.sys.mjs",
   MODEL_FEATURES: "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
   renderPrompt: "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
-  openAIEngine:
-    "moz-src:///browser/components/aiwindow/models/openAIEngine.sys.mjs",
   sanitizeUntrustedContent:
     "moz-src:///browser/components/aiwindow/models/ChatUtils.sys.mjs",
 });
@@ -416,8 +416,8 @@ export const AutoTabGroupingSuggestions = {
   // falls back to on-device, other locales drop the group); returns "" on a
   // deliberate decline (NSFW), which drops it.
   async _llmLabelForGroup(tabs) {
-    const fxAccountToken = await lazy.openAIEngine.getFxAccountToken();
-    if (!fxAccountToken) {
+    const token = await lazy.AuthProvider.getToken();
+    if (!token) {
       throw new Error("Smart Window LLM unavailable: no account token");
     }
     const titles = tabs
@@ -443,7 +443,7 @@ export const AutoTabGroupingSuggestions = {
       ]);
     conversation.setSystemMessage(systemPrompt);
     conversation.addUserMessage(lazy.renderPrompt(userTemplate, { titles }));
-    const response = await conversation.run({ fxAccountToken });
+    const response = await conversation.run({ token });
     const raw = response?.finalOutput?.trim() || "";
     return this.trimLabel(lazy.sanitizeUntrustedContent(raw, true).trim());
   },

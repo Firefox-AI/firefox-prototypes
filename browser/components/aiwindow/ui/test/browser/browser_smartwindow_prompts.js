@@ -927,7 +927,7 @@ add_task(async function test_resume_prompt_click_marks_memory_applied() {
             );
           });
         },
-        { fxAccountToken: "mock-fxa-token" }
+        { token: "mock-fxa-token" }
       );
     } finally {
       await SpecialPowers.popPrefEnv();

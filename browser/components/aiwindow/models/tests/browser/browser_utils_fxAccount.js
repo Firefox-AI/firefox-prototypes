@@ -16,7 +16,7 @@ const { MODEL_FEATURES, SERVICE_TYPES, PURPOSES } = ChromeUtils.importESModule(
 
 const TEST_MODEL = "test-model";
 
-add_task(async function test_getFxAccountToken_passes_correct_scope() {
+add_task(async function test_getToken_passes_correct_scope() {
   const fakeToken = "fake-oauth-token";
   const fxAccounts = getFxAccountsSingleton();
 
@@ -25,7 +25,7 @@ add_task(async function test_getFxAccountToken_passes_correct_scope() {
     .resolves(fakeToken);
 
   try {
-    const token = await openAIEngine.getFxAccountToken();
+    const token = await AuthProvider.getToken();
 
     Assert.ok(
       getOAuthTokenStub.calledOnce,
@@ -47,14 +47,14 @@ add_task(async function test_getFxAccountToken_passes_correct_scope() {
     Assert.equal(
       token,
       fakeToken,
-      "getFxAccountToken should return the token from getOAuthToken"
+      "getToken should return the token from getOAuthToken"
     );
   } finally {
     getOAuthTokenStub.restore();
   }
 });
 
-add_task(async function test_getFxAccountToken_returns_null_on_error() {
+add_task(async function test_getToken_returns_null_on_error() {
   const fxAccounts = getFxAccountsSingleton();
 
   const getOAuthTokenStub = sinon
@@ -62,7 +62,7 @@ add_task(async function test_getFxAccountToken_returns_null_on_error() {
     .rejects(new Error("FxA authentication failed"));
 
   try {
-    const token = await openAIEngine.getFxAccountToken();
+    const token = await AuthProvider.getToken();
 
     Assert.ok(
       getOAuthTokenStub.calledOnce,
@@ -71,10 +71,39 @@ add_task(async function test_getFxAccountToken_returns_null_on_error() {
     Assert.equal(
       token,
       null,
-      "getFxAccountToken should return null when getOAuthToken throws an error"
+      "getToken should return null when getOAuthToken throws an error"
     );
   } finally {
     getOAuthTokenStub.restore();
+  }
+});
+
+add_task(async function test_invalidateToken_removes_cached_token() {
+  const fxAccounts = getFxAccountsSingleton();
+
+  const removeCachedOAuthTokenStub = sinon
+    .stub(fxAccounts, "removeCachedOAuthToken")
+    .resolves();
+
+  try {
+    await AuthProvider.invalidateToken("stale-token");
+    Assert.ok(
+      removeCachedOAuthTokenStub.calledOnce,
+      "removeCachedOAuthToken should be called once"
+    );
+    Assert.deepEqual(
+      removeCachedOAuthTokenStub.getCall(0).args[0],
+      { token: "stale-token" },
+      "removeCachedOAuthToken should be called with the token"
+    );
+
+    await AuthProvider.invalidateToken(null);
+    Assert.ok(
+      removeCachedOAuthTokenStub.calledOnce,
+      "removeCachedOAuthToken should not be called without a token"
+    );
+  } finally {
+    removeCachedOAuthTokenStub.restore();
   }
 });
 
@@ -126,7 +155,7 @@ add_task(async function test_runWithAuth_retry_on_401_error() {
   const newToken = "new-token";
   const testContent = {
     messages: [{ role: "user", content: "test" }],
-    fxAccountToken: oldToken,
+    token: oldToken,
   };
   const expectedResponse = { success: true, data: "response" };
 
@@ -136,35 +165,29 @@ add_task(async function test_runWithAuth_retry_on_401_error() {
     .rejects(new Error("Request failed with 401 status code"));
   runStub.onSecondCall().resolves(expectedResponse);
 
-  const fxAccounts = getFxAccountsSingleton();
-  const removeCachedTokenStub = sinon
-    .stub(fxAccounts, "removeCachedOAuthToken")
+  const invalidateTokenStub = sinon
+    .stub(AuthProvider, "invalidateToken")
     .resolves();
-  const getFxAccountTokenStub = sinon
-    .stub(openAIEngine, "getFxAccountToken")
-    .resolves(newToken);
+  const getTokenStub = sinon.stub(AuthProvider, "getToken").resolves(newToken);
 
   try {
     const response = await engine._runWithAuth(testContent);
 
     Assert.ok(runStub.calledTwice, "engine.run should be called twice");
     Assert.ok(
-      removeCachedTokenStub.calledOnce,
-      "removeCachedOAuthToken should be called once"
+      invalidateTokenStub.calledOnce,
+      "invalidateToken should be called once"
     );
     Assert.deepEqual(
-      removeCachedTokenStub.getCall(0).args[0],
-      { token: oldToken },
-      "removeCachedOAuthToken should be called with old token"
+      invalidateTokenStub.getCall(0).args[0],
+      oldToken,
+      "invalidateToken should be called with old token"
     );
-    Assert.ok(
-      getFxAccountTokenStub.calledOnce,
-      "getFxAccountToken should be called once"
-    );
+    Assert.ok(getTokenStub.calledOnce, "getToken should be called once");
 
     const secondCallArgs = runStub.getCall(1).args[0];
     Assert.equal(
-      secondCallArgs.fxAccountToken,
+      secondCallArgs.token,
       newToken,
       "Second call should use new token"
     );
@@ -175,8 +198,8 @@ add_task(async function test_runWithAuth_retry_on_401_error() {
     );
   } finally {
     runStub.restore();
-    removeCachedTokenStub.restore();
-    getFxAccountTokenStub.restore();
+    invalidateTokenStub.restore();
+    getTokenStub.restore();
   }
 });
 
@@ -193,7 +216,7 @@ add_task(async function test_runWithAuth_fails_after_retry_401() {
   const newToken = "new-token";
   const testContent = {
     messages: [{ role: "user", content: "test" }],
-    fxAccountToken: oldToken,
+    token: oldToken,
   };
 
   const firstError = new Error("Request failed with 401 status code");
@@ -202,13 +225,10 @@ add_task(async function test_runWithAuth_fails_after_retry_401() {
   runStub.onFirstCall().rejects(firstError);
   runStub.onSecondCall().rejects(secondError);
 
-  const fxAccounts = getFxAccountsSingleton();
-  const removeCachedTokenStub = sinon
-    .stub(fxAccounts, "removeCachedOAuthToken")
+  const invalidateTokenStub = sinon
+    .stub(AuthProvider, "invalidateToken")
     .resolves();
-  const getFxAccountTokenStub = sinon
-    .stub(openAIEngine, "getFxAccountToken")
-    .resolves(newToken);
+  const getTokenStub = sinon.stub(AuthProvider, "getToken").resolves(newToken);
 
   try {
     await Assert.rejects(
@@ -219,23 +239,23 @@ add_task(async function test_runWithAuth_fails_after_retry_401() {
 
     Assert.ok(runStub.calledTwice, "engine.run should be called twice");
     Assert.ok(
-      removeCachedTokenStub.calledTwice,
-      "removeCachedOAuthToken should be called twice (for old and new tokens)"
+      invalidateTokenStub.calledTwice,
+      "invalidateToken should be called twice (for old and new tokens)"
     );
     Assert.deepEqual(
-      removeCachedTokenStub.getCall(0).args[0],
-      { token: oldToken },
-      "First removeCachedOAuthToken call should be for old token"
+      invalidateTokenStub.getCall(0).args[0],
+      oldToken,
+      "First invalidateToken call should be for old token"
     );
     Assert.deepEqual(
-      removeCachedTokenStub.getCall(1).args[0],
-      { token: newToken },
-      "Second removeCachedOAuthToken call should be for new token"
+      invalidateTokenStub.getCall(1).args[0],
+      newToken,
+      "Second invalidateToken call should be for new token"
     );
   } finally {
     runStub.restore();
-    removeCachedTokenStub.restore();
-    getFxAccountTokenStub.restore();
+    invalidateTokenStub.restore();
+    getTokenStub.restore();
   }
 });
 
@@ -262,9 +282,8 @@ add_task(async function test_runWithAuth_throws_401_with_custom_endpoint() {
     const runStub = sinon
       .stub(engine.engineInstance, "run")
       .rejects(expectedError);
-    const fxAccounts = getFxAccountsSingleton();
-    const removeCachedTokenStub = sinon
-      .stub(fxAccounts, "removeCachedOAuthToken")
+    const invalidateTokenStub = sinon
+      .stub(AuthProvider, "invalidateToken")
       .resolves();
 
     try {
@@ -276,12 +295,12 @@ add_task(async function test_runWithAuth_throws_401_with_custom_endpoint() {
 
       Assert.ok(runStub.calledOnce, "engine.run should be called once");
       Assert.ok(
-        removeCachedTokenStub.notCalled,
-        "removeCachedOAuthToken should not be called when custom endpoint is set"
+        invalidateTokenStub.notCalled,
+        "invalidateToken should not be called when custom endpoint is set"
       );
     } finally {
       runStub.restore();
-      removeCachedTokenStub.restore();
+      invalidateTokenStub.restore();
     }
   } finally {
     await SpecialPowers.popPrefEnv();
@@ -303,9 +322,8 @@ add_task(async function test_runWithAuth_throws_non_401_error() {
   const runStub = sinon
     .stub(engine.engineInstance, "run")
     .rejects(expectedError);
-  const fxAccounts = getFxAccountsSingleton();
-  const removeCachedTokenStub = sinon
-    .stub(fxAccounts, "removeCachedOAuthToken")
+  const invalidateTokenStub = sinon
+    .stub(AuthProvider, "invalidateToken")
     .resolves();
 
   try {
@@ -317,12 +335,12 @@ add_task(async function test_runWithAuth_throws_non_401_error() {
 
     Assert.ok(runStub.calledOnce, "engine.run should be called once");
     Assert.ok(
-      removeCachedTokenStub.notCalled,
-      "removeCachedOAuthToken should not be called for non-401 errors"
+      invalidateTokenStub.notCalled,
+      "invalidateToken should not be called for non-401 errors"
     );
   } finally {
     runStub.restore();
-    removeCachedTokenStub.restore();
+    invalidateTokenStub.restore();
   }
 });
 
@@ -386,7 +404,7 @@ add_task(async function test_runWithGeneratorAuth_retry_on_401_error() {
   const newToken = "new-token";
   const testOptions = {
     messages: [{ role: "user", content: "test" }],
-    fxAccountToken: oldToken,
+    token: oldToken,
   };
   const expectedChunks = [{ text: "Hello" }, { text: " retry" }];
 
@@ -410,13 +428,10 @@ add_task(async function test_runWithGeneratorAuth_retry_on_401_error() {
   runWithGeneratorStub.onFirstCall().returns(mockFailingGenerator());
   runWithGeneratorStub.onSecondCall().returns(mockSuccessGenerator());
 
-  const fxAccounts = getFxAccountsSingleton();
-  const removeCachedTokenStub = sinon
-    .stub(fxAccounts, "removeCachedOAuthToken")
+  const invalidateTokenStub = sinon
+    .stub(AuthProvider, "invalidateToken")
     .resolves();
-  const getFxAccountTokenStub = sinon
-    .stub(openAIEngine, "getFxAccountToken")
-    .resolves(newToken);
+  const getTokenStub = sinon.stub(AuthProvider, "getToken").resolves(newToken);
 
   try {
     const chunks = [];
@@ -429,22 +444,19 @@ add_task(async function test_runWithGeneratorAuth_retry_on_401_error() {
       "engine.runWithGenerator should be called twice"
     );
     Assert.ok(
-      removeCachedTokenStub.calledOnce,
-      "removeCachedOAuthToken should be called once"
+      invalidateTokenStub.calledOnce,
+      "invalidateToken should be called once"
     );
     Assert.deepEqual(
-      removeCachedTokenStub.getCall(0).args[0],
-      { token: oldToken },
-      "removeCachedOAuthToken should be called with old token"
+      invalidateTokenStub.getCall(0).args[0],
+      oldToken,
+      "invalidateToken should be called with old token"
     );
-    Assert.ok(
-      getFxAccountTokenStub.calledOnce,
-      "getFxAccountToken should be called once"
-    );
+    Assert.ok(getTokenStub.calledOnce, "getToken should be called once");
 
     const secondCallArgs = runWithGeneratorStub.getCall(1).args[0];
     Assert.equal(
-      secondCallArgs.fxAccountToken,
+      secondCallArgs.token,
       newToken,
       "Second call should use new token"
     );
@@ -455,8 +467,8 @@ add_task(async function test_runWithGeneratorAuth_retry_on_401_error() {
     );
   } finally {
     runWithGeneratorStub.restore();
-    removeCachedTokenStub.restore();
-    getFxAccountTokenStub.restore();
+    invalidateTokenStub.restore();
+    getTokenStub.restore();
   }
 });
 
@@ -473,7 +485,7 @@ add_task(async function test_runWithGeneratorAuth_fails_after_retry_401() {
   const newToken = "new-token";
   const testOptions = {
     messages: [{ role: "user", content: "test" }],
-    fxAccountToken: oldToken,
+    token: oldToken,
   };
 
   const firstError = new Error("Request failed");
@@ -498,13 +510,10 @@ add_task(async function test_runWithGeneratorAuth_fails_after_retry_401() {
   runWithGeneratorStub.onFirstCall().returns(mockFailingGenerator1());
   runWithGeneratorStub.onSecondCall().returns(mockFailingGenerator2());
 
-  const fxAccounts = getFxAccountsSingleton();
-  const removeCachedTokenStub = sinon
-    .stub(fxAccounts, "removeCachedOAuthToken")
+  const invalidateTokenStub = sinon
+    .stub(AuthProvider, "invalidateToken")
     .resolves();
-  const getFxAccountTokenStub = sinon
-    .stub(openAIEngine, "getFxAccountToken")
-    .resolves(newToken);
+  const getTokenStub = sinon.stub(AuthProvider, "getToken").resolves(newToken);
 
   try {
     const generator = engine._runWithGeneratorAuth(testOptions);
@@ -524,23 +533,23 @@ add_task(async function test_runWithGeneratorAuth_fails_after_retry_401() {
       "engine.runWithGenerator should be called twice"
     );
     Assert.ok(
-      removeCachedTokenStub.calledTwice,
-      "removeCachedOAuthToken should be called twice (for old and new tokens)"
+      invalidateTokenStub.calledTwice,
+      "invalidateToken should be called twice (for old and new tokens)"
     );
     Assert.deepEqual(
-      removeCachedTokenStub.getCall(0).args[0],
-      { token: oldToken },
-      "First removeCachedOAuthToken call should be for old token"
+      invalidateTokenStub.getCall(0).args[0],
+      oldToken,
+      "First invalidateToken call should be for old token"
     );
     Assert.deepEqual(
-      removeCachedTokenStub.getCall(1).args[0],
-      { token: newToken },
-      "Second removeCachedOAuthToken call should be for new token"
+      invalidateTokenStub.getCall(1).args[0],
+      newToken,
+      "Second invalidateToken call should be for new token"
     );
   } finally {
     runWithGeneratorStub.restore();
-    removeCachedTokenStub.restore();
-    getFxAccountTokenStub.restore();
+    invalidateTokenStub.restore();
+    getTokenStub.restore();
   }
 });
 
@@ -564,9 +573,8 @@ add_task(async function test_runWithGeneratorAuth_throws_non_401_error() {
   const runWithGeneratorStub = sinon
     .stub(engine.engineInstance, "runWithGenerator")
     .returns(mockFailingGenerator());
-  const fxAccounts = getFxAccountsSingleton();
-  const removeCachedTokenStub = sinon
-    .stub(fxAccounts, "removeCachedOAuthToken")
+  const invalidateTokenStub = sinon
+    .stub(AuthProvider, "invalidateToken")
     .resolves();
 
   try {
@@ -587,11 +595,11 @@ add_task(async function test_runWithGeneratorAuth_throws_non_401_error() {
       "engine.runWithGenerator should be called once"
     );
     Assert.ok(
-      removeCachedTokenStub.notCalled,
-      "removeCachedOAuthToken should not be called for non-401 errors"
+      invalidateTokenStub.notCalled,
+      "invalidateToken should not be called for non-401 errors"
     );
   } finally {
     runWithGeneratorStub.restore();
-    removeCachedTokenStub.restore();
+    invalidateTokenStub.restore();
   }
 });

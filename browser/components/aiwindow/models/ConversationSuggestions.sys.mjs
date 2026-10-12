@@ -6,7 +6,7 @@
 
 // conversation starter/followup generation functions
 
-import { openAIEngine } from "moz-src:///browser/components/aiwindow/models/openAIEngine.sys.mjs";
+import { AuthProvider } from "moz-src:///browser/components/aiwindow/models/AuthProvider.sys.mjs";
 import { MESSAGE_ROLE } from "moz-src:///browser/components/aiwindow/ui/modules/ChatStore.sys.mjs";
 import { MemoriesManager } from "moz-src:///browser/components/aiwindow/models/memories/MemoriesManager.sys.mjs";
 import { sanitizeUntrustedContent } from "moz-src:///browser/components/aiwindow/models/ChatUtils.sys.mjs";
@@ -269,10 +269,10 @@ export async function generateConversationStartersSidebar(
     conversation.setSystemMessage(conversationStarterSystemPrompt);
     conversation.addUserMessage(filled);
 
-    const fxAccountToken = await openAIEngine.getFxAccountToken();
+    const token = await AuthProvider.getToken();
     signal.throwIfAborted();
 
-    let runPromise = conversation.run({ fxAccountToken });
+    let runPromise = conversation.run({ token });
     runPromise = Promise.race([
       runPromise,
       new Promise((_, reject) => {
@@ -362,7 +362,7 @@ export async function generateFollowupPrompts(
     conversation.addUserMessage(filled);
 
     const result = await conversation.run({
-      fxAccountToken: await openAIEngine.getFxAccountToken(),
+      token: await AuthProvider.getToken(),
     });
 
     const prompts = cleanInferenceOutput(result);

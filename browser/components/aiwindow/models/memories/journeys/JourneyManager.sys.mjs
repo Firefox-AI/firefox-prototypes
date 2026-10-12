@@ -22,8 +22,8 @@ let _savedGetConversationsByIdDescriptor = null;
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
-  openAIEngine:
-    "moz-src:///browser/components/aiwindow/models/openAIEngine.sys.mjs",
+  AuthProvider:
+    "moz-src:///browser/components/aiwindow/models/AuthProvider.sys.mjs",
   MESSAGE_ROLE:
     "moz-src:///browser/components/aiwindow/ui/modules/ChatStore.sys.mjs",
   MemoriesManager:
@@ -508,7 +508,7 @@ export const JourneyManager = {
       conversation.securityProperties.commit();
 
       const runResult = await conversation.run({
-        fxAccountToken: await lazy.openAIEngine.getFxAccountToken(),
+        token: await lazy.AuthProvider.getToken(),
       });
       const cardsById = lazy.indexInferenceResultsById(
         this._unpackJsonArrayOutput(runResult)

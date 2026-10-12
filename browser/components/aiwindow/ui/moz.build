@@ -36,7 +36,6 @@ MOZ_SRC_FILES += [
     "modules/AITabSql.sys.mjs",
     "modules/AITabStore.sys.mjs",
     "modules/AIWindow.sys.mjs",
-    "modules/AIWindowAccountAuth.sys.mjs",
     "modules/AIWindowConstants.sys.mjs",
     "modules/AIWindowMenu.sys.mjs",
     "modules/AIWindowTabStatesManager.sys.mjs",

@@ -12,9 +12,9 @@ ChromeUtils.defineESModuleGetters(this, {
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
   AIWindowUI:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowUI.sys.mjs",
-  AIWindowAccountAuth:
-    "moz-src:///browser/components/aiwindow/ui/modules/AIWindowAccountAuth.sys.mjs",
   AIWindowTestUtils: "resource://testing-common/AIWindowTestUtils.sys.mjs",
+  AuthProvider:
+    "moz-src:///browser/components/aiwindow/models/AuthProvider.sys.mjs",
   Chat: "moz-src:///browser/components/aiwindow/models/Chat.sys.mjs",
   ChatConversation:
     "moz-src:///browser/components/aiwindow/ui/modules/ChatConversation.sys.mjs",
@@ -537,11 +537,11 @@ async function getConversationId(browser) {
  * @param {Array<object>} options.cards - Mocked headline-generation output
  * @param {Array<{url: string, title: string}>} options.urls - Inserted into
  *   Places and removed again on cleanup
- * @param {?string} [options.fxAccountToken]
+ * @param {?string} [options.token]
  */
 async function _stubResumeActivityGenerationCore(
   sb,
-  { memories, cards, urls, fxAccountToken = null }
+  { memories, cards, urls, token = null }
 ) {
   for (const [index, page] of urls.entries()) {
     await PlacesUtils.history.insert({
@@ -577,7 +577,7 @@ async function _stubResumeActivityGenerationCore(
     },
     run: sb.stub().resolves({ finalOutput: JSON.stringify(cards) }),
   }));
-  sb.stub(openAIEngine, "getFxAccountToken").resolves(fxAccountToken);
+  sb.stub(AuthProvider, "getToken").resolves(token);
 
   const originalAvailableLocales = Services.locale.availableLocales;
   const originalRequestedLocales = Services.locale.requestedLocales;
@@ -607,9 +607,9 @@ async function _stubResumeActivityGenerationCore(
  *
  * @param {object} sb - Sinon sandbox, owned and restored by the caller
  * @param {object} [options]
- * @param {?string} [options.fxAccountToken]
+ * @param {?string} [options.token]
  */
-async function stubResumeActivityGeneration(sb, { fxAccountToken } = {}) {
+async function stubResumeActivityGeneration(sb, { token } = {}) {
   const urls = [1, 2, 3, 4, 5].map(id => ({
     url: `https://example.com/${id}`,
     title: `Example ${id}`,
@@ -643,7 +643,7 @@ async function stubResumeActivityGeneration(sb, { fxAccountToken } = {}) {
     memories,
     cards,
     urls,
-    fxAccountToken,
+    token,
   });
 }
 
@@ -684,10 +684,10 @@ async function stubResumeActivityGenerationPool(sb, memoryCount) {
  * @param {Function} run - Async callback invoked with
  *   {win, browser, aiWindow, buttons}
  * @param {object} [options]
- * @param {?string} [options.fxAccountToken] - Token for mock-server-backed
+ * @param {?string} [options.token] - Token for mock-server-backed
  *   chat completion.
  */
-async function testResumeActivityClick(sb, run, { fxAccountToken } = {}) {
+async function testResumeActivityClick(sb, run, { token } = {}) {
   await SpecialPowers.pushPrefEnv({
     set: [
       ["browser.smartwindow.memories.generateFromConversation", true],
@@ -695,7 +695,7 @@ async function testResumeActivityClick(sb, run, { fxAccountToken } = {}) {
     ],
   });
   const resumeActivityStubs = await stubResumeActivityGeneration(sb, {
-    fxAccountToken,
+    token,
   });
   let win;
   try {
@@ -728,8 +728,8 @@ async function testResumeActivityClick(sb, run, { fxAccountToken } = {}) {
  *   real openAIEngine.build (going through RemoteSettings, ML engine creation,
  *   and the mock HTTP server). All other features get a mock engine that
  *   resolves immediately. Defaults to new Set(["chat"]).
- * @property {string} [fxAccountToken] - Value that the stubbed
- *   getFxAccountToken resolves with. Defaults to "mock-fxa-token".
+ * @property {string} [token] - Value that the stubbed
+ *   getToken resolves with. Defaults to "mock-fxa-token".
  * @property {EngineRunResponse} [engineRunResponse] - What the mock engine's
  *   run() resolves with for non-passthrough features. Defaults to
  *   { finalOutput: "Mock" }.
@@ -752,7 +752,7 @@ async function testResumeActivityClick(sb, run, { fxAccountToken } = {}) {
  */
 
 /**
- * Stubs openAIEngine.build and openAIEngine.getFxAccountToken so that
+ * Stubs openAIEngine.build and AuthProvider.getToken so that
  * background async operations (title generation, conversation starters, etc.)
  * resolve immediately instead of going through RemoteSettings / ML engine
  * creation / FxA token fetching. Without this, fire-and-forget calls like
@@ -775,7 +775,7 @@ async function testResumeActivityClick(sb, run, { fxAccountToken } = {}) {
  */
 async function stubEngineNetworkBoundaries({
   passthroughFeatures = new Set(["chat"]),
-  fxAccountToken = "mock-fxa-token",
+  token = "mock-fxa-token",
   engineRunResponse = { finalOutput: "Mock" },
   serverOptions = {},
 } = {}) {
@@ -808,9 +808,7 @@ async function stubEngineNetworkBoundaries({
       };
     });
 
-  const tokenStub = sinon
-    .stub(openAIEngine, "getFxAccountToken")
-    .resolves(fxAccountToken);
+  const tokenStub = sinon.stub(AuthProvider, "getToken").resolves(token);
 
   const capturedRequests = [];
   let server = null;
@@ -842,15 +840,13 @@ async function stubEngineNetworkBoundaries({
 }
 
 /**
- * Stubs AIWindowAccountAuth.ensureAIWindowAccess to skip sign-in flow
+ * Stubs AuthProvider.maybeSignIn to skip sign-in flow
  * Call the returned restore function to clean up the stub
  *
  * @returns {Function} restore function to clean up the stub
  */
 function skipSignIn() {
-  const stub = sinon
-    .stub(AIWindowAccountAuth, "ensureAIWindowAccess")
-    .resolves(true);
+  const stub = sinon.stub(AuthProvider, "maybeSignIn").resolves(true);
   return () => stub.restore();
 }
 

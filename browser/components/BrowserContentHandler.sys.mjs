@@ -10,9 +10,9 @@ const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   AIWindow:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
-  AIWindowAccountAuth:
-    "moz-src:///browser/components/aiwindow/ui/modules/AIWindowAccountAuth.sys.mjs",
   AsyncShutdown: "resource://gre/modules/AsyncShutdown.sys.mjs",
+  AuthProvider:
+    "moz-src:///browser/components/aiwindow/models/AuthProvider.sys.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
   BrowserUtils: "resource://gre/modules/BrowserUtils.sys.mjs",
   FirstStartup: "resource://gre/modules/FirstStartup.sys.mjs",
@@ -48,7 +48,7 @@ function canOpenAsSmartWindow(forcePrivate = false) {
   return (
     !forcePrivate &&
     lazy.AIWindow.shouldOpenAsSmartWindow() &&
-    lazy.AIWindowAccountAuth.hasToSConsent
+    lazy.AuthProvider.hasToSConsent
   );
 }
 

@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { openAIEngine } from "moz-src:///browser/components/aiwindow/models/openAIEngine.sys.mjs";
+import { AuthProvider } from "moz-src:///browser/components/aiwindow/models/AuthProvider.sys.mjs";
 import { MESSAGE_ROLE } from "moz-src:///browser/components/aiwindow/models/Conversation.sys.mjs";
 import {
   toolsConfig,
@@ -404,7 +404,7 @@ Object.assign(Chat, {
    * @param {BrowsingContext} options.browsingContext - Omitted for tests only.
    * @param {"fullpage" | "sidebar" | "urlbar"} options.mode - See the MODE in ai-window.mjs
    * @param {AbortSignal} [options.signal]
-   * @param {Promise<string|null>} [options.fxAccountTokenPromise] - A token
+   * @param {Promise<string|null>} [options.tokenPromise] - A token
    *   fetch the caller already started, so a cold or expired token resolves
    *   alongside prompt construction rather than after it. Omit to fetch here.
    */
@@ -413,7 +413,7 @@ Object.assign(Chat, {
     browsingContext,
     mode,
     signal,
-    fxAccountTokenPromise,
+    tokenPromise,
   }) {
     if (!browsingContext && !Cu.isInAutomation) {
       const err = new Error(
@@ -422,13 +422,12 @@ Object.assign(Chat, {
       err.clientReason = "missingBrowsingContext";
       throw err;
     }
-    const fxAccountToken = await (fxAccountTokenPromise ??
-      openAIEngine.getFxAccountToken());
-    if (!fxAccountToken) {
+    const token = await (tokenPromise ?? AuthProvider.getToken());
+    if (!token) {
       console.error("fetchWithHistory Account Token null or undefined");
-      const fxaError = new Error("FxA token unavailable");
-      fxaError.clientReason = "fxaTokenUnavailable";
-      throw fxaError;
+      const tokenError = new Error("Token unavailable");
+      tokenError.clientReason = "fxaTokenUnavailable";
+      throw tokenError;
     }
 
     const currentTurn = conversation.currentTurnIndex();
@@ -454,7 +453,7 @@ Object.assign(Chat, {
 
       const stream = conversation.runWithGenerator({
         streamOptions: { enabled: true },
-        fxAccountToken,
+        token,
         chatId: conversation.id,
         tools: chatToolsConfig,
         args: snapshot,
