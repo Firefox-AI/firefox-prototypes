@@ -4,19 +4,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+import { FxaAuthProviderImpl } from "moz-src:///browser/components/aiwindow/models/auth/FxaAuthProviderImpl.sys.mjs";
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
 const PREF_TOS_CONSENT_TIME = "browser.smartwindow.tos.consentTime";
 
 const lazy = XPCOMUtils.declareLazy({
-  FxAccounts: "resource://gre/modules/FxAccounts.sys.mjs",
-  getFxAccountsSingleton: "resource://gre/modules/FxAccounts.sys.mjs",
-  OAUTH_CLIENT_ID: "resource://gre/modules/FxAccountsCommon.sys.mjs",
-  ONLOGOUT_NOTIFICATION: "resource://gre/modules/FxAccountsCommon.sys.mjs",
-  SCOPE_PROFILE_UID: "resource://gre/modules/FxAccountsCommon.sys.mjs",
-  SCOPE_SMART_WINDOW: "resource://gre/modules/FxAccountsCommon.sys.mjs",
-  SpecialMessageActions:
-    "resource://messaging-system/lib/SpecialMessageActions.sys.mjs",
   hasAIWindowToSConsent: {
     pref: PREF_TOS_CONSENT_TIME,
     default: 0,
@@ -32,17 +25,26 @@ const lazy = XPCOMUtils.declareLazy({
 
 /**
  * Handles authentication and Terms of Service consent for Smart Window.
+ * Account-specific operations are delegated to an AuthProviderImpl.
  *
  * @fires AuthProviderSingleton#"AuthProvider:Logout"
  *  When the user signs out of their account.
  */
 class AuthProviderSingleton extends EventTarget {
-  constructor() {
-    super();
-    Services.obs.addObserver(
-      () => this.dispatchEvent(new Event("AuthProvider:Logout")),
-      lazy.ONLOGOUT_NOTIFICATION
-    );
+  /** @type {AuthProviderImpl} */
+  #impl;
+
+  #onLogout = () => this.dispatchEvent(new Event("AuthProvider:Logout"));
+
+  /**
+   * Sets the backend used for account-specific operations.
+   *
+   * @param {AuthProviderImpl} impl
+   */
+  setImpl(impl) {
+    this.#impl?.removeEventListener("AuthProviderImpl:Logout", this.#onLogout);
+    this.#impl = impl;
+    this.#impl.addEventListener("AuthProviderImpl:Logout", this.#onLogout);
   }
 
   get hasToSConsent() {
@@ -60,21 +62,12 @@ class AuthProviderSingleton extends EventTarget {
   }
 
   /**
-   * Retrieves the Firefox account token
+   * Retrieves the account token
    *
-   * @returns {Promise<string|null>}   The Firefox account token (string) or null
+   * @returns {Promise<string|null>}   The account token (string) or null
    */
-  async getToken() {
-    try {
-      const fxAccounts = lazy.getFxAccountsSingleton();
-      return await fxAccounts.getOAuthToken({
-        scope: [lazy.SCOPE_SMART_WINDOW, lazy.SCOPE_PROFILE_UID],
-        client_id: lazy.OAUTH_CLIENT_ID,
-      });
-    } catch (error) {
-      console.warn("Error obtaining FxA token:", error);
-      return null;
-    }
+  getToken() {
+    return this.#impl.getToken();
   }
 
   /**
@@ -87,8 +80,7 @@ class AuthProviderSingleton extends EventTarget {
     if (!token) {
       return;
     }
-    const fxAccounts = lazy.getFxAccountsSingleton();
-    await fxAccounts.removeCachedOAuthToken({ token });
+    await this.#impl.invalidateToken(token);
   }
 
   /**
@@ -96,14 +88,8 @@ class AuthProviderSingleton extends EventTarget {
    *
    * @returns {Promise<boolean>}
    */
-  async isSignedIn() {
-    try {
-      const fxAccounts = lazy.getFxAccountsSingleton();
-      return !!(await fxAccounts.getSignedInUser());
-    } catch (error) {
-      lazy.log.error("Error checking sign-in status:", error);
-      return false;
-    }
+  isSignedIn() {
+    return this.#impl.isSignedIn();
   }
 
   /**
@@ -121,27 +107,15 @@ class AuthProviderSingleton extends EventTarget {
 
     let outcome = "abandoned";
     try {
-      // Checked here as well as inside fxaSignInFlow so that a blocked flow,
-      // where the sign-in page is never shown, is distinguishable from one the
-      // user abandoned. Both make fxaSignInFlow return false.
-      if (!(await lazy.FxAccounts.canConnectAccount())) {
+      // Checked here as well as inside the sign-in flow so that a blocked
+      // flow, where the sign-in page is never shown, is distinguishable from
+      // one the user abandoned. Both make signIn return false.
+      if (!(await this.#impl.canSignIn())) {
         outcome = "blocked";
         return false;
       }
 
-      const didSignIn = await lazy.SpecialMessageActions.fxaSignInFlow(
-        {
-          autoClose: Services.prefs.getBoolPref(
-            "browser.smartwindow.firstrun.hasCompleted",
-            false
-          ),
-          entrypoint: "smartwindow",
-          extraParams: {
-            service: "smartwindow",
-          },
-        },
-        browser
-      );
+      const didSignIn = await this.#impl.signIn(browser);
       if (didSignIn) {
         outcome = "completed";
       }
@@ -215,3 +189,4 @@ class AuthProviderSingleton extends EventTarget {
 }
 
 export const AuthProvider = new AuthProviderSingleton();
+AuthProvider.setImpl(new FxaAuthProviderImpl());
