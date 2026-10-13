@@ -655,6 +655,9 @@ smartwindow-existing-user-fx-tou-body = To use { -smart-window-brand-name }, ple
 smartwindow-existing-user-fx-tou-accept = Accept
 smartwindow-existing-user-fx-tou-go-back = Go back
 
+# Signed-out users
+smartwindow-guest-tou-title = { -smart-window-brand-name } Terms of Use
+
 ## Smart Window about:welcome screen
 
 smartwindow-onboarding-title = Make { -smart-window-brand-name } your go-to

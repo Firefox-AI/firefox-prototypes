@@ -412,6 +412,21 @@ Example:
 }
 ```
 
+**`{ timestampSeconds: true }`** — Sets an integer pref to the current time as a Unix timestamp in seconds (i.e. `Math.floor(Date.now() / 1000)`).
+
+Example:
+```json
+"action": {
+  "type": "SET_PREF",
+  "data": {
+    "pref": {
+      "name": "browser.smartwindow.tos.consentTime",
+      "value": { "timestampSeconds": true }
+    }
+  }
+}
+```
+
 **`{ copyFromPref: string }`** — Copies the value from another existing preference into the target pref. The source and target prefs must be of the same type, otherwise an error is thrown.
 
 Example:

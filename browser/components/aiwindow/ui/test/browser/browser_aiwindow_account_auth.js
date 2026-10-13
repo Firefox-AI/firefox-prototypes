@@ -15,6 +15,10 @@ const { FxAccounts } = ChromeUtils.importESModule(
   "resource://gre/modules/FxAccounts.sys.mjs"
 );
 
+const { Spotlight } = ChromeUtils.importESModule(
+  "resource:///modules/asrouter/Spotlight.sys.mjs"
+);
+
 /**
  * Sets up the sign-in flow so promptSignIn can be driven to any of its
  * outcomes. Resets Glean first so each task reads its own events.
@@ -193,3 +197,92 @@ add_task(
     }
   }
 );
+
+/**
+ * Runs ensureAIWindowAccess as a signed-out guest with the Spotlight dialog
+ * stubbed out.
+ *
+ * @param {object} options
+ * @param {boolean} options.accept Whether the stubbed modal accepts the ToU
+ * @returns {object} The access result and the Spotlight and sign-in stubs
+ */
+async function runGuestAccess({ accept }) {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.smartwindow.guest.enabled", true],
+      ["browser.smartwindow.tos.consentTime", 0],
+    ],
+  });
+  const { sb, fxaSignInFlow } = stubSignInFlow({ signedIn: false });
+  const showSpotlightDialog = sb
+    .stub(Spotlight, "showSpotlightDialog")
+    .callsFake(async () => {
+      if (accept) {
+        Services.prefs.setIntPref(
+          "browser.smartwindow.tos.consentTime",
+          1735689600
+        );
+      }
+      return true;
+    });
+
+  try {
+    const allowed = await AIWindowAccountAuth.ensureAIWindowAccess(
+      gBrowser.selectedBrowser
+    );
+    return {
+      allowed,
+      hasToSConsent: AIWindowAccountAuth.hasToSConsent,
+      showSpotlightDialog,
+      fxaSignInFlow,
+    };
+  } finally {
+    sb.restore();
+    await SpecialPowers.popPrefEnv();
+  }
+}
+
+add_task(async function test_guest_accepts_terms_of_use() {
+  const { allowed, hasToSConsent, showSpotlightDialog, fxaSignInFlow } =
+    await runGuestAccess({ accept: true });
+
+  Assert.ok(allowed, "Guest is allowed in after accepting");
+  Assert.ok(hasToSConsent, "Smart Window consent is recorded");
+  Assert.ok(showSpotlightDialog.calledOnce, "The ToU modal is shown");
+  Assert.equal(
+    showSpotlightDialog.firstCall.args[1].id,
+    "AI_WINDOW_TOU_GUEST_MODAL",
+    "The guest ToU modal is shown"
+  );
+  Assert.ok(fxaSignInFlow.notCalled, "No sign-in flow is started");
+});
+
+add_task(async function test_guest_declines_terms_of_use() {
+  const { allowed, hasToSConsent, showSpotlightDialog, fxaSignInFlow } =
+    await runGuestAccess({ accept: false });
+
+  Assert.ok(!allowed, "Guest is not allowed in after going back");
+  Assert.ok(!hasToSConsent, "No Smart Window consent is recorded");
+  Assert.ok(showSpotlightDialog.calledOnce, "The ToU modal is shown");
+  Assert.ok(fxaSignInFlow.notCalled, "No sign-in flow is started");
+});
+
+add_task(async function test_signed_in_user_ignores_guest_mode() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.smartwindow.guest.enabled", true],
+      ["browser.smartwindow.tos.consentTime", 0],
+    ],
+  });
+  const { sb, fxaSignInFlow } = stubSignInFlow({ signedIn: true });
+  const showSpotlightDialog = sb.stub(Spotlight, "showSpotlightDialog");
+
+  try {
+    await AIWindowAccountAuth.ensureAIWindowAccess(gBrowser.selectedBrowser);
+    Assert.ok(fxaSignInFlow.calledOnce, "The account flow is used");
+    Assert.ok(showSpotlightDialog.notCalled, "The guest modal is not shown");
+  } finally {
+    sb.restore();
+    await SpecialPowers.popPrefEnv();
+  }
+});

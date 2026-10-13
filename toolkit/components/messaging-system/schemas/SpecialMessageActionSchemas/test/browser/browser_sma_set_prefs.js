@@ -199,6 +199,31 @@ add_task(async function test_set_pref_to_timestamp_string() {
   );
 });
 
+add_task(async function test_set_pref_to_timestamp_seconds() {
+  const prefName = "browser.smartwindow.tos.consentTime";
+  registerCleanupFunction(() => Services.prefs.clearUserPref(prefName));
+
+  const action = {
+    type: "SET_PREF",
+    data: {
+      pref: {
+        name: prefName,
+        value: { timestampSeconds: true },
+      },
+    },
+  };
+
+  const before = Math.floor(Date.now() / 1000);
+  await SMATestUtils.executeAndValidateAction(action);
+  const after = Math.floor(Date.now() / 1000);
+
+  const timestamp = Services.prefs.getIntPref(prefName);
+  Assert.ok(
+    timestamp >= before && timestamp <= after,
+    "Timestamp in seconds is within the expected time range"
+  );
+});
+
 add_task(async function test_set_messaging_system_pref_onImpression() {
   const action = {
     type: "SET_PREF",

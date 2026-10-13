@@ -2416,6 +2416,8 @@ pref("browser.ml.pageAssist.enabled", false);
 
 // Smart Window Feature
 pref("browser.smartwindow.enabled", false);
+// Lets signed-out users into Smart Window after accepting the Terms of Use.
+pref("browser.smartwindow.guest.enabled", false);
 // Default endpoint for preset models
 pref("browser.smartwindow.endpoint", "https://mlpa-prod-prod-mozilla.freetls.fastly.net/v1");
 pref("browser.smartwindow.memories.generateFromHistory", true);

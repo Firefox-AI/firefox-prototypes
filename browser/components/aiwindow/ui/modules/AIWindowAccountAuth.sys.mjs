@@ -7,9 +7,11 @@ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
+  ASRouter: "resource:///modules/asrouter/ASRouter.sys.mjs",
   FxAccounts: "resource://gre/modules/FxAccounts.sys.mjs",
   SpecialMessageActions:
     "resource://messaging-system/lib/SpecialMessageActions.sys.mjs",
+  Spotlight: "resource:///modules/asrouter/Spotlight.sys.mjs",
 });
 
 ChromeUtils.defineLazyGetter(lazy, "fxAccounts", () => {
@@ -44,6 +46,13 @@ XPCOMUtils.defineLazyPreferenceGetter(
   false
 );
 
+XPCOMUtils.defineLazyPreferenceGetter(
+  lazy,
+  "isGuestModeEnabled",
+  "browser.smartwindow.guest.enabled",
+  false
+);
+
 export const AIWindowAccountAuth = {
   get hasToSConsent() {
     return !!lazy.hasAIWindowToSConsent;
@@ -72,7 +81,7 @@ export const AIWindowAccountAuth = {
     if (!this.hasToSConsent) {
       return false;
     }
-    return await this.isSignedIn();
+    return lazy.isGuestModeEnabled || (await this.isSignedIn());
   },
 
   /**
@@ -139,13 +148,39 @@ export const AIWindowAccountAuth = {
     }
   },
 
+  /**
+   * Lets a signed-out user into Smart Window without an account when guest
+   * mode is enabled. Shows the Terms of Use modal, which records Smart Window
+   * consent when accepted.
+   *
+   * @param {Browser} browser
+   * @returns {Promise<boolean>} Whether the user has accepted the Terms of Use
+   */
+  async promptGuestConsent(browser) {
+    await lazy.ASRouter.waitForInitialized;
+    const message = await lazy.ASRouter.handleMessageRequest({
+      triggerId: "smartWindowGuestAccess",
+      template: "spotlight",
+    });
+    if (!message) {
+      lazy.log.error("No guest Terms of Use message available.");
+      return false;
+    }
+    await lazy.Spotlight.showSpotlightDialog(browser, message);
+    return this.hasToSConsent;
+  },
+
   async ensureAIWindowAccess(browser) {
     // Deliberately not canAccessAIWindow: that short-circuits on missing
     // consent without reading the sign-in state, and both halves are needed to
     // label the sign-in flow with why access was denied.
     const signedIn = await this.isSignedIn();
-    if (this.hasToSConsent && signedIn) {
+    if (this.hasToSConsent && (signedIn || lazy.isGuestModeEnabled)) {
       return true;
+    }
+
+    if (!signedIn && lazy.isGuestModeEnabled) {
+      return this.promptGuestConsent(browser);
     }
 
     if (!(await this.promptSignIn(browser, signedIn))) {

@@ -401,6 +401,7 @@ export const SpecialMessageActions = {
       "browser.smartwindow.firstrun.modelChoice",
       "browser.smartwindow.isDefaultWindow",
       "browser.smartwindow.sidebar.openByDefault",
+      "browser.smartwindow.tos.consentTime",
       "browser.smartwindow.memories.generateFromConversation",
       "browser.smartwindow.memories.generateFromHistory",
       "browser.crashReports.unsubmittedCheck.autoSubmit2",
@@ -483,6 +484,8 @@ export const SpecialMessageActions = {
       case "object":
         if (pref.value.timestamp) {
           Services.prefs.setStringPref(pref.name, Date.now().toString());
+        } else if (pref.value.timestampSeconds) {
+          Services.prefs.setIntPref(pref.name, Math.floor(Date.now() / 1000));
         } else if (pref.value.copyFromPref) {
           this.copyPrefValue(pref.name, pref.value.copyFromPref);
         } else {

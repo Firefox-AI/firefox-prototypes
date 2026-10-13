@@ -751,7 +751,7 @@
                       "type": ["boolean", "string", "number", "null", "object"]
                     }
                   },
-                  "description": "An object representing a pref containing a name and a value. The value can be an object with the property `timestamp` with a truthy value to set the pref to a string of the current time in ms. It can also be an object with the property 'copyFromPref' with a string value that is the name of a source pref whose value will be copied to the target pref."
+                  "description": "An object representing a pref containing a name and a value. The value can be an object with the property `timestamp` with a truthy value to set the pref to a string of the current time in ms, or with the property `timestampSeconds` with a truthy value to set an integer pref to the current time in seconds. It can also be an object with the property 'copyFromPref' with a string value that is the name of a source pref whose value will be copied to the target pref."
                 },
                 "onImpression": {
                   "type": "boolean",
