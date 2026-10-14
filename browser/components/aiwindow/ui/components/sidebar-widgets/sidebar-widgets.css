@@ -28,10 +28,19 @@
   font-size: var(--font-size-small);
 }
 
+.value,
+.time {
+  font-variant-numeric: tabular-nums;
+}
+
 .value {
   font-size: var(--font-size-large);
   font-weight: var(--font-weight-semibold);
-  font-variant-numeric: tabular-nums;
+}
+
+.time {
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
 }
 
 .detail {
