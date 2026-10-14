@@ -13,6 +13,7 @@
   padding-block-start: calc(var(--space-xxlarge) + var(--space-large));
   padding-inline: var(--space-small);
   padding-block-end: var(--space-xsmall);
+  align-items: start;
 }
 
 .card {
@@ -49,4 +50,19 @@
   font-size: var(--font-size-small);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.history {
+  margin: var(--space-xsmall) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-small);
+  color: var(--text-color);
+  font-size: var(--font-size-small);
+  font-variant-numeric: tabular-nums;
 }

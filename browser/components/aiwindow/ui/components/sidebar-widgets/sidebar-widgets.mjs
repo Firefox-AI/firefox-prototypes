@@ -7,7 +7,10 @@ import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  EMBEDDING_TYPE: "chrome://global/content/ml/EmbeddingsGenerator.sys.mjs",
+  EmbeddingsGenerator: "chrome://global/content/ml/EmbeddingsGenerator.sys.mjs",
   MerinoClient: "moz-src:///browser/components/urlbar/MerinoClient.sys.mjs",
+  cosSim: "chrome://global/content/ml/NLPUtils.sys.mjs",
 });
 
 /**
@@ -15,7 +18,9 @@ ChromeUtils.defineESModuleGetters(lazy, {
  *
  * Weather shows the current location until the selected page mentions a known
  * place (a Japan travel page shows Tokyo). The timer records how long the
- * previous tab was selected.
+ * previous tab was selected and totals that time by activity. Activities come
+ * from static embeddings, the same family about:inference runs, scored with
+ * the cosine similarity Smart Tab Grouping uses.
  */
 
 // First match wins. city/region/country are sent straight to the Merino
@@ -72,6 +77,75 @@ const DESTINATIONS = [
 
 const WEATHER_SOURCE = "newtab";
 const PAGE_TEXT_LIMIT = 2500;
+const ACTIVITY_TEXT_LIMIT = 600;
+// Normalized static embeddings of a page and a short prototype. Below this
+// the visit is "Other" instead of a forced category.
+const MIN_ACTIVITY_SIMILARITY = 0.22;
+
+const ACTIVITIES = [
+  {
+    id: "travel",
+    label: "Travel",
+    examples: [
+      "travel guide flights hotels vacation itinerary tourism sightseeing",
+      "visiting a city, booking a trip, things to do on holiday",
+    ],
+  },
+  {
+    id: "food",
+    label: "Food",
+    examples: [
+      "restaurant recipe cooking food menu dining cuisine",
+      "cafe grocery meal takeout what to eat",
+    ],
+  },
+  {
+    id: "research",
+    label: "Research",
+    examples: [
+      "research documentation reference paper study tutorial",
+      "how to technical docs wikipedia academic source",
+    ],
+  },
+  {
+    id: "news",
+    label: "News",
+    examples: [
+      "news headline breaking report journalism politics",
+      "world news newspaper article current events",
+    ],
+  },
+];
+
+const OTHER_ACTIVITY = { id: "other", label: "Other" };
+
+const ACTIVITY_KEYWORDS = [
+  {
+    activity: ACTIVITIES[0],
+    pattern:
+      /\b(travel|trip|flight|hotel|vacation|itinerary|tourism|airline|sightseeing)\b/i,
+  },
+  {
+    activity: ACTIVITIES[1],
+    pattern: /\b(recipe|restaurant|menu|cuisine|dining|food|cafe|grocery)\b/i,
+  },
+  {
+    activity: ACTIVITIES[3],
+    pattern: /\b(news|headline|breaking|politics|newspaper|journalism)\b/i,
+  },
+  {
+    activity: ACTIVITIES[2],
+    pattern:
+      /\b(research|documentation|wikipedia|tutorial|reference|paper|study)\b/i,
+  },
+];
+
+function keywordActivity(text) {
+  return (
+    ACTIVITY_KEYWORDS.find(entry => entry.pattern.test(text))?.activity ||
+    OTHER_ACTIVITY
+  );
+}
 
 function matchDestination(haystack) {
   if (!haystack) {
@@ -158,6 +232,7 @@ export class SidebarWidgets extends MozLitElement {
       allowOhttp: false,
     });
     this.#reports = new Map();
+    this.#totals = new Map();
   }
 
   #merino;
@@ -170,6 +245,11 @@ export class SidebarWidgets extends MozLitElement {
   #timer = 0;
   #weatherTimer = 0;
   #weatherGen = 0;
+  #totals = null;
+  #segment = null;
+  #pageSpec = "";
+  #embeddings = null;
+  #prototypePromise = null;
 
   #progress = {
     QueryInterface: ChromeUtils.generateQI([
@@ -182,6 +262,7 @@ export class SidebarWidgets extends MozLitElement {
         flags & Ci.nsIWebProgressListener.STATE_STOP
       ) {
         this.#scheduleWeather();
+        this.#noteDocument();
       }
     },
     onLocationChange: webProgress => {
@@ -239,12 +320,210 @@ export class SidebarWidgets extends MozLitElement {
       const spent = formatDuration(Date.now() - this.#visitStarted);
       this.lastSwitch = `Spent ${spent} on ${this.#host}`;
     }
+    this.#closeSegment();
     this.#tab = tab;
     this.#host = tabHost(tab);
     this.#visitStarted = Date.now();
     this.elapsed = "0:00";
     this.#watch(tab?.linkedBrowser);
+    this.#openSegment(tabUrl(tab));
     this.#scheduleWeather();
+  }
+
+  #noteDocument() {
+    const spec = tabUrl(this.#tab);
+    if (!spec) {
+      return;
+    }
+    if (spec !== this.#pageSpec) {
+      this.#openSegment(spec);
+      return;
+    }
+    // The tab was selected before the title was ready. Classify once more
+    // when the document finishes, keeping the time already accumulated.
+    const segment = this.#segment;
+    if (!segment || segment.refreshed) {
+      return;
+    }
+    segment.refreshed = true;
+    segment.activity = null;
+    this.#startClassify(segment, this.#tab, spec);
+  }
+
+  #openSegment(spec) {
+    this.#closeSegment();
+    const tab = this.#tab;
+    const segment = {
+      started: Date.now(),
+      spec,
+      activity: null,
+      done: null,
+    };
+    this.#segment = segment;
+    this.#pageSpec = spec;
+    this.#startClassify(segment, tab, spec);
+  }
+
+  #startClassify(segment, tab, spec) {
+    segment.classifyGen = (segment.classifyGen || 0) + 1;
+    const gen = segment.classifyGen;
+    segment.done = this.#classify(tab, spec)
+      .then(activity => {
+        if (segment.classifyGen !== gen) {
+          return activity;
+        }
+        if (this.#segment === segment) {
+          segment.activity = activity;
+          this.requestUpdate();
+        }
+        return activity;
+      })
+      .catch(() => OTHER_ACTIVITY);
+  }
+
+  #closeSegment() {
+    const segment = this.#segment;
+    this.#segment = null;
+    if (!segment?.started) {
+      return;
+    }
+    const ms = Date.now() - segment.started;
+    if (ms < 1000) {
+      return;
+    }
+    const apply = activity => {
+      const id = activity?.id || OTHER_ACTIVITY.id;
+      this.#totals.set(id, (this.#totals.get(id) || 0) + ms);
+      this.requestUpdate();
+    };
+    if (segment.activity) {
+      apply(segment.activity);
+      return;
+    }
+    segment.done?.then(apply).catch(() => apply(OTHER_ACTIVITY));
+  }
+
+  async #classify(tab, spec) {
+    const title = tab?.linkedBrowser?.contentTitle || "";
+    const host = tabHost(tab);
+    let text = `${title}\n${host}\n${spec}`;
+    if (isHttp(spec)) {
+      try {
+        const actor =
+          tab.linkedBrowser.browsingContext?.currentWindowGlobal?.getActor(
+            "PageExtractor"
+          );
+        const extraction = await actor?.getText({
+          sufficientLength: ACTIVITY_TEXT_LIMIT,
+          removeBoilerplate: true,
+          sourceUrl: spec,
+        });
+        if (extraction?.text) {
+          text += `\n${extraction.text.slice(0, ACTIVITY_TEXT_LIMIT)}`;
+        }
+      } catch (ex) {
+        // Title and host are enough for a guess.
+      }
+    }
+    try {
+      return await this.#nearestActivity(text);
+    } catch (ex) {
+      console.warn("Sidebar activity embedding failed", ex);
+      return keywordActivity(text);
+    }
+  }
+
+  #embedQueue = Promise.resolve();
+
+  #embed(texts) {
+    const run = this.#embedQueue.then(() => this.#embeddings.embedMany(texts));
+    this.#embedQueue = run.then(
+      () => {},
+      () => {}
+    );
+    return run;
+  }
+
+  #ensurePrototypes() {
+    if (!this.#prototypePromise) {
+      this.#prototypePromise = this.#buildPrototypes().catch(error => {
+        this.#prototypePromise = null;
+        throw error;
+      });
+    }
+    return this.#prototypePromise;
+  }
+
+  async #buildPrototypes() {
+    if (!this.#embeddings) {
+      // Static embeddings, not forGeneral(): that path loads the contextual
+      // model Smart Tab Grouping uses, which is more than this per-page
+      // classifier needs. forTest is the supported way to pin the backend.
+      this.#embeddings = lazy.EmbeddingsGenerator.forTest({
+        type: lazy.EMBEDDING_TYPE.STATIC,
+        embeddingSize: 128,
+      });
+    }
+    const texts = [];
+    const activities = [];
+    for (const activity of ACTIVITIES) {
+      for (const example of activity.examples) {
+        texts.push(example);
+        activities.push(activity);
+      }
+    }
+    const vectors = await this.#embed(texts);
+    return activities.map((activity, index) => ({
+      activity,
+      vector: vectors[index],
+    }));
+  }
+
+  async #nearestActivity(text) {
+    const prototypes = await this.#ensurePrototypes();
+    const [vector] = await this.#embed([text.slice(0, 1000)]);
+    let best = null;
+    let bestScore = MIN_ACTIVITY_SIMILARITY;
+    for (const item of prototypes) {
+      const score = lazy.cosSim(vector, item.vector);
+      if (score > bestScore) {
+        bestScore = score;
+        best = item.activity;
+      }
+    }
+    return best || OTHER_ACTIVITY;
+  }
+
+  #activityRows() {
+    const totals = new Map(this.#totals);
+    const segment = this.#segment;
+    if (segment?.activity && segment.started) {
+      const id = segment.activity.id;
+      const live = Date.now() - segment.started;
+      totals.set(id, (totals.get(id) || 0) + live);
+    }
+    const rows = ACTIVITIES.map(activity => ({
+      id: activity.id,
+      label: activity.label,
+      ms: totals.get(activity.id) || 0,
+    }));
+    const other = totals.get(OTHER_ACTIVITY.id) || 0;
+    if (other > 0) {
+      rows.push({
+        id: OTHER_ACTIVITY.id,
+        label: OTHER_ACTIVITY.label,
+        ms: other,
+      });
+    }
+    return rows.filter(row => row.ms >= 1000).sort((a, b) => b.ms - a.ms);
+  }
+
+  #activityLine() {
+    const label = this.#segment?.activity?.label;
+    if (!label) {
+      return "Classifying";
+    }
+    return `${label} · ${this.#host}`;
   }
 
   #watch(browser) {
@@ -434,7 +713,18 @@ export class SidebarWidgets extends MozLitElement {
       <section class="card" aria-label="Time on tab">
         <div class="label">On this tab</div>
         <div class="value">${this.elapsed}</div>
+        <div class="detail">${this.#activityLine()}</div>
         <div class="detail">${this.lastSwitch}</div>
+        <ul class="history">
+          ${this.#activityRows().map(
+            row => html`
+              <li>
+                <span>${row.label}</span>
+                <span>${formatDuration(row.ms)}</span>
+              </li>
+            `
+          )}
+        </ul>
       </section>
     `;
   }
