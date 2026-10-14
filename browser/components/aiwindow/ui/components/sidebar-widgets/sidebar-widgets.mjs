@@ -29,6 +29,7 @@ const DESTINATIONS = [
     city: "Tokyo",
     region: "Tokyo",
     country: "JP",
+    timeZone: "Asia/Tokyo",
     pattern: /\b(japan|japanese|tokyo|kyoto|osaka|hiroshima|hokkaido)\b/i,
   },
   {
@@ -37,6 +38,7 @@ const DESTINATIONS = [
     city: "Paris",
     region: "IDF",
     country: "FR",
+    timeZone: "Europe/Paris",
     pattern: /\b(paris|france)\b/i,
   },
   {
@@ -45,6 +47,7 @@ const DESTINATIONS = [
     city: "London",
     region: "London",
     country: "GB",
+    timeZone: "Europe/London",
     pattern: /\b(london|england|britain)\b/i,
   },
   {
@@ -53,6 +56,7 @@ const DESTINATIONS = [
     city: "Rome",
     region: "62",
     country: "IT",
+    timeZone: "Europe/Rome",
     pattern: /\b(rome|italy|florence|venice)\b/i,
   },
   {
@@ -61,6 +65,7 @@ const DESTINATIONS = [
     city: "New York",
     region: "NY",
     country: "US",
+    timeZone: "America/New_York",
     pattern: /\b(new york|nyc|manhattan)\b/i,
   },
 ];
@@ -398,6 +403,21 @@ export class SidebarWidgets extends MozLitElement {
     return "Loading";
   }
 
+  // Local time for the forecast place. Omitted timeZone is the browser zone,
+  // which matches the geolocation forecast.
+  #placeTime() {
+    const timeZone = this.weather.destination?.timeZone;
+    try {
+      return new Intl.DateTimeFormat(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+        timeZone,
+      }).format(new Date());
+    } catch (ex) {
+      return "";
+    }
+  }
+
   render() {
     return html`
       <link
@@ -407,6 +427,7 @@ export class SidebarWidgets extends MozLitElement {
       <section class="card" aria-label="Weather">
         <div class="label">Weather</div>
         <div class="value">${this.#weatherValue()}</div>
+        <div class="time">${this.#placeTime()}</div>
         <div class="detail">${this.#weatherSummary()}</div>
         <div class="detail">${this.#placeLine()}</div>
       </section>
