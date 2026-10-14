@@ -298,6 +298,7 @@ export interface Modules {
   "moz-src:///browser/components/aiwindow/models/aitab/AITab.sys.mjs": typeof import("moz-src:///browser/components/aiwindow/models/aitab/AITab.sys.mjs"),
   "moz-src:///browser/components/aiwindow/models/auth/AuthProviderImpl.sys.mjs": typeof import("moz-src:///browser/components/aiwindow/models/auth/AuthProviderImpl.sys.mjs"),
   "moz-src:///browser/components/aiwindow/models/auth/FxaAuthProviderImpl.sys.mjs": typeof import("moz-src:///browser/components/aiwindow/models/auth/FxaAuthProviderImpl.sys.mjs"),
+  "moz-src:///browser/components/aiwindow/models/auth/GuestAuthProviderImpl.sys.mjs": typeof import("moz-src:///browser/components/aiwindow/models/auth/GuestAuthProviderImpl.sys.mjs"),
   "moz-src:///browser/components/aiwindow/models/memories/Memories.sys.mjs": typeof import("moz-src:///browser/components/aiwindow/models/memories/Memories.sys.mjs"),
   "moz-src:///browser/components/aiwindow/models/memories/MemoriesChatSource.sys.mjs": typeof import("moz-src:///browser/components/aiwindow/models/memories/MemoriesChatSource.sys.mjs"),
   "moz-src:///browser/components/aiwindow/models/memories/MemoriesConstants.sys.mjs": typeof import("moz-src:///browser/components/aiwindow/models/memories/MemoriesConstants.sys.mjs"),

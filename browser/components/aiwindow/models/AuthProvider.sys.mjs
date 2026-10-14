@@ -5,6 +5,7 @@
  */
 
 import { FxaAuthProviderImpl } from "moz-src:///browser/components/aiwindow/models/auth/FxaAuthProviderImpl.sys.mjs";
+import { GuestAuthProviderImpl } from "moz-src:///browser/components/aiwindow/models/auth/GuestAuthProviderImpl.sys.mjs";
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
 const PREF_TOS_CONSENT_TIME = "browser.smartwindow.tos.consentTime";
@@ -189,4 +190,8 @@ class AuthProviderSingleton extends EventTarget {
 }
 
 export const AuthProvider = new AuthProviderSingleton();
-AuthProvider.setImpl(new FxaAuthProviderImpl());
+AuthProvider.setImpl(
+  Services.prefs.getBoolPref("browser.smartwindow.auth.guest.enabled", false)
+    ? new GuestAuthProviderImpl()
+    : new FxaAuthProviderImpl()
+);
