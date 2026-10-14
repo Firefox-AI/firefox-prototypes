@@ -39,11 +39,12 @@
 
 :host([mode="sidebar"]) {
   grid-template-areas:
+    "widgets"
     "browser"
     "prompts"
     "smartbar"
     "disclaimer";
-  grid-template-rows: 1fr auto auto auto;
+  grid-template-rows: auto 1fr auto auto auto;
   --smartbar-width: calc(100% - var(--space-large));
 }
 
@@ -75,10 +76,17 @@
 
 :host([mode="sidebar"].chat-active) {
   grid-template-areas:
+    "widgets"
     "browser"
     "smartbar"
     "disclaimer";
-  grid-template-rows: 1fr auto auto;
+  grid-template-rows: auto 1fr auto auto;
+}
+
+sidebar-widgets {
+  grid-area: widgets;
+  width: 100%;
+  min-width: 0;
 }
 
 #browser-container {
