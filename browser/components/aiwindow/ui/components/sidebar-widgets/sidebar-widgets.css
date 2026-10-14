@@ -1,0 +1,43 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+:host {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-small);
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  /* The sidebar header is position:absolute and paints over this row. */
+  padding-block-start: calc(var(--space-xxlarge) + var(--space-large));
+  padding-inline: var(--space-small);
+  padding-block-end: var(--space-xsmall);
+}
+
+.card {
+  min-width: 0;
+  padding: var(--space-small) var(--space-medium);
+  border: var(--border-width) solid var(--border-color-transparent);
+  border-radius: var(--border-radius-medium);
+  background-color: var(--background-color-box);
+}
+
+.label {
+  color: var(--text-color-deemphasized);
+  font-size: var(--font-size-small);
+}
+
+.value {
+  font-size: var(--font-size-large);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.detail {
+  overflow: hidden;
+  color: var(--text-color);
+  font-size: var(--font-size-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

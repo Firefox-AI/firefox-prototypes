@@ -159,6 +159,8 @@ browser.jar:
   content/browser/aiwindow/components/smartwindow-smartbar-glow.css (components/smartwindow-smartbar-glow/smartwindow-smartbar-glow.css)
   content/browser/aiwindow/components/smartwindow-topsites.mjs       (components/smartwindow-topsites/smartwindow-topsites.mjs)
   content/browser/aiwindow/components/smartwindow-topsites.css       (components/smartwindow-topsites/smartwindow-topsites.css)
+  content/browser/aiwindow/components/sidebar-widgets.mjs            (components/sidebar-widgets/sidebar-widgets.mjs)
+  content/browser/aiwindow/components/sidebar-widgets.css            (components/sidebar-widgets/sidebar-widgets.css)
   content/browser/aiwindow/components/smartwindow-group-tabs.mjs     (components/smartwindow-group-tabs/smartwindow-group-tabs.mjs)
   content/browser/aiwindow/assets/agent-watch.svg                    (assets/agent-watch.svg)
   content/browser/aiwindow/assets/applied-policy.svg                (assets/applied-policy.svg)

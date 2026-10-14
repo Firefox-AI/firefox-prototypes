@@ -17,6 +17,8 @@ import { RESUME_SECTION_EMPTY_REASON } from "chrome://browser/content/aiwindow/c
 import "chrome://browser/content/aiwindow/components/kit-mention.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/smartwindow-history-menu.mjs";
+// eslint-disable-next-line import/no-unassigned-import
+import "chrome://browser/content/aiwindow/components/sidebar-widgets.mjs";
 
 const { XPCOMUtils } = ChromeUtils.importESModule(
   "resource://gre/modules/XPCOMUtils.sys.mjs"
@@ -3968,24 +3970,25 @@ export class AIWindow extends MozLitElement {
       <link rel="stylesheet" href="chrome://browser/skin/smartbar.css" />
       ${this.mode === MODE.SIDEBAR
         ? html`<div class="chat-header sidebar-header">
-            <moz-button
-              data-l10n-id="aiwindow-new-chat"
-              data-l10n-attrs="tooltiptext,aria-label"
-              class="new-chat-icon-button"
-              type="ghost icon"
-              iconsrc="chrome://browser/content/aiwindow/assets/new-chat.svg"
-              @click=${this.onCreateNewChatClick}
-            ></moz-button>
-            ${this.#historyMenu("sidebar")}
-            <moz-button
-              data-l10n-id="aiwindow-close-sidebar"
-              data-l10n-attrs="tooltiptext,aria-label"
-              class="close-sidebar-button"
-              type="ghost icon"
-              iconsrc="chrome://global/skin/icons/close.svg"
-              @click=${this.#onCloseSidebarClick}
-            ></moz-button>
-          </div>`
+              <moz-button
+                data-l10n-id="aiwindow-new-chat"
+                data-l10n-attrs="tooltiptext,aria-label"
+                class="new-chat-icon-button"
+                type="ghost icon"
+                iconsrc="chrome://browser/content/aiwindow/assets/new-chat.svg"
+                @click=${this.onCreateNewChatClick}
+              ></moz-button>
+              ${this.#historyMenu("sidebar")}
+              <moz-button
+                data-l10n-id="aiwindow-close-sidebar"
+                data-l10n-attrs="tooltiptext,aria-label"
+                class="close-sidebar-button"
+                type="ghost icon"
+                iconsrc="chrome://global/skin/icons/close.svg"
+                @click=${this.#onCloseSidebarClick}
+              ></moz-button>
+            </div>
+            <sidebar-widgets></sidebar-widgets>`
         : ""}
       ${this.mode === MODE.FULLPAGE
         ? html`
