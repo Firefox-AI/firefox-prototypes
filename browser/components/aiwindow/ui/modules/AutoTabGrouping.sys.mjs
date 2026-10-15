@@ -43,6 +43,34 @@ XPCOMUtils.defineLazyPreferenceGetter(
   8000
 );
 
+// Prototype: automatic JOIN/CREATE of new tabs (smart-auto-grouping).
+const AUTO_PREF_BRANCH = "browser.smartwindow.autoTabGrouping.auto.";
+XPCOMUtils.defineLazyPreferenceGetter(
+  lazy,
+  "autoEnabled",
+  AUTO_PREF_BRANCH + "enabled",
+  true,
+  (_pref, _old, value) => AutoTabGrouping._onAutoEnabledChanged(value)
+);
+XPCOMUtils.defineLazyPreferenceGetter(
+  lazy,
+  "autoJoinDelayMs",
+  AUTO_PREF_BRANCH + "joinDelayMs",
+  2000
+);
+XPCOMUtils.defineLazyPreferenceGetter(
+  lazy,
+  "autoMinClusterSize",
+  AUTO_PREF_BRANCH + "minClusterSize",
+  3
+);
+const AUTO_BUTTON_PLACED_PREF = AUTO_PREF_BRANCH + "buttonPlaced";
+const PULSE_MS = 1400;
+const PULSE_FALLBACK_MS = 1600;
+const PULSE_DELAY_MS = 100;
+const CREATE_SCROLL_DELAY_MS = 340;
+const FALLBACK_GROUP_LABEL = "New group";
+
 const BUTTON_ID = "smartwindow-group-tabs-button";
 const PANEL_ID = "smartwindow-group-tabs-panel";
 const FLYOUT_ID = "smartwindow-group-tabs-flyout";
@@ -345,6 +373,14 @@ export const AutoTabGrouping = {
       this._createById(win, panel, e.detail.id)
     );
     card.addEventListener("ungroup", () => this._ungroupRecent(win, panel));
+    card.addEventListener("toggle-auto", e => {
+      this.setAutoEnabled(e.detail.enabled);
+      card.autoEnabled = lazy.autoEnabled;
+    });
+    card.addEventListener("undo-last", () => {
+      this.undoLastAutoGroup(win);
+      panel.hidePopup();
+    });
     card.addEventListener("select-group", e =>
       this._selectGroup(win, panel, e.detail.id)
     );
@@ -488,6 +524,8 @@ export const AutoTabGrouping = {
     card.recent = [...state.recent];
     card.duplicates = win.gBrowser.getAllDuplicateTabsToClose().length;
     card.tabGroups = this._tabGroupCount(win);
+    card.autoEnabled = lazy.autoEnabled;
+    card.undoLabel = this._undoLabel(win);
     return hidden;
   },
 
@@ -1210,5 +1248,481 @@ export const AutoTabGrouping = {
       }
     })();
     return state.computePromise;
+  },
+
+  // ---------------------------------------------------------------------------
+  // Automatic grouping of newly opened tabs (prototype: smart-auto-grouping).
+  //
+  // Every new tab whose first real (http/https) page load completes is queued.
+  // Its own joinDelay timer starts then; items fire strictly one at a time in
+  // enqueue order, and classification happens at dequeue so a tab sees the
+  // groups the previous item just created. At fire time everything is
+  // re-validated: the tab must still be open and loose and the target group
+  // must still exist, otherwise the item is dropped silently.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * @type {WeakMap<ChromeWindow, {queue: object[], running: boolean,
+   *   opened: WeakSet<MozTabbrowserTab>, handled: WeakSet<MozTabbrowserTab>,
+   *   lastCreatedGroupIds: string[], groupOrigin: Map<string, string>,
+   *   exclusions: Map<string, string>, undoing: boolean, listener: object}>}
+   */
+  _auto: new WeakMap(),
+
+  /**
+   * Start watching a Smart Window for new tabs. Idempotent; no-op in private
+   * windows. Also moves the toolbar button right of the New tab (+) button
+   * once (CustomizableUI persists placements, so the default order is not
+   * enough on an existing profile).
+   *
+   * @param {ChromeWindow} win
+   */
+  initAutoGrouping(win) {
+    if (!win?.gBrowser || win.closed || this._auto.has(win)) {
+      return;
+    }
+    if (lazy.PrivateBrowsingUtils.isWindowPrivate(win)) {
+      return;
+    }
+    const state = {
+      queue: [],
+      running: false,
+      opened: new WeakSet(),
+      handled: new WeakSet(),
+      lastCreatedGroupIds: [],
+      groupOrigin: new Map(),
+      exclusions: new Map(),
+      undoing: false,
+      listener: null,
+    };
+    state.listener = { handleEvent: e => this._onAutoEvent(win, state, e) };
+    const tabContainer = win.gBrowser.tabContainer;
+    for (const type of ["TabOpen", "TabClose", "TabAttrModified"]) {
+      tabContainer.addEventListener(type, state.listener);
+    }
+    win.addEventListener("TabGroupRemoved", state.listener);
+    win.addEventListener("unload", () => this.uninitAutoGrouping(win), {
+      once: true,
+    });
+    this._auto.set(win, state);
+    this._placeButtonNextToNewTab();
+    lazy.console.debug("auto grouping armed");
+  },
+
+  /**
+   * @param {ChromeWindow} win
+   */
+  uninitAutoGrouping(win) {
+    const state = this._auto.get(win);
+    if (!state) {
+      return;
+    }
+    this._cancelAllAuto(state);
+    const tabContainer = win.gBrowser?.tabContainer;
+    if (tabContainer) {
+      for (const type of ["TabOpen", "TabClose", "TabAttrModified"]) {
+        tabContainer.removeEventListener(type, state.listener);
+      }
+    }
+    win.removeEventListener("TabGroupRemoved", state.listener);
+    this._auto.delete(win);
+  },
+
+  /**
+   * One-time move of the Organize Tabs widget to the slot right after
+   * new-tab-button (never between the tabs and the + button, which would break
+   * the tab strip's hasadjacentnewtabbutton logic).
+   */
+  _placeButtonNextToNewTab() {
+    if (Services.prefs.getBoolPref(AUTO_BUTTON_PLACED_PREF, false)) {
+      return;
+    }
+    try {
+      const newTab = lazy.CustomizableUI.getPlacementOfWidget("new-tab-button");
+      const ours = lazy.CustomizableUI.getPlacementOfWidget(BUTTON_ID);
+      if (
+        newTab &&
+        ours &&
+        newTab.area == ours.area &&
+        ours.position != newTab.position + 1
+      ) {
+        lazy.CustomizableUI.moveWidgetWithinArea(
+          BUTTON_ID,
+          newTab.position + 1
+        );
+      }
+      Services.prefs.setBoolPref(AUTO_BUTTON_PLACED_PREF, true);
+    } catch (e) {
+      lazy.console.warn("Could not move the Organize Tabs button", e);
+    }
+  },
+
+  _onAutoEvent(win, state, event) {
+    switch (event.type) {
+      case "TabOpen":
+        state.opened.add(event.target);
+        break;
+      case "TabClose":
+        this._cancelAutoFor(state, event.target);
+        break;
+      case "TabAttrModified": {
+        const tab = event.target;
+        if (
+          !event.detail?.changed?.includes("busy") ||
+          tab.hasAttribute("busy") ||
+          !state.opened.has(tab) ||
+          state.handled.has(tab)
+        ) {
+          return;
+        }
+        if (!this._isAutoCandidate(tab)) {
+          // about:blank / newtab / chat page: wait for the first real load.
+          return;
+        }
+        state.handled.add(tab);
+        this._enqueueAuto(win, state, tab);
+        break;
+      }
+      case "TabGroupRemoved":
+        if (
+          !state.undoing &&
+          state.lastCreatedGroupIds.includes(event.target.id)
+        ) {
+          state.lastCreatedGroupIds = [];
+        }
+        break;
+    }
+  },
+
+  /**
+   * Loose, visible, non-pinned web-content tab with a title.
+   *
+   * @param {MozTabbrowserTab} tab
+   */
+  _isAutoCandidate(tab) {
+    if (
+      !tab ||
+      tab.closing ||
+      !tab.isConnected ||
+      tab.pinned ||
+      tab.group ||
+      tab.hidden ||
+      !tab.label
+    ) {
+      return false;
+    }
+    const uri = tab.linkedBrowser?.currentURI;
+    return !!uri && (uri.schemeIs("http") || uri.schemeIs("https"));
+  },
+
+  _enqueueAuto(win, state, tab) {
+    if (!lazy.autoEnabled) {
+      return;
+    }
+    const item = { tab, ready: false, timer: 0 };
+    item.timer = lazy.setTimeout(() => {
+      item.timer = 0;
+      item.ready = true;
+      this._pumpAuto(win, state);
+    }, lazy.autoJoinDelayMs);
+    state.queue.push(item);
+    lazy.console.debug("queued", tab.label);
+  },
+
+  _cancelAutoFor(state, tab) {
+    const index = state.queue.findIndex(item => item.tab === tab);
+    if (index < 0) {
+      return;
+    }
+    const [item] = state.queue.splice(index, 1);
+    if (item.timer) {
+      lazy.clearTimeout(item.timer);
+    }
+  },
+
+  _cancelAllAuto(state) {
+    for (const item of state.queue) {
+      if (item.timer) {
+        lazy.clearTimeout(item.timer);
+      }
+    }
+    state.queue = [];
+  },
+
+  async _pumpAuto(win, state) {
+    if (state.running || !state.queue.length || !state.queue[0].ready) {
+      return;
+    }
+    state.running = true;
+    const item = state.queue.shift();
+    try {
+      await this._processAuto(win, state, item.tab);
+    } catch (e) {
+      lazy.console.warn("auto grouping failed", e);
+    } finally {
+      state.running = false;
+    }
+    if (!win.closed) {
+      this._pumpAuto(win, state);
+    }
+  },
+
+  /**
+   * Decide JOIN / CREATE / nothing for one dequeued tab and act on it.
+   *
+   * @param {ChromeWindow} win
+   * @param {object} state
+   * @param {MozTabbrowserTab} tab
+   */
+  async _processAuto(win, state, tab) {
+    if (!lazy.autoEnabled || win.closed || !this._isAutoCandidate(tab)) {
+      return;
+    }
+    if (!lazy.AutoTabGroupingSuggestions.isAvailable) {
+      lazy.console.warn("auto grouping: classifier unavailable");
+      return;
+    }
+    const manager = lazy.AutoTabGroupingSuggestions.manager;
+    const metricsContext = {
+      isUserTriggered: false,
+      telemetrySource:
+        lazy.TabMetrics.METRIC_SOURCE.SMART_WINDOW_GROUP_SUGGESTIONS,
+    };
+
+    // JOIN: the first existing group the model says this tab fits.
+    let target = null;
+    for (const group of win.gBrowser.tabGroups.slice()) {
+      if (!this._isGroupLive(win, group) || !group.tabs.length) {
+        continue;
+      }
+      if (state.exclusions.get(tab.id) === group.id) {
+        continue;
+      }
+      let fit = [];
+      try {
+        fit = await this._withTimeout(
+          manager.smartTabGroupingForGroup(group, [...group.tabs, tab]),
+          lazy.timeoutMs
+        );
+      } catch (e) {
+        lazy.console.warn("smartTabGroupingForGroup failed", e);
+        return;
+      }
+      if (fit?.includes(tab)) {
+        target = group;
+        break;
+      }
+    }
+    if (target) {
+      if (!this._isAutoCandidate(tab) || !this._isGroupLive(win, target)) {
+        return;
+      }
+      target.addTabs([tab], metricsContext);
+      lazy.console.debug("JOIN", tab.label, "->", target.label);
+      this._autoEffects(win, target, tab, 0);
+      return;
+    }
+
+    // CREATE: only the trigger tab's own cluster among the loose tabs counts.
+    const minSize = lazy.autoMinClusterSize;
+    const candidates = lazy.AutoTabGroupingSuggestions.getCandidateTabs(win);
+    if (!candidates.includes(tab) || candidates.length < minSize) {
+      return;
+    }
+    let proposals;
+    try {
+      proposals = await this._withTimeout(
+        lazy.AutoTabGroupingSuggestions.buildProposals(candidates, []),
+        lazy.timeoutMs
+      );
+    } catch (e) {
+      lazy.console.warn("buildProposals failed", e);
+      return;
+    }
+    const mine = (proposals ?? []).filter(p => p.tabs.includes(tab));
+    if (mine.length !== 1) {
+      // 0 = no cluster; >1 would be CONFIRM. TODO: CONFIRM flow is a non-goal.
+      return;
+    }
+    const cluster = mine[0];
+    // Re-validate at fire time: members still loose and alive.
+    const members = cluster.tabs
+      .filter(t => this._isAutoCandidate(t))
+      .sort((a, b) => a._tPos - b._tPos);
+    if (members.length < minSize || !members.includes(tab)) {
+      return;
+    }
+    let label = cluster.label?.trim() || FALLBACK_GROUP_LABEL;
+    // Label collides with an existing group: prefer JOIN over a twin group.
+    const twin = win.gBrowser.tabGroups.find(
+      g => g.label?.trim().toLowerCase() === label.toLowerCase()
+    );
+    if (twin) {
+      twin.addTabs([tab], metricsContext);
+      lazy.console.debug("JOIN (label match)", tab.label, "->", twin.label);
+      this._autoEffects(win, twin, tab, 0);
+      return;
+    }
+    const selected = win.gBrowser.selectedTab;
+    const anchor = members.includes(selected) ? selected : tab;
+    const ordered = [...members.filter(t => t !== anchor), anchor];
+    let group;
+    try {
+      group = win.gBrowser.addTabGroup(ordered, {
+        label,
+        insertBefore: anchor,
+        metricsContext,
+      });
+    } catch (e) {
+      lazy.console.warn("addTabGroup failed", e);
+      return;
+    }
+    if (!group) {
+      return;
+    }
+    state.lastCreatedGroupIds = [group.id];
+    state.groupOrigin.set(group.id, "sw");
+    lazy.console.debug("CREATE", label, ordered.map(t => t.label));
+    this._autoEffects(win, group, tab, CREATE_SCROLL_DELAY_MS);
+  },
+
+  /**
+   * Pulse the group label and scroll the strip so the tab (or label) is in
+   * view. Both skip/instant under prefers-reduced-motion.
+   *
+   * @param {ChromeWindow} win
+   * @param {MozTabGroup} group
+   * @param {MozTabbrowserTab} tab
+   * @param {number} scrollDelay
+   */
+  _autoEffects(win, group, tab, scrollDelay) {
+    const reducedMotion = win.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    lazy.setTimeout(() => {
+      if (win.closed || !this._isGroupLive(win, group)) {
+        return;
+      }
+      const box = win.gBrowser.tabContainer.arrowScrollbox;
+      const el = group.collapsed || tab.group !== group ? group.labelElement : tab;
+      try {
+        if (box?.overflowing) {
+          box.ensureElementIsVisible(el, reducedMotion);
+        }
+      } catch (e) {
+        lazy.console.warn("scroll failed", e);
+      }
+    }, scrollDelay);
+    if (reducedMotion) {
+      return;
+    }
+    lazy.setTimeout(() => {
+      if (win.closed || !this._isGroupLive(win, group)) {
+        return;
+      }
+      const label = group.labelElement;
+      if (!label?.animate) {
+        return;
+      }
+      const c = "var(--tab-group-color)";
+      label.dataset.swPulse = "true";
+      const clear = () => {
+        delete label.dataset.swPulse;
+      };
+      try {
+        const anim = label.animate(
+          [
+            {
+              boxShadow: `0 0 0 0 color-mix(in srgb, ${c} 0%, transparent)`,
+              opacity: 1,
+            },
+            {
+              boxShadow: `0 0 0 3px color-mix(in srgb, ${c} 28%, transparent)`,
+              opacity: 0.78,
+              offset: 0.4,
+            },
+            {
+              boxShadow: `0 0 0 6px color-mix(in srgb, ${c} 0%, transparent)`,
+              opacity: 1,
+            },
+          ],
+          { duration: PULSE_MS, easing: "cubic-bezier(0.37, 0, 0.63, 1)" }
+        );
+        anim.finished.then(clear, clear);
+      } catch (e) {
+        lazy.console.warn("pulse failed", e);
+      }
+      lazy.setTimeout(clear, PULSE_FALLBACK_MS);
+    }, PULSE_DELAY_MS);
+  },
+
+  /**
+   * The current name of the last auto-created group, or null when there is
+   * nothing to undo (read live so a user rename shows up).
+   *
+   * @param {ChromeWindow} win
+   * @returns {?string}
+   */
+  _undoLabel(win) {
+    const state = this._auto.get(win);
+    const id = state?.lastCreatedGroupIds[0];
+    if (!id) {
+      return null;
+    }
+    const group = win.gBrowser.tabGroups.find(g => g.id === id);
+    if (!group) {
+      state.lastCreatedGroupIds = [];
+      return null;
+    }
+    return group.label || FALLBACK_GROUP_LABEL;
+  },
+
+  /**
+   * Dissolve the last auto-created group in place; its tabs stay where they
+   * are, now loose.
+   *
+   * @param {ChromeWindow} win
+   */
+  undoLastAutoGroup(win) {
+    const state = this._auto.get(win);
+    const id = state?.lastCreatedGroupIds[0];
+    if (!id) {
+      return;
+    }
+    const group = win.gBrowser.tabGroups.find(g => g.id === id);
+    state.lastCreatedGroupIds = [];
+    if (!group) {
+      return;
+    }
+    state.undoing = true;
+    try {
+      group.ungroupTabs(this._metricsContext());
+    } catch (e) {
+      lazy.console.warn("ungroupTabs failed", e);
+    } finally {
+      state.undoing = false;
+    }
+  },
+
+  /**
+   * Flip the master switch. Off cancels every scheduled item and leaves all
+   * groups as they are; on resumes for tabs opened from now on only.
+   *
+   * @param {boolean} enabled
+   */
+  setAutoEnabled(enabled) {
+    Services.prefs.setBoolPref(AUTO_PREF_BRANCH + "enabled", !!enabled);
+  },
+
+  _onAutoEnabledChanged(enabled) {
+    if (enabled) {
+      return;
+    }
+    for (const win of Services.wm.getEnumerator("navigator:browser")) {
+      const state = this._auto.get(win);
+      if (state) {
+        this._cancelAllAuto(state);
+      }
+    }
   },
 };

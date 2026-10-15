@@ -69,3 +69,16 @@ smartwindow-group-tabs-close-duplicates =
 # verb telling the user to duplicate anything.
 smartwindow-group-tabs-duplicates-list =
     .aria-label = Duplicate tabs to close
+
+## Automatic grouping (prototype)
+
+# Switch that turns automatic grouping of newly opened tabs on and off.
+smartwindow-group-tabs-auto-toggle =
+    .label = Group tabs automatically
+    .description = Turning this off keeps your groups as they are. We just stop grouping new tabs.
+# Action that dissolves the group automatic grouping created most recently.
+# The tabs stay open; only the grouping is removed.
+smartwindow-group-tabs-undo-last = Undo last group
+# Secondary text of the action above when no automatically created group is
+# left to undo.
+smartwindow-group-tabs-nothing-to-undo = Nothing to undo

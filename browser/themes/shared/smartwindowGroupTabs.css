@@ -297,3 +297,47 @@
 .swgt-ungroup-icon {
   mask-image: url("chrome://global/skin/icons/undo.svg");
 }
+
+/* Prototype: automatic grouping rows at the top of the panel. */
+.swgt-toggle-row {
+  box-sizing: border-box;
+  margin: var(--panel-menuitem-margin);
+  padding: var(--panel-menuitem-padding);
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens --
+     matches the prototype's 44px minimum row height. */
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.swgt-toggle-row > moz-toggle {
+  flex: 1;
+  min-width: 0;
+}
+
+.swgt-undo-text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-xxsmall);
+}
+
+.swgt-undo-text > .swgt-row-label {
+  flex: none;
+}
+
+.swgt-row-secondary {
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens --
+     same size .swgt-section uses; --font-size-small is unset in chrome. */
+  font-size: 0.9em;
+  color: var(--text-color-deemphasized);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swgt-row:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}

@@ -54,6 +54,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowAccountAuth.sys.mjs",
   AIWindowMenu:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowMenu.sys.mjs",
+  AutoTabGrouping:
+    "moz-src:///browser/components/aiwindow/ui/modules/AutoTabGrouping.sys.mjs",
   AutoTabGroupingSuggestions:
     "moz-src:///browser/components/aiwindow/ui/modules/AutoTabGroupingSuggestions.sys.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
@@ -469,6 +471,10 @@ export const AIWindow = {
     );
     if (!node.hidden) {
       lazy.AutoTabGroupingSuggestions.preloadModels();
+      // Prototype: arm automatic grouping for this Smart Window.
+      lazy.AutoTabGrouping.initAutoGrouping(node.documentGlobal);
+    } else {
+      lazy.AutoTabGrouping.uninitAutoGrouping(node.documentGlobal);
     }
   },
 

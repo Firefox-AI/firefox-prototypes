@@ -1208,7 +1208,9 @@ pref("browser.tabs.groups.smart.clusterMethod", "AGGLOMERATIVE");
 // AGGLOMERATIVE cosine-distance cutoff in thousandths (825 -> 0.825). Lower is
 // stricter (more, smaller groups); higher is more lenient (fewer, larger).
 pref("browser.tabs.groups.smart.agglomerativeThresholdInt", 650);
-pref("browser.tabs.groups.smart.optin", false);
+// Prototype smart-auto-grouping: opt the tab-strip smart grouping in so the
+// shared SmartTabGroupingManager path is fully enabled.
+pref("browser.tabs.groups.smart.optin", true);
 
 pref("browser.tabs.dragDrop.createGroup.enabled", true);
 pref("browser.tabs.dragDrop.createGroup.delayMS", 240);
@@ -2460,6 +2462,14 @@ pref("browser.smartwindow.autoTabGrouping.timeoutMs", 8000);
 pref("browser.smartwindow.autoTabGrouping.supportedLocales", "en,fr");
 pref("browser.smartwindow.autoTabGrouping.nonEnglishThresholdInt", 550);
 pref("browser.smartwindow.autoTabGrouping.loglevel", "Warn");
+// Smart Window: automatic grouping of newly opened tabs (prototype
+// smart-auto-grouping). joinTiming and collapseOnSettle are declared but inert.
+pref("browser.smartwindow.autoTabGrouping.auto.enabled", true);
+pref("browser.smartwindow.autoTabGrouping.auto.joinDelayMs", 2000);
+pref("browser.smartwindow.autoTabGrouping.auto.minClusterSize", 3);
+pref("browser.smartwindow.autoTabGrouping.auto.joinTiming", "after-delay");
+pref("browser.smartwindow.autoTabGrouping.auto.collapseOnSettle", true);
+pref("browser.smartwindow.autoTabGrouping.auto.buttonPlaced", false);
 
 // Smart Window: Smart Form Fill (bug 2055009).
 pref("browser.smartwindow.smartformfill.enabled", true);

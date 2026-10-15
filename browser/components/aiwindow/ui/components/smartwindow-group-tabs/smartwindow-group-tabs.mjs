@@ -43,6 +43,8 @@ export class SmartwindowGroupTabsCard extends MozLitElement {
     recent: { attribute: false },
     duplicates: { type: Number },
     tabGroups: { type: Number },
+    autoEnabled: { type: Boolean },
+    undoLabel: { attribute: false },
   };
 
   constructor() {
@@ -52,6 +54,8 @@ export class SmartwindowGroupTabsCard extends MozLitElement {
     this.recent = [];
     this.duplicates = 0;
     this.tabGroups = 0;
+    this.autoEnabled = true;
+    this.undoLabel = null;
     this.addEventListener("keydown", e => this.#onKeyDown(e));
   }
 
@@ -186,6 +190,43 @@ export class SmartwindowGroupTabsCard extends MozLitElement {
     </button>`;
   }
 
+  #autoRows() {
+    const canUndo = !!this.undoLabel;
+    return html`<div class="swgt-toggle-row">
+        <moz-toggle
+          id="sw-autogroup-toggle"
+          ?pressed=${this.autoEnabled}
+          data-l10n-id="smartwindow-group-tabs-auto-toggle"
+          data-l10n-attrs="label, description"
+          @toggle=${e =>
+            this.#emit("toggle-auto", { enabled: e.target.pressed })}
+        ></moz-toggle>
+      </div>
+      <button
+        type="button"
+        id="sw-autogroup-undo"
+        class="swgt-row swgt-undo-row"
+        ?disabled=${!canUndo}
+        aria-disabled=${!canUndo}
+        @click=${() => this.#emit("undo-last")}
+      >
+        <span class="swgt-ungroup-icon" aria-hidden="true"></span>
+        <span class="swgt-undo-text">
+          <span
+            class="swgt-row-label"
+            data-l10n-id="smartwindow-group-tabs-undo-last"
+          ></span>
+          ${canUndo
+            ? html`<span class="swgt-row-secondary">${this.undoLabel}</span>`
+            : html`<span
+                class="swgt-row-secondary"
+                data-l10n-id="smartwindow-group-tabs-nothing-to-undo"
+              ></span>`}
+        </span>
+      </button>
+      <hr class="swgt-separator" />`;
+  }
+
   render() {
     const hasSuggestions = !this.computing && !!this.suggestions.length;
     const hasRecent = !this.computing && !!this.recent.length;
@@ -203,6 +244,7 @@ export class SmartwindowGroupTabsCard extends MozLitElement {
         data-l10n-id="smartwindow-group-tabs-panel-heading"
       ></h1>`,
       html`<hr class="swgt-separator" />`,
+      this.#autoRows(),
       this.computing
         ? html`<div
             class="swgt-message swgt-loading"
