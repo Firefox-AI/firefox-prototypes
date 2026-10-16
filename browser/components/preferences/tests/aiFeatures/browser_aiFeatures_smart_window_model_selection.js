@@ -108,4 +108,51 @@ describe("Smart Window model selection", () => {
       "Model pref is saved via keyboard"
     );
   });
+
+  it("hides the auto model option when single page onboarding is off", async () => {
+    ({ doc, win } = await openSmartWindowPanel());
+
+    Assert.ok(
+      !doc.querySelector('moz-radio[data-l10n-id="smart-window-model-auto"]'),
+      "Auto model radio is not shown"
+    );
+  });
+
+  it("shows and saves the auto model option", async () => {
+    Services.fog.testResetFOG();
+    await SpecialPowers.pushPrefEnv({
+      set: [
+        ["browser.smartwindow.firstrun.singlePage", true],
+        ["browser.smartwindow.firstrun.modelChoice", "1"],
+      ],
+    });
+
+    ({ doc, win } = await openSmartWindowPanel());
+
+    const modelSelection = doc.getElementById("modelSelection");
+    const autoRadio = doc.querySelector(
+      'moz-radio[data-l10n-id="smart-window-model-auto"]'
+    );
+    Assert.ok(autoRadio, "Auto model radio is shown");
+    Assert.equal(
+      modelSelection.querySelector("moz-radio"),
+      autoRadio,
+      "Auto model is the first option"
+    );
+
+    autoRadio.click();
+
+    await TestUtils.waitForCondition(
+      () =>
+        Services.prefs.getStringPref(
+          "browser.smartwindow.firstrun.modelChoice",
+          ""
+        ) === "4",
+      "Waiting for auto model pref to be saved"
+    );
+    Assert.equal(modelSelection.value, "4", "Auto model is selected");
+
+    const [event] = Glean.smartWindow.settingsModel.testGetValue();
+    Assert.equal(event.extra.new_model, "auto", "Telemetry reports auto");
+  });
 });

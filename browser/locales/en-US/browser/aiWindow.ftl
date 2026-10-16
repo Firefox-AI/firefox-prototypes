@@ -117,6 +117,7 @@ aiwindow-website-chip-remove-button =
 ## Firstrun onboarding
 
 aiwindow-firstrun-title = Welcome to { -smart-window-brand-name }
+aiwindow-firstrun-intro-subtitle = It works alongside you to get stuff done. Plan, compare, explore, and more.
 aiwindow-firstrun-model-title = What’s important to you?
 aiwindow-firstrun-model-title-v2 = Pick a model to start
 aiwindow-firstrun-model-subtitle = Pick a model to power { -smart-window-brand-name }. Switch anytime.
@@ -155,6 +156,7 @@ aiwindow-input-model-select-button-label-fast = Fast
 aiwindow-input-model-select-button-label-allpurpose = Flexible
 aiwindow-input-model-select-button-label-personal = Personal
 aiwindow-input-model-select-button-label-custom = Custom
+aiwindow-input-model-select-button-label-auto = Auto
 aiwindow-input-model-select-button-description-custom = Use your own LLM
 
 # Variables:
@@ -162,6 +164,7 @@ aiwindow-input-model-select-button-description-custom = Use your own LLM
 # $model (string) - The model name
 aiwindow-input-model-select-menu-item-description = { $ownerName } { $model }
 aiwindow-input-model-select-menu-item-description-custom = Use your own LLM
+aiwindow-input-model-select-menu-item-description-auto = Use the best model for the task
 aiwindow-input-model-select-default-badge =
     .label = Default
     .title = The selected default model
@@ -193,6 +196,24 @@ aiwindow-firstrun-default-title = Make { -smart-window-brand-name } your go-to
 aiwindow-firstrun-default-subtitle = Browse, search, and ask in one place. You can still open Private and Classic Windows when you want.
 aiwindow-firstrun-default-checkbox-label = Always open { -brand-product-name } in { -smart-window-brand-name }
 aiwindow-firstrun-default-checkbox-description = Switch in settings anytime
+
+## Firstrun single page onboarding
+
+aiwindow-firstrun-single-page-title = Make it yours
+aiwindow-firstrun-single-page-subtitle = You’ve got choices about how { -smart-window-brand-name } works. Make changes anytime in settings.
+aiwindow-firstrun-single-page-model-label = Which model?
+aiwindow-firstrun-single-page-model-description = Models are what power chats and actions.
+aiwindow-firstrun-single-page-model-auto-label = Auto model
+aiwindow-firstrun-single-page-model-auto-description = Use the best model for the task
+aiwindow-firstrun-single-page-personalize-label = Personalize { -smart-window-brand-name }?
+aiwindow-firstrun-single-page-personalize-description = Gives you a more tailored experience over time. You choose how it learns. Memories from learning are only stored on your device.
+aiwindow-firstrun-single-page-personalize-chats = Learn from chats in { -smart-window-brand-name }
+aiwindow-firstrun-single-page-personalize-browsing = Learn from browsing across { -brand-product-name }
+aiwindow-firstrun-single-page-personalize-both = Learn from chats and browsing
+aiwindow-firstrun-single-page-personalize-none = Don’t personalize or learn
+aiwindow-firstrun-single-page-default-label = Make { -smart-window-brand-name } your go-to?
+aiwindow-firstrun-single-page-default-description = Open { -smart-window-brand-name } when { -brand-product-name } starts, restarts, or opens links from other apps.
+aiwindow-firstrun-single-page-save-button = Save and continue
 
 ## Ask Toolbar Button
 

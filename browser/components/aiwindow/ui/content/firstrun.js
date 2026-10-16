@@ -11,11 +11,14 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
   Region: "resource://gre/modules/Region.sys.mjs",
+  SpecialMessageActions:
+    "resource://messaging-system/lib/SpecialMessageActions.sys.mjs",
 });
 const MODEL_PREF = "browser.smartwindow.firstrun.modelChoice";
 const MISTRAL_RELEASE_PREF = "browser.smartwindow.mistralRelease";
 const AUTO_ADVANCE_PREF = "browser.smartwindow.firstrun.autoAdvanceMS";
 const FIRST_RUN_COMPLETE_PREF = "browser.smartwindow.firstrun.hasCompleted";
+const SINGLE_PAGE_PREF = "browser.smartwindow.firstrun.singlePage";
 const EXPLAINER_PAGE_PREF = "browser.smartwindow.firstrun.explainerURL";
 const MEMORIES_FROM_CONVERSATION_PREF =
   "browser.smartwindow.memories.generateFromConversation";
@@ -31,12 +34,17 @@ const NON_REMOVABLE_SCREEN_IDS = new Set([
   "AI_WINDOW_CHOOSE_MODEL",
   "AI_WINDOW_MEMORIES",
 ]);
-const { getAllModelsData, getModelDisplayOrder } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs"
-);
+const { AUTO_MODEL_CHOICE_ID, getAllModelsData, getModelDisplayOrder } =
+  ChromeUtils.importESModule(
+    "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs"
+  );
 
 const autoAdvanceMS = Services.prefs.getIntPref(AUTO_ADVANCE_PREF);
 const PROMOTED_BRAND_NAME = "Mistral";
+const SINGLE_PAGE_MESSAGE_IDS = {
+  intro: "AI_WINDOW_INTRO",
+  settings: "AI_WINDOW_SINGLE_PAGE",
+};
 
 /**
  * Model card content is keyed by the model's labelId.
@@ -604,9 +612,129 @@ function createAIWindowConfig(modelData) {
   };
 }
 
+function getExplainerURL() {
+  return Services.prefs.getStringPref(
+    EXPLAINER_PAGE_PREF,
+    "http://www.firefox.com/smart-window/?v=product"
+  );
+}
+
+/**
+ * Records onboardingComplete from the committed onboarding prefs.
+ */
+function recordOnboardingComplete() {
+  const memories = [];
+  if (Services.prefs.getBoolPref(MEMORIES_FROM_CONVERSATION_PREF, false)) {
+    memories.push(MEMORIES_CHATS_CHECKBOX_ID);
+  }
+  if (Services.prefs.getBoolPref(MEMORIES_FROM_HISTORY_PREF, false)) {
+    memories.push(MEMORIES_BROWSING_CHECKBOX_ID);
+  }
+  const setdefaultSource = Services.prefs.getBoolPref(
+    IS_DEFAULT_WINDOW_PREF,
+    false
+  )
+    ? SET_DEFAULT_CHECKBOX_ID
+    : "";
+
+  Glean.smartWindow.onboardingComplete.record({
+    model: Services.prefs.getStringPref(MODEL_PREF, ""),
+    memory_source: memories.join(","),
+    setdefault_source: setdefaultSource,
+  });
+}
+
+function buildModelOptions(modelData) {
+  const cards = isMistralRelease ? MODEL_CARDS_V2 : MODEL_CARDS;
+  return [
+    {
+      value: AUTO_MODEL_CHOICE_ID,
+      l10nId: "aiwindow-firstrun-single-page-model-auto-label",
+      descriptionL10nId: "aiwindow-firstrun-single-page-model-auto-description",
+      buttonL10nId: "aiwindow-firstrun-single-page-model-auto-description",
+    },
+    ...getModelDisplayOrder().map(choiceId => ({
+      value: choiceId,
+      l10nId: cards[choiceId]?.label,
+      l10nArgs: modelData[choiceId],
+      descriptionL10nId: cards[choiceId]?.body,
+    })),
+  ];
+}
+
+async function renderSinglePageFirstRun(modelData) {
+  const { getMemoriesChoice } = await import(
+    "chrome://browser/content/aiwindow/components/smartwindow-onboarding.mjs"
+  );
+
+  document.getElementById("multi-stage-message-root")?.remove();
+  const onboarding = document.createElement("smartwindow-onboarding");
+  onboarding.modelOptions = buildModelOptions(modelData);
+  onboarding.modelChoiceId =
+    getPromotedChoiceId(modelData) ?? AUTO_MODEL_CHOICE_ID;
+  onboarding.memoriesChoice = getMemoriesChoice(
+    Services.prefs.getBoolPref(MEMORIES_FROM_CONVERSATION_PREF, true),
+    Services.prefs.getBoolPref(MEMORIES_FROM_HISTORY_PREF, true)
+  );
+  onboarding.isDefaultWindow = true;
+  onboarding.introDurationMS = autoAdvanceMS;
+
+  onboarding.addEventListener(
+    "smartwindow-onboarding:step-shown",
+    ({ detail }) => {
+      Glean.smartWindow.onboardingScreenImpression.record({
+        message_id: SINGLE_PAGE_MESSAGE_IDS[detail.step],
+      });
+    }
+  );
+
+  onboarding.addEventListener(
+    "smartwindow-onboarding:model-change",
+    ({ detail }) => {
+      Glean.smartWindow.onboardingModelSelected.record({
+        model: detail.modelChoiceId,
+      });
+    }
+  );
+
+  onboarding.addEventListener(
+    "smartwindow-onboarding:save",
+    ({ detail }) => {
+      Services.prefs.setStringPref(MODEL_PREF, detail.modelChoiceId);
+      Services.prefs.setBoolPref(
+        MEMORIES_FROM_CONVERSATION_PREF,
+        detail.memories.fromConversation
+      );
+      Services.prefs.setBoolPref(
+        MEMORIES_FROM_HISTORY_PREF,
+        detail.memories.fromHistory
+      );
+      Services.prefs.setBoolPref(
+        IS_DEFAULT_WINDOW_PREF,
+        detail.isDefaultWindow
+      );
+      Services.prefs.setBoolPref(FIRST_RUN_COMPLETE_PREF, true);
+      recordOnboardingComplete();
+
+      lazy.SpecialMessageActions.handleAction(
+        { type: "OPEN_URL", data: { args: getExplainerURL(), where: "tab" } },
+        topChromeWindow.gBrowser.selectedBrowser
+      );
+      window.location.href = lazy.AIWindow.newTabURL;
+    },
+    { once: true }
+  );
+
+  document.body.prepend(onboarding);
+}
+
 async function renderFirstRun() {
   // Create config after model data is loaded
   const modelData = await getAllModelsData();
+  if (Services.prefs.getBoolPref(SINGLE_PAGE_PREF, false)) {
+    await renderSinglePageFirstRun(modelData);
+    return;
+  }
   const AI_WINDOW_CONFIG = createAIWindowConfig(modelData);
 
   const AWParent = new lazy.AboutWelcomeParent();
@@ -693,35 +821,13 @@ async function renderFirstRun() {
     window.AWSendToParent("SPECIAL_ACTION", {
       type: "OPEN_URL",
       data: {
-        args: Services.prefs.getStringPref(
-          EXPLAINER_PAGE_PREF,
-          "http://www.firefox.com/smart-window/?v=product"
-        ),
+        args: getExplainerURL(),
         where: "tab",
       },
     });
     // The checkbox SET_PREF actions have committed by the time onboarding
     // finishes, so the final selections are derived from the backing prefs.
-    const memories = [];
-    if (Services.prefs.getBoolPref(MEMORIES_FROM_CONVERSATION_PREF, false)) {
-      memories.push(MEMORIES_CHATS_CHECKBOX_ID);
-    }
-    if (Services.prefs.getBoolPref(MEMORIES_FROM_HISTORY_PREF, false)) {
-      memories.push(MEMORIES_BROWSING_CHECKBOX_ID);
-    }
-    const memorySource = memories.join(",");
-    const setdefaultSource = Services.prefs.getBoolPref(
-      IS_DEFAULT_WINDOW_PREF,
-      false
-    )
-      ? SET_DEFAULT_CHECKBOX_ID
-      : "";
-
-    Glean.smartWindow.onboardingComplete.record({
-      model: Services.prefs.getStringPref(MODEL_PREF, ""),
-      memory_source: memorySource,
-      setdefault_source: setdefaultSource,
-    });
+    recordOnboardingComplete();
     window.location.href = lazy.AIWindow.newTabURL;
   };
 

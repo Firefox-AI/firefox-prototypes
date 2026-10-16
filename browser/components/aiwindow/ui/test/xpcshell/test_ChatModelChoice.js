@@ -10,6 +10,8 @@ registerCleanupFunction(() => {
 });
 
 const {
+  AUTO_MODEL,
+  AUTO_MODEL_CHOICE_ID,
   FALLBACK_MODELS,
   getModelForChoice,
   getAllModelsData,
@@ -405,3 +407,35 @@ add_task(async function test_cache_refreshes_on_sync() {
     _clearRemoteClientForTesting();
   }
 });
+
+add_task(
+  async function test_getAllModelsData_includes_auto_model_when_enabled() {
+    const sb = sinon.createSandbox();
+    _setRemoteClientForTesting({
+      get: sb.stub().resolves([]),
+      on: sb.stub(),
+    });
+    try {
+      _clearModelsDataCacheForTesting();
+      Assert.ok(
+        !(AUTO_MODEL_CHOICE_ID in (await getAllModelsData())),
+        "Auto model is not offered when the pref is off"
+      );
+
+      Services.prefs.setBoolPref(
+        "browser.smartwindow.firstrun.singlePage",
+        true
+      );
+      Assert.deepEqual(
+        (await getAllModelsData())[AUTO_MODEL_CHOICE_ID],
+        AUTO_MODEL,
+        "Enabling the pref rebuilds the cache with the auto model"
+      );
+    } finally {
+      Services.prefs.clearUserPref("browser.smartwindow.firstrun.singlePage");
+      _clearModelsDataCacheForTesting();
+      _clearRemoteClientForTesting();
+      sb.restore();
+    }
+  }
+);

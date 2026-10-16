@@ -73,6 +73,9 @@ smart-window-model-personal-v2 =
     .label = {$shortName}: Personal
     .description = Built for personalized help across languages. Full name: { $model } by { $ownerName }
 
+smart-window-model-auto =
+    .label = Auto model
+    .description = Use the best model for the task
 smart-window-model-custom =
     .label = Custom: Use your own LLM
 smart-window-model-custom-name =

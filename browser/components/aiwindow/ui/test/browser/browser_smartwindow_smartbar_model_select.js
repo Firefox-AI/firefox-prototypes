@@ -748,3 +748,57 @@ add_task(async function test_smartbar_input_does_not_persist_model_choice() {
     await SpecialPowers.popPrefEnv();
   }
 });
+
+add_task(async function test_smartbar_model_select_shows_auto_model() {
+  _clearModelsDataCacheForTesting();
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.smartwindow.firstrun.singlePage", true],
+      ["browser.smartwindow.firstrun.modelChoice", "4"],
+    ],
+  });
+  const { restore } = await stubEngineNetworkBoundaries({
+    serverOptions: null,
+  });
+
+  try {
+    const win = await openAIWindow();
+    const browser = win.gBrowser.selectedBrowser;
+    await waitForSelectedModel(browser, "auto");
+
+    const { buttonL10nId, firstItemIsAuto, autoItemChecked } =
+      await SpecialPowers.spawn(browser, [], async () => {
+        const aiWindowElement = content.document.querySelector("ai-window");
+        const modelSelect = aiWindowElement.shadowRoot
+          .querySelector("#ai-window-smartbar")
+          .querySelector("input-model-select");
+        await modelSelect.updateComplete;
+        const firstItem = modelSelect.shadowRoot.querySelector(
+          "panel-list button.model-item"
+        );
+        return {
+          buttonL10nId: modelSelect.shadowRoot
+            .querySelector("moz-button")
+            .getAttribute("data-l10n-id"),
+          firstItemIsAuto: !!firstItem.querySelector(
+            '.model-item-label[data-l10n-id="aiwindow-input-model-select-button-label-auto"]'
+          ),
+          autoItemChecked: !!firstItem.querySelector(".model-item-check"),
+        };
+      });
+
+    Assert.equal(
+      buttonL10nId,
+      "aiwindow-input-model-select-button-label-auto",
+      "Button shows the Auto label"
+    );
+    Assert.ok(firstItemIsAuto, "Auto is the first menu item");
+    Assert.ok(autoItemChecked, "Auto menu item is checked");
+
+    await BrowserTestUtils.closeWindow(win);
+  } finally {
+    await restore();
+    await SpecialPowers.popPrefEnv();
+    _clearModelsDataCacheForTesting();
+  }
+});

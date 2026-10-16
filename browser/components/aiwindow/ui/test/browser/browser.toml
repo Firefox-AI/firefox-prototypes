@@ -137,6 +137,8 @@ skip-if = [
   "os == 'mac' && os_version == '15.30' && arch == 'aarch64'", # Bug 2012723
 ]
 
+["browser_aiwindow_firstrun_single_page.js"]
+
 ["browser_aiwindow_followup_tokens.js"]
 
 ["browser_aiwindow_group_tabs_button_interaction.js"]

@@ -21,9 +21,9 @@ const { XPCOMUtils } = ChromeUtils.importESModule(
 
 // TODO Bug 2053495: remove with mistral release pref
 const MISTRAL_RELEASE_PREF = "browser.smartwindow.mistralRelease";
-const { getModelDisplayOrder } = window.IS_STORYBOOK
+const { AUTO_MODEL_CHOICE_ID, getModelDisplayOrder } = window.IS_STORYBOOK
   ? // TODO Bug 2053495: ensure TypeError doesn't occur in Storybook once pref gating has been removed
-    { getModelDisplayOrder: () => ["1", "2", "3"] }
+    { AUTO_MODEL_CHOICE_ID: "4", getModelDisplayOrder: () => ["1", "2", "3"] }
   : ChromeUtils.importESModule(
       "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs"
     );
@@ -37,6 +37,7 @@ const MODEL_ICONS = {
   1: "chrome://browser/content/aiwindow/assets/model-choice-1.svg",
   2: "chrome://browser/content/aiwindow/assets/model-choice-2.svg",
   3: "chrome://browser/content/aiwindow/assets/model-choice-3.svg",
+  4: "chrome://browser/content/aiwindow/assets/smart-window.svg",
 };
 
 const MODEL_ICONS_V2 = {
@@ -44,12 +45,14 @@ const MODEL_ICONS_V2 = {
   1: "chrome://browser/content/aiwindow/assets/model-choice-gemini.svg",
   2: "chrome://browser/content/aiwindow/assets/model-choice-qwen.svg",
   3: "chrome://browser/content/aiwindow/assets/model-choice-mistral.svg",
+  4: "chrome://browser/content/aiwindow/assets/smart-window.svg",
 };
 const BUTTON_LABEL_L10N_IDS = {
   0: "aiwindow-input-model-select-button-label-custom",
   1: "aiwindow-input-model-select-button-label-fast",
   2: "aiwindow-input-model-select-button-label-allpurpose",
   3: "aiwindow-input-model-select-button-label-personal",
+  4: "aiwindow-input-model-select-button-label-auto",
 };
 
 /**
@@ -116,8 +119,11 @@ export class InputModelSelect extends MozLitElement {
     }
     const order = getModelDisplayOrder();
     const rank = index => {
-      // Custom (choice "0") always leads the list.
+      // Custom (choice "0") always leads the list, followed by auto.
       if (index === "0") {
+        return -2;
+      }
+      if (index === AUTO_MODEL_CHOICE_ID) {
         return -1;
       }
       const position = order.indexOf(index);
@@ -171,6 +177,9 @@ export class InputModelSelect extends MozLitElement {
   #getDescriptionL10nId(choiceId) {
     if (choiceId === "0") {
       return "aiwindow-input-model-select-menu-item-description-custom";
+    }
+    if (choiceId === AUTO_MODEL_CHOICE_ID) {
+      return "aiwindow-input-model-select-menu-item-description-auto";
     }
     if (this.mistralRelease) {
       return BUTTON_LABEL_L10N_IDS[choiceId];
@@ -230,7 +239,9 @@ export class InputModelSelect extends MozLitElement {
               ${this.mistralRelease
                 ? html`<span
                     class="model-item-details"
-                    data-l10n-id=${this.#getButtonLabelL10nId(item.index)}
+                    data-l10n-id=${item.index === AUTO_MODEL_CHOICE_ID
+                      ? this.#getDescriptionL10nId(item.index)
+                      : this.#getButtonLabelL10nId(item.index)}
                   ></span>`
                 : html`<span
                     class="model-item-details"

@@ -1,0 +1,167 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+:host {
+  --onboarding-card-border-color: light-dark(
+    var(--color-violet-desaturated-20, var(--color-purple-20)),
+    var(--color-violet-desaturated-50, var(--color-gray-70))
+  );
+  --onboarding-card-bg: light-dark(var(--color-white), var(--color-gray-75, var(--color-gray-80)));
+  --onboarding-title-color: transparent;
+  --onboarding-title-bg-image: light-dark(
+    linear-gradient(270deg, var(--color-violet-40) 11.55%, var(--color-violet-60) 90.5%),
+    linear-gradient(270deg, var(--color-violet-30) 11.55%, var(--color-violet-50) 90.5%)
+  );
+
+  @media (forced-colors) {
+    --onboarding-title-color: CanvasText;
+    --onboarding-title-bg-image: none;
+  }
+
+  display: block;
+  color: var(--text-color);
+}
+
+.onboarding {
+  align-items: center;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xlarge);
+  margin-inline: auto;
+  max-width: 720px;
+  min-height: 100vh;
+  justify-content: center;
+  padding: var(--space-xxlarge) var(--space-large);
+}
+
+@keyframes springUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.intro {
+  gap: var(--space-medium);
+
+  .onboarding-title,
+  .onboarding-subtitle {
+    animation: springUp 0.3s ease-in both;
+  }
+
+  .onboarding-title {
+    animation-delay: 0.3s;
+  }
+
+  .onboarding-subtitle {
+    animation-delay: 0.5s;
+    color: var(--text-color);
+    font-weight: var(--font-weight-semibold);
+    max-width: 24em;
+  }
+}
+
+.settings {
+  animation: fadeIn 0.3s ease-in both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro .onboarding-title,
+  .intro .onboarding-subtitle,
+  .settings {
+    animation: none;
+  }
+}
+
+.onboarding-title {
+  background-image: var(--onboarding-title-bg-image);
+  background-clip: text;
+  color: var(--onboarding-title-color);
+  font-size: var(--font-size-xxxlarge);
+  font-weight: var(--font-weight);
+  margin: 0;
+  text-align: center;
+}
+
+.onboarding-subtitle {
+  color: var(--text-color-deemphasized);
+  font-size: var(--font-size-large);
+  margin: 0;
+  max-width: 34em;
+  text-align: center;
+}
+
+.settings-card {
+  background: var(--onboarding-card-bg);
+  border: var(--border-width) solid var(--onboarding-card-border-color);
+  border-radius: var(--border-radius-large);
+  box-shadow: var(--box-shadow-level-1);
+  width: 100%;
+}
+
+.setting-row {
+  align-items: center;
+  display: flex;
+  gap: var(--space-xlarge);
+  justify-content: space-between;
+  padding: var(--space-xlarge);
+
+  & + & {
+    border-top: var(--border-width) solid var(--onboarding-card-border-color);
+  }
+}
+
+label.setting-row {
+  cursor: pointer;
+}
+
+.setting-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxsmall);
+  min-width: 0;
+}
+
+.setting-label {
+  font-size: var(--font-size-large);
+  font-weight: var(--font-weight-bold);
+  margin: 0;
+}
+
+.setting-description {
+  color: var(--text-color-deemphasized);
+  margin: 0;
+}
+
+smartwindow-option-select {
+  flex-shrink: 0;
+}
+
+#default-checkbox {
+  accent-color: light-dark(var(--color-violet-60), var(--color-violet-30));
+  flex-shrink: 0;
+  height: var(--icon-size-medium);
+  margin: 0;
+  width: var(--icon-size-medium);
+}
+
+#save-button {
+  --button-border-radius: var(--border-radius-circle);
+  --button-background-color-primary: light-dark(var(--color-violet-60), var(--color-violet-30));
+  --button-font-size: var(--font-size-large);
+}
