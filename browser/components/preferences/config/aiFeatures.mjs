@@ -28,6 +28,12 @@ const lazy = XPCOMUtils.declareLazy({
   GenAI: "moz-src:///browser/components/genai/GenAI.sys.mjs",
   MemoryStore:
     "moz-src:///browser/components/aiwindow/services/MemoryStore.sys.mjs",
+  AUTO_MODEL_CHOICE_ID:
+    "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
+  AUTO_MODEL_PREF:
+    "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
+  isAutoModelEnabled:
+    "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
   getCachedModelsData:
     "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
   getModelDisplayOrder:
@@ -324,6 +330,15 @@ const isMistralRelease = () =>
   Services.prefs.getBoolPref(MISTRAL_RELEASE_PREF, false);
 
 /**
+ * @param {string} choiceId - Model choice ID
+ * @returns {string} Model name reported in settingsModel telemetry
+ */
+const modelNameForChoice = choiceId =>
+  choiceId === lazy.AUTO_MODEL_CHOICE_ID
+    ? "auto"
+    : lazy.getCachedModelsData()[String(choiceId)].model;
+
+/**
  * Keyed by choice ID; entry order here does not matter. Radio display order is
  * controlled by getModelDisplayOrder().
  *
@@ -362,7 +377,7 @@ const buildPresetModelOptions = () => {
   const strings = isMistralRelease()
     ? MODEL_CHOICE_STRINGS_V2
     : MODEL_CHOICE_STRINGS;
-  return lazy.getModelDisplayOrder().map(choiceId => {
+  const options = lazy.getModelDisplayOrder().map(choiceId => {
     const { l10nId } = strings[choiceId];
     const option = /** @type {Record<string, any>} */ ({
       value: choiceId,
@@ -373,6 +388,13 @@ const buildPresetModelOptions = () => {
     });
     return option;
   });
+  if (lazy.isAutoModelEnabled()) {
+    options.unshift({
+      value: lazy.AUTO_MODEL_CHOICE_ID,
+      l10nId: "smart-window-model-auto",
+    });
+  }
+  return options;
 };
 
 /**
@@ -845,12 +867,15 @@ Preferences.addSetting({
       "smartWindowFirstRunModelChoice",
       "smartWindowCustomEndpoint",
     ],
-    // TODO Bug 2053495: remove with mistral release pref.
+    // TODO Bug 2053495: remove MISTRAL_RELEASE_PREF observer with mistral release pref.
     setup(emitChange) {
       const observer = () => emitChange();
       Services.prefs.addObserver(MISTRAL_RELEASE_PREF, observer);
-      return () =>
+      Services.prefs.addObserver(lazy.AUTO_MODEL_PREF, observer);
+      return () => {
         Services.prefs.removeObserver(MISTRAL_RELEASE_PREF, observer);
+        Services.prefs.removeObserver(lazy.AUTO_MODEL_PREF, observer);
+      };
     },
     getControlConfig(config) {
       const customOption = config.options.find(option => option.value === "0");
@@ -874,9 +899,7 @@ Preferences.addSetting({
     },
     set(value, deps, setting) {
       const prev = deps.smartWindowFirstRunModelChoice.value;
-      previousAssistantModel = prev
-        ? lazy.getCachedModelsData()[String(prev)].model
-        : "No model";
+      previousAssistantModel = prev ? modelNameForChoice(prev) : "No model";
 
       customRadioSelected = value === "0";
       if (customRadioSelected) {
@@ -896,7 +919,7 @@ Preferences.addSetting({
       // sending telemetry only for the preset models
       // custom model telemetry is sent after user hits the save button
       if (value !== "0") {
-        const new_model = lazy.getCachedModelsData()[String(value)].model;
+        const new_model = modelNameForChoice(value);
         Glean.smartWindow.settingsModel.record({
           previous_model: previousAssistantModel,
           new_model,

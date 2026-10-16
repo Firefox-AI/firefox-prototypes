@@ -1,0 +1,78 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+:host {
+  --button-border-radius: var(--border-radius-circle);
+  --button-font-weight: var(--font-weight);
+
+  display: inline-flex;
+}
+
+.option-select-button::part(button) {
+  padding-inline: var(--space-large) var(--space-medium);
+}
+
+panel-list {
+  --panel-max-width: 392px;
+  padding-inline: var(--space-small);
+}
+
+.option-item {
+  align-items: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--border-radius-medium);
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  gap: var(--space-small);
+  padding: var(--space-small) var(--space-medium);
+  text-align: start;
+  width: 100%;
+
+  &:hover {
+    background-color: var(--button-background-color-hover);
+  }
+
+  &:active {
+    background-color: var(--button-background-color-active);
+  }
+
+  &[aria-checked="true"] {
+    background-color: var(--button-background-color-hover);
+  }
+
+  /* TODO: Bug 2033070 -  Nova tokens were implemented as the default value for the custom properties, and the fallbacks (and lint exceptions) will need to be removed after launch */
+  @media -moz-pref("browser.nova.enabled") {
+    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+    border-radius: var(--smartwindow-panel-item-border-radius);
+  }
+}
+
+.option-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxsmall);
+  min-width: 0;
+}
+
+.option-item-label {
+  font-size: var(--font-size-root);
+  overflow-wrap: anywhere;
+}
+
+.option-item-description {
+  color: var(--text-color-deemphasized);
+  font-size: var(--font-size-small);
+}
+
+.option-item-check {
+  -moz-context-properties: fill;
+  fill: var(--icon-fill, currentColor);
+  flex-shrink: 0;
+  height: var(--icon-size);
+  margin-inline-start: auto;
+  width: var(--icon-size);
+}

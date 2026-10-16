@@ -15,6 +15,18 @@ export { openAIEngine };
 export const MODEL_PREF = "browser.smartwindow.model";
 export const GENERIC_MODEL_NAME = "generic";
 const MODEL_CHOICE_PREF = "browser.smartwindow.firstrun.modelChoice";
+export const AUTO_MODEL_CHOICE_ID = "4";
+// The auto model choice ships with the single page first run onboarding.
+export const AUTO_MODEL_PREF = "browser.smartwindow.firstrun.singlePage";
+export const AUTO_MODEL = Object.freeze({
+  model: "auto",
+  ownerName: "",
+  labelId: "auto",
+});
+
+export function isAutoModelEnabled() {
+  return Services.prefs.getBoolPref(AUTO_MODEL_PREF, false);
+}
 // TODO Bug 2053495: remove with mistral release pref
 const MISTRAL_RELEASE_PREF = "browser.smartwindow.mistralRelease";
 
@@ -676,6 +688,9 @@ let _modelsDataCache = null;
 Services.prefs.addObserver(MISTRAL_RELEASE_PREF, () => {
   _modelsDataCache = null;
 });
+Services.prefs.addObserver(AUTO_MODEL_PREF, () => {
+  _modelsDataCache = null;
+});
 
 export async function refreshModelsDataCache() {
   _modelsDataCache = null;
@@ -705,6 +720,9 @@ export async function getAllModelsData() {
     if (data) {
       modelData[id] = data;
     }
+  }
+  if (isAutoModelEnabled()) {
+    modelData[AUTO_MODEL_CHOICE_ID] = AUTO_MODEL;
   }
   _modelsDataCache = modelData;
   return _modelsDataCache;
