@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Organize tabs</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="header">Smart groups</header>
+
+  <section class="row toggle-row">
+    <div class="text">
+      <label for="sw-autogroup-toggle" class="title">Group tabs automatically</label>
+      <div class="desc">Turning this off keeps your groups as they are. We just stop grouping new tabs.</div>
+    </div>
+    <label class="switch">
+      <input type="checkbox" id="sw-autogroup-toggle" aria-label="Group tabs automatically">
+      <span class="slider"></span>
+    </label>
+  </section>
+
+  <hr>
+
+  <button class="row item" id="sw-autogroup-undo" disabled>
+    <span class="text">
+      <span class="title">Undo last group</span>
+      <span class="desc" id="sw-autogroup-undo-desc">Nothing to undo</span>
+    </span>
+  </button>
+
+  <hr>
+
+  <section class="row model-row">
+    <div class="text">
+      <div class="title">On-device model</div>
+      <div class="desc" id="model-detail">…</div>
+    </div>
+    <button class="small" id="model-enable" hidden>Enable</button>
+  </section>
+
+  <details class="advanced">
+    <summary>Advanced</summary>
+    <label>Delay before grouping (ms)
+      <input type="number" id="adv-delay" min="0" step="250">
+    </label>
+    <label>Minimum tabs for a new group
+      <input type="number" id="adv-min" min="2" max="6">
+    </label>
+    <label>Similarity threshold (0–1)
+      <input type="number" id="adv-threshold" min="0.1" max="0.95" step="0.05">
+    </label>
+    <div class="log" id="log"></div>
+  </details>
+
+  <script src="popup.js"></script>
+</body>
+</html>
