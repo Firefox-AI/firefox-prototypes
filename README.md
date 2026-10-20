@@ -11,13 +11,17 @@ same **lite** scope as the worktree build on branch `smart-auto-grouping`.
 ## What it does
 
 - **JOIN.** Every tab opened after install is classified once, 2 s after its
-  first web page finishes loading. If it fits an existing group it moves to the
-  end of that group and the group expands if it was collapsed. For 5 s the
-  moved tab carries the multi-select highlight and the group name reads
-  "✦ Travel", then both revert. The toolbar button shows a badge until you open
-  the menu, where a "Last moved" row names the tab and group with a **Show me**
-  button that jumps to it. One tab is enough to join. Works for user-made
-  groups too.
+  first web page finishes loading. Each existing group is scored with the same
+  logistic affinity model Firefox's smart tab grouping uses for "suggest more
+  tabs" (weights ported from SmartTabGrouping.sys.mjs): the highest title
+  similarity to any member of the group, the fraction of members on the same
+  host, and similarity to the group name. Named groups need probability 0.59,
+  unnamed 0.123. The best group wins; the tab moves to its end and the group
+  expands if it was collapsed. For 5 s the moved tab carries the multi-select
+  highlight and the group name reads "✦ Travel", then both revert. The toolbar
+  button shows a badge until you open the menu, where a "Last moved" row names
+  the tab and group with a **Show me** button that jumps to it. One tab is
+  enough to join. Works for user-made groups too.
 - **CREATE.** Otherwise, if the new tab and at least two other loose tabs in the
   window clearly belong together, they form a new group in place at the new tab
   (the new tab ends up last), named and colored from a topic table.
@@ -42,7 +46,8 @@ same **lite** scope as the worktree build on branch `smart-auto-grouping`.
   (A~B, B~C puts C in the group). Falls back to the heuristic if the model is
   unavailable. Differences from the tree: no page description in the embedded
   text, nearest-neighbour clustering around the new tab instead of
-  agglomerative clustering over all tabs, and **group names come from a topic
+  agglomerative clustering over all tabs (JOIN scoring is the tree's, with up
+  to 10 anchor tabs instead of 3), and **group names come from a topic
   table, not the Gemini/topic-model label path**.
 - Strict one-at-a-time queue, re-validation at fire time (tab still open, still
   loose, group still exists), cancel if the tab closes before the 2 s delay.
@@ -68,7 +73,7 @@ Permanent (your Nightly profile has `xpinstall.signatures.required = false`):
    ```bash
    cd /Users/joliehuang/FirefoxPrototype/extensions/smart-auto-grouping && web-ext build --overwrite-dest
    ```
-2. Drag `web-ext-artifacts/smart-auto-grouping-0.1.4.xpi` onto a Firefox window
+2. Drag `web-ext-artifacts/smart-auto-grouping-0.2.0.xpi` onto a Firefox window
    and accept the prompt (a prebuilt one is already there).
 
 The toolbar button is added to the overflow area by default. Pin it from the
@@ -89,7 +94,7 @@ extensions (puzzle) menu so it sits next to the tab strip.
 **Advanced** in the menu exposes the delay, minimum cluster size and the
 similarity threshold (0.45 default; raise it if groups feel too eager).
 
-## Test (15 checks, all passing on Nightly 160, 2026-10-20)
+## Test (18 checks, all passing on Nightly 160, 2026-10-20)
 
 ```bash
 cd /Users/joliehuang/FirefoxPrototype/worktrees/smart-auto-grouping

@@ -321,8 +321,47 @@ const Classifier = (() => {
     return vs.map(o => cosine(v, o));
   }
 
-  /** Best existing group for `tab`, or null. Compares against each group's members. */
-  async function bestGroup(tab, groups, allTabs, excludedGroupId, threshold) {
+  // Per-group affinity, ported from Firefox's SmartTabGrouping.sys.mjs
+  // (LOGISTIC_REGRESSION_PARAMS, trained on synthetic data). Features:
+  //   s_tt_max  highest title similarity between the new tab and any member
+  //   s_dd      fraction of members on the same host
+  //   s_gc      similarity between the new tab and the group name (named groups)
+  const AFFINITY = {
+    withName: { group: 0.10249, title: 0.54897, domain: 0.34854, intercept: -0.07397, threshold: 0.59 },
+    titleOnly: { group: 0, title: 0.92513, domain: 0.07487, intercept: -2.58574, threshold: 0.123 },
+  };
+  const MAX_ANCHORS = 10; // the tree uses 3; the embedding cache makes more affordable
+
+  const sigmoid = z => 1 / (1 + Math.exp(-z));
+
+  // Cosine-like similarity in [-1, 1]: real cosine with the model, else the
+  // heuristic score mapped from [0, 1].
+  async function cosineLike(tab, others) {
+    const m = await modelSimilarity(tab, others).catch(() => null);
+    if (m) {
+      return m;
+    }
+    return others.map(o => 2 * heuristicSim(tab, o) - 1);
+  }
+
+  async function groupAffinity(tab, group, members) {
+    const anchors = members.slice(-MAX_ANCHORS);
+    const titleCos = Math.max(...(await cosineLike(tab, anchors)));
+    const host = hostOf(tab.url);
+    const domainFrac = host ? anchors.filter(a => hostOf(a.url) === host).length / anchors.length : 0;
+    const named = !!(group.title && group.title.trim());
+    const params = named ? AFFINITY.withName : AFFINITY.titleOnly;
+    const groupCos = named ? (await cosineLike(tab, [{ title: group.title, url: "" }]))[0] : -1;
+    const z = params.group * (0.5 * (groupCos + 1))
+      + params.title * (0.5 * (titleCos + 1))
+      + params.domain * domainFrac
+      + params.intercept;
+    const probability = sigmoid(z);
+    return { probability, threshold: params.threshold, titleCos, domainFrac, groupCos };
+  }
+
+  /** Best existing group for `tab`, or null, by the trained affinity score. */
+  async function bestGroup(tab, groups, allTabs, excludedGroupId) {
     let best = null;
     for (const g of groups) {
       if (g.id === excludedGroupId) {
@@ -332,15 +371,9 @@ const Classifier = (() => {
       if (!members.length) {
         continue;
       }
-      const sims = await similarity(tab, members);
-      // Mean of member similarity, boosted by a title match if the group is named.
-      let score = sims.reduce((a, b) => a + b, 0) / sims.length;
-      if (g.title) {
-        const titleSim = (await similarity(tab, [{ title: g.title, url: "" }]))[0];
-        score = Math.max(score, 0.5 * score + 0.5 * titleSim);
-      }
-      if (score >= threshold && (!best || score > best.score)) {
-        best = { group: g, score };
+      const a = await groupAffinity(tab, g, members);
+      if (a.probability >= a.threshold && (!best || a.probability > best.score)) {
+        best = { group: g, score: a.probability, detail: a };
       }
     }
     return best;
@@ -456,5 +489,5 @@ const Classifier = (() => {
     return { backend: useModel ? "model" : "heuristic", texts, matrix, model, heuristic };
   }
 
-  return { ensureEngine, bestGroup, clusterAround, label, status, hostOf, siteOf, debugSim };
+  return { ensureEngine, bestGroup, groupAffinity, clusterAround, label, status, hostOf, siteOf, debugSim };
 })();

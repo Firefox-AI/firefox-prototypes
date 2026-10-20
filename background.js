@@ -190,7 +190,7 @@ async function process(tabId) {
   const { threshold, minClusterSize } = state.settings;
 
   // JOIN: one tab is enough to join an existing group (§5.3).
-  const fit = await Classifier.bestGroup(tab, groups, allTabs, state.exclusions[tab.id], threshold);
+  const fit = await Classifier.bestGroup(tab, groups, allTabs, state.exclusions[tab.id]);
   if (fit) {
     const fresh = await browser.tabs.get(tabId).catch(() => null);
     if (!isLooseCandidate(fresh)) {
@@ -200,7 +200,8 @@ async function process(tabId) {
     await moveToEndOfGroup(tab.id, fit.group.id);
     await revealGroup(fit.group.id);
     autoAdded.set(tab.id, fit.group.id);
-    logAction(`Joined "${fit.group.title || "untitled group"}" (score ${fit.score.toFixed(2)})`);
+    const d = fit.detail;
+    logAction(`Joined "${fit.group.title || "untitled group"}" (p=${fit.score.toFixed(2)}; title ${d.titleCos.toFixed(2)}, domain ${d.domainFrac.toFixed(2)}, name ${d.groupCos.toFixed(2)})`);
     announceMove(tab, fit.group);
     return;
   }
