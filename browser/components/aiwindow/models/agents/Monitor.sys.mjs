@@ -259,6 +259,8 @@ export class Monitor {
    *   in the same concatenated format as run-time extraction.
    * @param {number} [options.runCount] - Lifetime number of runs started,
    *   surfaced as execution_seq in telemetry.
+   * @param {{ url: string, createdAt: string }} [options.smartPage] - The
+   *   smart page last generated for this task, when it has one.
    */
   constructor({
     id = crypto.randomUUID(),
@@ -278,6 +280,7 @@ export class Monitor {
     history = [],
     initialSnapshot = null,
     runCount = 0,
+    smartPage = null,
   } = {}) {
     // validate the schedule is an actual schedule object and not a serialized object
     if (!schedule?.getNextRunTime) {
@@ -308,6 +311,7 @@ export class Monitor {
     this.history = Array.isArray(history) ? history : [];
     this.initialSnapshot = initialSnapshot;
     this.runCount = runCount;
+    this.smartPage = smartPage;
 
     // final verification that the monitor is valid
     if (!this.id || !this.monitorPrompt || !this.watchUrls.length) {
@@ -344,6 +348,7 @@ export class Monitor {
       history,
       initialSnapshot: savedMonitor.initialSnapshot ?? null,
       runCount: savedMonitor.runCount,
+      smartPage: savedMonitor.smartPage ?? null,
     });
   }
 
@@ -837,6 +842,7 @@ export class Monitor {
         ? { ...this.initialSnapshot }
         : null,
       runCount: this.runCount,
+      ...(this.smartPage ? { smartPage: { ...this.smartPage } } : {}),
     };
   }
 
