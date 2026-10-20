@@ -36,7 +36,8 @@ const MAX_VISIBLE_ROWS = 5;
  *  - agent-monitor-panel:create-task
  *  - agent-monitor-panel:manage-tasks
  *  - agent-monitor-panel:open-task  (detail: { id }; a row was activated. Only
- *    fires for a task that watches at least one page.)
+ *    fires for a task that watches at least one page, or that has a generated
+ *    smart page.)
  *  - agent-monitor-item:*  (re-dispatched from the create form, see that
  *    component; the host handles :submit, :cancel and :draft-change)
  *
@@ -132,7 +133,23 @@ export class AgentMonitorPanel extends MozLitElement {
     ></span>`;
   }
 
+  #renderSmartPageCreated(monitor) {
+    const createdAt = Date.parse(monitor.smartPage?.createdAt ?? "");
+    if (Number.isNaN(createdAt)) {
+      return null;
+    }
+    return html`<span
+      class="monitor-row-result"
+      data-l10n-id="smartwindow-monitor-panel-smart-page-created"
+      data-l10n-args=${JSON.stringify({ time: createdAt })}
+    ></span>`;
+  }
+
   #renderResult(monitor, isNewMatch) {
+    const created = this.#renderSmartPageCreated(monitor);
+    if (created) {
+      return created;
+    }
     const lastRun = this.#lastRun(monitor);
     if (!lastRun || lastRun.status === "running") {
       return nothing;
@@ -158,9 +175,10 @@ export class AgentMonitorPanel extends MozLitElement {
   }
 
   #onRowClick(monitor) {
-    // Activating a row opens the pages the task watches, so a task with none
-    // has nothing to open. The row stays focusable so it can still be read.
-    if (!monitor.watchUrls?.length) {
+    // A smart page task opens that page. Anything else opens the pages it
+    // watches, so a task with neither has nothing to open. The row stays
+    // focusable so it can still be read.
+    if (!monitor.smartPage?.url && !monitor.watchUrls?.length) {
       return;
     }
     this.#dispatch("agent-monitor-panel:open-task", { id: monitor.id });
@@ -171,7 +189,9 @@ export class AgentMonitorPanel extends MozLitElement {
       <button
         type="button"
         class="monitor-row"
-        aria-disabled=${monitor.watchUrls?.length ? nothing : "true"}
+        aria-disabled=${monitor.smartPage?.url || monitor.watchUrls?.length
+          ? nothing
+          : "true"}
         ?data-just-created=${monitor.id === this.justCreatedId}
         @click=${() => this.#onRowClick(monitor)}
       >
@@ -294,6 +314,7 @@ export class AgentMonitorPanel extends MozLitElement {
             .agent=${this.agent}
             .draft=${this.draft}
             .selfContained=${false}
+            .smartPages=${true}
           ></agent-monitor-item>`
         : this.#renderList()}
     `;

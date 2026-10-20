@@ -1145,6 +1145,23 @@ export const MonitorAgent = {
   },
 
   /**
+   * Records the smart page just generated for a task and tells open panels.
+   *
+   * @param {string} id - The monitor id
+   * @param {{ url: string, createdAt: string }} smartPage
+   */
+  async setSmartPage(id, smartPage) {
+    await this._ensureLoaded();
+    const monitor = gMonitors.get(id);
+    if (!monitor) {
+      return;
+    }
+    monitor.smartPage = { ...smartPage };
+    monitor.updatedAt = new Date().toISOString();
+    await this._saveAndNotify(monitor);
+  },
+
+  /**
    * Stops desktop notifications for a monitor
    *
    * @param {string} id - The monitor id

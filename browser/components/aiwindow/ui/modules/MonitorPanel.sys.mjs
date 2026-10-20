@@ -203,6 +203,9 @@ export const MonitorPanel = {
     contents.addEventListener("agent-monitor-item:submit", event =>
       this._onCreateSubmit(panel, event.detail)
     );
+    contents.addEventListener("agent-monitor-item:smart-page", event =>
+      this._syncCreateHeading(panel, event.detail?.smartPage)
+    );
     // The form is torn down whenever the panel closes or the view changes, so
     // the draft is held out here to survive that.
     contents.addEventListener("agent-monitor-item:draft-change", event => {
@@ -247,6 +250,11 @@ export const MonitorPanel = {
   _onOpenTask(panel, win, id) {
     // Read the task before hiding the panel, which tears the contents down.
     const monitor = panel._contents.monitors?.find(m => m.id === id);
+    if (monitor?.smartPage?.url) {
+      panel.hidePopup();
+      win.switchToTabHavingURI(monitor.smartPage.url, true);
+      return;
+    }
     const urls = (monitor?.watchUrls ?? []).filter(lazy.isAllowedWatchUrl);
     if (!urls.length) {
       return;
@@ -345,7 +353,10 @@ export const MonitorPanel = {
   // Switching to the create view while the list is already showing animates
   // the form sliding in.
   _openCreateView(panel, win) {
-    panel._contents.agent = { url: this._watchableUrl(win) };
+    panel._contents.agent = {
+      url: this._watchableUrl(win),
+      pageTitle: win.gBrowser?.selectedTab?.label ?? "",
+    };
     this._setView(panel, "create");
   },
 
@@ -387,6 +398,23 @@ export const MonitorPanel = {
   },
 
   /**
+   * The create view's header names a smart page once the form says this task
+   * is one. Fluent owns the title otherwise.
+   *
+   * @param {XULElement} panel
+   * @param {boolean} smartPage
+   */
+  _syncCreateHeading(panel, smartPage) {
+    if (panel._contents.view !== "create") {
+      return;
+    }
+    const l10nId = smartPage
+      ? "smartwindow-monitor-panel-create-smart-page-title"
+      : VIEW_TITLE_L10N_IDS.create;
+    panel.ownerDocument.l10n.setAttributes(panel._title, l10nId);
+  },
+
+  /**
    * @param {XULElement} panel
    */
   async _syncContents(panel) {
@@ -415,7 +443,7 @@ export const MonitorPanel = {
    * @param {object} detail - See agent-monitor-item's ":submit" event.
    */
   async _onCreateSubmit(panel, detail) {
-    const { monitorName, condition, watchUrls, schedule } = detail;
+    const { monitorName, condition, watchUrls, schedule, smartPage } = detail;
     let id;
     try {
       id = await lazy.MonitorAgent.createMonitor({
@@ -428,6 +456,17 @@ export const MonitorPanel = {
     } catch (error) {
       console.error("Failed to create monitor:", error);
       return;
+    }
+    if (smartPage) {
+      // The page is built after the task exists. The panel does not wait on
+      // it; a notification opens the page once it is stored.
+      lazy.MonitorUIUtils.generateTaskSmartPage({
+        monitorId: id,
+        title: monitorName,
+        condition,
+        watchUrls,
+        frequency: schedule?.frequency,
+      });
     }
     if (!panel.isConnected) {
       return;
