@@ -16,7 +16,6 @@ const DEFAULT_SETTINGS = {
   joinDelayMs: 2000,    // §5.2 after-delay
   minClusterSize: 3,    // §3 minimum to create a new group (incl. trigger)
   threshold: 0.45,      // similarity threshold, same for JOIN and CREATE
-  feedbackMs: 5000,     // how long the moved-tab highlight and title flash last
 };
 
 const FLASH_PREFIX = "\u2726 "; // "✦ " in front of the group name while a tab lands
@@ -34,6 +33,8 @@ const state = {
 const pendingNewTabs = new Set();   // created this session, waiting for first real load
 const timers = new Map();           // tabId -> timeout id
 const autoAdded = new Map();        // tabId -> groupId the actor put it in (correction detection)
+const pendingVisits = new Map();    // tabId -> groupId: moved tabs the user has not clicked into yet
+const flashedTitles = new Map();    // groupId -> original title while the sparkle prefix is shown
 let queue = Promise.resolve();
 
 // ---- persistence --------------------------------------------------------------
@@ -109,6 +110,9 @@ browser.tabs.onCreated.addListener(tab => {
 browser.tabs.onUpdated.addListener((tabId, change, tab) => {
   // Correction detection: the actor put this tab in a group and it left that group.
   if ("groupId" in change) {
+    if (pendingVisits.has(tabId) && change.groupId !== pendingVisits.get(tabId)) {
+      settleVisit(tabId);
+    }
     const placed = autoAdded.get(tabId);
     if (placed !== undefined && change.groupId !== placed) {
       autoAdded.delete(tabId);
@@ -131,6 +135,7 @@ browser.tabs.onUpdated.addListener((tabId, change, tab) => {
 browser.tabs.onRemoved.addListener(tabId => {
   pendingNewTabs.delete(tabId);
   autoAdded.delete(tabId);
+  settleVisit(tabId, { clearHighlight: false });
   if (timers.has(tabId)) {
     clearTimeout(timers.get(tabId));
     timers.delete(tabId);   // §5.2: closed before the timer fired → nothing happens
@@ -258,40 +263,64 @@ async function revealGroup(groupId) {
 
 // Make the landing visible: highlight the moved tab (without changing the
 // active tab), prefix the group name with a sparkle, record it for the menu,
-// and badge the toolbar button. Everything reverts after settings.feedbackMs.
+// and badge the toolbar button. Highlight and prefix stay until the user
+// clicks into the moved tab (or closes it, or moves it out of the group).
 async function announceMove(tab, group) {
-  const ms = state.settings.feedbackMs;
   state.lastMoved = { tabId: tab.id, title: tab.title, groupId: group.id, groupTitle: group.title || "", at: Date.now() };
   state.unseenMoves += 1;
   setBadge();
+  let fresh;
   try {
-    const fresh = await browser.tabs.get(tab.id);
-    if (!fresh.active) {
-      await browser.tabs.update(tab.id, { highlighted: true, active: false });
-      setTimeout(() => browser.tabs.update(tab.id, { highlighted: false }).catch(() => {}), ms);
-    }
+    fresh = await browser.tabs.get(tab.id);
   } catch (e) {
-    // tab gone
+    return; // tab gone
   }
-  try {
-    const live = await browser.tabGroups.get(group.id);
-    const original = stripFlash(live.title);
-    const flashed = FLASH_PREFIX + original;
-    await browser.tabGroups.update(group.id, { title: flashed });
-    setTimeout(async () => {
-      try {
-        const now = await browser.tabGroups.get(group.id);
-        if (now.title === flashed) {
-          await browser.tabGroups.update(group.id, { title: original });
-        }
-      } catch (e) {
-        // group gone
-      }
-    }, ms);
-  } catch (e) {
-    // group gone
+  if (fresh.active) {
+    return; // the user is already looking at it
+  }
+  pendingVisits.set(tab.id, group.id);
+  await browser.tabs.update(tab.id, { highlighted: true, active: false }).catch(() => {});
+  if (!flashedTitles.has(group.id)) {
+    try {
+      const live = await browser.tabGroups.get(group.id);
+      const original = stripFlash(live.title);
+      flashedTitles.set(group.id, original);
+      await browser.tabGroups.update(group.id, { title: FLASH_PREFIX + original });
+    } catch (e) {
+      flashedTitles.delete(group.id);
+    }
   }
 }
+
+// Called when a moved tab is visited, closed, or leaves its group.
+async function settleVisit(tabId, { clearHighlight = true } = {}) {
+  const groupId = pendingVisits.get(tabId);
+  if (groupId === undefined) {
+    return;
+  }
+  pendingVisits.delete(tabId);
+  if (clearHighlight) {
+    await browser.tabs.update(tabId, { highlighted: false }).catch(() => {});
+  }
+  const stillPending = [...pendingVisits.values()].includes(groupId);
+  if (!stillPending && flashedTitles.has(groupId)) {
+    const original = flashedTitles.get(groupId);
+    flashedTitles.delete(groupId);
+    try {
+      const now = await browser.tabGroups.get(groupId);
+      if (now.title === FLASH_PREFIX + original) {
+        await browser.tabGroups.update(groupId, { title: original });
+      }
+    } catch (e) {
+      // group gone
+    }
+  }
+}
+
+browser.tabs.onActivated.addListener(info => {
+  // Activating the tab already selects it alone, so no highlight to clear.
+  settleVisit(info.tabId, { clearHighlight: false });
+});
 
 function setBadge() {
   const text = state.unseenMoves ? String(state.unseenMoves) : "";

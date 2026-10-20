@@ -176,6 +176,14 @@ def make_user_group(client, urls, label):
     """, urls, label)
 
 
+def activate_tab(client, url):
+    chrome(client, """
+      const [url] = arguments;
+      const tab = gBrowser.tabs.find(t => t.getAttribute("data-e2e") === url);
+      if (tab) gBrowser.selectedTab = tab;
+    """, url)
+
+
 def set_collapsed(client, label, collapsed):
     chrome(client, """
       const [label, collapsed] = arguments;
@@ -371,12 +379,20 @@ def main():
         record("feedback: moved tab highlighted, group title flashed, badge set",
                bool(moved) and moved["multiselected"] and not moved["selected"] and travel_raw == "\u2726 Travel" and badge == "1",
                json.dumps({"multiselected": moved and moved["multiselected"], "selected": moved and moved["selected"], "label": travel_raw, "badge": badge}))
-        time.sleep(6)
+        time.sleep(8)
         moved = find(client, TRAVEL_MORE[0])
         travel_raw = next((g["rawLabel"] for g in groups(client) if g["label"] == "Travel"), None)
-        record("feedback: highlight and title flash revert after 5s",
-               bool(moved) and not moved["multiselected"] and travel_raw == "Travel",
+        record("feedback: still highlighted and flashed 8s later (no timeout)",
+               bool(moved) and moved["multiselected"] and travel_raw == "\u2726 Travel",
                json.dumps({"multiselected": moved and moved["multiselected"], "label": travel_raw}))
+        activate_tab(client, TRAVEL_MORE[0])
+        time.sleep(1)
+        moved = find(client, TRAVEL_MORE[0])
+        travel_raw = next((g["rawLabel"] for g in groups(client) if g["label"] == "Travel"), None)
+        record("feedback: clicking into the moved tab clears highlight and sparkle",
+               bool(moved) and moved["selected"] and not moved["multiselected"] and travel_raw == "Travel",
+               json.dumps({"selected": moved and moved["selected"], "multiselected": moved and moved["multiselected"], "label": travel_raw}))
+        activate_tab(client, RECIPES[0])  # leave the moved tab again before the next steps
 
         # ---- cancel on close ---------------------------------------------------------------
         add_tab(client, TRAVEL_MORE[1])
