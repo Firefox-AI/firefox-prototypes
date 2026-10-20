@@ -1641,6 +1641,7 @@ export class AITab {
 
       const { conversation, system, user } =
         await AITab.#resolvePromptSet(priorConversation);
+      lazy.console.info(`generating with model ${conversation.engine?.model}`);
       // An upsert at index 0, so a continued conversation is re-pointed at
       // today's catalog rather than the one it was first generated against.
       conversation.setSystemMessage(

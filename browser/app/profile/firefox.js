@@ -2441,9 +2441,10 @@ pref("browser.smartwindow.enabled", false);
 // Default endpoint for preset models
 pref("browser.smartwindow.endpoint", "https://mlpa-prod-prod-mozilla.freetls.fastly.net/v1");
 // Overrides the model used for aitab (gentab) page generation only, leaving
-// chat on the selected model. Empty uses the Remote Settings default (Gemini).
-// e.g. "qwen38-flash-next". The endpoint and API key apply only when a model
-// override is set.
+// chat on the selected model. Empty uses the Remote Settings default (Gemini),
+// e.g. "qwen38-flash-next" switches to Qwen. While a model override is set, a
+// non-empty endpointOverride sends the request there with apiKeyOverride; an
+// empty one keeps the endpoint and key the chat model uses.
 pref("browser.smartwindow.aitab.modelOverride", "");
 pref("browser.smartwindow.aitab.endpointOverride", "https://mlpa-nonprod-stage-mozilla.freetls.fastly.net/v1");
 pref("browser.smartwindow.aitab.apiKeyOverride", "");

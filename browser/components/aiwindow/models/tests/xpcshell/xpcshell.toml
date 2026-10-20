@@ -31,6 +31,8 @@ firefox-appdir = "browser"
 
 ["test_Message.js"]
 
+["test_PromptLoader_AITabModelOverride.js"]
+
 ["test_PromptLoader_BrowserContext.js"]
 
 ["test_PromptOptimizer.js"]

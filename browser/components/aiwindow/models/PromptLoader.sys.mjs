@@ -510,13 +510,29 @@ export async function buildEngineForFeature(feature, opts = {}) {
 
   // resolve the model to use for inference, this allows specific features to default to chat model
   let model = mainConfig.inference_model || mainConfig.model;
+  const aitabModelOverride =
+    feature === MODEL_FEATURES.AITAB
+      ? Services.prefs.getStringPref(AITAB_MODEL_OVERRIDE_PREF, "")
+      : "";
   const CHAT_MODEL_FALLBACK_FEATURES = new Set([
     MODEL_FEATURES.AGENT_MONITOR,
     MODEL_FEATURES.AITAB,
     MODEL_FEATURES.RESUME_ACTIVITY_CONVERSATION,
     MODEL_FEATURES.RESUME_ACTIVITY_CONVERSATION_STARTER,
   ]);
-  if (
+  if (aitabModelOverride) {
+    model = aitabModelOverride;
+    // The key belongs to the endpoint, so both are replaced together or
+    // neither is.
+    const endpointOverride = Services.prefs.getStringPref(
+      AITAB_ENDPOINT_OVERRIDE_PREF,
+      ""
+    );
+    if (endpointOverride) {
+      baseURL = endpointOverride;
+      apiKey = Services.prefs.getStringPref(AITAB_APIKEY_OVERRIDE_PREF, "");
+    }
+  } else if (
     model === GENERIC_MODEL_NAME &&
     CHAT_MODEL_FALLBACK_FEATURES.has(feature)
   ) {
@@ -524,16 +540,6 @@ export async function buildEngineForFeature(feature, opts = {}) {
       modelChoiceIdOverride: opts.modelChoiceIdOverride,
     });
     model = chatConfig.inference_model || chatConfig.model;
-  }
-
-  const aitabModelOverride =
-    feature === MODEL_FEATURES.AITAB &&
-    Services.prefs.getStringPref(AITAB_MODEL_OVERRIDE_PREF, "");
-  if (aitabModelOverride) {
-    model = aitabModelOverride;
-    baseURL =
-      Services.prefs.getStringPref(AITAB_ENDPOINT_OVERRIDE_PREF, "") || baseURL;
-    apiKey = Services.prefs.getStringPref(AITAB_APIKEY_OVERRIDE_PREF, "");
   }
 
   const engine = await openAIEngine.build({
