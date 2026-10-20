@@ -8,6 +8,15 @@ function render(s) {
   undo.disabled = !s.undoTitle;
   $("sw-autogroup-undo-desc").textContent = s.undoTitle ? s.undoTitle : "Nothing to undo";
 
+  const lm = s.lastMoved;
+  $("last-moved-row").hidden = !lm;
+  if (lm) {
+    const ago = Math.max(0, Math.round((Date.now() - lm.at) / 1000));
+    const where = lm.stillThere ? `into "${lm.groupTitle}"` : "(since moved by you)";
+    $("last-moved-desc").textContent = `"${lm.title}" ${where}, ${ago < 60 ? ago + "s" : Math.round(ago / 60) + " min"} ago`;
+    $("show-last-moved").hidden = !lm.stillThere;
+  }
+
   $("model-detail").textContent = s.model.detail;
   $("model-enable").hidden = s.model.ready || /Downloading|Loading/.test(s.model.detail);
 
@@ -18,8 +27,13 @@ function render(s) {
 }
 
 async function refresh() {
-  render(await browser.runtime.sendMessage({ type: "getState" }));
+  render(await browser.runtime.sendMessage({ type: "getState", fromPopup: true }));
 }
+
+$("show-last-moved").addEventListener("click", async () => {
+  await browser.runtime.sendMessage({ type: "showLastMoved" });
+  window.close();
+});
 
 $("sw-autogroup-toggle").addEventListener("change", async e => {
   render(await browser.runtime.sendMessage({ type: "setEnabled", enabled: e.target.checked }));

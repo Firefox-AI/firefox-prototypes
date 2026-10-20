@@ -119,15 +119,18 @@ def tab_info(client):
         title: t.label,
         index: i,
         pinned: t.pinned,
-        group: t.group ? t.group.label : null,
+        group: t.group ? t.group.label.replace(/^\u2726 /, "") : null,
+        groupRaw: t.group ? t.group.label : null,
         groupId: t.group ? t.group.id : null,
+        multiselected: t.multiselected,
+        selected: t.selected,
       }));
     """)
 
 
 def groups(client):
     return chrome(client, """
-      return gBrowser.tabGroups.map(g => ({ id: g.id, label: g.label, tabs: g.tabs.map(t => t.getAttribute("data-e2e") || t.linkedBrowser.currentURI.spec) }));
+      return gBrowser.tabGroups.map(g => ({ id: g.id, label: g.label.replace(/^\u2726 /, ""), rawLabel: g.label, tabs: g.tabs.map(t => t.getAttribute("data-e2e") || t.linkedBrowser.currentURI.spec) }));
     """)
 
 
@@ -176,7 +179,7 @@ def make_user_group(client, urls, label):
 def set_collapsed(client, label, collapsed):
     chrome(client, """
       const [label, collapsed] = arguments;
-      const g = gBrowser.tabGroups.find(g => g.label === label);
+      const g = gBrowser.tabGroups.find(g => g.label.replace(/^\u2726 /, "") === label);
       if (g) g.collapsed = collapsed;
     """, label, collapsed)
 
@@ -184,9 +187,32 @@ def set_collapsed(client, label, collapsed):
 def is_collapsed(client, label):
     return chrome(client, """
       const [label] = arguments;
-      const g = gBrowser.tabGroups.find(g => g.label === label);
+      const g = gBrowser.tabGroups.find(g => g.label.replace(/^\u2726 /, "") === label);
       return g ? g.collapsed : null;
     """, label)
+
+
+WIDGET_ID = "smart-auto-grouping_prototype_mozilla_org-browser-action"
+
+
+def pin_button(client):
+    """Move the toolbar button out of the extensions panel into the nav bar, like a user pinning it."""
+    chrome(client, """
+      const [id] = arguments;
+      const { CustomizableUI } = ChromeUtils.importESModule("moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs");
+      CustomizableUI.addWidgetToArea(id, CustomizableUI.AREA_NAVBAR);
+    """, WIDGET_ID)
+
+
+def badge_text(client):
+    return chrome(client, """
+      const [id] = arguments;
+      const { CustomizableUI } = ChromeUtils.importESModule("moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs");
+      const node = CustomizableUI.getWidget(id)?.forWindow(window)?.node;
+      if (!node) return null;
+      const btn = node.querySelector(".unified-extensions-item-action-button") || node;
+      return btn.getAttribute("badge") || "";
+    """, WIDGET_ID)
 
 
 def popup_url(client):
@@ -304,6 +330,7 @@ def main():
         time.sleep(2)
         ok = chrome(client, "const [id] = arguments; return !!WebExtensionPolicy.getByID(id);", EXT_ID)
         record("smoke: extension installed", bool(ok))
+        pin_button(client)
 
         # ---- CREATE -------------------------------------------------------------------
         add_tab(client, RECIPES[0]); add_tab(client, RECIPES[1])
@@ -338,6 +365,18 @@ def main():
         time.sleep(0.5)
         record("join: collapsed Travel group is expanded after the join", is_collapsed(client, "Travel") is False,
                f"collapsed={is_collapsed(client, 'Travel')}")
+        moved = find(client, TRAVEL_MORE[0])
+        travel_raw = next((g["rawLabel"] for g in groups(client) if g["label"] == "Travel"), None)
+        badge = badge_text(client)
+        record("feedback: moved tab highlighted, group title flashed, badge set",
+               bool(moved) and moved["multiselected"] and not moved["selected"] and travel_raw == "\u2726 Travel" and badge == "1",
+               json.dumps({"multiselected": moved and moved["multiselected"], "selected": moved and moved["selected"], "label": travel_raw, "badge": badge}))
+        time.sleep(6)
+        moved = find(client, TRAVEL_MORE[0])
+        travel_raw = next((g["rawLabel"] for g in groups(client) if g["label"] == "Travel"), None)
+        record("feedback: highlight and title flash revert after 5s",
+               bool(moved) and not moved["multiselected"] and travel_raw == "Travel",
+               json.dumps({"multiselected": moved and moved["multiselected"], "label": travel_raw}))
 
         # ---- cancel on close ---------------------------------------------------------------
         add_tab(client, TRAVEL_MORE[1])
@@ -353,6 +392,20 @@ def main():
         st = popup_state(client, handle)
         record("menu: toggle on, undo enabled with group name",
                st["enabled"] and not st["undoDisabled"] and st["undoDesc"] == created_label, json.dumps(st))
+        lm = popup_eval(client, handle, """
+          const row = document.getElementById("last-moved-row");
+          return { hidden: row.hidden, text: document.getElementById("last-moved-desc").textContent,
+                   showHidden: document.getElementById("show-last-moved").hidden };
+        """)
+        badge_after = badge_text(client)
+        record("menu: Last moved row names the tab and group; badge cleared on open",
+               (not lm["hidden"]) and "Travel" in lm["text"] and "Madeira" in lm["text"] and not lm["showHidden"] and badge_after == "",
+               json.dumps({"row": lm, "badge": badge_after}))
+        popup_click(client, handle, "#show-last-moved")
+        time.sleep(1)
+        sel = find(client, TRAVEL_MORE[0])
+        record("menu: Show me activates the moved tab", bool(sel) and sel["selected"], json.dumps(sel))
+        handle = open_popup_tab(client)  # the popup tab closed itself
         popup_click(client, handle, "label.switch")
         st = popup_state(client, handle)
         add_tab(client, TRAVEL_MORE[2])

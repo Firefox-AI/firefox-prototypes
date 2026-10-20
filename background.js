@@ -16,7 +16,10 @@ const DEFAULT_SETTINGS = {
   joinDelayMs: 2000,    // §5.2 after-delay
   minClusterSize: 3,    // §3 minimum to create a new group (incl. trigger)
   threshold: 0.45,      // similarity threshold, same for JOIN and CREATE
+  feedbackMs: 5000,     // how long the moved-tab highlight and title flash last
 };
+
+const FLASH_PREFIX = "\u2726 "; // "✦ " in front of the group name while a tab lands
 
 const state = {
   settings: { ...DEFAULT_SETTINGS },
@@ -24,6 +27,8 @@ const state = {
   groupOrigin: {},           // groupId -> "sw" (user-made groups are simply absent)
   exclusions: {},            // tabId -> groupId: never auto-add this tab to that group again
   log: [],                   // last few actions, for the popup
+  lastMoved: null,           // { tabId, title, groupId, groupTitle, at } for the menu's "Show me"
+  unseenMoves: 0,            // toolbar badge count, cleared when the menu opens
 };
 
 const pendingNewTabs = new Set();   // created this session, waiting for first real load
@@ -53,10 +58,19 @@ async function load() {
         delete state.exclusions[id];
       }
     }
+    for (const g of await browser.tabGroups.query({})) {
+      if ((g.title || "").startsWith(FLASH_PREFIX)) {
+        await browser.tabGroups.update(g.id, { title: stripFlash(g.title) });
+      }
+    }
   } catch (e) {
     console.warn("[auto-grouping] prune failed", e);
   }
   await persist();
+}
+
+function stripFlash(title) {
+  return (title || "").startsWith(FLASH_PREFIX) ? title.slice(FLASH_PREFIX.length) : title || "";
 }
 
 function persist() {
@@ -168,10 +182,11 @@ async function process(tabId) {
   if (!isLooseCandidate(tab)) {
     return; // pinned, already grouped by the user, or not a web page
   }
-  const [groups, allTabs] = await Promise.all([
+  let [groups, allTabs] = await Promise.all([
     browser.tabGroups.query({ windowId: tab.windowId }),
     browser.tabs.query({ windowId: tab.windowId }),
   ]);
+  groups = groups.map(g => ({ ...g, title: stripFlash(g.title) }));
   const { threshold, minClusterSize } = state.settings;
 
   // JOIN: one tab is enough to join an existing group (§5.3).
@@ -186,6 +201,7 @@ async function process(tabId) {
     await revealGroup(fit.group.id);
     autoAdded.set(tab.id, fit.group.id);
     logAction(`Joined "${fit.group.title || "untitled group"}" (score ${fit.score.toFixed(2)})`);
+    announceMove(tab, fit.group);
     return;
   }
 
@@ -205,6 +221,7 @@ async function process(tabId) {
     await revealGroup(sameName.id);
     autoAdded.set(tab.id, sameName.id);
     logAction(`Joined "${sameName.title}" (same name as the proposed group)`);
+    announceMove(tab, sameName);
     return;
   }
 
@@ -235,6 +252,66 @@ async function revealGroup(groupId) {
     await browser.tabGroups.update(groupId, { collapsed: false });
   } catch (e) {
     console.warn("[auto-grouping] could not expand group", groupId, e);
+  }
+}
+
+// Make the landing visible: highlight the moved tab (without changing the
+// active tab), prefix the group name with a sparkle, record it for the menu,
+// and badge the toolbar button. Everything reverts after settings.feedbackMs.
+async function announceMove(tab, group) {
+  const ms = state.settings.feedbackMs;
+  state.lastMoved = { tabId: tab.id, title: tab.title, groupId: group.id, groupTitle: group.title || "", at: Date.now() };
+  state.unseenMoves += 1;
+  setBadge();
+  try {
+    const fresh = await browser.tabs.get(tab.id);
+    if (!fresh.active) {
+      await browser.tabs.update(tab.id, { highlighted: true, active: false });
+      setTimeout(() => browser.tabs.update(tab.id, { highlighted: false }).catch(() => {}), ms);
+    }
+  } catch (e) {
+    // tab gone
+  }
+  try {
+    const live = await browser.tabGroups.get(group.id);
+    const original = stripFlash(live.title);
+    const flashed = FLASH_PREFIX + original;
+    await browser.tabGroups.update(group.id, { title: flashed });
+    setTimeout(async () => {
+      try {
+        const now = await browser.tabGroups.get(group.id);
+        if (now.title === flashed) {
+          await browser.tabGroups.update(group.id, { title: original });
+        }
+      } catch (e) {
+        // group gone
+      }
+    }, ms);
+  } catch (e) {
+    // group gone
+  }
+}
+
+function setBadge() {
+  const text = state.unseenMoves ? String(state.unseenMoves) : "";
+  browser.browserAction.setBadgeText({ text }).catch(() => {});
+  browser.browserAction.setBadgeBackgroundColor({ color: "#0062fa" }).catch(() => {});
+}
+
+async function showLastMoved() {
+  const m = state.lastMoved;
+  if (!m) {
+    return;
+  }
+  try {
+    const tab = await browser.tabs.get(m.tabId);
+    if (tab.groupId !== -1) {
+      await browser.tabGroups.update(tab.groupId, { collapsed: false });
+    }
+    await browser.tabs.update(tab.id, { active: true });
+    await browser.windows.update(tab.windowId, { focused: true });
+  } catch (e) {
+    state.lastMoved = null;
   }
 }
 
@@ -287,25 +364,47 @@ async function undoLastGroup() {
   state.lastCreatedGroupIds = state.lastCreatedGroupIds.filter(id => id !== group.id);
   delete state.groupOrigin[group.id];
   await persist();
-  logAction(`Undid group "${group.title || "untitled"}" (${tabs.length} tabs)`);
-  return group.title || "";
+  logAction(`Undid group "${stripFlash(group.title) || "untitled"}" (${tabs.length} tabs)`);
+  return stripFlash(group.title);
 }
 
 async function snapshot() {
   const group = await lastGroup();
   return {
     settings: state.settings,
-    undoTitle: group ? group.title || "Untitled group" : null,
+    undoTitle: group ? stripFlash(group.title) || "Untitled group" : null,
     undoCount: state.lastCreatedGroupIds.length,
     model: Classifier.status(),
     log: state.log,
+    lastMoved: await lastMovedInfo(),
   };
+}
+
+async function lastMovedInfo() {
+  const m = state.lastMoved;
+  if (!m) {
+    return null;
+  }
+  try {
+    const tab = await browser.tabs.get(m.tabId);
+    const group = tab.groupId !== -1 ? await browser.tabGroups.get(tab.groupId) : null;
+    return { title: tab.title, groupTitle: group ? stripFlash(group.title) : null, at: m.at, stillThere: !!group && group.id === m.groupId };
+  } catch (e) {
+    state.lastMoved = null;
+    return null;
+  }
 }
 
 browser.runtime.onMessage.addListener((msg, sender) => {
   switch (msg && msg.type) {
     case "getState":
+      if (msg.fromPopup && state.unseenMoves) {
+        state.unseenMoves = 0;
+        setBadge();
+      }
       return snapshot();
+    case "showLastMoved":
+      return showLastMoved().then(snapshot);
     case "setEnabled":
       return setEnabled(msg.enabled).then(snapshot);
     case "undo":
