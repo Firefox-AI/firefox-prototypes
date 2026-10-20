@@ -280,7 +280,8 @@ const Classifier = (() => {
 
   // Heuristic similarity in [0, 1].
   function heuristicSim(a, b) {
-    if (siteOf(a.url) && siteOf(a.url) === siteOf(b.url)) {
+    const ha = hostOf(a.url), hb = hostOf(b.url);
+    if (ha && ha === hb) {
       return 1;
     }
     const ca = categoryOf(a), cb = categoryOf(b);
@@ -288,7 +289,10 @@ const Classifier = (() => {
     if (ca && cb && ca === cb) {
       return 0.7 + 0.3 * jac;
     }
-    return jac >= 0.3 ? 0.6 : jac;
+    // Same registrable domain but a different host (mail. vs docs.google.com)
+    // is only a weak hint; alone it stays under the threshold.
+    const sameSite = siteOf(a.url) && siteOf(a.url) === siteOf(b.url);
+    return Math.max(jac >= 0.3 ? 0.6 : jac, sameSite ? 0.35 : 0);
   }
 
   // ---- public API ------------------------------------------------------------

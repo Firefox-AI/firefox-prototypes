@@ -25,8 +25,8 @@ same **lite** scope as the worktree build on branch `smart-auto-grouping`.
   (off keeps every group, just stops grouping new tabs; on resumes without
   regrouping existing loose tabs) and "Undo last group" (ungroups the most
   recent auto-made group in place; disabled when there is nothing to undo).
-- **Classifier.** Heuristic by default (same site, shared topic keywords, title
-  overlap). Click **Enable** in the menu to add on-device sentence embeddings
+- **Classifier.** Heuristic by default (same host, shared topic keywords, title
+  overlap; same domain on a different host is only a weak hint). Click **Enable** in the menu to add on-device sentence embeddings
   through Firefox's `trial.ml` API. The model is the one Nightly's own smart
   tab grouping uses for clustering: `Xenova/all-MiniLM-L6-v2` v0.1.0 q8 from
   the Mozilla model hub (Remote Settings feature `simple-text-embedder`, the
@@ -65,7 +65,7 @@ Permanent (your Nightly profile has `xpinstall.signatures.required = false`):
    ```bash
    cd /Users/joliehuang/FirefoxPrototype/extensions/smart-auto-grouping && web-ext build --overwrite-dest
    ```
-2. Drag `web-ext-artifacts/smart-auto-grouping-0.1.2.xpi` onto a Firefox window
+2. Drag `web-ext-artifacts/smart-auto-grouping-0.1.3.xpi` onto a Firefox window
    and accept the prompt (a prebuilt one is already there).
 
 The toolbar button is added to the overflow area by default. Pin it from the
