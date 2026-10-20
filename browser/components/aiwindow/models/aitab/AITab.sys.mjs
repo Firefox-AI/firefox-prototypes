@@ -1185,6 +1185,9 @@ export class AITab {
       // model.
       const budgetedText =
         text.length > perTabBudget ? text.slice(0, perTabBudget) : text;
+      lazy.console.debug(
+        `extracted ${text.length} chars from ${url} (${budgetedText.length} sent to model):\n${budgetedText}`
+      );
       const headLines = [`## ${heading}`, `URL: ${url}`];
       // Omit the Image: line when absent so the model never echoes an empty
       // value.
@@ -1199,6 +1202,9 @@ export class AITab {
     }
 
     if (rawText) {
+      lazy.console.debug(
+        `inline content ${rawText.length} chars (${Math.min(rawText.length, perTabBudget)} sent to model)`
+      );
       sourceParts.push(
         `${RAW_CONTENT_HEADING}\n\n${rawText.slice(0, perTabBudget)}`
       );
