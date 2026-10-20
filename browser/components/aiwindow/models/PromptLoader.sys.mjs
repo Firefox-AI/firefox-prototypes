@@ -37,6 +37,10 @@ ChromeUtils.defineESModuleGetters(lazy, {
 
 const CUSTOM_PROMPTS_PREF = "browser.smartwindow.customPrompts";
 const MODEL_CHOICE_PREF = "browser.smartwindow.firstrun.modelChoice";
+const AITAB_MODEL_OVERRIDE_PREF = "browser.smartwindow.aitab.modelOverride";
+const AITAB_ENDPOINT_OVERRIDE_PREF =
+  "browser.smartwindow.aitab.endpointOverride";
+const AITAB_APIKEY_OVERRIDE_PREF = "browser.smartwindow.aitab.apiKeyOverride";
 
 // Core modules that define the assistant; if either is missing
 // buildChatSystemPrompt throws rather than serve a partial prompt. Others are
@@ -502,7 +506,7 @@ export async function buildEngineForFeature(feature, opts = {}) {
   const modelChoiceId =
     opts.modelChoiceIdOverride ??
     Services.prefs.getStringPref(MODEL_CHOICE_PREF, "");
-  const { baseURL, apiKey } = openAIEngine.resolveEndpointConfig(modelChoiceId);
+  let { baseURL, apiKey } = openAIEngine.resolveEndpointConfig(modelChoiceId);
 
   // resolve the model to use for inference, this allows specific features to default to chat model
   let model = mainConfig.inference_model || mainConfig.model;
@@ -520,6 +524,16 @@ export async function buildEngineForFeature(feature, opts = {}) {
       modelChoiceIdOverride: opts.modelChoiceIdOverride,
     });
     model = chatConfig.inference_model || chatConfig.model;
+  }
+
+  const aitabModelOverride =
+    feature === MODEL_FEATURES.AITAB &&
+    Services.prefs.getStringPref(AITAB_MODEL_OVERRIDE_PREF, "");
+  if (aitabModelOverride) {
+    model = aitabModelOverride;
+    baseURL =
+      Services.prefs.getStringPref(AITAB_ENDPOINT_OVERRIDE_PREF, "") || baseURL;
+    apiKey = Services.prefs.getStringPref(AITAB_APIKEY_OVERRIDE_PREF, "");
   }
 
   const engine = await openAIEngine.build({
