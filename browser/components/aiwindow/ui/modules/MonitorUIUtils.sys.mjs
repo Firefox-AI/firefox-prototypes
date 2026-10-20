@@ -4,13 +4,26 @@
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  AITab: "moz-src:///browser/components/aiwindow/models/aitab/AITab.sys.mjs",
+  AITabStore:
+    "moz-src:///browser/components/aiwindow/ui/modules/AITabStore.sys.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
+  Conversation:
+    "moz-src:///browser/components/aiwindow/models/Conversation.sys.mjs",
+  getHeadingFont:
+    "moz-src:///browser/components/aiwindow/ui/modules/AITabHeadingFont.sys.mjs",
   MonitorAgent:
     "moz-src:///browser/components/aiwindow/models/agents/MonitorAgent.sys.mjs",
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
   Region: "resource://gre/modules/Region.sys.mjs",
   URILoadingHelper: "resource:///modules/URILoadingHelper.sys.mjs",
 });
+
+const AlertNotification = Components.Constructor(
+  "@mozilla.org/alert-notification;1",
+  "nsIAlertNotification",
+  "initWithObject"
+);
 
 const localization = new Localization(
   [
@@ -188,6 +201,12 @@ export const MonitorUIUtils = {
             weekday: monitor.schedule.weekday?.toString(),
           }
         : null,
+      smartPage: monitor.smartPage
+        ? {
+            url: monitor.smartPage.url,
+            createdAt: monitor.smartPage.createdAt,
+          }
+        : null,
     };
   },
 
@@ -340,4 +359,111 @@ export const MonitorUIUtils = {
     const homeRegion = lazy.Region.home?.toUpperCase();
     return Boolean(homeRegion && supportedRegions.includes(homeRegion));
   },
+
+  /**
+   * Builds a smart page from a task's pages as soon as the task is created,
+   * then notifies when it is ready. Clicking the notification opens the page.
+   * Spike: this runs once, at creation. The task's schedule is what the button
+   * promises will repeat.
+   *
+   * @param {object} options
+   * @param {string} options.monitorId - Task the page belongs to.
+   * @param {string} options.title - Task name, also the notification title.
+   * @param {string} [options.condition] - What the task was asked to watch.
+   * @param {string[]} options.watchUrls - Pages to build the smart page from.
+   * @param {string} [options.frequency] - "daily" or "weekly".
+   * @returns {Promise<void>}
+   */
+  async generateTaskSmartPage({
+    monitorId,
+    title,
+    condition,
+    watchUrls,
+    frequency,
+  }) {
+    const cadence = frequency === "weekly" ? "every week" : "every day";
+    const focus = [title, condition, `Write a page to reopen ${cadence}.`]
+      .filter(part => part?.trim())
+      .join("\n\n");
+    try {
+      lazy
+        .getHeadingFont()
+        .catch(error =>
+          console.error("Failed to prefetch the heading font", error)
+        );
+      const conversation = new lazy.Conversation();
+      const result = await lazy.AITab.generateAITab(
+        { urlList: watchUrls, focus, howInitiated: "chat" },
+        conversation
+      );
+      if (result.error) {
+        console.error("Failed to generate smart page:", result.error);
+        notifySmartPage(title, "The smart page could not be created.");
+        return;
+      }
+
+      const { context, convId, toolConvId, ...pageMetadata } = result.metadata;
+      const stored = await lazy.AITabStore.create({
+        convId: convId ?? conversation.id,
+        toolConvId,
+        slug: result.metadata.id,
+        title: result.metadata.title || title,
+        context,
+        components: { metadata: pageMetadata, surface: result.surface },
+      });
+      const url = lazy.AITab.buildViewerURL(stored.slug);
+      const createdAt = new Date().toISOString();
+      await lazy.MonitorAgent.setSmartPage(monitorId, { url, createdAt });
+      notifySmartPage(
+        result.metadata.title || title,
+        "Your smart page is ready.",
+        url
+      );
+    } catch (error) {
+      console.error("Failed to generate smart page:", error);
+      notifySmartPage(title, "The smart page could not be created.");
+    }
+  },
 };
+
+/**
+ * @param {string} title
+ * @param {string} text
+ * @param {string} [url] - Opened when the notification is clicked.
+ */
+function notifySmartPage(title, text, url) {
+  try {
+    const alertsService = Cc["@mozilla.org/alerts-service;1"].getService(
+      Ci.nsIAlertsService
+    );
+    const observer = {
+      observe: (_subject, topic) => {
+        if (topic === "alertclickcallback" && url) {
+          openSmartPage(url);
+        }
+      },
+    };
+    const alert = new AlertNotification({
+      name: `smart-page-${crypto.randomUUID()}`,
+      title: title || "Smart page",
+      text,
+      textClickable: !!url,
+    });
+    alertsService.showAlert(alert, observer);
+  } catch (error) {
+    console.error("Failed to show smart page notification", error);
+  }
+}
+
+/**
+ * @param {string} url
+ */
+function openSmartPage(url) {
+  const win = lazy.BrowserWindowTracker.getTopWindow({ private: false });
+  if (!win) {
+    return;
+  }
+  lazy.URILoadingHelper.openTrustedLinkIn(win, url, "tab", {
+    forceForeground: true,
+  });
+}

@@ -290,7 +290,44 @@ function sanitizeMonitorRecord(monitor, recoverInvalid = false) {
       monitor.initialSnapshot ?? null,
       recoverInvalid
     ),
+    ...smartPageFields(monitor.smartPage ?? null, recoverInvalid),
   };
+}
+
+/**
+ * A generated smart page is optional. Absent or corrupt data is left off the
+ * record so monitors stored before this field existed stay unchanged.
+ *
+ * @param {?object} smartPage
+ * @param {boolean} recoverInvalid
+ * @returns {{ smartPage?: { url: string, createdAt: string } }}
+ */
+function smartPageFields(smartPage, recoverInvalid) {
+  if (smartPage == null) {
+    return {};
+  }
+  try {
+    if (typeof smartPage !== "object" || Array.isArray(smartPage)) {
+      throw invalidField("smart page");
+    }
+    const url = stringField(smartPage.url, "smart page url");
+    const parsed = URL.parse(url);
+    if (parsed?.protocol !== "about:" || parsed.pathname !== "smartpage") {
+      throw invalidField("smart page url");
+    }
+    return {
+      smartPage: {
+        url,
+        createdAt: timestampField(smartPage.createdAt, "smart page timestamp"),
+      },
+    };
+  } catch (error) {
+    if (!recoverInvalid) {
+      throw error;
+    }
+    lazy.log.warn(`Discarding invalid stored smart page: ${error}`);
+    return {};
+  }
 }
 
 function wrapRequest(request) {

@@ -23,9 +23,15 @@ smartwindow-monitor-panel-result-match = Match
 smartwindow-monitor-panel-result-no-match = No match
 # Shown when the most recent check failed, so there is no match to report.
 smartwindow-monitor-panel-result-could-not-check = Couldn’t check
+# Shown on a smart page task instead of the match result.
+# Variables:
+#   $time (Number) - When the page was last generated, as a timestamp.
+smartwindow-monitor-panel-smart-page-created = Created { DATETIME($time, month: "short", day: "numeric", hour: "numeric", minute: "2-digit") }
 smartwindow-monitor-panel-create = Create new task
 # Panel title while the user is filling in the create form
 smartwindow-monitor-panel-create-title = Create new task
+# Panel title and create-form heading when the task generates a smart page
+smartwindow-monitor-panel-create-smart-page-title = Create smart page
 # Variables:
 #   $used (number) - How many tasks the user has
 #   $max (number) - The maximum number of tasks allowed
@@ -125,6 +131,9 @@ ai-tasks-alert-weekday-saturday =
 ## Alert Actions - Button labels for alert management
 
 ai-tasks-alert-create-button = Create task
+# Create-form button when the task generates a smart page on its schedule.
+ai-tasks-alert-create-smart-page-daily = Create daily smart page
+ai-tasks-alert-create-smart-page-weekly = Create weekly smart page
 ai-tasks-alert-cancel-button = Cancel
 ai-tasks-alert-save-button = Save changes
 ai-tasks-alert-delete-button =
