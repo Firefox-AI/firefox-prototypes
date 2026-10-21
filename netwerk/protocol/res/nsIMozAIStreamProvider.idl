@@ -1,0 +1,37 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#include "nsISupports.idl"
+
+interface nsIInputStream;
+interface nsIURI;
+
+[scriptable, uuid(80557271-8358-4de8-9af2-5a724da5af7b)]
+interface nsIMozAIStreamCallback : nsISupports
+{
+  void onStream(in nsIInputStream aStream,
+                in ACString aContentType,
+                in long long aContentLength);
+
+  void onError(in nsresult aStatus);
+};
+
+/**
+ * Provides the content of moz-ai:// URIs. Implemented by the front-end and
+ * registered under MOZ_AI_STREAM_PROVIDER_CONTRACTID, in every process that
+ * can load moz-ai:// URIs.
+ */
+[scriptable, uuid(821e0919-23d5-44e6-b477-1afccb08218c)]
+interface nsIMozAIStreamProvider : nsISupports
+{
+  /**
+   * Asynchronously resolves aURI. Exactly one of the callback methods is
+   * called, on the main thread.
+   */
+  void getStream(in nsIURI aURI, in nsIMozAIStreamCallback aCallback);
+};
+
+%{C++
+#define MOZ_AI_STREAM_PROVIDER_CONTRACTID "@mozilla.org/moz-ai/stream-provider;1"
+%}

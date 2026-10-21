@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import {
+  isAIFileURL,
   isSettingsURL,
   isSmartPageURL,
   isTasksURL,
@@ -45,7 +46,12 @@ export class AIChatContentParent extends JSWindowActorParent {
   isTrustedInternalURI(uri) {
     const url = URL.parse(uri.spec);
 
-    return isSettingsURL(url) || isTasksURL(url) || isSmartPageURL(url);
+    return (
+      isSettingsURL(url) ||
+      isTasksURL(url) ||
+      isSmartPageURL(url) ||
+      isAIFileURL(url)
+    );
   }
 
   dispatchMessageToChatContent(message) {

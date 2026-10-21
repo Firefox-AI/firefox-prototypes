@@ -3,6 +3,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 XPIDL_SOURCES += [
+    "nsIMozAIStreamProvider.idl",
     "nsIResProtocolHandler.idl",
     "nsISubstitutingProtocolHandler.idl",
 ]
@@ -11,6 +12,7 @@ XPIDL_MODULE = "necko_res"
 
 EXPORTS.mozilla.net += [
     "ExtensionProtocolHandler.h",
+    "MozAIProtocolHandler.h",
     "MozNewTabWallpaperProtocolHandler.h",
     "MozSrcProtocolHandler.h",
     "PageThumbProtocolHandler.h",
@@ -26,6 +28,7 @@ EXPORTS += [
 
 UNIFIED_SOURCES += [
     "ExtensionProtocolHandler.cpp",
+    "MozAIProtocolHandler.cpp",
     "MozNewTabWallpaperProtocolHandler.cpp",
     "MozSrcProtocolHandler.cpp",
     "nsResProtocolHandler.cpp",

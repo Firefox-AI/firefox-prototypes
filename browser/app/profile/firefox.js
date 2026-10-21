@@ -2475,6 +2475,9 @@ pref("browser.smartwindow.aitab.menus", true);
 pref("browser.smartwindow.aitab.menus", false);
 #endif
 
+// Lets the model store files per conversation, served at moz-ai:// URLs.
+pref("browser.smartwindow.files.enabled", false);
+
 // Smart Window Agent
 pref("browser.smartwindow.agent.enabled", true);
 pref("browser.smartwindow.agent.supportedRegions", "US,CA");

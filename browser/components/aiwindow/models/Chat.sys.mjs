@@ -25,6 +25,11 @@ import {
   SEARCH_THE_WEB,
   searchTheWebToolConfig,
   GET_SKILL,
+  FILES_PREF,
+  FILES_TOOLS,
+  WRITE_FILE,
+  READ_FILE,
+  LIST_FILES,
 } from "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs";
 import { runSearchTheWeb } from "moz-src:///browser/components/aiwindow/models/search/SearchWorkflow.sys.mjs";
 
@@ -140,6 +145,9 @@ export async function executeToolByName(
 const FEATURE_GATED_HANDLERS = new Map([
   [SEARCH_THE_WEB, runSearchTheWeb],
   [GENERATE_AITAB, runGenerateAiTab],
+  [WRITE_FILE, toolFns.writeFile],
+  [READ_FILE, toolFns.readFile],
+  [LIST_FILES, toolFns.listFiles],
 ]);
 
 /**
@@ -265,6 +273,9 @@ function filterFeatureGatedTools(tools, conversation) {
   }
   if (!Services.prefs.getBoolPref(AITAB_PREF, false)) {
     filtered = filtered.filter(t => !AITAB_TOOLS.has(t.function?.name));
+  }
+  if (!Services.prefs.getBoolPref(FILES_PREF, false)) {
+    filtered = filtered.filter(t => !FILES_TOOLS.has(t.function?.name));
   }
   return filtered;
 }

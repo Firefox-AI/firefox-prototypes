@@ -64,3 +64,19 @@ export function getSmartPageName(url) {
 export function isSmartPageURL(url) {
   return !!getSmartPageName(url);
 }
+
+// A conversation id, as minted by crypto.randomUUID().
+const AI_CONTEXT_ID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * A file stored by a conversation (moz-ai://[conversation id]/[path]). Like a
+ * generated page, its content is untrusted and it is only linked to when the
+ * conversation produced it.
+ *
+ * @param {?URL} url
+ * @returns {boolean}
+ */
+export function isAIFileURL(url) {
+  return url?.protocol === "moz-ai:" && AI_CONTEXT_ID_REGEX.test(url.hostname);
+}

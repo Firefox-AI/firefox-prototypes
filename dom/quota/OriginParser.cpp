@@ -135,7 +135,7 @@ void OriginParser::HandleScheme(const nsDependentCSubstring& aToken) {
       aToken.EqualsLiteral("indexeddb") ||
       (isFile = aToken.EqualsLiteral("file")) || aToken.EqualsLiteral("app") ||
       aToken.EqualsLiteral("resource") ||
-      aToken.EqualsLiteral("moz-extension") ||
+      aToken.EqualsLiteral("moz-extension") || aToken.EqualsLiteral("moz-ai") ||
       (isChrome = aToken.EqualsLiteral(kChromeOrigin)) ||
       aToken.EqualsLiteral("uuid")) {
     mScheme = aToken;

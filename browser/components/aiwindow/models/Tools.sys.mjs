@@ -49,6 +49,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   AITab: "moz-src:///browser/components/aiwindow/models/aitab/AITab.sys.mjs",
   AITabStore:
     "moz-src:///browser/components/aiwindow/ui/modules/AITabStore.sys.mjs",
+  AIFiles:
+    "moz-src:///browser/components/aiwindow/models/files/AIFiles.sys.mjs",
   getHeadingFont:
     "moz-src:///browser/components/aiwindow/ui/modules/AITabHeadingFont.sys.mjs",
   setTimeout: "resource://gre/modules/Timer.sys.mjs",
@@ -144,11 +146,16 @@ export const GET_NAVIGATION_INFO = "get_navigation_info";
 export const MANAGE_TABS = "manage_tabs";
 export const GET_SKILL = "get_skill";
 export const ADD_MEMORY = "add_memory";
+export const WRITE_FILE = "write_file";
+export const READ_FILE = "read_file";
+export const LIST_FILES = "list_files";
 
 // Tools gated behind a feature pref. Filtered out of the model's tool list
 // in Chat.sys.mjs when the pref is off.
 export const AITAB_PREF = "browser.smartwindow.aitab.enabled";
 export const AITAB_TOOLS = new Set([GENERATE_AITAB]);
+export const FILES_PREF = "browser.smartwindow.files.enabled";
+export const FILES_TOOLS = new Set([WRITE_FILE, READ_FILE, LIST_FILES]);
 export const SEARCH_QUERY_ENDPOINT_PREF =
   "browser.smartwindow.searchQuery.endpointURL";
 export const SEARCH_QUERY_APIKEY_PREF =
@@ -212,6 +219,9 @@ export const TOOLS = [
   SEARCH_THE_WEB,
   GET_SKILL,
   GENERATE_AITAB,
+  WRITE_FILE,
+  READ_FILE,
+  LIST_FILES,
 ];
 
 export const RUN_SEARCH_VERBATIM_QUERY_DESCRIPTION =
@@ -625,6 +635,65 @@ export const toolsConfig = [
           },
         },
         required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: WRITE_FILE,
+      description:
+        "Create or replace a file in the storage of this conversation. Files " +
+        "persist across turns and can be opened by the user in a tab: an HTML " +
+        "file is rendered as a web page, and can load the other files of the " +
+        "conversation with relative URLs. The result contains the URL token " +
+        "of the file, to link the user to it.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description:
+              'Relative path of the file, e.g. "index.html" or "data/notes.md".',
+          },
+          content: {
+            type: "string",
+            description: "The full content of the file, as text.",
+          },
+        },
+        required: ["path", "content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: READ_FILE,
+      description:
+        "Read a text file from the storage of this conversation, e.g. to " +
+        "revise a file written on an earlier turn.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "Relative path of the file.",
+          },
+        },
+        required: ["path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: LIST_FILES,
+      description:
+        "List the files in the storage of this conversation, with their " +
+        "sizes in bytes and their URL tokens.",
+      parameters: {
+        type: "object",
+        properties: {},
       },
     },
   },
@@ -1894,6 +1963,68 @@ export async function manageTabs(
   );
 }
 
+// Files are only readable through moz-ai URLs, so the model gets them as URL
+// tokens, which the chat restores into URLs it trusts as seen.
+function aiFileToken(conversation, path) {
+  const url = lazy.AIFiles.urlFor(conversation.id, path);
+  conversation.addSeenUrls([url]);
+  return conversation.convertUrlToToken(url);
+}
+
+/**
+ * @param {object} toolParams
+ * @param {string} toolParams.path
+ * @param {string} toolParams.content
+ * @param {ChatConversation} conversation
+ * @returns {Promise<string>}
+ */
+export async function writeFile({ path, content }, conversation) {
+  try {
+    const { size } = await lazy.AIFiles.writeFile(
+      conversation.id,
+      path,
+      content ?? ""
+    );
+    const token = aiFileToken(conversation, path);
+    return `The file ${path} was saved (${size} bytes). Link the user to it as [${path}](§url_token: ${token}§) if it is meant to be opened.`;
+  } catch (e) {
+    lazy.console.error("[Tool] write_file failed", e);
+    return `The file ${path} could not be saved: ${e.message}`;
+  }
+}
+
+/**
+ * @param {object} toolParams
+ * @param {string} toolParams.path
+ * @param {ChatConversation} conversation
+ * @returns {Promise<string>}
+ */
+export async function readFile({ path }, conversation) {
+  try {
+    return await lazy.AIFiles.readTextFile(conversation.id, path);
+  } catch (e) {
+    return `The file ${path} could not be read: ${e.message}`;
+  }
+}
+
+/**
+ * @param {object} _toolParams
+ * @param {ChatConversation} conversation
+ * @returns {Promise<Array<{path: string, size: number, url: string}>|string>}
+ */
+export async function listFiles(_toolParams, conversation) {
+  try {
+    const files = await lazy.AIFiles.listFiles(conversation.id);
+    return files.map(({ path, size }) => ({
+      path,
+      size,
+      url: `§url_token: ${aiFileToken(conversation, path)}§`,
+    }));
+  } catch (e) {
+    return `The files could not be listed: ${e.message}`;
+  }
+}
+
 export const toolFns = {
   getOpenTabs,
   searchBrowsingHistory,
@@ -1903,4 +2034,7 @@ export const toolFns = {
   manageTabs,
   addMemory,
   getSkill,
+  writeFile,
+  readFile,
+  listFiles,
 };

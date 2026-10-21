@@ -11,6 +11,7 @@ import {
 } from "chrome://browser/content/aiwindow/modules/ChatMarkdownParser.mjs";
 import { dispatchClientError } from "chrome://browser/content/aiwindow/modules/ClientErrorTelemetry.mjs";
 import {
+  isAIFileURL,
   isSettingsURL,
   isSmartPageURL,
 } from "chrome://browser/content/aiwindow/modules/TrustedInternalURLs.mjs";
@@ -305,11 +306,12 @@ export class AIChatMessage extends MozLitElement {
     for (const anchor of root.querySelectorAll("a[href]")) {
       const parsed = URL.parse(anchor.href);
 
-      // Settings pages are always trusted; a generated page only when this
-      // conversation produced it.
+      // Settings pages are always trusted; a generated page or a file only
+      // when this conversation produced it.
       if (
         isSettingsURL(parsed) ||
-        (isSmartPageURL(parsed) && this.seenUrls.has(anchor.href))
+        ((isSmartPageURL(parsed) || isAIFileURL(parsed)) &&
+          this.seenUrls.has(anchor.href))
       ) {
         continue;
       }

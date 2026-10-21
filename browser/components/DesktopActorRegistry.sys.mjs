@@ -17,6 +17,15 @@ ChromeUtils.defineESModuleGetters(lazy, {
  * available at https://firefox-source-docs.mozilla.org/dom/ipc/jsactors.html
  */
 let JSPROCESSACTORS = {
+  AIFiles: {
+    parent: {
+      esModuleURI:
+        "moz-src:///browser/components/aiwindow/models/files/AIFilesParent.sys.mjs",
+    },
+    remoteTypes: ["webIsolated"],
+    safeForUntrustedWebProcess: true,
+  },
+
   // Miscellaneous stuff that needs to be initialized per process.
   BrowserProcess: {
     child: {
