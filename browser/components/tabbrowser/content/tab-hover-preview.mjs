@@ -619,7 +619,7 @@ class TabPanel extends HoverPanel {
 
     const userContextId = this.#tab?.userContextId;
     const identity = userContextId
-      ? lazy.ContextualIdentityService.getPublicIdentityFromId(userContextId)
+      ? lazy.ContextualIdentityService.getDisplayedIdentityFromId(userContextId)
       : null;
     if (!identity) {
       indicator.hidden = true;

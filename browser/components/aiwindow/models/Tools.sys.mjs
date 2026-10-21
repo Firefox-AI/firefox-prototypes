@@ -51,6 +51,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/AITabStore.sys.mjs",
   AIAddons:
     "moz-src:///browser/components/aiwindow/models/files/AIAddons.sys.mjs",
+  AIBrowse:
+    "moz-src:///browser/components/aiwindow/models/browse/AIBrowse.sys.mjs",
   AIFiles:
     "moz-src:///browser/components/aiwindow/models/files/AIFiles.sys.mjs",
   getHeadingFont:
@@ -152,6 +154,15 @@ export const WRITE_FILE = "write_file";
 export const READ_FILE = "read_file";
 export const LIST_FILES = "list_files";
 export const INSTALL_ADDON = "install_addon";
+export const BROWSE_OPEN = "browse_open";
+export const BROWSE_SNAPSHOT = "browse_snapshot";
+export const BROWSE_CLICK = "browse_click";
+export const BROWSE_TYPE = "browse_type";
+export const BROWSE_SCROLL = "browse_scroll";
+export const BROWSE_BACK = "browse_back";
+export const BROWSE_READ = "browse_read";
+export const BROWSE_SET_VISIBLE = "browse_set_visible";
+export const BROWSE_CLOSE = "browse_close";
 
 // Tools gated behind a feature pref. Filtered out of the model's tool list
 // in Chat.sys.mjs when the pref is off.
@@ -161,6 +172,18 @@ export const FILES_PREF = "browser.smartwindow.files.enabled";
 export const FILES_TOOLS = new Set([WRITE_FILE, READ_FILE, LIST_FILES]);
 export const ADDONS_PREF = "browser.smartwindow.files.addons.enabled";
 export const ADDONS_TOOLS = new Set([INSTALL_ADDON]);
+export const BROWSE_PREF = "browser.smartwindow.browse.enabled";
+export const BROWSE_TOOLS = new Set([
+  BROWSE_OPEN,
+  BROWSE_SNAPSHOT,
+  BROWSE_CLICK,
+  BROWSE_TYPE,
+  BROWSE_SCROLL,
+  BROWSE_BACK,
+  BROWSE_READ,
+  BROWSE_SET_VISIBLE,
+  BROWSE_CLOSE,
+]);
 export const SEARCH_QUERY_ENDPOINT_PREF =
   "browser.smartwindow.searchQuery.endpointURL";
 export const SEARCH_QUERY_APIKEY_PREF =
@@ -228,6 +251,15 @@ export const TOOLS = [
   READ_FILE,
   LIST_FILES,
   INSTALL_ADDON,
+  BROWSE_OPEN,
+  BROWSE_SNAPSHOT,
+  BROWSE_CLICK,
+  BROWSE_TYPE,
+  BROWSE_SCROLL,
+  BROWSE_BACK,
+  BROWSE_READ,
+  BROWSE_SET_VISIBLE,
+  BROWSE_CLOSE,
 ];
 
 export const RUN_SEARCH_VERBATIM_QUERY_DESCRIPTION =
@@ -725,6 +757,136 @@ export const toolsConfig = [
           },
         },
         required: ["path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: BROWSE_OPEN,
+      description:
+        "Open a web page in this conversation's own browsing tab, which is hidden from the user unless made visible, and logged out of every site: it does not share cookies with the user. Returns the page's interactive elements, each with a uid to act on it.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: {
+            type: "string",
+            description: "The http or https URL to open, or a URL token.",
+          },
+        },
+        required: ["url"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: BROWSE_SNAPSHOT,
+      description:
+        "List the interactive elements of the page in the browsing tab again, e.g. after it changed by itself.",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: BROWSE_CLICK,
+      description:
+        "Click an element of the page in the browsing tab, by the uid of the latest snapshot. Returns the snapshot of the page afterwards.",
+      parameters: {
+        type: "object",
+        properties: {
+          uid: { type: "integer", description: "The uid of the element." },
+        },
+        required: ["uid"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: BROWSE_TYPE,
+      description:
+        "Replace the text of a text field, or choose the option of a select element, in the browsing tab. Returns the snapshot of the page afterwards.",
+      parameters: {
+        type: "object",
+        properties: {
+          uid: { type: "integer", description: "The uid of the element." },
+          text: {
+            type: "string",
+            description: "The text, or the label of the option to choose.",
+          },
+          submit: {
+            type: "boolean",
+            description: "Whether to press Enter afterwards.",
+          },
+        },
+        required: ["uid", "text"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: BROWSE_SCROLL,
+      description: "Scroll the page in the browsing tab by most of a screen.",
+      parameters: {
+        type: "object",
+        properties: {
+          direction: { type: "string", enum: ["up", "down"] },
+        },
+        required: ["direction"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: BROWSE_BACK,
+      description: "Go back to the previous page in the browsing tab.",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: BROWSE_READ,
+      description: "Read the text content of the page in the browsing tab.",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: BROWSE_SET_VISIBLE,
+      description:
+        "Show the browsing tab to the user and switch to it, or hide it again. Show it when the user asks to see what you are doing, or must act on the page themselves, e.g. to log in.",
+      parameters: {
+        type: "object",
+        properties: {
+          visible: { type: "boolean" },
+        },
+        required: ["visible"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: BROWSE_CLOSE,
+      description: "Close the browsing tab when the browsing is done.",
+      parameters: {
+        type: "object",
+        properties: {},
       },
     },
   },
@@ -2108,6 +2270,108 @@ export async function installAddon({ path }, conversation) {
   }
 }
 
+/**
+ * Describes a page of a browsing session to the model.
+ *
+ * @param {object} snapshot - See AIBrowse.snapshot.
+ * @param {ChatConversation} conversation
+ * @returns {string}
+ */
+function formatBrowseSnapshot(snapshot, conversation) {
+  if (snapshot.errorPage) {
+    return (
+      `The page could not be loaded, the tab shows the error page "${snapshot.title}". ` +
+      "Tell the user, or go back with browse_back."
+    );
+  }
+  conversation.addSeenUrls([snapshot.url]);
+  const lines = [
+    `Page: §url_token: ${conversation.convertUrlToToken(snapshot.url)}§`,
+    `Title: ${snapshot.title}`,
+    `Visible to the user: ${snapshot.visible ? "yes" : "no"}`,
+    `Scrolled: ${snapshot.scrollY} of ${Math.max(
+      0,
+      snapshot.scrollHeight - snapshot.viewportHeight
+    )} pixels`,
+    "Interactive elements, * marks those outside the viewport:",
+  ];
+  for (const e of snapshot.elements) {
+    let line = `[${e.uid}]${e.inViewport ? "" : "*"} ${e.role} "${e.label}"`;
+    if (e.type && e.type !== e.role) {
+      line += ` type=${e.type}`;
+    }
+    if (e.value) {
+      line += ` value="${e.value}"`;
+    }
+    if (e.checked) {
+      line += " checked";
+    }
+    if (e.disabled) {
+      line += " disabled";
+    }
+    lines.push(line);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Runs a browsing tool.
+ *
+ * @param {string} name - One of BROWSE_TOOLS.
+ * @param {object} params
+ * @param {ChatConversation} conversation
+ * @returns {Promise<string>}
+ */
+export async function browse(name, params, conversation) {
+  const id = conversation.id;
+  try {
+    switch (name) {
+      case BROWSE_OPEN:
+        return formatBrowseSnapshot(
+          await lazy.AIBrowse.open(id, params.url),
+          conversation
+        );
+      case BROWSE_SNAPSHOT:
+        return formatBrowseSnapshot(
+          await lazy.AIBrowse.snapshot(id),
+          conversation
+        );
+      case BROWSE_CLICK:
+        return formatBrowseSnapshot(
+          await lazy.AIBrowse.click(id, params.uid),
+          conversation
+        );
+      case BROWSE_TYPE:
+        return formatBrowseSnapshot(
+          await lazy.AIBrowse.type(id, params.uid, params.text, params.submit),
+          conversation
+        );
+      case BROWSE_SCROLL:
+        return formatBrowseSnapshot(
+          await lazy.AIBrowse.scroll(id, params.direction),
+          conversation
+        );
+      case BROWSE_BACK:
+        return formatBrowseSnapshot(await lazy.AIBrowse.back(id), conversation);
+      case BROWSE_READ:
+        return await lazy.AIBrowse.read(id);
+      case BROWSE_SET_VISIBLE:
+        if (params.visible) {
+          lazy.AIBrowse.show(id);
+        } else {
+          lazy.AIBrowse.hide(id);
+        }
+        return `The browsing tab is now ${params.visible ? "visible" : "hidden"}.`;
+      case BROWSE_CLOSE:
+        lazy.AIBrowse.close(id);
+        return "The browsing tab is closed.";
+    }
+    return `Unknown browsing tool: ${name}`;
+  } catch (e) {
+    return `${name} failed: ${e.message}`;
+  }
+}
+
 export const toolFns = {
   getOpenTabs,
   searchBrowsingHistory,
@@ -2121,4 +2385,5 @@ export const toolFns = {
   readFile,
   listFiles,
   installAddon,
+  browse,
 };

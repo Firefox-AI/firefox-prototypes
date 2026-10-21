@@ -240,6 +240,21 @@ let JSWINDOWACTORS = {
     enablePreference: "browser.aboutwelcome.enabled",
   },
 
+  AIBrowse: {
+    parent: {
+      esModuleURI:
+        "moz-src:///browser/components/aiwindow/models/browse/AIBrowseParent.sys.mjs",
+    },
+    child: {
+      esModuleURI:
+        "moz-src:///browser/components/aiwindow/models/browse/AIBrowseChild.sys.mjs",
+    },
+    matches: ["http://*/*", "https://*/*"],
+    messageManagerGroups: ["browsers"],
+    enablePreference: "browser.smartwindow.browse.enabled",
+    safeForUntrustedWebProcess: true,
+  },
+
   AIChatContent: {
     parent: {
       esModuleURI:

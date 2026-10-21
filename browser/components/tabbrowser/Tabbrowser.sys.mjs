@@ -909,7 +909,7 @@ export class Tabbrowser {
     }
 
     let identity =
-      lazy.ContextualIdentityService.getPublicIdentityFromId(userContextId);
+      lazy.ContextualIdentityService.getDisplayedIdentityFromId(userContextId);
     if (!identity) {
       replaceContainerClass("color", hbox, "");
       hbox.hidden = true;

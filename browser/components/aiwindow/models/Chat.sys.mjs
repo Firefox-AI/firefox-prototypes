@@ -33,6 +33,8 @@ import {
   ADDONS_PREF,
   ADDONS_TOOLS,
   INSTALL_ADDON,
+  BROWSE_PREF,
+  BROWSE_TOOLS,
 } from "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs";
 import { runSearchTheWeb } from "moz-src:///browser/components/aiwindow/models/search/SearchWorkflow.sys.mjs";
 
@@ -152,6 +154,10 @@ const FEATURE_GATED_HANDLERS = new Map([
   [READ_FILE, toolFns.readFile],
   [LIST_FILES, toolFns.listFiles],
   [INSTALL_ADDON, toolFns.installAddon],
+  ...[...BROWSE_TOOLS].map(name => [
+    name,
+    (params, conversation) => toolFns.browse(name, params, conversation),
+  ]),
 ]);
 
 /**
@@ -286,6 +292,9 @@ function filterFeatureGatedTools(tools, conversation) {
     );
   } else if (!Services.prefs.getBoolPref(ADDONS_PREF, false)) {
     filtered = filtered.filter(t => !ADDONS_TOOLS.has(t.function?.name));
+  }
+  if (!Services.prefs.getBoolPref(BROWSE_PREF, false)) {
+    filtered = filtered.filter(t => !BROWSE_TOOLS.has(t.function?.name));
   }
   return filtered;
 }
@@ -472,6 +481,11 @@ Object.assign(Chat, {
      */
     const isVerbatimQuery = currentTurn === 0;
     const chatToolsConfig = filterFeatureGatedTools(toolsConfig, conversation);
+    logConversationStream(
+      currentTurn,
+      "TOOLS",
+      chatToolsConfig.map(t => t.function?.name)
+    );
 
     let fullResponseText = "";
 

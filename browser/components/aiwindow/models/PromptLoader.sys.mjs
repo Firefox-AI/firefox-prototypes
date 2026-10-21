@@ -49,6 +49,33 @@ const REQUIRED_CHAT_MODULES = new Set(["identity", "response-rules"]);
 const GATED_CHAT_MODULES = new Map([
   ["pages", "browser.smartwindow.aitab.enabled"],
 ]);
+// Sections appended to the chat prompt while their pref is on, for tools that
+// have no Remote Settings module yet. Appended last so that they take
+// precedence over a published module that says these capabilities do not
+// exist. Same pref strings as in Tools.sys.mjs.
+const LOCAL_GATED_CHAT_SECTIONS = [
+  [
+    "browser.smartwindow.files.enabled",
+    `## Files
+This conversation has a file storage of its own. Use write_file, read_file and list_files to keep content across turns, or to build something the user can open, such as an HTML page. When you write a file meant to be opened, link the user to it with the URL token write_file returns.`,
+  ],
+  [
+    "browser.smartwindow.files.addons.enabled",
+    `## Extensions
+You can create Firefox extensions: write their files with write_file in a directory, then call install_addon with that directory. The user confirms the installation. If it fails, fix the files from the errors and call install_addon again.`,
+  ],
+  [
+    "browser.smartwindow.browse.enabled",
+    `## Browsing
+You have a browser tab of your own for this conversation, and you can open pages in it and act on them: browse_open, browse_snapshot, browse_click, browse_type, browse_scroll, browse_back, browse_read, browse_set_visible and browse_close. This overrides anything above saying that you cannot open pages, navigate or open tabs.
+- When the user asks to open, visit or go to a page, or to do something on a website, use browse_open, not search_the_web.
+- Act on the page with the uids of the latest snapshot. Use browse_read to read the page.
+- The tab is hidden. When the user asks to see it, call browse_set_visible with visible set to true.
+- When the user is looking at a tab in an "AI-Task" container, the browsing tools act on that tab, whichever conversation opened it. If the user asks you to do something in the tab they see, start with browse_snapshot.
+- Never say that you opened, showed or did something in a tab unless a browsing tool did it.`,
+  ],
+];
+
 // Browser-context fragments predate its params manifest. Without one at this
 // build's major, read the legacy 1.x "tab" fragment, which builds that do not
 // render `{#key}...{/key}` sections also read.
@@ -255,6 +282,12 @@ export async function buildChatSystemPrompt(model) {
       const err = new Error(`Missing required chat module: ${entry.name}`);
       err.clientReason = "promptLoadFailure";
       throw err;
+    }
+  }
+
+  for (const [pref, text] of LOCAL_GATED_CHAT_SECTIONS) {
+    if (Services.prefs.getBoolPref(pref, false)) {
+      sections.push(text);
     }
   }
 

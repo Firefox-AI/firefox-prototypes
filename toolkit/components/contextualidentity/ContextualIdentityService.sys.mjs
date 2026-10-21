@@ -484,6 +484,86 @@ _ContextualIdentityService.prototype = {
     );
   },
 
+  /**
+   * Returns the private identity with the given name, creating it if needed.
+   * Private identities are not offered to the user, but the UI shows the name,
+   * color and icon of the tabs of one that has a color and an icon.
+   *
+   * @param {string} name
+   * @param {object} [options]
+   * @param {string} [options.color] - One of containerColors.
+   * @param {string} [options.icon] - One of containerIcons.
+   */
+  getOrCreatePrivateIdentity(name, { color = "", icon = "" } = {}) {
+    this.ensureDataReady();
+
+    let identity = this._identities.find(
+      i => !i.public && !i.policy && i.name == name
+    );
+    if (identity) {
+      if (identity.color != color || identity.icon != icon) {
+        identity.color = color;
+        identity.icon = icon;
+        this.saveSoon();
+      }
+      return Cu.cloneInto(identity, {});
+    }
+
+    if (this._systemIdentities.some(i => i.name == name)) {
+      throw new Error(`'${name}' is reserved`);
+    }
+
+    let userContextId = ++this._lastUserContextId;
+    if (userContextId >= MAX_USER_CONTEXT_ID) {
+      throw new Error(
+        `Unable to create a new userContext with id '${userContextId}'`
+      );
+    }
+
+    identity = {
+      userContextId,
+      public: false,
+      icon,
+      color,
+      name,
+      accessKey: "",
+    };
+
+    this._identities.push(identity);
+    this.saveSoon();
+
+    return Cu.cloneInto(identity, {});
+  },
+
+  /**
+   * Removes a private identity created by getOrCreatePrivateIdentity, and
+   * all its data.
+   *
+   * @param {number} userContextId
+   * @returns {boolean} Whether the identity existed.
+   */
+  removePrivateIdentity(userContextId) {
+    this.ensureDataReady();
+
+    let index = this._identities.findIndex(
+      i =>
+        i.userContextId == userContextId &&
+        !i.public &&
+        !i.policy &&
+        !this._systemIdentities.some(s => s.name == i.name)
+    );
+    if (index == -1) {
+      return false;
+    }
+
+    Services.clearData.deleteDataFromOriginAttributesPattern({ userContextId });
+    this._identities.splice(index, 1);
+    this._openedIdentities.delete(userContextId);
+    this.saveSoon();
+
+    return true;
+  },
+
   update(userContextId, name, icon, color) {
     this.ensureDataReady();
 
@@ -870,8 +950,27 @@ _ContextualIdentityService.prototype = {
     return "";
   },
 
+  /**
+   * Returns the identity whose name, color and icon the UI shows for the tabs
+   * of a userContextId: a public identity, or a private one with a color and
+   * an icon.
+   *
+   * @param {number} userContextId
+   */
+  getDisplayedIdentityFromId(userContextId) {
+    this.ensureDataReady();
+    return Cu.cloneInto(
+      this._identities.find(
+        info =>
+          info.userContextId == userContextId &&
+          (info.public || (info.color && info.icon))
+      ),
+      {}
+    );
+  },
+
   getUserContextLabel(userContextId) {
-    let identity = this.getPublicIdentityFromId(userContextId);
+    let identity = this.getDisplayedIdentityFromId(userContextId);
     if (!identity) {
       return "";
     }
@@ -944,7 +1043,7 @@ _ContextualIdentityService.prototype = {
     }
 
     let userContextId = tab.getAttribute("usercontextid");
-    let identity = this.getPublicIdentityFromId(userContextId);
+    let identity = this.getDisplayedIdentityFromId(userContextId);
 
     /* Remove any existing container color/icon classes. */
     for (let className of [...tab.classList]) {

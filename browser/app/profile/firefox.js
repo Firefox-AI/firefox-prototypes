@@ -2483,6 +2483,8 @@ pref("browser.smartwindow.files.addons.enabled", true);
 #else
 pref("browser.smartwindow.files.addons.enabled", false);
 #endif
+// Lets the model browse in a tab of its own, per conversation.
+pref("browser.smartwindow.browse.enabled", false);
 
 // Smart Window Agent
 pref("browser.smartwindow.agent.enabled", true);

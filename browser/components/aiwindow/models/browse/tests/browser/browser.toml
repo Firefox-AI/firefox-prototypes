@@ -1,0 +1,8 @@
+[DEFAULT]
+support-files = [
+  "file_form.html",
+  "file_second.html",
+]
+prefs = ["browser.smartwindow.browse.enabled=true"]
+
+["browser_ai_browse.js"]
