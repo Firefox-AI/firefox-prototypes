@@ -31,6 +31,8 @@ import {
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
+  AIWindow:
+    "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
   MonitorAgent:
     "moz-src:///browser/components/aiwindow/models/agents/MonitorAgent.sys.mjs",
   MonitorUIUtils:
@@ -734,10 +736,7 @@ export class AgentUI {
     window,
     isFullPage = false,
   }) {
-    if (
-      !lazy.MonitorUIUtils.isMonitorRegionSupported() ||
-      !Services.prefs.getBoolPref(PREF_AGENT_ENABLED, false)
-    ) {
+    if (!this.#isAgentCommandAvailable()) {
       return false;
     }
 
@@ -770,6 +769,36 @@ export class AgentUI {
     });
 
     return true;
+  }
+
+  /**
+   * Whether agent commands such as /watch can run, from the
+   * smartWindowAgentWatch rollout prefs (enabled and supportedRegions)
+   *
+   * @returns {boolean}
+   */
+  static #isAgentCommandAvailable() {
+    return (
+      Services.prefs.getBoolPref(PREF_AGENT_ENABLED, false) &&
+      lazy.MonitorUIUtils.isMonitorRegionSupported()
+    );
+  }
+
+  /**
+   * Whether a page can be handed to /watch from an entry point outside the
+   * smartbar, such as the page context menu or the smart cursor. Uses the
+   * same availability check as /watch itself.
+   *
+   * @param {ChromeWindow} win - The window showing the page
+   * @param {string} url - The page URL
+   * @returns {boolean}
+   */
+  static canWatchPage(win, url) {
+    return (
+      lazy.AIWindow.isAIWindowActiveAndEnabled(win) &&
+      this.#isAgentCommandAvailable() &&
+      lazy.isAllowedWatchUrl(url)
+    );
   }
 
   /**

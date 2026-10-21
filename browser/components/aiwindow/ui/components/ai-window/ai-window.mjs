@@ -2231,6 +2231,34 @@ export class AIWindow extends MozLitElement {
   }
 
   /**
+   * Runs an agent command as if it were typed in the smartbar, for entry
+   * points outside it such as the page context menu and the smart cursor
+   *
+   * @param {object} options
+   * @param {string} options.command - Command id from AGENT_COMMANDS
+   * @param {string} options.contextPageUrl - Page URL to seed the agent with
+   * @returns {boolean} True when the command was handled, false while a reply
+   *   is still streaming, matching the smartbar
+   */
+  runAgentCommand({ command, contextPageUrl }) {
+    if (this.isGenerating) {
+      return false;
+    }
+    const handled = lazy.AgentUI.tryHandleCommand({
+      command,
+      value: `/${command}`,
+      contextPageUrl,
+      conversation: this.#conversation,
+      window: this.#topChromeWindow,
+      isFullPage: this.mode === MODE.FULLPAGE,
+    });
+    if (handled && !this.classList.contains("chat-active")) {
+      this.#initActiveChatlayout();
+    }
+    return handled;
+  }
+
+  /**
    * @param {object} options
    * @param {string} options.text
    * @param {ChatSubmitType} options.submitType - How the request was submitted

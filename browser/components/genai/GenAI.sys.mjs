@@ -14,6 +14,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
   AIWindowUI:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowUI.sys.mjs",
+  AGENT_COMMANDS: "chrome://browser/content/aiwindow/modules/AgentCommands.mjs",
+  AgentUI: "moz-src:///browser/components/aiwindow/ui/modules/AgentUI.sys.mjs",
   ASRouterTargeting: "resource:///modules/asrouter/ASRouterTargeting.sys.mjs",
   ContentAnalysisUtils: "resource://gre/modules/ContentAnalysisUtils.sys.mjs",
   E10SUtils: "resource://gre/modules/E10SUtils.sys.mjs",
@@ -673,6 +675,23 @@ export const GenAI = {
       };
 
       const browser = document.documentGlobal.gBrowser.selectedBrowser;
+      const pageUrl = browser.currentURI.spec;
+      if (
+        !panel.selectionData.inputType &&
+        lazy.AgentUI.canWatchPage(document.defaultView, pageUrl)
+      ) {
+        const watchButton = addItem();
+        document.l10n.setAttributes(watchButton, "genai-shortcuts-watch-page");
+        watchButton.toggleAttribute(
+          "disabled",
+          this.isSmartWindowGenerating(document.defaultView)
+        );
+        watchButton.addEventListener("command", () => {
+          panel.hide();
+          this.handleWatchPage(document.defaultView, pageUrl);
+        });
+      }
+
       const context = await this.addAskChatItems(
         browser,
         panel.selectionData,
@@ -1610,6 +1629,48 @@ export const GenAI = {
   },
 
   /**
+   * Opens the Smart Window sidebar and runs /watch for the page, which shows
+   * the monitor creation card
+   *
+   * @param {ChromeWindow} win - The Smart Window
+   * @param {string} pageUrl - The page to watch
+   */
+  async handleWatchPage(win, pageUrl) {
+    const aiWindowEl = await this.openSmartWindowSidebar(win);
+    aiWindowEl?.runAgentCommand({
+      command: lazy.AGENT_COMMANDS.WATCH,
+      contextPageUrl: pageUrl,
+    });
+  },
+
+  /**
+   * Whether the Smart Window sidebar is still streaming a reply, while /watch
+   * can't be added to its conversation
+   *
+   * @param {ChromeWindow} win - The Smart Window
+   * @returns {boolean}
+   */
+  isSmartWindowGenerating(win) {
+    const aiBrowser = win.document.getElementById(lazy.AIWindowUI.BROWSER_ID);
+    return !!aiBrowser?.contentDocument?.querySelector("ai-window:defined")
+      ?.isGenerating;
+  },
+
+  /**
+   * Opens the Smart Window sidebar if it's closed
+   *
+   * @param {ChromeWindow} win - The Smart Window
+   * @returns {Promise<?Element>} The sidebar's ai-window element
+   */
+  async openSmartWindowSidebar(win) {
+    if (!lazy.AIWindowUI.isSidebarOpen(win)) {
+      const activeConversation = lazy.AIWindow.getActiveConversation(win);
+      await lazy.AIWindowUI.openSidebar(win, activeConversation ?? undefined);
+    }
+    return lazy.AIWindowUI._getSidebarAiWindow(win);
+  },
+
+  /**
    * Handle selected prompt by opening tab or sidebar.
    *
    * @param {object} promptObj to convert to string
@@ -1650,11 +1711,7 @@ export const GenAI = {
     // In Smart Window, send selected text or page URL with prompt label to the
     // assistant
     if (lazy.AIWindow.isAIWindowActive(win)) {
-      if (!lazy.AIWindowUI.isSidebarOpen(win)) {
-        const activeConversation = lazy.AIWindow.getActiveConversation(win);
-        await lazy.AIWindowUI.openSidebar(win, activeConversation ?? undefined);
-      }
-      const aiWindowEl = lazy.AIWindowUI._getSidebarAiWindow(win);
+      const aiWindowEl = await this.openSmartWindowSidebar(win);
       if (aiWindowEl) {
         // TODO (Bug 2048401): Revisit prompt construction once Smart Window prompt definitions
         // are finalized via Remote Settings.

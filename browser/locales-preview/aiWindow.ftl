@@ -362,6 +362,17 @@ main-context-menu-create-aitab =
     .label = Create { -smart-page-brand-name }
     .accesskey = C
 
+# Page context menu entry that opens the Smart Window sidebar with /watch for
+# the current page.
+main-context-menu-watch-page =
+    .label = Watch this page
+    .accesskey = W
+
+# Smart cursor Ask panel entry that opens the Smart Window sidebar with /watch
+# for the current page.
+genai-shortcuts-watch-page =
+    .label = Watch this page
+
 # Tab context menu entry that builds a generated page from the tabs the menu
 # was opened on.
 tab-context-create-aitab =

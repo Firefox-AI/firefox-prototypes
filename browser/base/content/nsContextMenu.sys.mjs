@@ -9,6 +9,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
   AIWindowMenu:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowMenu.sys.mjs",
+  AgentUI: "moz-src:///browser/components/aiwindow/ui/modules/AgentUI.sys.mjs",
   BrowserSearchTelemetry:
     "moz-src:///browser/components/search/BrowserSearchTelemetry.sys.mjs",
   BrowserUtils: "resource://gre/modules/BrowserUtils.sys.mjs",
@@ -931,6 +932,17 @@ export class nsContextMenu {
       showItem: this.showItem.bind(this),
       source: "page",
     });
+    const canWatchPage =
+      !this.onLink &&
+      !this.onImage &&
+      !this.onTextInput &&
+      lazy.AgentUI.canWatchPage(this.window, this.browser.currentURI.spec);
+    this.showItem("context-watch-page", canWatchPage);
+    this.setItemAttr(
+      "context-watch-page",
+      "disabled",
+      canWatchPage && lazy.GenAI.isSmartWindowGenerating(this.window)
+    );
     this.showItem(
       "context-create-aitab",
       lazy.AIWindowMenu.canShowAITabMenu(this.window, [this.browser.currentURI])
@@ -2657,6 +2669,10 @@ export class nsContextMenu {
       dest = "tab";
     }
     this.window.openTrustedLinkIn(drmInfoURL, dest);
+  }
+
+  watchPage() {
+    lazy.GenAI.handleWatchPage(this.window, this.browser.currentURI.spec);
   }
 
   createAITab() {

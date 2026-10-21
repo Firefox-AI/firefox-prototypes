@@ -218,6 +218,9 @@ document.addEventListener(
         case "context-create-aitab":
           gContextMenu.createAITab();
           break;
+        case "context-watch-page":
+          gContextMenu.watchPage();
+          break;
         case "context-showonlythisframe":
           gContextMenu.showOnlyThisFrame();
           break;
