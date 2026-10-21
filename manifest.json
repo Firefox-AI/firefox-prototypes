@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Smart Window Auto Grouping (prototype)",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Prototype of Smart Window auto grouping as a WebExtension: new tabs join a matching tab group or form a new group once three related tabs are open. Passive by default, with a toolbar menu to turn it off or undo the last group.",
   "browser_specific_settings": {
     "gecko": {

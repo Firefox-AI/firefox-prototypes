@@ -19,7 +19,9 @@ same **lite** scope as the worktree build on branch `smart-auto-grouping`.
   unnamed 0.123. The best group wins; the tab moves to its end and the group
   expands if it was collapsed. The moved tab carries the multi-select
   highlight and the group name reads "✦ Travel" until you click into that
-  tab (or close it, or move it out), then both revert. The toolbar
+  tab (or close it, or move it out), then both revert. A tab that was already
+  in the foreground when it joined gets the sparkle too; it clears the next
+  time you click into that tab. The toolbar
   button shows a badge until you open the menu, where a "Last moved" row names
   the tab and group with a **Show me** button that jumps to it. One tab is
   enough to join. Works for user-made groups too.
@@ -74,7 +76,7 @@ Permanent (your Nightly profile has `xpinstall.signatures.required = false`):
    ```bash
    cd /Users/joliehuang/FirefoxPrototype/extensions/smart-auto-grouping && web-ext build --overwrite-dest
    ```
-2. Drag `web-ext-artifacts/smart-auto-grouping-0.2.1.xpi` onto a Firefox window
+2. Drag `web-ext-artifacts/smart-auto-grouping-0.2.2.xpi` onto a Firefox window
    and accept the prompt (a prebuilt one is already there).
 
 The toolbar button is added to the overflow area by default. Pin it from the
@@ -95,7 +97,7 @@ extensions (puzzle) menu so it sits next to the tab strip.
 **Advanced** in the menu exposes the delay, minimum cluster size and the
 similarity threshold (0.45 default; raise it if groups feel too eager).
 
-## Test (19 checks, all passing on Nightly 160, 2026-10-20)
+## Test (21 checks, all passing on Nightly 160, 2026-10-20)
 
 ```bash
 cd /Users/joliehuang/FirefoxPrototype/worktrees/smart-auto-grouping

@@ -393,6 +393,28 @@ def main():
                bool(moved) and moved["selected"] and not moved["multiselected"] and travel_raw == "Travel",
                json.dumps({"selected": moved and moved["selected"], "multiselected": moved and moved["multiselected"], "label": travel_raw}))
         activate_tab(client, RECIPES[0])  # leave the moved tab again before the next steps
+        # Foreground join: the tab is selected while it joins; sparkle must still show.
+        chrome(client, """
+          const [url] = arguments;
+          const t = gBrowser.addTab(url, { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(), inBackground: false });
+          t.setAttribute("data-e2e", url);
+        """, TRAVEL_MORE[1])
+        wait_loaded(client, [TRAVEL_MORE[1]])
+        fg = wait_for(lambda: (lambda t: t and t["group"] == "Travel")(find(client, TRAVEL_MORE[1])), 25)
+        time.sleep(1)
+        travel_raw = next((g["rawLabel"] for g in groups(client) if g["label"] == "Travel"), None)
+        record("feedback: foreground tab that joins still shows the sparkle",
+               bool(fg) and find(client, TRAVEL_MORE[1])["selected"] and travel_raw == "\u2726 Travel",
+               json.dumps({"selected": find(client, TRAVEL_MORE[1])["selected"], "label": travel_raw}))
+        activate_tab(client, RECIPES[0])
+        time.sleep(0.5)
+        activate_tab(client, TRAVEL_MORE[1])
+        time.sleep(1)
+        travel_raw = next((g["rawLabel"] for g in groups(client) if g["label"] == "Travel"), None)
+        record("feedback: switching away and back clears it", travel_raw == "Travel", json.dumps({"label": travel_raw}))
+        close_tab(client, TRAVEL_MORE[1])
+        activate_tab(client, RECIPES[0])
+        time.sleep(1)
 
         # ---- cancel on close ---------------------------------------------------------------
         add_tab(client, TRAVEL_MORE[1])

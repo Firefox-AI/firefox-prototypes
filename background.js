@@ -26,7 +26,7 @@ const state = {
   groupOrigin: {},           // groupId -> "sw" (user-made groups are simply absent)
   exclusions: {},            // tabId -> groupId: never auto-add this tab to that group again
   log: [],                   // last few actions, for the popup
-  lastMoved: null,           // { tabId, title, groupId, groupTitle, at } for the menu's "Show me"
+  recentMoves: [],           // newest first: { tabId, title, groupId, groupTitle, at } for the menu's "Show me"
   unseenMoves: 0,            // toolbar badge count, cleared when the menu opens
 };
 
@@ -266,7 +266,8 @@ async function revealGroup(groupId) {
 // and badge the toolbar button. Highlight and prefix stay until the user
 // clicks into the moved tab (or closes it, or moves it out of the group).
 async function announceMove(tab, group) {
-  state.lastMoved = { tabId: tab.id, title: tab.title, groupId: group.id, groupTitle: group.title || "", at: Date.now() };
+  state.recentMoves.unshift({ tabId: tab.id, title: tab.title, groupId: group.id, groupTitle: group.title || "", at: Date.now() });
+  state.recentMoves = state.recentMoves.slice(0, 10);
   state.unseenMoves += 1;
   setBadge();
   let fresh;
@@ -275,11 +276,12 @@ async function announceMove(tab, group) {
   } catch (e) {
     return; // tab gone
   }
-  if (fresh.active) {
-    return; // the user is already looking at it
-  }
   pendingVisits.set(tab.id, group.id);
-  await browser.tabs.update(tab.id, { highlighted: true, active: false }).catch(() => {});
+  if (!fresh.active) {
+    await browser.tabs.update(tab.id, { highlighted: true, active: false }).catch(() => {});
+  }
+  // A tab that is already in the foreground still gets the sparkle; it clears
+  // the next time the user clicks into that tab (after switching away).
   if (!flashedTitles.has(group.id)) {
     try {
       const live = await browser.tabGroups.get(group.id);
@@ -328,21 +330,31 @@ function setBadge() {
   browser.browserAction.setBadgeBackgroundColor({ color: "#0062fa" }).catch(() => {});
 }
 
+// Newest move whose tab still exists; drops entries for closed tabs.
+async function latestMove() {
+  while (state.recentMoves.length) {
+    const m = state.recentMoves[0];
+    try {
+      const tab = await browser.tabs.get(m.tabId);
+      return { m, tab };
+    } catch (e) {
+      state.recentMoves.shift();
+    }
+  }
+  return null;
+}
+
 async function showLastMoved() {
-  const m = state.lastMoved;
-  if (!m) {
+  const latest = await latestMove();
+  if (!latest) {
     return;
   }
-  try {
-    const tab = await browser.tabs.get(m.tabId);
-    if (tab.groupId !== -1) {
-      await browser.tabGroups.update(tab.groupId, { collapsed: false });
-    }
-    await browser.tabs.update(tab.id, { active: true });
-    await browser.windows.update(tab.windowId, { focused: true });
-  } catch (e) {
-    state.lastMoved = null;
+  const { tab } = latest;
+  if (tab.groupId !== -1) {
+    await browser.tabGroups.update(tab.groupId, { collapsed: false }).catch(() => {});
   }
+  await browser.tabs.update(tab.id, { active: true }).catch(() => {});
+  await browser.windows.update(tab.windowId, { focused: true }).catch(() => {});
 }
 
 async function moveToEndOfGroup(tabId, groupId) {
@@ -411,18 +423,13 @@ async function snapshot() {
 }
 
 async function lastMovedInfo() {
-  const m = state.lastMoved;
-  if (!m) {
+  const latest = await latestMove();
+  if (!latest) {
     return null;
   }
-  try {
-    const tab = await browser.tabs.get(m.tabId);
-    const group = tab.groupId !== -1 ? await browser.tabGroups.get(tab.groupId) : null;
-    return { title: tab.title, groupTitle: group ? stripFlash(group.title) : null, at: m.at, stillThere: !!group && group.id === m.groupId };
-  } catch (e) {
-    state.lastMoved = null;
-    return null;
-  }
+  const { m, tab } = latest;
+  const group = tab.groupId !== -1 ? await browser.tabGroups.get(tab.groupId).catch(() => null) : null;
+  return { title: tab.title, groupTitle: group ? stripFlash(group.title) : null, at: m.at, stillThere: !!group && group.id === m.groupId };
 }
 
 browser.runtime.onMessage.addListener((msg, sender) => {
