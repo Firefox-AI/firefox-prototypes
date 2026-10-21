@@ -232,6 +232,34 @@ export const AIFiles = {
   },
 
   /**
+   * Copies a directory of a context to the file system, replacing the content
+   * of the target directory.
+   *
+   * @param {string} contextId
+   * @param {string} path - The directory to copy, e.g. "add-ons/foo".
+   * @param {string} targetPath - Absolute path of the target directory.
+   * @returns {Promise<number>} The number of files copied.
+   */
+  async exportDirectory(contextId, path, targetPath) {
+    const prefix = splitPath(path).join("/") + "/";
+    const files = (await this.listFiles(contextId)).filter(f =>
+      f.path.startsWith(prefix)
+    );
+
+    await IOUtils.remove(targetPath, { recursive: true, ignoreAbsent: true });
+    await IOUtils.makeDirectory(targetPath);
+
+    for (const file of files) {
+      const segments = file.path.slice(prefix.length).split("/");
+      const target = PathUtils.join(targetPath, ...segments);
+      await IOUtils.makeDirectory(PathUtils.parent(target));
+      const buffer = await this.readFile(contextId, file.path);
+      await IOUtils.write(target, new Uint8Array(buffer));
+    }
+    return files.length;
+  },
+
+  /**
    * Resolves a moz-ai URI to the content of the file it names. A URI naming a
    * directory resolves to the index.html file it contains.
    *

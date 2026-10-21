@@ -6,6 +6,7 @@ with Files("**"):
     BUG_COMPONENT = ("Core", "Machine Learning: General")
 
 MOZ_SRC_FILES += [
+    "AIAddons.sys.mjs",
     "AIFiles.sys.mjs",
     "AIFilesParent.sys.mjs",
     "AIFilesStreamProvider.sys.mjs",

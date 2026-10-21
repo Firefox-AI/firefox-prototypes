@@ -2477,6 +2477,12 @@ pref("browser.smartwindow.aitab.menus", false);
 
 // Lets the model store files per conversation, served at moz-ai:// URLs.
 pref("browser.smartwindow.files.enabled", false);
+// Lets the model install the extensions it stores, as temporary add-ons.
+#ifdef NIGHTLY_BUILD
+pref("browser.smartwindow.files.addons.enabled", true);
+#else
+pref("browser.smartwindow.files.addons.enabled", false);
+#endif
 
 // Smart Window Agent
 pref("browser.smartwindow.agent.enabled", true);

@@ -30,6 +30,9 @@ import {
   WRITE_FILE,
   READ_FILE,
   LIST_FILES,
+  ADDONS_PREF,
+  ADDONS_TOOLS,
+  INSTALL_ADDON,
 } from "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs";
 import { runSearchTheWeb } from "moz-src:///browser/components/aiwindow/models/search/SearchWorkflow.sys.mjs";
 
@@ -148,6 +151,7 @@ const FEATURE_GATED_HANDLERS = new Map([
   [WRITE_FILE, toolFns.writeFile],
   [READ_FILE, toolFns.readFile],
   [LIST_FILES, toolFns.listFiles],
+  [INSTALL_ADDON, toolFns.installAddon],
 ]);
 
 /**
@@ -275,7 +279,13 @@ function filterFeatureGatedTools(tools, conversation) {
     filtered = filtered.filter(t => !AITAB_TOOLS.has(t.function?.name));
   }
   if (!Services.prefs.getBoolPref(FILES_PREF, false)) {
-    filtered = filtered.filter(t => !FILES_TOOLS.has(t.function?.name));
+    filtered = filtered.filter(
+      t =>
+        !FILES_TOOLS.has(t.function?.name) &&
+        !ADDONS_TOOLS.has(t.function?.name)
+    );
+  } else if (!Services.prefs.getBoolPref(ADDONS_PREF, false)) {
+    filtered = filtered.filter(t => !ADDONS_TOOLS.has(t.function?.name));
   }
   return filtered;
 }

@@ -49,6 +49,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   AITab: "moz-src:///browser/components/aiwindow/models/aitab/AITab.sys.mjs",
   AITabStore:
     "moz-src:///browser/components/aiwindow/ui/modules/AITabStore.sys.mjs",
+  AIAddons:
+    "moz-src:///browser/components/aiwindow/models/files/AIAddons.sys.mjs",
   AIFiles:
     "moz-src:///browser/components/aiwindow/models/files/AIFiles.sys.mjs",
   getHeadingFont:
@@ -149,6 +151,7 @@ export const ADD_MEMORY = "add_memory";
 export const WRITE_FILE = "write_file";
 export const READ_FILE = "read_file";
 export const LIST_FILES = "list_files";
+export const INSTALL_ADDON = "install_addon";
 
 // Tools gated behind a feature pref. Filtered out of the model's tool list
 // in Chat.sys.mjs when the pref is off.
@@ -156,6 +159,8 @@ export const AITAB_PREF = "browser.smartwindow.aitab.enabled";
 export const AITAB_TOOLS = new Set([GENERATE_AITAB]);
 export const FILES_PREF = "browser.smartwindow.files.enabled";
 export const FILES_TOOLS = new Set([WRITE_FILE, READ_FILE, LIST_FILES]);
+export const ADDONS_PREF = "browser.smartwindow.files.addons.enabled";
+export const ADDONS_TOOLS = new Set([INSTALL_ADDON]);
 export const SEARCH_QUERY_ENDPOINT_PREF =
   "browser.smartwindow.searchQuery.endpointURL";
 export const SEARCH_QUERY_APIKEY_PREF =
@@ -222,6 +227,7 @@ export const TOOLS = [
   WRITE_FILE,
   READ_FILE,
   LIST_FILES,
+  INSTALL_ADDON,
 ];
 
 export const RUN_SEARCH_VERBATIM_QUERY_DESCRIPTION =
@@ -694,6 +700,31 @@ export const toolsConfig = [
       parameters: {
         type: "object",
         properties: {},
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: INSTALL_ADDON,
+      description:
+        "Install a Firefox WebExtension stored in a directory of this " +
+        "conversation, written with write_file. The directory must contain a " +
+        "manifest.json (Manifest V3 preferred) and every file it references, " +
+        "as text: use SVG for icons. The user is asked to confirm, and the " +
+        "extension is installed temporarily, until Firefox restarts. Call it " +
+        "again after changing the files to reload the extension. On failure " +
+        "the result contains the errors to fix.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description:
+              'Relative path of the directory, e.g. "add-ons/tab-counter".',
+          },
+        },
+        required: ["path"],
       },
     },
   },
@@ -2025,6 +2056,58 @@ export async function listFiles(_toolParams, conversation) {
   }
 }
 
+/**
+ * Asks the user whether to install an extension the model wrote.
+ *
+ * @param {object} summary
+ * @param {string} summary.name
+ * @param {string} summary.version
+ * @param {string[]} summary.permissions
+ * @returns {Promise<boolean>}
+ */
+async function confirmAddonInstall({ name, version, permissions }) {
+  const window = lazy.BrowserWindowTracker.getTopWindow();
+  if (!window) {
+    return false;
+  }
+  const text =
+    `Install the extension "${name}" ${version} written by Smart Window?\n\n` +
+    (permissions.length
+      ? `It asks for:\n${permissions.map(p => `  - ${p}`).join("\n")}\n\n`
+      : "") +
+    "It stays installed until Firefox restarts.";
+  const result = await Services.prompt.asyncConfirm(
+    window.browsingContext,
+    Ci.nsIPromptService.MODAL_TYPE_WINDOW,
+    "Install extension",
+    text
+  );
+  return result.getProperty("ok");
+}
+
+/**
+ * @param {object} toolParams
+ * @param {string} toolParams.path
+ * @param {ChatConversation} conversation
+ * @returns {Promise<string>}
+ */
+export async function installAddon({ path }, conversation) {
+  try {
+    const addon = await lazy.AIAddons.install(
+      conversation.id,
+      path,
+      confirmAddonInstall
+    );
+    if (!addon) {
+      return "The user declined to install the extension. Do not try again unless they ask.";
+    }
+    return `The extension "${addon.name}" ${addon.version} (id ${addon.id}) is installed until Firefox restarts.`;
+  } catch (e) {
+    lazy.console.error("[Tool] install_addon failed", e);
+    return `The extension could not be installed: ${e.message}`;
+  }
+}
+
 export const toolFns = {
   getOpenTabs,
   searchBrowsingHistory,
@@ -2037,4 +2120,5 @@ export const toolFns = {
   writeFile,
   readFile,
   listFiles,
+  installAddon,
 };

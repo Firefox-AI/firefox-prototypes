@@ -2,3 +2,5 @@
 firefox-appdir = "browser"
 
 ["test_AIFiles.js"]
+
+["test_AIAddons.js"]
