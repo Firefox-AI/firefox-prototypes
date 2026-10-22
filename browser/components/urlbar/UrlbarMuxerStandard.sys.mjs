@@ -17,6 +17,9 @@ ChromeUtils.defineESModuleGetters(lazy, {
   QuickSuggest: "moz-src:///browser/components/urlbar/QuickSuggest.sys.mjs",
   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
   UrlbarPrefs: "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs",
+  UrlbarProviderOpenTabs:
+    "moz-src:///browser/components/urlbar/UrlbarProviderOpenTabs.sys.mjs",
+  UrlbarResult: "chrome://browser/content/urlbar/UrlbarResult.mjs",
   UrlbarProviderQuickSuggest:
     "moz-src:///browser/components/urlbar/UrlbarProviderQuickSuggest.sys.mjs",
   UrlbarSearchUtils:
@@ -87,6 +90,10 @@ class MuxerUnifiedComplete extends UrlbarMuxer {
    *   The array of UrlbarResult that is not sorted yet.
    */
   sort(context, unsortedResults) {
+    if (lazy.UrlbarPrefs.get("switchTabs.exactMatchHeuristic")) {
+      unsortedResults = this.#promoteOpenTabHeuristic(context, unsortedResults);
+    }
+
     // This method is called multiple times per keystroke, so it should be as
     // fast and efficient as possible.  We do two passes through the results:
     // one to collect state for the second pass, and then a second to build the
@@ -1346,6 +1353,93 @@ class MuxerUnifiedComplete extends UrlbarMuxer {
     if (result.payload.url) {
       state.addedResultUrls.add(result.payload.url);
     }
+  }
+
+  /**
+   * Smart Window prototype: when the typed string is exactly a URL that is
+   * already open in a tab (same container preferred), replace the URL
+   * heuristic with a heuristic switch-to-tab result so Enter switches instead
+   * of opening a copy. Shift/Alt (action-override) still loads the URL here,
+   * the existing "open a copy" gesture for switch-to-tab rows. Several
+   * heuristic providers (autofill, history URL, fallback) may each offer a URL
+   * heuristic for the same string and the muxer later keeps one, so all of
+   * them are replaced.
+   *
+   * @param {UrlbarQueryContext} context
+   * @param {UrlbarResult[]} results
+   * @returns {UrlbarResult[]}
+   */
+  #promoteOpenTabHeuristic(context, results) {
+    let isUrlHeuristic = r =>
+      r.heuristic &&
+      r.type == lazy.UrlbarShared.RESULT_TYPE.URL &&
+      r.payload?.url;
+    let index = results.findIndex(isUrlHeuristic);
+    if (index < 0) {
+      return results;
+    }
+    // Only when the user typed the whole URL: an autofill row that still has
+    // characters to complete must keep autofilling.
+    let norm = str =>
+      lazy.UrlbarShared.stripPrefixAndTrim(str.trim(), {
+        stripHttp: true,
+        stripHttps: true,
+        stripWww: true,
+        trimSlash: true,
+      })[0].toLowerCase();
+    let typed = norm(context.searchString);
+    let openTabs = lazy.UrlbarProviderOpenTabs.getOpenTabUrls(
+      context.isPrivate
+    );
+    let url = null;
+    let entries = null;
+    let template = null;
+    for (let r of results) {
+      if (!isUrlHeuristic(r) || norm(r.payload.url) != typed) {
+        continue;
+      }
+      let candidates = [
+        r.payload.url,
+        r.payload.url.endsWith("/")
+          ? r.payload.url.slice(0, -1)
+          : r.payload.url + "/",
+      ];
+      for (let candidate of candidates) {
+        let found = openTabs.get(candidate);
+        if (found?.size) {
+          url = candidate;
+          entries = found;
+          template = r;
+          break;
+        }
+      }
+      if (url) {
+        break;
+      }
+    }
+    if (!url || url == context.currentPage) {
+      return results;
+    }
+    let picked =
+      [...entries].find(([ctx]) => ctx == context.userContextId) ||
+      [...entries][0];
+    let [userContextId, tabGroup] = picked;
+    let replacement = new lazy.UrlbarResult({
+      type: lazy.UrlbarShared.RESULT_TYPE.TAB_SWITCH,
+      source: lazy.UrlbarShared.RESULT_SOURCE.TABS,
+      heuristic: true,
+      providerName: template.providerName,
+      payload: {
+        url,
+        title: template.payload.title,
+        icon: template.payload.icon,
+        userContext: UrlbarUtils.getUserContextData(userContextId),
+        tabGroup,
+      },
+    });
+    let copy = results.filter(r => !isUrlHeuristic(r));
+    copy.splice(index, 0, replacement);
+    return copy;
   }
 
   /**

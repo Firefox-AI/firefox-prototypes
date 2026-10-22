@@ -705,6 +705,8 @@ pref("browser.urlbar.decodeURLsOnCopy", false);
 // Whether or not to move tabs into the active window when using the "Switch to
 // Tab" feature of the awesomebar.
 pref("browser.urlbar.switchTabs.adoptIntoActiveWindow", false);
+// Smart Window prototype: exact-match typed URLs switch to the open tab.
+pref("browser.urlbar.switchTabs.exactMatchHeuristic", true);
 
 // Whether addresses and search results typed into the address bar
 // should be opened in new tabs by default.

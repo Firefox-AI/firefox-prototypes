@@ -54,3 +54,21 @@ strip overflows.
 - `browser/themes/shared/smartwindowGroupTabs.css` — row styles
 - `browser/locales/en-US/browser/autoTabGrouping.ftl` — 3 strings
 - `browser/app/profile/firefox.js` — prefs above
+
+## Address bar: exact-match "Switch to Tab" (added 2026-10-22)
+
+When the typed or pasted text is exactly the URL of an open tab (scheme, `www`
+and trailing slash ignored; same container preferred), the first row of the
+address bar is the Switch to Tab result instead of "Visit". Enter switches to
+that tab. Holding Shift (or Alt) while pressing Enter uses Firefox's existing
+action override and loads the URL in the current tab instead, which is the
+"open a copy" gesture. Partial URLs still autofill as before.
+
+- Code: `browser/components/urlbar/UrlbarMuxerStandard.sys.mjs`
+  (`#promoteOpenTabHeuristic`), gated by
+  `browser.urlbar.switchTabs.exactMatchHeuristic` (default true here).
+- Test: `_prototype/2026-10-14-smart-auto-grouping/test-switch-to-tab.py`
+  (3 checks, Marionette, run with `./mach python`).
+- Dev note: after `./mach build faster` on `.sys.mjs` files, delete
+  `profile-default/startupCache` before relaunching, or the old module keeps
+  running from the startup cache.

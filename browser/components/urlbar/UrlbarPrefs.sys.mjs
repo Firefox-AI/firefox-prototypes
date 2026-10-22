@@ -673,6 +673,10 @@ const PREF_URLBAR_DEFAULTS = /** @type {PreferenceDefinition[]} */ ([
   // active window.
   ["switchTabs.adoptIntoActiveWindow", false],
 
+  // Smart Window prototype: when the typed URL exactly matches an open tab,
+  // make the switch-to-tab result the heuristic (first) row.
+  ["switchTabs.exactMatchHeuristic", true],
+
   // The minimum number of characters needed to match a tab group name.
   ["tabGroups.minSearchLength", 1],
 
