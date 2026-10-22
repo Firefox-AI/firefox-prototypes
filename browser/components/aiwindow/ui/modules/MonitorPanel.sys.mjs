@@ -16,6 +16,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/models/agents/Monitor.sys.mjs",
   MonitorUIUtils:
     "moz-src:///browser/components/aiwindow/ui/modules/MonitorUIUtils.sys.mjs",
+  PANEL_ACTIONS:
+    "moz-src:///browser/components/aiwindow/ui/modules/PanelActions.sys.mjs",
   TabMetrics: "moz-src:///browser/components/tabbrowser/TabMetrics.sys.mjs",
   isAllowedWatchUrl:
     "moz-src:///browser/components/aiwindow/models/agents/Monitor.sys.mjs",
@@ -203,8 +205,14 @@ export const MonitorPanel = {
     contents.addEventListener("agent-monitor-item:submit", event =>
       this._onCreateSubmit(panel, event.detail)
     );
-    contents.addEventListener("agent-monitor-item:smart-page", event =>
-      this._syncCreateHeading(panel, event.detail?.smartPage)
+    contents.addEventListener("agent-monitor-panel:choose-action", event =>
+      this._onChooseAction(panel, win, event.detail?.id)
+    );
+    contents.addEventListener("agent-action-form:cancel", () =>
+      this._setView(panel, "list")
+    );
+    contents.addEventListener("agent-action-form:submit", event =>
+      this._onActionSubmit(panel, event.detail)
     );
     // The form is torn down whenever the panel closes or the view changes, so
     // the draft is held out here to survive that.
@@ -366,12 +374,12 @@ export const MonitorPanel = {
    * two places.
    *
    * @param {XULElement} panel
-   * @param {"list"|"create"} view
+   * @param {"list"|"create"|"action"} view
    */
   _setView(panel, view) {
     const doc = panel.ownerDocument;
     panel._contents.view = view;
-    doc.l10n.setAttributes(panel._title, VIEW_TITLE_L10N_IDS[view]);
+    this._applyHeading(panel, view);
 
     // The back button is added and removed rather than hidden: the stylesheet
     // centers the title by compensating for a back button whenever one precedes
@@ -398,20 +406,106 @@ export const MonitorPanel = {
   },
 
   /**
-   * The create view's header names a smart page once the form says this task
-   * is one. Fluent owns the title otherwise.
+   * Names the header after the view. An action form uses the copy on its
+   * catalog entry: a raw title when one was supplied, otherwise its Fluent id.
    *
    * @param {XULElement} panel
-   * @param {boolean} smartPage
+   * @param {"list"|"create"|"action"} view
    */
-  _syncCreateHeading(panel, smartPage) {
-    if (panel._contents.view !== "create") {
+  _applyHeading(panel, view) {
+    const title = panel._title;
+    const action = panel._contents.action;
+    if (view === "action" && action?.title) {
+      title.removeAttribute("data-l10n-id");
+      title.removeAttribute("data-l10n-args");
+      title.textContent = action.title;
       return;
     }
-    const l10nId = smartPage
-      ? "smartwindow-monitor-panel-create-smart-page-title"
-      : VIEW_TITLE_L10N_IDS.create;
-    panel.ownerDocument.l10n.setAttributes(panel._title, l10nId);
+    const l10nId =
+      view === "action" && action?.titleL10nId
+        ? action.titleL10nId
+        : VIEW_TITLE_L10N_IDS[view];
+    panel.ownerDocument.l10n.setAttributes(title, l10nId);
+  },
+
+  /**
+   * @param {XULElement} panel
+   * @param {ChromeWindow} win
+   * @param {string} id - A PANEL_ACTIONS entry.
+   */
+  _onChooseAction(panel, win, id) {
+    const action = lazy.PANEL_ACTIONS.find(item => item.id === id);
+    if (!action) {
+      return;
+    }
+    if (action.kind === "immediate") {
+      panel.hidePopup();
+      if (action.handler === "zoom-in") {
+        win.FullZoom?.enlarge();
+      }
+      return;
+    }
+    panel._contents.action = action;
+    panel._contents.agent = { url: this._watchableUrl(win) };
+    this._setView(panel, "action");
+  },
+
+  /**
+   * @param {XULElement} panel
+   * @param {object} detail - See agent-action-form's ":submit" event.
+   */
+  async _onActionSubmit(panel, detail) {
+    const { handler, values } = detail ?? {};
+    if (handler === "create-smart-page") {
+      await this._createSmartPageTask(panel, values);
+      return;
+    }
+    if (handler === "notify-at") {
+      lazy.MonitorUIUtils.scheduleReminder(values?.time);
+    }
+    if (panel.isConnected) {
+      this._setView(panel, "list");
+    }
+  },
+
+  /**
+   * Creates the task, then builds its smart page once. The panel returns to
+   * the list without waiting on the page.
+   *
+   * @param {XULElement} panel
+   * @param {object} values - Form values from the action's blocks.
+   */
+  async _createSmartPageTask(panel, values) {
+    const { name, focus, pages, frequency, time, weekday } = values ?? {};
+    let id;
+    try {
+      id = await lazy.MonitorAgent.createMonitor({
+        prompt: focus,
+        watchUrls: pages,
+        pageTitle: name,
+        schedule: this._toAgentSchedule({
+          frequency,
+          time,
+          ...(frequency === "weekly" && { weekday }),
+        }),
+        source: "toolbar_panel",
+      });
+    } catch (error) {
+      console.error("Failed to create monitor:", error);
+      return;
+    }
+    lazy.MonitorUIUtils.generateTaskSmartPage({
+      monitorId: id,
+      title: name,
+      condition: focus,
+      watchUrls: pages,
+      frequency,
+    });
+    if (!panel.isConnected) {
+      return;
+    }
+    panel._contents.justCreatedId = id;
+    this._setView(panel, "list");
   },
 
   /**
@@ -443,7 +537,7 @@ export const MonitorPanel = {
    * @param {object} detail - See agent-monitor-item's ":submit" event.
    */
   async _onCreateSubmit(panel, detail) {
-    const { monitorName, condition, watchUrls, schedule, smartPage } = detail;
+    const { monitorName, condition, watchUrls, schedule } = detail;
     let id;
     try {
       id = await lazy.MonitorAgent.createMonitor({
@@ -456,17 +550,6 @@ export const MonitorPanel = {
     } catch (error) {
       console.error("Failed to create monitor:", error);
       return;
-    }
-    if (smartPage) {
-      // The page is built after the task exists. The panel does not wait on
-      // it; a notification opens the page once it is stored.
-      lazy.MonitorUIUtils.generateTaskSmartPage({
-        monitorId: id,
-        title: monitorName,
-        condition,
-        watchUrls,
-        frequency: schedule?.frequency,
-      });
     }
     if (!panel.isConnected) {
       return;

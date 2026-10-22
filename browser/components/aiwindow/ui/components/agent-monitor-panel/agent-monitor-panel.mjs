@@ -7,12 +7,16 @@ import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/agent-monitor-item.mjs";
 // eslint-disable-next-line import/no-unassigned-import
+import "chrome://browser/content/aiwindow/components/agent-action-form.mjs";
+// eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/monitor-status-chip.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   MonitorUIUtils:
     "moz-src:///browser/components/aiwindow/ui/modules/MonitorUIUtils.sys.mjs",
+  PANEL_ACTIONS:
+    "moz-src:///browser/components/aiwindow/ui/modules/PanelActions.sys.mjs",
 });
 
 // The panel is a summary rather than the whole list, which lives behind
@@ -34,12 +38,15 @@ const MAX_VISIBLE_ROWS = 5;
  *
  * Dispatches:
  *  - agent-monitor-panel:create-task
+ *  - agent-monitor-panel:choose-action  detail: { id } - An extra menu entry.
+ *    The host looks the id up in PANEL_ACTIONS.
  *  - agent-monitor-panel:manage-tasks
  *  - agent-monitor-panel:open-task  (detail: { id }; a row was activated. Only
  *    fires for a task that watches at least one page, or that has a generated
  *    smart page.)
  *  - agent-monitor-item:*  (re-dispatched from the create form, see that
  *    component; the host handles :submit, :cancel and :draft-change)
+ *  - agent-action-form:*  (re-dispatched from an extra menu entry's form)
  *
  * @property {object[]} monitors - Monitors in the order they should be listed,
  *   each formatted by MonitorUIUtils.formatMonitorForDisplay().
@@ -47,7 +54,9 @@ const MAX_VISIBLE_ROWS = 5;
  * @property {?object} agent - What the create form starts from, e.g. the page
  *   the user is on. See agent-monitor-item's 'agent'.
  * @property {?object} draft - In-progress create form state, owned by the host.
- * @property {"list"|"create"} view - Which view to render.
+ * @property {?object} action - The PANEL_ACTIONS entry shown when view is
+ *   "action".
+ * @property {"list"|"create"|"action"} view - Which view to render.
  * @property {?string} justCreatedId - This Id is used to trigger an animation
  * to show the user the newly created monitor task
  * @property {string[]} attentionIds - Ids of monitors that newly matched since
@@ -59,6 +68,7 @@ export class AgentMonitorPanel extends MozLitElement {
     monitors: { type: Array },
     maxMonitors: { type: Number },
     agent: { type: Object },
+    action: { type: Object },
     draft: { type: Object },
     view: { type: String, reflect: true },
     justCreatedId: { type: String },
@@ -70,6 +80,7 @@ export class AgentMonitorPanel extends MozLitElement {
     this.monitors = [];
     this.maxMonitors = 0;
     this.agent = null;
+    this.action = null;
     this.draft = null;
     this.view = "list";
     this.justCreatedId = null;
@@ -286,6 +297,7 @@ export class AgentMonitorPanel extends MozLitElement {
           ></span>
           <span class="monitor-footer-chevron" aria-hidden="true"></span>
         </button>
+        ${this.#renderMenuActions(atLimit)}
         <button
           type="button"
           class="monitor-footer-row"
@@ -302,21 +314,61 @@ export class AgentMonitorPanel extends MozLitElement {
     `;
   }
 
+  #renderMenuActions(atLimit) {
+    return lazy.PANEL_ACTIONS.map(action => {
+      const label = action.menuLabel
+        ? html`<span>${action.menuLabel}</span>`
+        : html`<span data-l10n-id=${action.menuL10nId}></span>`;
+      return html`<button
+        type="button"
+        class="monitor-footer-row"
+        ?disabled=${action.requiresMonitorSlot && atLimit}
+        @click=${() =>
+          this.#dispatch("agent-monitor-panel:choose-action", {
+            id: action.id,
+          })}
+      >
+        <img
+          class="monitor-footer-icon"
+          src="chrome://global/skin/icons/plus.svg"
+          alt=""
+        />
+        ${label}
+        ${action.kind === "form"
+          ? html`<span
+              class="monitor-footer-chevron monitor-footer-trailing"
+              aria-hidden="true"
+            ></span>`
+          : nothing}
+      </button>`;
+    });
+  }
+
+  #renderBody() {
+    if (this.view === "create") {
+      return html`<agent-monitor-item
+        mode="create"
+        .agent=${this.agent}
+        .draft=${this.draft}
+        .selfContained=${false}
+      ></agent-monitor-item>`;
+    }
+    if (this.view === "action") {
+      return html`<agent-action-form
+        .action=${this.action}
+        .agent=${this.agent}
+      ></agent-action-form>`;
+    }
+    return this.#renderList();
+  }
+
   render() {
     return html`
       <link
         rel="stylesheet"
         href="chrome://browser/content/aiwindow/components/agent-monitor-panel.css"
       />
-      ${this.view === "create"
-        ? html`<agent-monitor-item
-            mode="create"
-            .agent=${this.agent}
-            .draft=${this.draft}
-            .selfContained=${false}
-            .smartPages=${true}
-          ></agent-monitor-item>`
-        : this.#renderList()}
+      ${this.#renderBody()}
     `;
   }
 }

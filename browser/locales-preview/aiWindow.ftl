@@ -30,8 +30,24 @@ smartwindow-monitor-panel-smart-page-created = Created { DATETIME($time, month: 
 smartwindow-monitor-panel-create = Create new task
 # Panel title while the user is filling in the create form
 smartwindow-monitor-panel-create-title = Create new task
-# Panel title and create-form heading when the task generates a smart page
+# Panel title and button for the news smart page form
 smartwindow-monitor-panel-create-smart-page-title = Create smart page
+# Menu entry under "Create new task" that opens the news smart page form
+smartwindow-monitor-panel-news = News smart page
+smartwindow-monitor-panel-news-focus =
+  .label = What should the page cover?
+  .placeholder = Today’s headlines, a topic to follow, what to leave out.
+# Menu entry that opens a form with only a time
+smartwindow-monitor-panel-remind = Remind me
+smartwindow-monitor-panel-remind-title = Remind me
+smartwindow-monitor-panel-remind-button = Remind me
+# Menu entry that zooms the current page in immediately
+smartwindow-monitor-panel-zoom-in = Zoom in
+# Desktop notification for the reminder above
+smartwindow-monitor-panel-reminder-title = Reminder
+# Variables:
+#   $time (Number) - When the reminder is for, as a timestamp.
+smartwindow-monitor-panel-reminder-body = It’s { DATETIME($time, hour: "numeric", minute: "2-digit") }.
 # Variables:
 #   $used (number) - How many tasks the user has
 #   $max (number) - The maximum number of tasks allowed
@@ -131,9 +147,6 @@ ai-tasks-alert-weekday-saturday =
 ## Alert Actions - Button labels for alert management
 
 ai-tasks-alert-create-button = Create task
-# Create-form button when the task generates a smart page on its schedule.
-ai-tasks-alert-create-smart-page-daily = Create daily smart page
-ai-tasks-alert-create-smart-page-weekly = Create weekly smart page
 ai-tasks-alert-cancel-button = Cancel
 ai-tasks-alert-save-button = Save changes
 ai-tasks-alert-delete-button =

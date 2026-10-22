@@ -1,0 +1,54 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+:host {
+  display: block;
+}
+
+.action-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-medium);
+  padding: var(--space-medium);
+}
+
+.action-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xsmall);
+}
+
+.action-label {
+  font-weight: var(--font-weight-semibold);
+}
+
+.action-error {
+  color: var(--text-color-error);
+  font-size: var(--font-size-small);
+}
+
+.action-page-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-small);
+}
+
+.action-page-row moz-input-url {
+  flex: 1;
+}
+
+.action-pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xsmall);
+}
+
+.action-actions {
+  display: flex;
+  gap: var(--space-small);
+}
+
+.action-spacer {
+  flex: 1;
+}
