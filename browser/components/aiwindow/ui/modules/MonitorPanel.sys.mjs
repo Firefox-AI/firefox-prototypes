@@ -19,6 +19,10 @@ ChromeUtils.defineESModuleGetters(lazy, {
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
   PANEL_ACTIONS:
     "moz-src:///browser/components/aiwindow/ui/modules/PanelActions.sys.mjs",
+  cachedPanelActions:
+    "moz-src:///browser/components/aiwindow/ui/modules/PanelSuggestions.sys.mjs",
+  suggestPanelActions:
+    "moz-src:///browser/components/aiwindow/ui/modules/PanelSuggestions.sys.mjs",
   TabMetrics: "moz-src:///browser/components/tabbrowser/TabMetrics.sys.mjs",
   isAllowedWatchUrl:
     "moz-src:///browser/components/aiwindow/models/agents/Monitor.sys.mjs",
@@ -169,6 +173,55 @@ export const MonitorPanel = {
     popupSet.appendChild(panel);
     panel.openPopup(anchor, "bottomright topright", 0, 4, false, false);
     this._syncContents(panel);
+    this._suggestActions(panel, win);
+  },
+
+  /**
+   * Shows a cached set for this page, if this session already asked. Opening
+   * the panel does not ask. The menu control does: the first time, then again
+   * to replace the set while the panel stays open.
+   *
+   * @param {XULElement} panel
+   * @param {ChromeWindow} win
+   * @param {boolean} [refresh] - Ask for a set. Omit to only apply the cache.
+   */
+  _suggestActions(panel, win, refresh = false) {
+    const url = this._watchableUrl(win);
+    const contents = panel._contents;
+    contents.canRefreshSuggestions = Boolean(url);
+    if (!url || !refresh) {
+      if (url) {
+        const cached = lazy.cachedPanelActions(url);
+        if (cached?.length) {
+          contents.suggestions = cached;
+        }
+      }
+      return;
+    }
+    const pageTitle = win.gBrowser?.selectedTab?.label ?? "";
+    const epoch = (panel._suggestionEpoch ?? 0) + 1;
+    panel._suggestionEpoch = epoch;
+    contents.suggestionsRefreshing = true;
+    lazy
+      .suggestPanelActions({ url, pageTitle })
+      .then(actions => {
+        if (
+          !panel.isConnected ||
+          panel._suggestionEpoch !== epoch ||
+          !actions?.length
+        ) {
+          return;
+        }
+        contents.suggestions = actions;
+      })
+      .catch(error => {
+        console.error("Failed to suggest panel actions:", error);
+      })
+      .finally(() => {
+        if (panel.isConnected && panel._suggestionEpoch === epoch) {
+          contents.suggestionsRefreshing = false;
+        }
+      });
   },
 
   /**
@@ -208,6 +261,9 @@ export const MonitorPanel = {
     );
     contents.addEventListener("agent-monitor-panel:choose-action", event =>
       this._onChooseAction(panel, win, event.detail?.id)
+    );
+    contents.addEventListener("agent-monitor-panel:refresh-suggestions", () =>
+      this._suggestActions(panel, win, true)
     );
     contents.addEventListener("agent-action-form:cancel", () =>
       this._setView(panel, "list")
@@ -407,8 +463,8 @@ export const MonitorPanel = {
   },
 
   /**
-   * Names the header after the view. An action form uses the copy on its
-   * catalog entry: a raw title when one was supplied, otherwise its Fluent id.
+   * Names the header after the view. An action form uses its title, or the
+   * menu label when that is the only copy, otherwise its Fluent id.
    *
    * @param {XULElement} panel
    * @param {"list"|"create"|"action"} view
@@ -416,17 +472,20 @@ export const MonitorPanel = {
   _applyHeading(panel, view) {
     const title = panel._title;
     const action = panel._contents.action;
-    if (view === "action" && action?.title) {
-      title.removeAttribute("data-l10n-id");
-      title.removeAttribute("data-l10n-args");
-      title.textContent = action.title;
-      return;
+    if (view === "action") {
+      const raw = action?.title || action?.menuLabel;
+      if (raw) {
+        title.removeAttribute("data-l10n-id");
+        title.removeAttribute("data-l10n-args");
+        title.textContent = raw;
+        return;
+      }
+      if (action?.titleL10nId) {
+        panel.ownerDocument.l10n.setAttributes(title, action.titleL10nId);
+        return;
+      }
     }
-    const l10nId =
-      view === "action" && action?.titleL10nId
-        ? action.titleL10nId
-        : VIEW_TITLE_L10N_IDS[view];
-    panel.ownerDocument.l10n.setAttributes(title, l10nId);
+    panel.ownerDocument.l10n.setAttributes(title, VIEW_TITLE_L10N_IDS[view]);
   },
 
   /**
@@ -435,13 +494,13 @@ export const MonitorPanel = {
    * @param {string} id - A PANEL_ACTIONS entry.
    */
   _onChooseAction(panel, win, id) {
-    const action = lazy.PANEL_ACTIONS.find(item => item.id === id);
+    const action = this._actionFor(panel, id);
     if (!action) {
       return;
     }
     if (action.kind === "immediate") {
       panel.hidePopup();
-      this._runImmediate(win, action.handler);
+      this._runImmediate(win, action);
       return;
     }
     panel._contents.action = action;
@@ -485,34 +544,110 @@ export const MonitorPanel = {
   },
 
   /**
+   * A suggested row is matched before the static catalog. Ids do not overlap.
+   *
+   * @param {XULElement} panel
+   * @param {string} id
+   * @returns {?object}
+   */
+  _actionFor(panel, id) {
+    return (
+      panel._contents.suggestions?.find(item => item.id === id) ??
+      lazy.PANEL_ACTIONS.find(item => item.id === id) ??
+      null
+    );
+  },
+
+  /**
    * Runs a menu entry that has no form. Unknown handlers do nothing.
+   * `params` on a suggested entry fills in the handler, for example the
+   * phrase find-in-page highlights.
    *
    * @param {ChromeWindow} win
-   * @param {string} [handler]
+   * @param {object} action
    */
-  _runImmediate(win, handler) {
-    switch (handler) {
+  _runImmediate(win, action) {
+    const params = action.params ?? {};
+    switch (action.handler) {
       case "zoom-in":
         win.FullZoom?.enlarge();
         break;
       case "summarize-page":
-        this._summarizePage(win);
+      case "open-smart-page":
+        this._summarizePage(win, params.focus);
         break;
       case "reader-view":
         this._openReaderView(win);
+        break;
+      case "find-in-page":
+        this._startFind(win, params.query, params.highlight);
+        break;
+      case "bookmark-page":
+        this._bookmarkNow(win, params);
+        break;
+      case "notify-at":
+        lazy.MonitorUIUtils.scheduleReminder(params.time, params.note);
+        break;
+      case "create-monitor":
+        this._createMonitorNow(win, params);
         break;
     }
   },
 
   /**
    * @param {ChromeWindow} win
+   * @param {string} [focus]
    */
-  _summarizePage(win) {
+  _summarizePage(win, focus) {
     const url = this._watchableUrl(win);
     lazy.MonitorUIUtils.openFocusedSmartPage({
-      focus: "Summarize this page.",
+      focus: focus?.trim() || "Summarize this page.",
       watchUrls: url ? [url] : [],
     });
+  },
+
+  /**
+   * @param {ChromeWindow} win
+   * @param {object} params
+   */
+  _bookmarkNow(win, params) {
+    const url = this._watchableUrl(win);
+    const title =
+      params?.name?.trim() || win.gBrowser?.selectedTab?.label || url;
+    if (!url) {
+      lazy.MonitorUIUtils.showNotification(
+        "Bookmark",
+        "Open a web page first."
+      );
+      return;
+    }
+    this._insertBookmark(url, title);
+  },
+
+  /**
+   * @param {ChromeWindow} win
+   * @param {object} params
+   */
+  async _createMonitorNow(win, params) {
+    const url = this._watchableUrl(win);
+    const prompt = params?.prompt?.trim();
+    if (!url || !prompt) {
+      return;
+    }
+    try {
+      await lazy.MonitorAgent.createMonitor({
+        prompt,
+        watchUrls: [url],
+        pageTitle: params.name?.trim() || prompt,
+        schedule: this._toAgentSchedule({
+          frequency: params.frequency === "weekly" ? "weekly" : "daily",
+          time: params.time || "09:00",
+        }),
+        source: "toolbar_panel",
+      });
+    } catch (error) {
+      console.error("Failed to create monitor:", error);
+    }
   },
 
   /**
@@ -549,13 +684,21 @@ export const MonitorPanel = {
   /**
    * @param {ChromeWindow} win
    * @param {string} term
+   * @param {boolean} [highlight] - Highlight every match, not just the current one.
    */
-  async _startFind(win, term) {
+  async _startFind(win, term, highlight = false) {
+    const query = term?.trim();
+    if (!query) {
+      return;
+    }
     try {
       const bar = await win.gFindBarPromise;
       bar.open(bar.FIND_NORMAL);
-      bar._findField.value = term;
+      bar._findField.value = query;
       bar.onFindAgainCommand(false);
+      if (highlight) {
+        bar.toggleHighlight(true);
+      }
       bar._findField.focus();
     } catch (error) {
       console.error("Failed to find on this page:", error);
@@ -676,7 +819,8 @@ export const MonitorPanel = {
    * @param {object} values - Form values from the action's blocks.
    */
   async _createSmartPageTask(panel, values) {
-    const { name, focus, pages, frequency, time, weekday } = values ?? {};
+    const { name, pages, frequency, time, weekday } = values ?? {};
+    const focus = values?.focus?.trim() || values?.prompt?.trim();
     let id;
     try {
       id = await lazy.MonitorAgent.createMonitor({

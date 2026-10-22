@@ -254,6 +254,22 @@
   height: var(--icon-size-medium);
   -moz-context-properties: fill;
   fill: currentColor;
+
+  &.spinning {
+    animation: monitor-footer-spin 0.9s linear infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .monitor-footer-icon.spinning {
+    animation: none;
+  }
+}
+
+@keyframes monitor-footer-spin {
+  to {
+    transform: rotate(1turn);
+  }
 }
 
 .monitor-footer-trailing {

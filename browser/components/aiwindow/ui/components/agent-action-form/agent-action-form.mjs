@@ -15,7 +15,7 @@ import "chrome://global/content/elements/moz-select.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://global/content/elements/moz-button.mjs";
 // eslint-disable-next-line import/no-unassigned-import
-import "chrome://browser/content/aiwindow/components/ai-website-chip.mjs";
+import "chrome://browser/content/aiwindow/components/smartwindow-chip.mjs";
 
 const MAX_PAGES = 5;
 
@@ -106,11 +106,17 @@ export class AgentActionForm extends MozLitElement {
     this.pages = url ? [url] : [];
     this.pendingUrl = "";
     this.errors = {};
+    const params = this.action?.params ?? {};
     this.values = {
-      frequency: "daily",
-      time: nextTimeOption(),
+      frequency: params.frequency === "weekly" ? "weekly" : "daily",
+      time: params.time || nextTimeOption(),
       weekday: "1",
     };
+    for (const [key, value] of Object.entries(params)) {
+      if (typeof value === "string" && value) {
+        this.values[key] = value;
+      }
+    }
   }
 
   #setValue(id, value) {
@@ -334,17 +340,16 @@ export class AgentActionForm extends MozLitElement {
         ? html`<div class="action-pages">
             ${this.pages.map(
               url =>
-                html`<ai-website-chip
-                  type="context-chip"
-                  size="small"
+                html`<smartwindow-chip
+                  type="context"
                   removable
-                  label=${new URL(url).hostname}
                   title=${url}
+                  .label=${new URL(url).hostname}
                   .iconSrc=${`page-icon:${url}`}
-                  @ai-website-chip:remove=${() => {
+                  @smartwindow-chip:remove=${() => {
                     this.pages = this.pages.filter(item => item !== url);
                   }}
-                ></ai-website-chip>`
+                ></smartwindow-chip>`
             )}
           </div>`
         : nothing}
@@ -437,13 +442,14 @@ export class AgentActionForm extends MozLitElement {
   }
 
   #renderSubmit() {
-    const { submitLabel, submitL10nId } = this.action ?? {};
-    if (submitLabel) {
-      return html`<moz-button
-        type="primary"
-        label=${submitLabel}
-        @click=${() => this.#onSubmit()}
-      ></moz-button>`;
+    const { submitLabel, submitL10nId, menuLabel } = this.action ?? {};
+    // label is a Fluent attribute on moz-button, so a raw string set there is
+    // cleared. The default slot is what the button shows.
+    const label = submitLabel || (submitL10nId ? "" : menuLabel);
+    if (label) {
+      return html`<moz-button type="primary" @click=${() => this.#onSubmit()}
+        >${label}</moz-button
+      >`;
     }
     return html`<moz-button
       type="primary"
