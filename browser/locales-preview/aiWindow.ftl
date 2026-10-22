@@ -37,6 +37,14 @@ smartwindow-monitor-panel-news = News smart page
 smartwindow-monitor-panel-news-focus =
   .label = What should the page cover?
   .placeholder = Today’s headlines, a topic to follow, what to leave out.
+# Menu entry that builds one smart page from the current tab and a focus
+smartwindow-monitor-panel-custom = Custom smart page
+smartwindow-monitor-panel-custom-title = Custom smart page
+smartwindow-monitor-panel-custom-focus =
+  .label = What should the page cover?
+  .placeholder = Summarize this page, pull out the argument, list the steps.
+smartwindow-monitor-panel-custom-focus-error = Enter what the page should cover.
+smartwindow-monitor-panel-custom-no-page = Open a web page first.
 # Menu entry that opens a form with only a time
 smartwindow-monitor-panel-remind = Remind me
 smartwindow-monitor-panel-remind-title = Remind me

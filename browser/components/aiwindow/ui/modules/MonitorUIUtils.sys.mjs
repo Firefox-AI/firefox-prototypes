@@ -386,43 +386,55 @@ export const MonitorUIUtils = {
     const focus = [title, condition, `Write a page to reopen ${cadence}.`]
       .filter(part => part?.trim())
       .join("\n\n");
+    const page = await buildSmartPage({ focus, watchUrls, title });
+    if (!page) {
+      return;
+    }
     try {
-      lazy
-        .getHeadingFont()
-        .catch(error =>
-          console.error("Failed to prefetch the heading font", error)
-        );
-      const conversation = new lazy.Conversation();
-      const result = await lazy.AITab.generateAITab(
-        { urlList: watchUrls, focus, howInitiated: "chat" },
-        conversation
-      );
-      if (result.error) {
-        console.error("Failed to generate smart page:", result.error);
-        notifySmartPage(title, "The smart page could not be created.");
-        return;
-      }
-
-      const { context, convId, toolConvId, ...pageMetadata } = result.metadata;
-      const stored = await lazy.AITabStore.create({
-        convId: convId ?? conversation.id,
-        toolConvId,
-        slug: result.metadata.id,
-        title: result.metadata.title || title,
-        context,
-        components: { metadata: pageMetadata, surface: result.surface },
-      });
-      const url = lazy.AITab.buildViewerURL(stored.slug);
       const createdAt = new Date().toISOString();
-      await lazy.MonitorAgent.setSmartPage(monitorId, { url, createdAt });
-      notifySmartPage(
-        result.metadata.title || title,
-        "Your smart page is ready.",
-        url
-      );
+      await lazy.MonitorAgent.setSmartPage(monitorId, {
+        url: page.url,
+        createdAt,
+      });
+      notifySmartPage(page.title, "Your smart page is ready.", page.url);
     } catch (error) {
-      console.error("Failed to generate smart page:", error);
+      console.error("Failed to store the smart page:", error);
       notifySmartPage(title, "The smart page could not be created.");
+    }
+  },
+
+  /**
+   * Builds one smart page from `focus` and the given pages, then opens it.
+   * Spike: the pages are the tab the user is on. Nothing is stored on a task.
+   *
+   * @param {object} options
+   * @param {string} options.focus - Passed to AITab as the page focus.
+   * @param {string[]} options.watchUrls - Pages to build from. Empty when the
+   *   current tab is not a page a smart page can use.
+   * @returns {Promise<void>}
+   */
+  async openFocusedSmartPage({ focus, watchUrls }) {
+    const urls = (watchUrls ?? []).filter(Boolean);
+    if (!urls.length) {
+      notifySmartPage(
+        localized(
+          "smartwindow-monitor-panel-custom-title",
+          "Custom smart page"
+        ),
+        localized(
+          "smartwindow-monitor-panel-custom-no-page",
+          "Open a web page first."
+        )
+      );
+      return;
+    }
+    const page = await buildSmartPage({
+      focus,
+      watchUrls: urls,
+      title: "Smart page",
+    });
+    if (page) {
+      openSmartPage(page.url);
     }
   },
 
@@ -436,6 +448,67 @@ export const MonitorUIUtils = {
     armReminder(time);
   },
 };
+
+/**
+ * Generates a smart page and stores it. Notifies and returns null on failure.
+ *
+ * @param {object} options
+ * @param {string} options.focus - Instruction passed to AITab.
+ * @param {string[]} options.watchUrls - Pages the smart page is built from.
+ * @param {string} options.title - Fallback title and the failure notification.
+ * @returns {Promise<?{url: string, title: string}>}
+ */
+async function buildSmartPage({ focus, watchUrls, title }) {
+  try {
+    lazy
+      .getHeadingFont()
+      .catch(error =>
+        console.error("Failed to prefetch the heading font", error)
+      );
+    const conversation = new lazy.Conversation();
+    const result = await lazy.AITab.generateAITab(
+      { urlList: watchUrls, focus, howInitiated: "chat" },
+      conversation
+    );
+    if (result.error) {
+      console.error("Failed to generate smart page:", result.error);
+      notifySmartPage(title, "The smart page could not be created.");
+      return null;
+    }
+
+    const { context, convId, toolConvId, ...pageMetadata } = result.metadata;
+    const stored = await lazy.AITabStore.create({
+      convId: convId ?? conversation.id,
+      toolConvId,
+      slug: result.metadata.id,
+      title: result.metadata.title || title,
+      context,
+      components: { metadata: pageMetadata, surface: result.surface },
+    });
+    return {
+      url: lazy.AITab.buildViewerURL(stored.slug),
+      title: result.metadata.title || title,
+    };
+  } catch (error) {
+    console.error("Failed to generate smart page:", error);
+    notifySmartPage(title, "The smart page could not be created.");
+    return null;
+  }
+}
+
+/**
+ * @param {string} id
+ * @param {string} fallback
+ * @returns {string}
+ */
+function localized(id, fallback) {
+  try {
+    return localization.formatValueSync(id);
+  } catch (error) {
+    console.error("Failed to format a smart page string", error);
+    return fallback;
+  }
+}
 
 // Holds reminder timers so they are not collected before they fire.
 const reminderTimers = new Set();
