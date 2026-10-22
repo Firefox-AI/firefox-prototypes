@@ -9,9 +9,15 @@ const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   EMBEDDING_TYPE: "chrome://global/content/ml/EmbeddingsGenerator.sys.mjs",
   EmbeddingsGenerator: "chrome://global/content/ml/EmbeddingsGenerator.sys.mjs",
+  AuthProvider:
+    "moz-src:///browser/components/aiwindow/models/AuthProvider.sys.mjs",
+  GetPageContent: "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs",
   MemoriesManager:
     "moz-src:///browser/components/aiwindow/models/memories/MemoriesManager.sys.mjs",
+  MODEL_FEATURES: "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
   MerinoClient: "moz-src:///browser/components/urlbar/MerinoClient.sys.mjs",
+  buildEngineForFeature:
+    "moz-src:///browser/components/aiwindow/models/PromptLoader.sys.mjs",
   cosSim: "chrome://global/content/ml/NLPUtils.sys.mjs",
 });
 
@@ -24,6 +30,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
  * from static embeddings, the same family about:inference runs, scored with
  * the cosine similarity Smart Tab Grouping uses. That activity also picks
  * memories from MemoriesManager, with placeholder examples when none match.
+ * A note card asks the title-generation model for a short practical note
+ * grounded in that page and only the memories that bear on it.
  */
 
 // First match wins. city/region/country are sent straight to the Merino
@@ -81,6 +89,11 @@ const DESTINATIONS = [
 const WEATHER_SOURCE = "newtab";
 const PAGE_TEXT_LIMIT = 2500;
 const ACTIVITY_TEXT_LIMIT = 600;
+const NOTE_PAGE_LIMIT = 1500;
+// Quiet period after the last top-level load event. Session restore selects
+// a tab before its document has any content, and a short wait starts the
+// note on an empty page.
+const NOTE_DEBOUNCE_MS = 1500;
 // Normalized static embeddings of a page and a short prototype. Below this
 // the visit is "Other" instead of a forced category.
 const MIN_ACTIVITY_SIMILARITY = 0.22;
@@ -355,8 +368,36 @@ function temperatureUnit() {
   return navigator.language === "en-US" ? "f" : "c";
 }
 
+function noteText(text) {
+  return String(text || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Enough of a conversation for GetPageContent to read an already-open tab.
+// Headless fetches are not used: a missing tab returns ok: false.
+const PAGE_READ = {
+  getAllMentionURLs() {
+    return new Set();
+  },
+  addSeenUrls() {},
+  securityProperties: {
+    setPrivateData() {},
+    setUntrustedInput() {},
+  },
+};
+
+const NOTE_SYSTEM = [
+  "Write a short practical note for a sidebar card, two or three sentences.",
+  "Lead with what is useful on this page: what to do, book, change, or notice.",
+  "Memories are a mixed list. Use one only when it changes that advice.",
+  "Leave out memories that do not bear on this page.",
+  "Do not mention every memory, and do not say that you are using memories.",
+  "Plain prose. No preamble, no title, no quotes, and no list.",
+].join(" ");
+
 /**
- * Weather and tab-time cards shown at the top of the AI Window sidebar.
+ * Weather, tab-time, memory, and note cards shown at the top of the AI Window sidebar.
  */
 export class SidebarWidgets extends MozLitElement {
   static properties = {
@@ -365,6 +406,7 @@ export class SidebarWidgets extends MozLitElement {
     lastSwitch: { type: String },
     memories: { type: Array },
     memoriesLabel: { type: String },
+    note: { type: String },
   };
 
   constructor() {
@@ -381,6 +423,7 @@ export class SidebarWidgets extends MozLitElement {
     this.lastSwitch = "Switch tabs to compare";
     this.memories = placeholderMemories("other");
     this.memoriesLabel = "Examples";
+    this.note = "Waiting for the page";
     this.#merino = new lazy.MerinoClient("AIWINDOW_SIDEBAR_WEATHER", {
       allowOhttp: false,
     });
@@ -405,6 +448,10 @@ export class SidebarWidgets extends MozLitElement {
   #prototypePromise = null;
   #memoryGen = 0;
   #memoryActivityId = "";
+  #noteTimer = 0;
+  #noteGen = 0;
+  #noteKey = "";
+  #enginePromise = null;
 
   #progress = {
     QueryInterface: ChromeUtils.generateQI([
@@ -412,17 +459,23 @@ export class SidebarWidgets extends MozLitElement {
       "nsISupportsWeakReference",
     ]),
     onStateChange: (webProgress, _request, flags) => {
-      if (
-        webProgress.isTopLevel &&
-        flags & Ci.nsIWebProgressListener.STATE_STOP
-      ) {
+      if (!webProgress.isTopLevel) {
+        return;
+      }
+      const loadStart = flags & Ci.nsIWebProgressListener.STATE_START;
+      const loadStop = flags & Ci.nsIWebProgressListener.STATE_STOP;
+      if (loadStop) {
         this.#scheduleWeather();
         this.#noteDocument();
+      }
+      if (loadStart || loadStop) {
+        this.#postponeNote();
       }
     },
     onLocationChange: webProgress => {
       if (webProgress.isTopLevel) {
         this.#scheduleWeather();
+        this.#postponeNote();
       }
     },
     onProgressChange() {},
@@ -447,6 +500,7 @@ export class SidebarWidgets extends MozLitElement {
     super.disconnectedCallback();
     clearInterval(this.#timer);
     clearTimeout(this.#weatherTimer);
+    clearTimeout(this.#noteTimer);
     this.#win?.gBrowser.tabContainer.removeEventListener(
       "TabSelect",
       this.#onTabSelect
@@ -454,6 +508,8 @@ export class SidebarWidgets extends MozLitElement {
     this.#unwatch();
     this.#win = null;
     this.#weatherGen += 1;
+    this.#noteGen += 1;
+    this.#noteKey = "";
   }
 
   #onTabSelect = event => {
@@ -507,6 +563,11 @@ export class SidebarWidgets extends MozLitElement {
 
   #openSegment(spec) {
     this.#closeSegment();
+    clearTimeout(this.#noteTimer);
+    this.#noteTimer = 0;
+    this.#noteGen += 1;
+    this.#noteKey = "";
+    this.note = "Waiting for the page";
     const tab = this.#tab;
     const segment = {
       started: Date.now(),
@@ -546,7 +607,9 @@ export class SidebarWidgets extends MozLitElement {
 
   async #loadMemories(activity) {
     const activityId = activity?.id || OTHER_ACTIVITY.id;
+    // Same activity on a new URL still needs a new note. Memories stay put.
     if (activityId === this.#memoryActivityId) {
+      this.#scheduleNote();
       return;
     }
     this.#memoryActivityId = activityId;
@@ -573,10 +636,144 @@ export class SidebarWidgets extends MozLitElement {
     if (found.length) {
       this.memories = found;
       this.memoriesLabel = label;
+    } else {
+      this.memories = placeholderMemories(activityId);
+      this.memoriesLabel = `${label} · examples`;
+    }
+    this.#scheduleNote();
+  }
+
+  // Push note generation out while a restored or newly opened document is
+  // still loading. Does not change a note that already finished.
+  #postponeNote() {
+    if (!this.#segment?.activity) {
       return;
     }
-    this.memories = placeholderMemories(activityId);
-    this.memoriesLabel = `${label} · examples`;
+    if (this.note === "Writing a note") {
+      this.#noteGen += 1;
+      this.#noteKey = "";
+      this.note = "Waiting for the page";
+    }
+    this.#scheduleNote();
+  }
+
+  #documentLoading() {
+    try {
+      return !!this.#tab?.linkedBrowser?.webProgress?.isLoadingDocument;
+    } catch (ex) {
+      return false;
+    }
+  }
+
+  #scheduleNote() {
+    if (!this.#segment?.activity) {
+      return;
+    }
+    clearTimeout(this.#noteTimer);
+    this.#noteTimer = setTimeout(() => {
+      this.#noteTimer = 0;
+      this.#loadNote();
+    }, NOTE_DEBOUNCE_MS);
+  }
+
+  async #loadNote() {
+    if (this.#documentLoading()) {
+      this.#scheduleNote();
+      return;
+    }
+    const activity = this.#segment?.activity;
+    const spec = this.#pageSpec;
+    if (!activity || !spec) {
+      return;
+    }
+    const lines = (this.memories || [])
+      .map(memory => memory.text)
+      .filter(Boolean);
+    const examples = (this.memories || []).some(memory => memory.placeholder);
+    const title = this.#tab?.label || "";
+    const key = `${spec}\0${title}\0${activity.id}\0${lines.join("\n")}`;
+    if (key === this.#noteKey) {
+      return;
+    }
+    this.#noteKey = key;
+    const gen = ++this.#noteGen;
+    this.note = "Writing a note";
+    try {
+      const text = await this.#writeNote(spec, activity, lines, examples);
+      if (gen !== this.#noteGen) {
+        return;
+      }
+      this.note = text || "Could not write a note";
+    } catch (ex) {
+      console.warn("Sidebar note failed", ex);
+      if (gen !== this.#noteGen) {
+        return;
+      }
+      this.note = "Could not write a note";
+    }
+  }
+
+  async #writeNote(spec, activity, lines, examples) {
+    const excerpt = await this.#pageExcerpt(spec);
+    const title = this.#tab?.label || "";
+    const memoryBlock = lines.length
+      ? lines.map(line => `- ${line}`).join("\n")
+      : "- (none)";
+    const memoryLabel = examples
+      ? "Example memories for this activity"
+      : "Saved memories";
+    const content = [
+      `Activity: ${activity.label}`,
+      `Title: ${title}`,
+      `URL: ${spec}`,
+      excerpt ? `Page:\n${excerpt}` : "Page text is unavailable.",
+      `${memoryLabel}:\n${memoryBlock}`,
+      "Write the note. Skip memories that are not relevant to this page.",
+    ].join("\n\n");
+    const { engine, parameters } = await this.#engineBundle();
+    const response = await engine.run({
+      args: [
+        { role: "system", content: NOTE_SYSTEM },
+        { role: "user", content },
+      ],
+      token: await lazy.AuthProvider.getToken(),
+      inferenceParams: {
+        ...parameters,
+        max_completion_tokens: 220,
+      },
+    });
+    const text = noteText(response?.finalOutput);
+    if (!text) {
+      throw new Error("empty note");
+    }
+    return text;
+  }
+
+  async #pageExcerpt(spec) {
+    if (!isHttp(spec)) {
+      return "";
+    }
+    const results = await lazy.GetPageContent.getPageContent(
+      { url_list: [spec] },
+      PAGE_READ
+    );
+    const result = results?.[0];
+    if (!result?.ok) {
+      return "";
+    }
+    return result.content.slice(0, NOTE_PAGE_LIMIT);
+  }
+
+  #engineBundle() {
+    if (!this.#enginePromise) {
+      this.#enginePromise = lazy
+        .buildEngineForFeature(lazy.MODEL_FEATURES.TITLE_GENERATION)
+        .catch(error => {
+          this.#enginePromise = null;
+          throw error;
+        });
+    }
+    return this.#enginePromise;
   }
 
   #closeSegment() {
@@ -929,6 +1126,10 @@ export class SidebarWidgets extends MozLitElement {
         <ul class="memories-list">
           ${this.memories.map(memory => html`<li>${memory.text}</li>`)}
         </ul>
+      </section>
+      <section class="card note" aria-label="Note">
+        <div class="label">Note</div>
+        <p class="note-body">${this.note}</p>
       </section>
     `;
   }

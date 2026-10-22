@@ -67,8 +67,15 @@
   font-variant-numeric: tabular-nums;
 }
 
-.memories {
+.memories,
+.note {
   grid-column: 1 / -1;
+}
+
+.note-body {
+  margin-block: var(--space-xsmall) 0;
+  color: var(--text-color);
+  font-size: var(--font-size-small);
 }
 
 .memories-list {
