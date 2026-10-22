@@ -89,8 +89,11 @@ export class AgentMonitorPanel extends MozLitElement {
 
   updated(changed) {
     super.updated(changed);
-    if (changed.has("view") && this.view === "create") {
-      this.#focusCreateForm();
+    if (
+      changed.has("view") &&
+      (this.view === "create" || this.view === "action")
+    ) {
+      this.#focusOpenForm();
     }
     // Animate the trips between the list and the create form
     if (
@@ -109,13 +112,21 @@ export class AgentMonitorPanel extends MozLitElement {
     }
   }
 
-  async #focusCreateForm() {
-    const form = this.shadowRoot.querySelector("agent-monitor-item");
+  async #focusOpenForm() {
+    const view = this.view;
+    const form = this.shadowRoot.querySelector(
+      view === "action" ? "agent-action-form" : "agent-monitor-item"
+    );
     await form?.updateComplete;
-    // The view can change again while the card renders.
-    if (this.view === "create") {
-      form?.focusName();
+    // The view can change again while the form renders.
+    if (this.view !== view || !form?.isConnected) {
+      return;
     }
+    if (view === "action") {
+      form.focusFirst();
+      return;
+    }
+    form.focusName();
   }
 
   #dispatch(type, detail) {

@@ -212,7 +212,7 @@ export const MonitorPanel = {
       this._setView(panel, "list")
     );
     contents.addEventListener("agent-action-form:submit", event =>
-      this._onActionSubmit(panel, event.detail)
+      this._onActionSubmit(panel, win, event.detail)
     );
     // The form is torn down whenever the panel closes or the view changes, so
     // the draft is held out here to survive that.
@@ -354,7 +354,7 @@ export const MonitorPanel = {
    *   page a monitor can watch (about: pages, view-source, and so on).
    */
   _watchableUrl(win) {
-    const url = win.gBrowser?.currentURI?.spec ?? "";
+    const url = win?.gBrowser?.currentURI?.spec ?? "";
     return lazy.isAllowedWatchUrl(url) ? url : "";
   },
 
@@ -452,12 +452,17 @@ export const MonitorPanel = {
 
   /**
    * @param {XULElement} panel
+   * @param {ChromeWindow} win
    * @param {object} detail - See agent-action-form's ":submit" event.
    */
-  async _onActionSubmit(panel, detail) {
+  async _onActionSubmit(panel, win, detail) {
     const { handler, values } = detail ?? {};
     if (handler === "create-smart-page") {
       await this._createSmartPageTask(panel, values);
+      return;
+    }
+    if (handler === "open-smart-page") {
+      this._openFocusedSmartPage(panel, win, values);
       return;
     }
     if (handler === "notify-at") {
@@ -466,6 +471,26 @@ export const MonitorPanel = {
     if (panel.isConnected) {
       this._setView(panel, "list");
     }
+  },
+
+  /**
+   * Builds one smart page from the focus the user typed and the tab they are
+   * on, then opens it. The panel closes without waiting on generation.
+   *
+   * @param {XULElement} panel
+   * @param {ChromeWindow} win
+   * @param {object} values - Form values from the action's blocks.
+   */
+  _openFocusedSmartPage(panel, win, values) {
+    const url = this._watchableUrl(win);
+    if (panel.isConnected) {
+      this._setView(panel, "list");
+      panel.hidePopup();
+    }
+    lazy.MonitorUIUtils.openFocusedSmartPage({
+      focus: values?.focus,
+      watchUrls: url ? [url] : [],
+    });
   },
 
   /**

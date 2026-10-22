@@ -93,10 +93,12 @@ export class AgentActionForm extends MozLitElement {
     }
   }
 
-  firstUpdated() {
-    this.shadowRoot
-      .querySelector("moz-input-text, moz-textarea, moz-select")
-      ?.focus();
+  async focusFirst() {
+    const field = this.shadowRoot?.querySelector(
+      "moz-input-text, moz-textarea, moz-select"
+    );
+    await field?.updateComplete;
+    field?.focus();
   }
 
   #seed() {
@@ -174,14 +176,21 @@ export class AgentActionForm extends MozLitElement {
       if (block.type === "pages") {
         this.#validatePages(errors);
       } else if (!String(this.values[block.id] ?? "").trim()) {
-        errors[block.id] =
-          block.type === "text"
-            ? "ai-tasks-alert-error-name-required"
-            : "ai-tasks-alert-error-condition-required";
+        errors[block.id] = this.#requiredErrorId(block);
       }
     }
     this.errors = errors;
     return !Object.values(errors).some(Boolean);
+  }
+
+  #requiredErrorId(block) {
+    if (block.errorL10nId) {
+      return block.errorL10nId;
+    }
+    if (block.type === "text") {
+      return "ai-tasks-alert-error-name-required";
+    }
+    return "ai-tasks-alert-error-condition-required";
   }
 
   #validatePages(errors) {
@@ -193,6 +202,25 @@ export class AgentActionForm extends MozLitElement {
     if (!this.pages.length) {
       errors.pages = this.errors.pages || "ai-tasks-alert-error-no-pages";
     }
+  }
+
+  #onFormKeydown(event) {
+    if (event.key !== "Enter" || event.shiftKey || event.isComposing) {
+      return;
+    }
+    // A newline, adding a page, and activating a button already have a key.
+    const skip = new Set([
+      "textarea",
+      "moz-textarea",
+      "moz-input-url",
+      "button",
+      "moz-button",
+    ]);
+    if (event.composedPath().some(node => skip.has(node.localName))) {
+      return;
+    }
+    event.preventDefault();
+    this.#onSubmit();
   }
 
   #onSubmit() {
@@ -240,7 +268,7 @@ export class AgentActionForm extends MozLitElement {
         ></moz-input-text>`
       : html`<moz-input-text
           data-l10n-id=${block.l10nId}
-          data-l10n-attrs="label"
+          data-l10n-attrs=${block.l10nAttrs ?? "label"}
           .value=${this.values[block.id] ?? ""}
           @input=${event => this.#setValue(block.id, event.target.value)}
         ></moz-input-text>`;
@@ -434,7 +462,7 @@ export class AgentActionForm extends MozLitElement {
         rel="stylesheet"
         href="chrome://browser/content/aiwindow/components/agent-action-form.css"
       />
-      <div class="action-form">
+      <div class="action-form" @keydown=${event => this.#onFormKeydown(event)}>
         ${(this.action.blocks ?? []).map(block => this.#renderBlock(block))}
         <div class="action-actions">
           <span class="action-spacer"></span>

@@ -13,9 +13,9 @@
  * Copy is the model's `label` (and `menuLabel`, `title`, `submitLabel`) when
  * it supplied one, and a Fluent id otherwise.
  *
- * `handler` is what the button does. `create-smart-page` and `notify-at` are
- * wired. Anything else is accepted and does nothing, so a model can offer a
- * control before it has a behavior.
+ * `handler` is what the button does. `create-smart-page`, `open-smart-page`,
+ * and `notify-at` are wired. Anything else is accepted and does nothing, so a
+ * model can offer a control before it has a behavior.
  */
 
 export const PANEL_ACTIONS = [
@@ -48,6 +48,24 @@ export const PANEL_ACTIONS = [
       },
       { type: "frequency", id: "frequency" },
       { type: "time", id: "time" },
+    ],
+  },
+  {
+    id: "custom-page",
+    kind: "form",
+    handler: "open-smart-page",
+    menuL10nId: "smartwindow-monitor-panel-custom",
+    titleL10nId: "smartwindow-monitor-panel-custom-title",
+    submitL10nId: "smartwindow-monitor-panel-create-smart-page-title",
+    blocks: [
+      {
+        type: "text",
+        id: "focus",
+        l10nId: "smartwindow-monitor-panel-custom-focus",
+        l10nAttrs: "label,placeholder",
+        errorL10nId: "smartwindow-monitor-panel-custom-focus-error",
+        required: true,
+      },
     ],
   },
   {
