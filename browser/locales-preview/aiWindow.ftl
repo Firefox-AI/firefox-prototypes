@@ -51,6 +51,54 @@ smartwindow-monitor-panel-remind-title = Remind me
 smartwindow-monitor-panel-remind-button = Remind me
 # Menu entry that zooms the current page in immediately
 smartwindow-monitor-panel-zoom-in = Zoom in
+# Menu entry that summarizes the current page immediately
+smartwindow-monitor-panel-summarize = Summarize this page
+# Menu entry that builds one smart page comparing the pages the user picks
+smartwindow-monitor-panel-compare = Compare pages
+smartwindow-monitor-panel-compare-title = Compare pages
+smartwindow-monitor-panel-compare-focus =
+  .label = What should the comparison cover?
+  .placeholder = Prices, claims, what is different.
+# Menu entry that searches the current page
+smartwindow-monitor-panel-find = Find on this page
+smartwindow-monitor-panel-find-title = Find on this page
+smartwindow-monitor-panel-find-query =
+  .label = Find
+  .placeholder = A word or phrase
+smartwindow-monitor-panel-find-error = Enter what to find.
+smartwindow-monitor-panel-find-button = Find
+# Menu entry that bookmarks the current page, with an optional name
+smartwindow-monitor-panel-bookmark = Bookmark this page
+smartwindow-monitor-panel-bookmark-title = Bookmark this page
+smartwindow-monitor-panel-bookmark-name =
+  .label = Name
+  .placeholder = Leave blank to use the page title
+smartwindow-monitor-panel-bookmark-button = Bookmark
+# Menu entry that creates a price-watching task
+smartwindow-monitor-panel-price = Price watch
+smartwindow-monitor-panel-price-title = Price watch
+smartwindow-monitor-panel-price-query =
+  .label = What should I watch for?
+  .placeholder = The headphones drop under $50.
+smartwindow-monitor-panel-price-error = Enter what to watch for.
+smartwindow-monitor-panel-price-button = Watch price
+# Menu entry that reminds the user about something they type, at a time
+smartwindow-monitor-panel-note = Remind me to…
+smartwindow-monitor-panel-note-title = Remind me to…
+smartwindow-monitor-panel-note-body =
+  .label = What should I remind you about?
+  .placeholder = Leave for the appointment, check the oven.
+smartwindow-monitor-panel-note-error = Enter what to be reminded about.
+# Menu entry whose form is only a preview. The button does not run anything.
+smartwindow-monitor-panel-research = Research this
+smartwindow-monitor-panel-research-title = Research this
+smartwindow-monitor-panel-research-brief =
+  .label = What do you want to learn?
+  .placeholder = How the warranty compares, what reviewers disagree on.
+smartwindow-monitor-panel-research-error = Enter what you want to learn.
+smartwindow-monitor-panel-done = Done
+# Menu entry that opens the current page in reader view
+smartwindow-monitor-panel-reader = Open reader view
 # Desktop notification for the reminder above
 smartwindow-monitor-panel-reminder-title = Reminder
 # Variables:

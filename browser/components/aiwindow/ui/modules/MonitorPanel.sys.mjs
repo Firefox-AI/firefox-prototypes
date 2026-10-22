@@ -16,6 +16,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/models/agents/Monitor.sys.mjs",
   MonitorUIUtils:
     "moz-src:///browser/components/aiwindow/ui/modules/MonitorUIUtils.sys.mjs",
+  PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
   PANEL_ACTIONS:
     "moz-src:///browser/components/aiwindow/ui/modules/PanelActions.sys.mjs",
   TabMetrics: "moz-src:///browser/components/tabbrowser/TabMetrics.sys.mjs",
@@ -440,9 +441,7 @@ export const MonitorPanel = {
     }
     if (action.kind === "immediate") {
       panel.hidePopup();
-      if (action.handler === "zoom-in") {
-        win.FullZoom?.enlarge();
-      }
+      this._runImmediate(win, action.handler);
       return;
     }
     panel._contents.action = action;
@@ -457,20 +456,196 @@ export const MonitorPanel = {
    */
   async _onActionSubmit(panel, win, detail) {
     const { handler, values } = detail ?? {};
-    if (handler === "create-smart-page") {
-      await this._createSmartPageTask(panel, values);
-      return;
-    }
-    if (handler === "open-smart-page") {
-      this._openFocusedSmartPage(panel, win, values);
-      return;
-    }
-    if (handler === "notify-at") {
-      lazy.MonitorUIUtils.scheduleReminder(values?.time);
+    switch (handler) {
+      case "create-smart-page":
+        await this._createSmartPageTask(panel, values);
+        return;
+      case "open-smart-page":
+        this._openFocusedSmartPage(panel, win, values);
+        return;
+      case "compare-pages":
+        this._comparePages(panel, values);
+        return;
+      case "find-in-page":
+        this._findInPage(panel, win, values);
+        return;
+      case "bookmark-page":
+        this._bookmarkPage(panel, win, values);
+        return;
+      case "create-monitor":
+        await this._createMonitorTask(panel, values);
+        return;
+      case "notify-at":
+        lazy.MonitorUIUtils.scheduleReminder(values?.time, values?.note);
+        break;
     }
     if (panel.isConnected) {
       this._setView(panel, "list");
     }
+  },
+
+  /**
+   * Runs a menu entry that has no form. Unknown handlers do nothing.
+   *
+   * @param {ChromeWindow} win
+   * @param {string} [handler]
+   */
+  _runImmediate(win, handler) {
+    switch (handler) {
+      case "zoom-in":
+        win.FullZoom?.enlarge();
+        break;
+      case "summarize-page":
+        this._summarizePage(win);
+        break;
+      case "reader-view":
+        this._openReaderView(win);
+        break;
+    }
+  },
+
+  /**
+   * @param {ChromeWindow} win
+   */
+  _summarizePage(win) {
+    const url = this._watchableUrl(win);
+    lazy.MonitorUIUtils.openFocusedSmartPage({
+      focus: "Summarize this page.",
+      watchUrls: url ? [url] : [],
+    });
+  },
+
+  /**
+   * @param {XULElement} panel
+   * @param {object} values
+   */
+  _comparePages(panel, values) {
+    const focus = values?.focus?.trim() || "Compare these pages.";
+    if (panel.isConnected) {
+      this._setView(panel, "list");
+      panel.hidePopup();
+    }
+    lazy.MonitorUIUtils.openFocusedSmartPage({
+      focus,
+      watchUrls: values?.pages ?? [],
+    });
+  },
+
+  /**
+   * @param {XULElement} panel
+   * @param {ChromeWindow} win
+   * @param {object} values
+   */
+  _findInPage(panel, win, values) {
+    const term = values?.query?.trim() ?? "";
+    if (panel.isConnected) {
+      panel.hidePopup();
+    }
+    if (term) {
+      this._startFind(win, term);
+    }
+  },
+
+  /**
+   * @param {ChromeWindow} win
+   * @param {string} term
+   */
+  async _startFind(win, term) {
+    try {
+      const bar = await win.gFindBarPromise;
+      bar.open(bar.FIND_NORMAL);
+      bar._findField.value = term;
+      bar.onFindAgainCommand(false);
+      bar._findField.focus();
+    } catch (error) {
+      console.error("Failed to find on this page:", error);
+    }
+  },
+
+  /**
+   * @param {XULElement} panel
+   * @param {ChromeWindow} win
+   * @param {object} values
+   */
+  _bookmarkPage(panel, win, values) {
+    const url = this._watchableUrl(win);
+    const title =
+      values?.name?.trim() || win.gBrowser?.selectedTab?.label || url;
+    if (panel.isConnected) {
+      panel.hidePopup();
+    }
+    if (!url) {
+      lazy.MonitorUIUtils.showNotification(
+        "Bookmark",
+        "Open a web page first."
+      );
+      return;
+    }
+    this._insertBookmark(url, title);
+  },
+
+  /**
+   * @param {string} url
+   * @param {string} title
+   */
+  async _insertBookmark(url, title) {
+    try {
+      await lazy.PlacesUtils.bookmarks.insert({
+        parentGuid: lazy.PlacesUtils.bookmarks.unfiledGuid,
+        url,
+        title,
+      });
+      lazy.MonitorUIUtils.showNotification(title, "Bookmarked.");
+    } catch (error) {
+      console.error("Failed to bookmark page:", error);
+    }
+  },
+
+  /**
+   * @param {ChromeWindow} win
+   */
+  _openReaderView(win) {
+    const url = this._watchableUrl(win);
+    if (!url || typeof win.openTrustedLinkIn !== "function") {
+      return;
+    }
+    win.openTrustedLinkIn(
+      `about:reader?url=${encodeURIComponent(url)}`,
+      "current"
+    );
+  },
+
+  /**
+   * Creates a task from a form and does not build a smart page.
+   *
+   * @param {XULElement} panel
+   * @param {object} values
+   */
+  async _createMonitorTask(panel, values) {
+    const { pages, frequency, time, weekday } = values ?? {};
+    const prompt = values?.prompt?.trim();
+    let id;
+    try {
+      id = await lazy.MonitorAgent.createMonitor({
+        prompt,
+        watchUrls: pages,
+        pageTitle: prompt,
+        schedule: this._toAgentSchedule({
+          frequency,
+          time,
+          ...(frequency === "weekly" && { weekday }),
+        }),
+        source: "toolbar_panel",
+      });
+    } catch (error) {
+      console.error("Failed to create monitor:", error);
+      return;
+    }
+    if (!panel.isConnected) {
+      return;
+    }
+    panel._contents.justCreatedId = id;
+    this._setView(panel, "list");
   },
 
   /**
