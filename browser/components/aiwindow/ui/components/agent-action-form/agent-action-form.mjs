@@ -106,11 +106,17 @@ export class AgentActionForm extends MozLitElement {
     this.pages = url ? [url] : [];
     this.pendingUrl = "";
     this.errors = {};
+    const params = this.action?.params ?? {};
     this.values = {
-      frequency: "daily",
-      time: nextTimeOption(),
+      frequency: params.frequency === "weekly" ? "weekly" : "daily",
+      time: params.time || nextTimeOption(),
       weekday: "1",
     };
+    for (const [key, value] of Object.entries(params)) {
+      if (typeof value === "string" && value) {
+        this.values[key] = value;
+      }
+    }
   }
 
   #setValue(id, value) {
@@ -437,13 +443,14 @@ export class AgentActionForm extends MozLitElement {
   }
 
   #renderSubmit() {
-    const { submitLabel, submitL10nId } = this.action ?? {};
-    if (submitLabel) {
-      return html`<moz-button
-        type="primary"
-        label=${submitLabel}
-        @click=${() => this.#onSubmit()}
-      ></moz-button>`;
+    const { submitLabel, submitL10nId, menuLabel } = this.action ?? {};
+    // label is a Fluent attribute on moz-button, so a raw string set there is
+    // cleared. The default slot is what the button shows.
+    const label = submitLabel || (submitL10nId ? "" : menuLabel);
+    if (label) {
+      return html`<moz-button type="primary" @click=${() => this.#onSubmit()}
+        >${label}</moz-button
+      >`;
     }
     return html`<moz-button
       type="primary"

@@ -40,6 +40,7 @@ const MAX_VISIBLE_ROWS = 5;
  *  - agent-monitor-panel:create-task
  *  - agent-monitor-panel:choose-action  detail: { id } - An extra menu entry.
  *    The host looks the id up in PANEL_ACTIONS.
+ *  - agent-monitor-panel:refresh-suggestions - Ask for a set for this page.
  *  - agent-monitor-panel:manage-tasks
  *  - agent-monitor-panel:open-task  (detail: { id }; a row was activated. Only
  *    fires for a task that watches at least one page, or that has a generated
@@ -56,6 +57,11 @@ const MAX_VISIBLE_ROWS = 5;
  * @property {?object} draft - In-progress create form state, owned by the host.
  * @property {?object} action - The PANEL_ACTIONS entry shown when view is
  *   "action".
+ * @property {object[]} suggestions - Menu entries suggested for the open page.
+ *   They render ahead of the static entries, with the Smart Window icon.
+ * @property {boolean} canRefreshSuggestions - Offer the control that asks.
+ *   It reads "Generate smart menu" until a set is showing, then "Refresh".
+ * @property {boolean} suggestionsRefreshing - A new set is on the way.
  * @property {"list"|"create"|"action"} view - Which view to render.
  * @property {?string} justCreatedId - This Id is used to trigger an animation
  * to show the user the newly created monitor task
@@ -69,6 +75,9 @@ export class AgentMonitorPanel extends MozLitElement {
     maxMonitors: { type: Number },
     agent: { type: Object },
     action: { type: Object },
+    suggestions: { type: Array },
+    canRefreshSuggestions: { type: Boolean },
+    suggestionsRefreshing: { type: Boolean },
     draft: { type: Object },
     view: { type: String, reflect: true },
     justCreatedId: { type: String },
@@ -81,6 +90,9 @@ export class AgentMonitorPanel extends MozLitElement {
     this.maxMonitors = 0;
     this.agent = null;
     this.action = null;
+    this.suggestions = [];
+    this.canRefreshSuggestions = false;
+    this.suggestionsRefreshing = false;
     this.draft = null;
     this.view = "list";
     this.justCreatedId = null;
@@ -326,33 +338,64 @@ export class AgentMonitorPanel extends MozLitElement {
   }
 
   #renderMenuActions(atLimit) {
-    return lazy.PANEL_ACTIONS.map(action => {
-      const label = action.menuLabel
-        ? html`<span>${action.menuLabel}</span>`
-        : html`<span data-l10n-id=${action.menuL10nId}></span>`;
-      return html`<button
-        type="button"
-        class="monitor-footer-row"
-        ?disabled=${action.requiresMonitorSlot && atLimit}
-        @click=${() =>
-          this.#dispatch("agent-monitor-panel:choose-action", {
-            id: action.id,
-          })}
-      >
-        <img
-          class="monitor-footer-icon"
-          src="chrome://global/skin/icons/plus.svg"
-          alt=""
-        />
-        ${label}
-        ${action.kind === "form"
-          ? html`<span
-              class="monitor-footer-chevron monitor-footer-trailing"
-              aria-hidden="true"
-            ></span>`
-          : nothing}
-      </button>`;
-    });
+    const suggested = (this.suggestions ?? []).map(action =>
+      this.#renderMenuRow(action, atLimit, true)
+    );
+    const catalog = lazy.PANEL_ACTIONS.map(action =>
+      this.#renderMenuRow(action, atLimit, false)
+    );
+    return [...suggested, this.#renderRefresh(), ...catalog];
+  }
+
+  #renderRefresh() {
+    if (!this.canRefreshSuggestions) {
+      return nothing;
+    }
+    const generated = Boolean(this.suggestions?.length);
+    const iconClass = this.suggestionsRefreshing
+      ? "monitor-footer-icon spinning"
+      : "monitor-footer-icon";
+    const icon = generated
+      ? "chrome://global/skin/icons/reload.svg"
+      : "chrome://browser/skin/smart-window-mono-32.svg";
+    const l10nId = generated
+      ? "smartwindow-monitor-panel-refresh"
+      : "smartwindow-monitor-panel-generate";
+    return html`<button
+      type="button"
+      class="monitor-footer-row"
+      ?disabled=${this.suggestionsRefreshing}
+      @click=${() =>
+        this.#dispatch("agent-monitor-panel:refresh-suggestions", {})}
+    >
+      <img class=${iconClass} src=${icon} alt="" />
+      <span data-l10n-id=${l10nId}></span>
+    </button>`;
+  }
+
+  #renderMenuRow(action, atLimit, suggested) {
+    const label = action.menuLabel
+      ? html`<span>${action.menuLabel}</span>`
+      : html`<span data-l10n-id=${action.menuL10nId}></span>`;
+    const icon = suggested
+      ? "chrome://browser/skin/smart-window-mono-32.svg"
+      : "chrome://global/skin/icons/plus.svg";
+    return html`<button
+      type="button"
+      class="monitor-footer-row"
+      ?disabled=${action.requiresMonitorSlot && atLimit}
+      @click=${() =>
+        this.#dispatch("agent-monitor-panel:choose-action", { id: action.id })}
+    >
+      <img class="monitor-footer-icon" src=${icon} alt="" />
+      ${label}
+      ${action.kind === "form"
+        ? html`<span
+            class="monitor-footer-chevron monitor-footer-trailing"
+            aria-hidden="true"
+          ></span>`
+        : nothing}
+    </button>`;
   }
 
   #renderBody() {

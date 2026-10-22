@@ -109,6 +109,10 @@ smartwindow-monitor-panel-reminder-body = It’s { DATETIME($time, hour: "numeri
 #   $max (number) - The maximum number of tasks allowed
 smartwindow-monitor-panel-count = { $used } of { $max }
 smartwindow-monitor-panel-manage = Manage and view all tasks
+# Asks for page-specific menu items. Shown until a set is on screen.
+smartwindow-monitor-panel-generate = Generate smart menu
+# Asks again for page-specific menu items while the panel stays open.
+smartwindow-monitor-panel-refresh = Refresh suggestions
 
 ## AI Tasks
 
