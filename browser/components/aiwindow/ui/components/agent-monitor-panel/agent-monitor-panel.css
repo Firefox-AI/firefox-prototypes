@@ -256,6 +256,10 @@
   fill: currentColor;
 }
 
+.monitor-footer-trailing {
+  margin-inline-start: auto;
+}
+
 .monitor-footer-chevron {
   width: var(--icon-size-small);
   height: var(--icon-size-small);

@@ -150,6 +150,8 @@ browser.jar:
   content/browser/aiwindow/assets/aitab-error-kit.svg               (assets/aitab-error-kit.svg)
   content/browser/aiwindow/components/aitab-text-block.mjs          (components/aitab-page/aitab-text-block/aitab-text-block.mjs)
   content/browser/aiwindow/components/aitab-text-block.css          (components/aitab-page/aitab-text-block/aitab-text-block.css)
+  content/browser/aiwindow/components/agent-action-form.mjs         (components/agent-action-form/agent-action-form.mjs)
+  content/browser/aiwindow/components/agent-action-form.css         (components/agent-action-form/agent-action-form.css)
   content/browser/aiwindow/components/agent-monitor-item.mjs        (components/agent-monitor-item/agent-monitor-item.mjs)
   content/browser/aiwindow/components/agent-monitor-item.css        (components/agent-monitor-item/agent-monitor-item.css)
   content/browser/aiwindow/components/agent-monitor-panel.mjs       (components/agent-monitor-panel/agent-monitor-panel.mjs)

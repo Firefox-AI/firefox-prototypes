@@ -51,14 +51,6 @@ const SCHEDULE_ICON = "chrome://browser/skin/calendar-24.svg";
 const TIME_ICON = "chrome://browser/skin/history-20.svg";
 const DEFAULT_MAX_WATCH_URLS = 5;
 
-// Spike: a task whose title (or a page it watches) reads as news gets a smart
-// page on its schedule instead of a condition check. Matched as whole words.
-const SMART_PAGE_TITLE_RE = new RegExp(
-  "\\b(?:news(?:letter|paper)?|headlines?|briefings?|digests?" +
-    "|roundups?|bulletins?|current events|breaking)\\b",
-  "i"
-);
-
 // How long to coalesce typing before mirroring the form to the host
 const DRAFT_PERSIST_DELAY_MS = 250;
 
@@ -131,10 +123,7 @@ const WEEKDAYS = [
  * Dispatches:
  *  - agent-monitor-item:toggle       detail: { expanded }
  *  - agent-monitor-item:edit-toggle  detail: { editing }
- *  - agent-monitor-item:submit       detail: { mode, id, monitorName, condition, watchUrls, schedule, smartPage }
- *  - agent-monitor-item:smart-page  detail: { smartPage } - Create form only,
- *    when `smartPages` is set. Fired as the title crosses into or out of a
- *    news-style task.
+ *  - agent-monitor-item:submit       detail: { mode, id, monitorName, condition, watchUrls, schedule, autoExpandAndCheck }
  *  - agent-monitor-item:draft-change detail: { draft: MonitorDraft|null }
  *  - agent-monitor-item:resolve-titles detail: { urls } - Asks for the page
  *    titles of form pages that have none. Whoever answers dispatches
@@ -188,8 +177,6 @@ const WEEKDAYS = [
  *  (defaults to true). Hosts that cap how many monitors run at once set this to
  *  false once the cap is reached, so Resume reads as unavailable rather than
  *  failing after the user presses it. Pausing is never blocked.
- * @property {boolean} smartPages - When true, a news-style title switches the
- *  create button to one that promises a recurring smart page. Defaults to false.
  */
 export class AgentMonitorItem extends MozLitElement {
   static properties = {
@@ -206,7 +193,6 @@ export class AgentMonitorItem extends MozLitElement {
       attribute: "self-contained",
     },
     canResume: { type: Boolean },
-    smartPages: { type: Boolean },
     checkFrequency: { type: String, state: true },
     scheduleTime: { type: String, state: true },
     scheduleWeekday: { type: Number, state: true },
@@ -229,7 +215,6 @@ export class AgentMonitorItem extends MozLitElement {
     this.maxWatchUrls = DEFAULT_MAX_WATCH_URLS;
     this.selfContained = true;
     this.canResume = true;
-    this.smartPages = false;
     this.checkFrequency = SCHEDULE_TYPES.DAILY;
     this.scheduleTime = nextTimeOption();
     this.scheduleWeekday = 1;
@@ -248,8 +233,6 @@ export class AgentMonitorItem extends MozLitElement {
   #draftName;
   #draftPersistTimer = null;
   #requestedTitleUrls = new Set();
-  // Last smart-page state announced to the host, so typing does not re-fire it.
-  #announcedSmartPage = null;
 
   willUpdate(changed) {
     if (changed.has("agent")) {
@@ -269,7 +252,6 @@ export class AgentMonitorItem extends MozLitElement {
     ) {
       this.#requestMissingTitles();
     }
-    this.#publishSmartPage();
   }
 
   #requestMissingTitles() {
@@ -432,49 +414,6 @@ export class AgentMonitorItem extends MozLitElement {
     return this.#draftName ?? this.agent?.monitorName ?? "";
   }
 
-  /**
-   * A news-style task is one whose own name, the page it was opened on, or a
-   * watched page's title matches SMART_PAGE_TITLE_RE.
-   *
-   * @returns {boolean}
-   */
-  #wantsSmartPage() {
-    if (!this.smartPages || this.mode !== "create") {
-      return false;
-    }
-    const titles = [this.#monitorName];
-    for (const url of this.pageUrls) {
-      titles.push(this.#titleFor(url));
-      // The tab the form was opened on, until its title is resolved.
-      if (url === this.agent?.url) {
-        titles.push(this.agent?.pageTitle);
-      }
-    }
-    return titles.some(title => SMART_PAGE_TITLE_RE.test(title ?? ""));
-  }
-
-  #createButtonL10nId() {
-    if (!this.#wantsSmartPage()) {
-      return "ai-tasks-alert-create-button";
-    }
-    if (this.checkFrequency === SCHEDULE_TYPES.WEEKLY) {
-      return "ai-tasks-alert-create-smart-page-weekly";
-    }
-    return "ai-tasks-alert-create-smart-page-daily";
-  }
-
-  #publishSmartPage() {
-    if (!this.smartPages || this.mode !== "create") {
-      return;
-    }
-    const smartPage = this.#wantsSmartPage();
-    if (smartPage === this.#announcedSmartPage) {
-      return;
-    }
-    this.#announcedSmartPage = smartPage;
-    this.#dispatch("agent-monitor-item:smart-page", { smartPage });
-  }
-
   get #isAtMaxUrls() {
     return this.pageUrls.length >= this.maxWatchUrls;
   }
@@ -547,13 +486,6 @@ export class AgentMonitorItem extends MozLitElement {
     this.#clearFieldError("name");
     // Typing coalesces, a change (blur) flushes right away
     this.#persistDraft({ debounce: event.type === "input" });
-    // Re-render only when the title crosses the news threshold, so the create
-    // button can switch without resetting the field on every keystroke.
-    const smartPageChanged =
-      this.smartPages && this.#wantsSmartPage() !== this.#announcedSmartPage;
-    if (smartPageChanged) {
-      this.requestUpdate();
-    }
   }
 
   #onCardClick(e) {
@@ -729,7 +661,6 @@ export class AgentMonitorItem extends MozLitElement {
         time: this.scheduleTime,
         weekday: this.scheduleWeekday,
       },
-      smartPage: this.#wantsSmartPage(),
       autoExpandAndCheck: isCreateMode, // Signal to expand and check after creation
     });
     // Exit edit mode after saving
@@ -1109,12 +1040,12 @@ export class AgentMonitorItem extends MozLitElement {
     if (!this.selfContained) {
       return nothing;
     }
-    const l10nId = this.#wantsSmartPage()
-      ? "smartwindow-monitor-panel-create-smart-page-title"
-      : "ai-tasks-alert-modal-title";
     return html`<div class="title-container">
       <monitor-icon size="small"></monitor-icon>
-      <h2 class="monitor-card-state-title" data-l10n-id=${l10nId}></h2>
+      <h2
+        class="monitor-card-state-title"
+        data-l10n-id="ai-tasks-alert-modal-title"
+      ></h2>
     </div>`;
   }
 
@@ -1122,7 +1053,7 @@ export class AgentMonitorItem extends MozLitElement {
     return html`<moz-button
       id="create-task-button"
       type="primary"
-      data-l10n-id=${this.#createButtonL10nId()}
+      data-l10n-id="ai-tasks-alert-create-button"
       data-l10n-attrs="label"
       @click=${this.#onSubmit}
     ></moz-button>`;

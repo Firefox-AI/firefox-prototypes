@@ -16,6 +16,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/models/agents/MonitorAgent.sys.mjs",
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
   Region: "resource://gre/modules/Region.sys.mjs",
+  setTimeout: "resource://gre/modules/Timer.sys.mjs",
   URILoadingHelper: "resource:///modules/URILoadingHelper.sys.mjs",
 });
 
@@ -424,7 +425,59 @@ export const MonitorUIUtils = {
       notifySmartPage(title, "The smart page could not be created.");
     }
   },
+
+  /**
+   * Notifies once, the next time the clock reaches `time`. Spike: the timer
+   * lives in this process and is forgotten when it fires or the browser quits.
+   *
+   * @param {string} time - "HH:MM" on a 24-hour clock.
+   */
+  scheduleReminder(time) {
+    armReminder(time);
+  },
 };
+
+// Holds reminder timers so they are not collected before they fire.
+const reminderTimers = new Set();
+
+/**
+ * @param {string} time - "HH:MM" on a 24-hour clock.
+ */
+function armReminder(time) {
+  const [hour, minute] = String(time ?? "")
+    .split(":")
+    .map(Number);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute)) {
+    return;
+  }
+  const when = new Date();
+  when.setSeconds(0, 0);
+  when.setHours(hour, minute);
+  if (when.getTime() <= Date.now()) {
+    when.setDate(when.getDate() + 1);
+  }
+  const timer = lazy.setTimeout(() => {
+    reminderTimers.delete(timer);
+    let title = "Reminder";
+    let body = `It’s ${when.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    })}.`;
+    try {
+      title = localization.formatValueSync(
+        "smartwindow-monitor-panel-reminder-title"
+      );
+      body = localization.formatValueSync(
+        "smartwindow-monitor-panel-reminder-body",
+        { time: when.getTime() }
+      );
+    } catch (error) {
+      console.error("Failed to format the reminder", error);
+    }
+    notifySmartPage(title, body);
+  }, when.getTime() - Date.now());
+  reminderTimers.add(timer);
+}
 
 /**
  * @param {string} title
