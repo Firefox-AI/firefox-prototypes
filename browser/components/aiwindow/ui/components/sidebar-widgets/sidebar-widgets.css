@@ -66,3 +66,18 @@
   font-size: var(--font-size-small);
   font-variant-numeric: tabular-nums;
 }
+
+.memories {
+  grid-column: 1 / -1;
+}
+
+.memories-list {
+  margin: var(--space-xsmall) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.memories-list li {
+  color: var(--text-color);
+  font-size: var(--font-size-small);
+}

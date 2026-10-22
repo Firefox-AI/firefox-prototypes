@@ -9,6 +9,8 @@ const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   EMBEDDING_TYPE: "chrome://global/content/ml/EmbeddingsGenerator.sys.mjs",
   EmbeddingsGenerator: "chrome://global/content/ml/EmbeddingsGenerator.sys.mjs",
+  MemoriesManager:
+    "moz-src:///browser/components/aiwindow/models/memories/MemoriesManager.sys.mjs",
   MerinoClient: "moz-src:///browser/components/urlbar/MerinoClient.sys.mjs",
   cosSim: "chrome://global/content/ml/NLPUtils.sys.mjs",
 });
@@ -20,7 +22,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
  * place (a Japan travel page shows Tokyo). The timer records how long the
  * previous tab was selected and totals that time by activity. Activities come
  * from static embeddings, the same family about:inference runs, scored with
- * the cosine similarity Smart Tab Grouping uses.
+ * the cosine similarity Smart Tab Grouping uses. That activity also picks
+ * memories from MemoriesManager, with placeholder examples when none match.
  */
 
 // First match wins. city/region/country are sent straight to the Merino
@@ -100,6 +103,46 @@ const ACTIVITIES = [
     ],
   },
   {
+    id: "shopping",
+    label: "Shopping",
+    examples: [
+      "online shopping product reviews prices checkout cart",
+      "buying clothes shoes furniture comparing deals",
+    ],
+  },
+  {
+    id: "entertainment",
+    label: "Entertainment",
+    examples: [
+      "movies tv shows streaming music concerts games",
+      "what to watch playlist album trailer box office",
+    ],
+  },
+  {
+    id: "health",
+    label: "Health",
+    examples: [
+      "fitness workout running sleep health symptoms exercise",
+      "training plan yoga steps calories doctor visit",
+    ],
+  },
+  {
+    id: "finance",
+    label: "Finance",
+    examples: [
+      "banking budget savings investing credit card bills",
+      "mortgage taxes retirement portfolio spending",
+    ],
+  },
+  {
+    id: "sports",
+    label: "Sports",
+    examples: [
+      "sports scores standings game highlights team schedule",
+      "soccer basketball baseball match results playoffs",
+    ],
+  },
+  {
     id: "research",
     label: "Research",
     examples: [
@@ -119,32 +162,138 @@ const ACTIVITIES = [
 
 const OTHER_ACTIVITY = { id: "other", label: "Other" };
 
+// Query passed to MemoriesManager.getRelevantMemories for the current activity.
+const MEMORY_QUERIES = {
+  travel: "travel flights airlines hotels trips",
+  food: "food diet vegan restaurants meals",
+  shopping: "shopping products prices purchases",
+  entertainment: "movies music shows games streaming",
+  health: "health fitness exercise sleep workouts",
+  finance: "finance banking budget savings investing",
+  sports: "sports scores teams games",
+  research: "research learning studying documentation",
+  news: "news current events headlines",
+  other: "personal preferences",
+};
+
+// Shown when getRelevantMemories returns nothing. Prototype examples only.
+const PLACEHOLDER_MEMORIES = {
+  travel: [
+    "Flies United",
+    "Prefers aisle seats",
+    "Books hotels downtown",
+    "Travels with a carry-on only",
+  ],
+  food: ["Is vegan", "Likes spicy food", "Cooks on weeknights", "Avoids dairy"],
+  shopping: [
+    "Compares prices before buying",
+    "Buys running shoes online",
+    "Shops for home goods",
+    "Prefers free shipping",
+  ],
+  entertainment: [
+    "Watches sci-fi movies",
+    "Listens to jazz",
+    "Plays puzzle games",
+    "Follows new album releases",
+  ],
+  health: [
+    "Runs three times a week",
+    "Tracks sleep",
+    "Prefers morning workouts",
+    "Stretches after running",
+  ],
+  finance: [
+    "Uses a high-yield savings account",
+    "Tracks monthly spending",
+    "Invests in index funds",
+    "Pays credit cards in full",
+  ],
+  sports: [
+    "Follows soccer scores",
+    "Plays pickup basketball",
+    "Watches weekend games",
+    "Checks standings on Mondays",
+  ],
+  research: [
+    "Researches AI news",
+    "Reads technical docs",
+    "Saves papers to read later",
+    "Keeps notes on new tools",
+  ],
+  news: [
+    "Researches AI news",
+    "Follows world politics",
+    "Reads morning headlines",
+    "Skips celebrity news",
+  ],
+  other: [
+    "Is vegan",
+    "Flies United",
+    "Researches AI news",
+    "Runs three times a week",
+    "Compares prices before buying",
+    "Watches sci-fi movies",
+  ],
+};
+
+function placeholderMemories(activityId) {
+  const lines = PLACEHOLDER_MEMORIES[activityId] || PLACEHOLDER_MEMORIES.other;
+  return lines.map(text => ({ text, placeholder: true }));
+}
+
 const ACTIVITY_KEYWORDS = [
   {
-    activity: ACTIVITIES[0],
+    id: "travel",
     pattern:
       /\b(travel|trip|flight|hotel|vacation|itinerary|tourism|airline|sightseeing)\b/i,
   },
   {
-    activity: ACTIVITIES[1],
+    id: "food",
     pattern: /\b(recipe|restaurant|menu|cuisine|dining|food|cafe|grocery)\b/i,
   },
   {
-    activity: ACTIVITIES[3],
+    id: "shopping",
+    pattern: /\b(shop|shopping|cart|checkout|price|buy|store|deal)\b/i,
+  },
+  {
+    id: "entertainment",
+    pattern:
+      /\b(movie|film|netflix|spotify|music|album|concert|game|streaming|trailer)\b/i,
+  },
+  {
+    id: "health",
+    pattern:
+      /\b(workout|fitness|running|yoga|sleep|exercise|health|calories|training)\b/i,
+  },
+  {
+    id: "finance",
+    pattern:
+      /\b(bank|budget|savings|invest|mortgage|credit|taxes|retirement|portfolio)\b/i,
+  },
+  {
+    id: "sports",
+    pattern:
+      /\b(soccer|basketball|baseball|football|nfl|nba|score|standings|playoffs|match)\b/i,
+  },
+  {
+    id: "news",
     pattern: /\b(news|headline|breaking|politics|newspaper|journalism)\b/i,
   },
   {
-    activity: ACTIVITIES[2],
+    id: "research",
     pattern:
       /\b(research|documentation|wikipedia|tutorial|reference|paper|study)\b/i,
   },
 ];
 
+function activityById(id) {
+  return ACTIVITIES.find(activity => activity.id === id) || OTHER_ACTIVITY;
+}
+
 function keywordActivity(text) {
-  return (
-    ACTIVITY_KEYWORDS.find(entry => entry.pattern.test(text))?.activity ||
-    OTHER_ACTIVITY
-  );
+  const id = ACTIVITY_KEYWORDS.find(entry => entry.pattern.test(text))?.id;
+  return id ? activityById(id) : OTHER_ACTIVITY;
 }
 
 function matchDestination(haystack) {
@@ -214,6 +363,8 @@ export class SidebarWidgets extends MozLitElement {
     weather: { type: Object },
     elapsed: { type: String },
     lastSwitch: { type: String },
+    memories: { type: Array },
+    memoriesLabel: { type: String },
   };
 
   constructor() {
@@ -228,6 +379,8 @@ export class SidebarWidgets extends MozLitElement {
     };
     this.elapsed = "0:00";
     this.lastSwitch = "Switch tabs to compare";
+    this.memories = placeholderMemories("other");
+    this.memoriesLabel = "Examples";
     this.#merino = new lazy.MerinoClient("AIWINDOW_SIDEBAR_WEATHER", {
       allowOhttp: false,
     });
@@ -250,6 +403,8 @@ export class SidebarWidgets extends MozLitElement {
   #pageSpec = "";
   #embeddings = null;
   #prototypePromise = null;
+  #memoryGen = 0;
+  #memoryActivityId = "";
 
   #progress = {
     QueryInterface: ChromeUtils.generateQI([
@@ -374,11 +529,54 @@ export class SidebarWidgets extends MozLitElement {
         }
         if (this.#segment === segment) {
           segment.activity = activity;
+          this.#loadMemories(activity);
           this.requestUpdate();
         }
         return activity;
       })
-      .catch(() => OTHER_ACTIVITY);
+      .catch(() => {
+        if (this.#segment === segment) {
+          segment.activity = OTHER_ACTIVITY;
+          this.#loadMemories(OTHER_ACTIVITY);
+          this.requestUpdate();
+        }
+        return OTHER_ACTIVITY;
+      });
+  }
+
+  async #loadMemories(activity) {
+    const activityId = activity?.id || OTHER_ACTIVITY.id;
+    if (activityId === this.#memoryActivityId) {
+      return;
+    }
+    this.#memoryActivityId = activityId;
+    const gen = ++this.#memoryGen;
+    const label = activity?.label || OTHER_ACTIVITY.label;
+    let found = [];
+    try {
+      const matches = await lazy.MemoriesManager.getRelevantMemories(
+        MEMORY_QUERIES[activityId] || MEMORY_QUERIES.other,
+        3,
+        0.2
+      );
+      found = (matches || [])
+        .map(memory => memory.memory_summary?.trim())
+        .filter(Boolean)
+        .slice(0, 3)
+        .map(text => ({ text, placeholder: false }));
+    } catch (ex) {
+      console.warn("Sidebar memories lookup failed", ex);
+    }
+    if (gen !== this.#memoryGen) {
+      return;
+    }
+    if (found.length) {
+      this.memories = found;
+      this.memoriesLabel = label;
+      return;
+    }
+    this.memories = placeholderMemories(activityId);
+    this.memoriesLabel = `${label} · examples`;
   }
 
   #closeSegment() {
@@ -724,6 +922,12 @@ export class SidebarWidgets extends MozLitElement {
               </li>
             `
           )}
+        </ul>
+      </section>
+      <section class="card memories" aria-label="Memories">
+        <div class="label">Memories · ${this.memoriesLabel}</div>
+        <ul class="memories-list">
+          ${this.memories.map(memory => html`<li>${memory.text}</li>`)}
         </ul>
       </section>
     `;
