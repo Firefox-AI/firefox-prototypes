@@ -443,9 +443,18 @@ export const MonitorUIUtils = {
    * lives in this process and is forgotten when it fires or the browser quits.
    *
    * @param {string} time - "HH:MM" on a 24-hour clock.
+   * @param {string} [message] - Shown instead of the clock time.
    */
-  scheduleReminder(time) {
-    armReminder(time);
+  scheduleReminder(time, message) {
+    armReminder(time, message);
+  },
+
+  /**
+   * @param {string} title
+   * @param {string} text
+   */
+  showNotification(title, text) {
+    notifySmartPage(title, text);
   },
 };
 
@@ -515,8 +524,9 @@ const reminderTimers = new Set();
 
 /**
  * @param {string} time - "HH:MM" on a 24-hour clock.
+ * @param {string} [message] - Shown instead of the clock time.
  */
-function armReminder(time) {
+function armReminder(time, message) {
   const [hour, minute] = String(time ?? "")
     .split(":")
     .map(Number);
@@ -529,21 +539,26 @@ function armReminder(time) {
   if (when.getTime() <= Date.now()) {
     when.setDate(when.getDate() + 1);
   }
+  const note = message?.trim();
   const timer = lazy.setTimeout(() => {
     reminderTimers.delete(timer);
     let title = "Reminder";
-    let body = `It’s ${when.toLocaleTimeString(undefined, {
-      hour: "numeric",
-      minute: "2-digit",
-    })}.`;
+    let body =
+      note ||
+      `It’s ${when.toLocaleTimeString(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      })}.`;
     try {
       title = localization.formatValueSync(
         "smartwindow-monitor-panel-reminder-title"
       );
-      body = localization.formatValueSync(
-        "smartwindow-monitor-panel-reminder-body",
-        { time: when.getTime() }
-      );
+      if (!note) {
+        body = localization.formatValueSync(
+          "smartwindow-monitor-panel-reminder-body",
+          { time: when.getTime() }
+        );
+      }
     } catch (error) {
       console.error("Failed to format the reminder", error);
     }
