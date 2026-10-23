@@ -13,8 +13,19 @@
       <label for="sw-autogroup-toggle" class="title">Group tabs automatically</label>
       <div class="desc">Turning this off keeps your groups as they are. We just stop grouping new tabs.</div>
     </div>
-    <label class="switch">
+    <label class="switch" id="sw-autogroup-switch">
       <input type="checkbox" id="sw-autogroup-toggle" aria-label="Group tabs automatically">
+      <span class="slider"></span>
+    </label>
+  </section>
+
+  <section class="row toggle-row">
+    <div class="text">
+      <label for="sw-dedupe-toggle" class="title">Jump to open tabs instead of duplicates</label>
+      <div class="desc">When a page is already open, switch to it rather than opening a copy.</div>
+    </div>
+    <label class="switch" id="sw-dedupe-switch">
+      <input type="checkbox" id="sw-dedupe-toggle" aria-label="Jump to open tabs instead of duplicates">
       <span class="slider"></span>
     </label>
   </section>
@@ -33,6 +44,7 @@
       <div class="title">Last moved</div>
       <div class="desc" id="last-moved-desc"></div>
     </div>
+    <button class="small" id="reopen-copy" hidden>Reopen copy</button>
     <button class="small" id="show-last-moved">Show me</button>
   </section>
 

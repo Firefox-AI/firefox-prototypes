@@ -4,6 +4,7 @@ const $ = id => document.getElementById(id);
 
 function render(s) {
   $("sw-autogroup-toggle").checked = !!s.settings.enabled;
+  $("sw-dedupe-toggle").checked = !!s.settings.dedupe;
   const undo = $("sw-autogroup-undo");
   undo.disabled = !s.undoTitle;
   $("sw-autogroup-undo-desc").textContent = s.undoTitle ? s.undoTitle : "Nothing to undo";
@@ -12,9 +13,15 @@ function render(s) {
   $("last-moved-row").hidden = !lm;
   if (lm) {
     const ago = Math.max(0, Math.round((Date.now() - lm.at) / 1000));
-    const where = lm.stillThere ? `into "${lm.groupTitle}"` : "(since moved by you)";
-    $("last-moved-desc").textContent = `"${lm.title}" ${where}, ${ago < 60 ? ago + "s" : Math.round(ago / 60) + " min"} ago`;
+    const when = ago < 60 ? ago + "s" : Math.round(ago / 60) + " min";
+    if (lm.kind === "dedupe") {
+      $("last-moved-desc").textContent = `Jumped to "${lm.title}" instead of opening a copy, ${when} ago`;
+    } else {
+      const where = lm.stillThere ? `into "${lm.groupTitle}"` : "(since moved by you)";
+      $("last-moved-desc").textContent = `"${lm.title}" ${where}, ${when} ago`;
+    }
     $("show-last-moved").hidden = !lm.stillThere;
+    $("reopen-copy").hidden = !lm.canReopen;
   }
 
   $("model-detail").textContent = s.model.detail;
@@ -33,6 +40,15 @@ async function refresh() {
 $("show-last-moved").addEventListener("click", async () => {
   await browser.runtime.sendMessage({ type: "showLastMoved" });
   window.close();
+});
+
+$("reopen-copy").addEventListener("click", async () => {
+  await browser.runtime.sendMessage({ type: "reopenLastCopy" });
+  window.close();
+});
+
+$("sw-dedupe-toggle").addEventListener("change", async e => {
+  render(await browser.runtime.sendMessage({ type: "setSettings", settings: { dedupe: e.target.checked } }));
 });
 
 $("sw-autogroup-toggle").addEventListener("change", async e => {

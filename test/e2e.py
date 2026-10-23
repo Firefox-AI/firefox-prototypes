@@ -184,6 +184,28 @@ def activate_tab(client, url):
     """, url)
 
 
+def add_tab_fg(client, url):
+    chrome(client, """
+      const [url] = arguments;
+      const t = gBrowser.addTab(url, { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(), inBackground: false });
+      t.setAttribute("data-e2e", url + "#dup");
+    """, url)
+
+
+def count_url(client, url):
+    return chrome(client, """
+      const [url] = arguments;
+      return gBrowser.tabs.filter(t => t.linkedBrowser.currentURI.spec.replace(/[/]$/, "") === url.replace(/[/]$/, "")).length;
+    """, url)
+
+
+def selected_info(client):
+    return chrome(client, """
+      const t = gBrowser.selectedTab;
+      return { e2e: t.getAttribute("data-e2e"), url: t.linkedBrowser.currentURI.spec, multiselectedLisbon: gBrowser.tabs.some(x => x.multiselected && x.linkedBrowser.currentURI.spec.includes("Lisbon")) };
+    """)
+
+
 def set_collapsed(client, label, collapsed):
     chrome(client, """
       const [label, collapsed] = arguments;
@@ -416,6 +438,62 @@ def main():
         activate_tab(client, RECIPES[0])
         time.sleep(1)
 
+        # ---- duplicates: jump to the open tab instead of opening a copy ----------------------
+        lisbon = TRAVEL[0]
+        activate_tab(client, RECIPES[0])
+        time.sleep(0.5)
+        add_tab_fg(client, lisbon)
+        time.sleep(3)
+        sel = selected_info(client)
+        record("dedupe: opening an already-open URL in a new tab jumps to the existing tab",
+               count_url(client, lisbon) == 1 and sel["url"].startswith(lisbon),
+               json.dumps({"copies": count_url(client, lisbon), "selected": sel}))
+        activate_tab(client, RECIPES[0])
+        time.sleep(0.5)
+        add_tab(client, lisbon)  # background open (middle-click style)
+        time.sleep(3)
+        sel = selected_info(client)
+        record("dedupe: background duplicate is dropped without stealing focus; existing tab highlighted",
+               count_url(client, lisbon) == 1 and sel["e2e"] == RECIPES[0] and sel["multiselectedLisbon"],
+               json.dumps({"copies": count_url(client, lisbon), "selected": sel}))
+        activate_tab(client, lisbon)
+        time.sleep(0.5)
+        activate_tab(client, RECIPES[0])
+        handle = open_popup_tab(client)
+        st = popup_state(client, handle)
+        lm = popup_eval(client, handle, """
+          return { text: document.getElementById("last-moved-desc").textContent, reopenHidden: document.getElementById("reopen-copy").hidden };
+        """)
+        record("dedupe: menu explains the jump and offers Reopen copy",
+               "instead of opening a copy" in lm["text"] and "Lisbon" in lm["text"] and not lm["reopenHidden"], json.dumps(lm))
+        popup_click(client, handle, "#reopen-copy")
+        time.sleep(4)
+        record("dedupe: Reopen copy opens a second tab that stays",
+               count_url(client, lisbon) == 2, json.dumps({"copies": count_url(client, lisbon)}))
+        chrome(client, """
+          const [url] = arguments;
+          const dups = gBrowser.tabs.filter(t => t.linkedBrowser.currentURI.spec === url && t.getAttribute("data-e2e") !== url);
+          for (const t of dups) gBrowser.removeTab(t);
+        """, lisbon)
+        handle = open_popup_tab(client)
+        popup_click(client, handle, "#sw-dedupe-switch")
+        time.sleep(1)
+        add_tab_fg(client, lisbon)
+        time.sleep(3)
+        record("dedupe: toggle off lets a duplicate open", count_url(client, lisbon) == 2, json.dumps({"copies": count_url(client, lisbon)}))
+        chrome(client, """
+          const [url] = arguments;
+          const dups = gBrowser.tabs.filter(t => t.linkedBrowser.currentURI.spec === url && t.getAttribute("data-e2e") !== url);
+          for (const t of dups) gBrowser.removeTab(t);
+        """, lisbon)
+        handle = open_popup_tab(client)
+        popup_click(client, handle, "#sw-dedupe-switch")
+        time.sleep(1)
+        chrome(client, """
+          for (const t of gBrowser.tabs.filter(t => t.getAttribute("data-e2e") === "popup")) gBrowser.removeTab(t);
+        """)
+        activate_tab(client, RECIPES[0])
+
         # ---- cancel on close ---------------------------------------------------------------
         add_tab(client, TRAVEL_MORE[1])
         wait_loaded(client, [TRAVEL_MORE[1]], timeout=20)
@@ -436,15 +514,16 @@ def main():
                    showHidden: document.getElementById("show-last-moved").hidden };
         """)
         badge_after = badge_text(client)
-        record("menu: Last moved row names the tab and group; badge cleared on open",
-               (not lm["hidden"]) and "Travel" in lm["text"] and "Madeira" in lm["text"] and not lm["showHidden"] and badge_after == "",
+        # The newest entry is now the Lisbon duplicate jump from the dedupe section.
+        record("menu: Last moved row names the latest action; badge cleared on open",
+               (not lm["hidden"]) and "Lisbon" in lm["text"] and not lm["showHidden"] and badge_after == "",
                json.dumps({"row": lm, "badge": badge_after}))
         popup_click(client, handle, "#show-last-moved")
         time.sleep(1)
-        sel = find(client, TRAVEL_MORE[0])
-        record("menu: Show me activates the moved tab", bool(sel) and sel["selected"], json.dumps(sel))
+        sel = selected_info(client)
+        record("menu: Show me activates that tab", sel["url"].startswith(TRAVEL[0]), json.dumps(sel))
         handle = open_popup_tab(client)  # the popup tab closed itself
-        popup_click(client, handle, "label.switch")
+        popup_click(client, handle, "#sw-autogroup-switch")
         st = popup_state(client, handle)
         add_tab(client, TRAVEL_MORE[2])
         wait_loaded(client, [TRAVEL_MORE[2]])
@@ -453,7 +532,7 @@ def main():
         travel3 = next((g for g in groups(client) if g["label"] == "Travel"), None)
         record("menu: off → new travel tab stays loose, groups kept", (not st["enabled"]) and still_loose and travel3 and len(travel3["tabs"]) == 4,
                json.dumps({"state": st, "tab": find(client, TRAVEL_MORE[2])}))
-        popup_click(client, handle, "label.switch")
+        popup_click(client, handle, "#sw-autogroup-switch")
         st = popup_state(client, handle)
         time.sleep(4)
         not_regrouped = find(client, TRAVEL_MORE[2])["group"] is None

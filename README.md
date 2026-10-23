@@ -28,6 +28,14 @@ same **lite** scope as the worktree build on branch `smart-auto-grouping`.
 - **CREATE.** Otherwise, if the new tab and at least two other loose tabs in the
   window clearly belong together, they form a new group in place at the new tab
   (the new tab ends up last), named and colored from a topic table.
+- **No duplicate tabs.** When a fresh tab navigates to a URL that is already
+  open in the same window and container, Firefox jumps to the existing tab and
+  the new one is dropped before it loads. Nothing to click. If the duplicate
+  was opened in the background (middle-click), the existing tab is highlighted
+  instead of stealing focus. Only a tab's first navigation within 10 s of being
+  created counts, so restored sessions and old blank tabs are untouched. The
+  menu's "Last moved" row explains the jump and offers **Reopen copy**. Toggle:
+  "Jump to open tabs instead of duplicates".
 - **Passive.** No toasts, no per-move undo. Correct it the normal way: drag the
   tab out, ungroup, close. A tab dragged out of an auto group is never put back
   in that group.
@@ -76,7 +84,7 @@ Permanent (your Nightly profile has `xpinstall.signatures.required = false`):
    ```bash
    cd /Users/joliehuang/FirefoxPrototype/extensions/smart-auto-grouping && web-ext build --overwrite-dest
    ```
-2. Drag `web-ext-artifacts/smart-auto-grouping-0.2.2.xpi` onto a Firefox window
+2. Drag `web-ext-artifacts/smart-auto-grouping-0.3.0.xpi` onto a Firefox window
    and accept the prompt (a prebuilt one is already there).
 
 The toolbar button is added to the overflow area by default. Pin it from the
@@ -97,7 +105,7 @@ extensions (puzzle) menu so it sits next to the tab strip.
 **Advanced** in the menu exposes the delay, minimum cluster size and the
 similarity threshold (0.45 default; raise it if groups feel too eager).
 
-## Test (21 checks, all passing on Nightly 160, 2026-10-20)
+## Test (23 checks + 3 model checks, all passing on Nightly 160, 2026-10-22)
 
 ```bash
 cd /Users/joliehuang/FirefoxPrototype/worktrees/smart-auto-grouping
@@ -115,7 +123,7 @@ tuning the threshold.
 
 ## Files
 
-- `manifest.json` MV2, permissions `tabs`, `tabGroups`, `storage`; optional `trialML`
+- `manifest.json` MV2, permissions `tabs`, `tabGroups`, `storage`, `webNavigation`; optional `trialML`
 - `background.js` the actor: trigger, queue, JOIN/CREATE, undo, settings, storage
 - `classifier.js` heuristic + on-device embedding backends, topic/label table
 - `popup/` the menu

@@ -16,7 +16,10 @@ const DEFAULT_SETTINGS = {
   joinDelayMs: 2000,    // §5.2 after-delay
   minClusterSize: 3,    // §3 minimum to create a new group (incl. trigger)
   threshold: 0.45,      // similarity threshold, same for JOIN and CREATE
+  dedupe: true,         // jump to an already-open tab instead of opening a copy
 };
+const FRESH_MS = 10000;        // a tab counts as fresh for this long after it was created
+const STARTUP_GRACE_MS = 15000; // ignore tabs created while a session is being restored
 
 const FLASH_PREFIX = "\u2726 "; // "✦ " in front of the group name while a tab lands
 
@@ -33,6 +36,9 @@ const state = {
 const pendingNewTabs = new Set();   // created this session, waiting for first real load
 const timers = new Map();           // tabId -> timeout id
 const autoAdded = new Map();        // tabId -> groupId the actor put it in (correction detection)
+const freshTabs = new Map();        // tabId -> { at, active }: tabs that have not navigated yet
+const exemptTabs = new Set();       // tabs the user asked to reopen as a copy; never deduped
+const startedAt = Date.now();
 const pendingVisits = new Map();    // tabId -> groupId: moved tabs the user has not clicked into yet
 const flashedTitles = new Map();    // groupId -> original title while the sparkle prefix is shown
 let queue = Promise.resolve();
@@ -105,7 +111,98 @@ browser.tabs.onCreated.addListener(tab => {
     return;
   }
   pendingNewTabs.add(tab.id);
+  freshTabs.set(tab.id, { at: Date.now(), active: !!tab.active });
 });
+
+// ---- duplicates: a fresh tab navigating to a URL that is already open -------------------
+// Jump to the existing tab (same window and container) and drop the new one,
+// so no copy ever appears. Only a tab's first navigation counts, and only
+// within FRESH_MS of its creation, so restored sessions and long-lived blank
+// tabs are left alone. Background opens (middle-click) do not steal focus:
+// the existing tab is highlighted instead.
+function sameUrl(a, b) {
+  const strip = u => (u || "").replace(/\/$/, "");
+  return strip(a) === strip(b);
+}
+
+browser.webNavigation.onBeforeNavigate.addListener(async details => {
+  if (details.frameId !== 0) {
+    return;
+  }
+  const fresh = freshTabs.get(details.tabId);
+  if (!fresh) {
+    return;
+  }
+  freshTabs.delete(details.tabId);
+  if (!state.settings.dedupe || exemptTabs.has(details.tabId)) {
+    return;
+  }
+  if (Date.now() - fresh.at > FRESH_MS || Date.now() - startedAt < STARTUP_GRACE_MS) {
+    return;
+  }
+  if (!isHttp(details.url)) {
+    return;
+  }
+  let tab;
+  try {
+    tab = await browser.tabs.get(details.tabId);
+  } catch (e) {
+    return;
+  }
+  if (tab.pinned || tab.incognito) {
+    return;
+  }
+  const windowTabs = await browser.tabs.query({ windowId: tab.windowId });
+  const existing = windowTabs.find(
+    t => t.id !== tab.id && t.cookieStoreId === tab.cookieStoreId && sameUrl(t.url, details.url)
+  );
+  if (!existing) {
+    return;
+  }
+  const takeFocus = fresh.active || tab.active;
+  state.recentMoves.unshift({
+    kind: "dedupe", tabId: existing.id, title: existing.title, url: details.url,
+    groupId: existing.groupId, groupTitle: "", at: Date.now(),
+    reopen: { url: details.url, index: tab.index, windowId: tab.windowId, cookieStoreId: tab.cookieStoreId, active: takeFocus },
+  });
+  state.recentMoves = state.recentMoves.slice(0, 10);
+  state.unseenMoves += 1;
+  setBadge();
+  if (existing.groupId !== -1) {
+    await revealGroup(existing.groupId);
+  }
+  if (takeFocus) {
+    await browser.tabs.update(existing.id, { active: true }).catch(() => {});
+  } else {
+    pendingVisits.set(existing.id, existing.groupId);
+    await browser.tabs.update(existing.id, { highlighted: true, active: false }).catch(() => {});
+  }
+  if (existing.groupId !== -1) {
+    await flashGroupTitle(existing.groupId);
+    if (!takeFocus) {
+      pendingVisits.set(existing.id, existing.groupId);
+    }
+  }
+  await browser.tabs.remove(tab.id).catch(() => {});
+  logAction(`Jumped to open tab "${existing.title}" instead of opening a copy`);
+});
+
+async function reopenLastCopy() {
+  const m = state.recentMoves.find(x => x.kind === "dedupe" && x.reopen);
+  if (!m) {
+    return;
+  }
+  const { url, index, windowId, cookieStoreId, active } = m.reopen;
+  let created;
+  try {
+    created = await browser.tabs.create({ url, index, windowId, cookieStoreId, active: true });
+  } catch (e) {
+    created = await browser.tabs.create({ url, active: true });
+  }
+  exemptTabs.add(created.id);
+  m.reopen = null;
+  logAction(`Reopened a copy of "${m.title}"`);
+}
 
 browser.tabs.onUpdated.addListener((tabId, change, tab) => {
   // Correction detection: the actor put this tab in a group and it left that group.
@@ -134,6 +231,8 @@ browser.tabs.onUpdated.addListener((tabId, change, tab) => {
 
 browser.tabs.onRemoved.addListener(tabId => {
   pendingNewTabs.delete(tabId);
+  freshTabs.delete(tabId);
+  exemptTabs.delete(tabId);
   autoAdded.delete(tabId);
   settleVisit(tabId, { clearHighlight: false });
   if (timers.has(tabId)) {
@@ -282,15 +381,20 @@ async function announceMove(tab, group) {
   }
   // A tab that is already in the foreground still gets the sparkle; it clears
   // the next time the user clicks into that tab (after switching away).
-  if (!flashedTitles.has(group.id)) {
-    try {
-      const live = await browser.tabGroups.get(group.id);
-      const original = stripFlash(live.title);
-      flashedTitles.set(group.id, original);
-      await browser.tabGroups.update(group.id, { title: FLASH_PREFIX + original });
-    } catch (e) {
-      flashedTitles.delete(group.id);
-    }
+  await flashGroupTitle(group.id);
+}
+
+async function flashGroupTitle(groupId) {
+  if (flashedTitles.has(groupId)) {
+    return;
+  }
+  try {
+    const live = await browser.tabGroups.get(groupId);
+    const original = stripFlash(live.title);
+    flashedTitles.set(groupId, original);
+    await browser.tabGroups.update(groupId, { title: FLASH_PREFIX + original });
+  } catch (e) {
+    flashedTitles.delete(groupId);
   }
 }
 
@@ -429,7 +533,11 @@ async function lastMovedInfo() {
   }
   const { m, tab } = latest;
   const group = tab.groupId !== -1 ? await browser.tabGroups.get(tab.groupId).catch(() => null) : null;
-  return { title: tab.title, groupTitle: group ? stripFlash(group.title) : null, at: m.at, stillThere: !!group && group.id === m.groupId };
+  return {
+    kind: m.kind || "join", title: tab.title, groupTitle: group ? stripFlash(group.title) : null, at: m.at,
+    stillThere: m.kind === "dedupe" ? true : !!group && group.id === m.groupId,
+    canReopen: m.kind === "dedupe" && !!m.reopen,
+  };
 }
 
 browser.runtime.onMessage.addListener((msg, sender) => {
@@ -442,6 +550,8 @@ browser.runtime.onMessage.addListener((msg, sender) => {
       return snapshot();
     case "showLastMoved":
       return showLastMoved().then(snapshot);
+    case "reopenLastCopy":
+      return reopenLastCopy().then(snapshot);
     case "setEnabled":
       return setEnabled(msg.enabled).then(snapshot);
     case "undo":
