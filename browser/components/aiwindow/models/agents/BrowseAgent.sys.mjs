@@ -391,6 +391,12 @@ async function getSmartWindowEngine(model) {
   return gSmartWindowEngine.engine;
 }
 
+function isStaleEngineError(error) {
+  return /Port does not exist|engine (was|has been) (terminated|destroyed)/i.test(
+    `${error?.name ?? ""} ${error?.message ?? ""}`
+  );
+}
+
 function toOpenAIMessages(turns) {
   const messages = [{ role: "system", content: SYSTEM_PROMPT }];
 
@@ -502,7 +508,6 @@ async function requestSmartWindow({ turns, signal }) {
       throw error;
     }
   }
-  const engine = await getSmartWindowEngine(model);
   const request = {
     args: toOpenAIMessages(turns),
     token,
@@ -516,10 +521,18 @@ async function requestSmartWindow({ turns, signal }) {
       throw new DOMException("Aborted", "AbortError");
     }
     try {
+      const engine = await getSmartWindowEngine(model);
       const response = await engine.run(request);
       return normalizeOpenAIReply(response);
     } catch (error) {
       lastError = error;
+      if (isStaleEngineError(error)) {
+        // The inference process went away since the engine was built, so
+        // the cached engine must be rebuilt before trying again.
+        lazy.console.warn("engine connection lost, rebuilding", error);
+        gSmartWindowEngine = null;
+        continue;
+      }
       if (!lazy.openAIEngine.isRetryableError(error)) {
         break;
       }
@@ -1168,13 +1181,19 @@ export class BrowseAgentSession {
           double: !!input.double,
         });
         await this.#settle();
-        return this.#actionResult(
-          name,
-          input,
-          `${input.double ? "Double-clicked" : "Clicked"} (${x}, ${y})${
-            result.target ? ` on ${result.target}` : ""
-          }.`
-        );
+        let status = `${input.double ? "Double-clicked" : "Clicked"} (${x}, ${y})${
+          result.target ? ` on ${result.target}` : ""
+        }.`;
+        if (result.nearby?.length) {
+          const options = result.nearby.map(el => {
+            const spot = this.#toScreenshot(el.x, el.y);
+            return `<${el.tag}> "${el.label}" @(${spot.x},${spot.y})`;
+          });
+          status += ` That element is not interactive; the nearest clickable elements are: ${options.join(
+            "; "
+          )}.`;
+        }
+        return this.#actionResult(name, input, status);
       }
 
       case "type": {

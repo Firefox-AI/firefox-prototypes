@@ -12,6 +12,8 @@ const MAX_ELEMENTS = 150;
 const MAX_TEXT_CHARS = 20000;
 const MAX_LABEL_CHARS = 80;
 const MAX_FIND_MATCHES = 10;
+const NEARBY_RADIUS_PX = 160;
+const MAX_NEARBY = 5;
 const MAX_FIND_TEXT_NODES = 5000;
 
 const INTERACTIVE_SELECTOR = [
@@ -183,7 +185,48 @@ export class BrowseAgentChild extends JSWindowActorChild {
         win
       );
     }
-    return { target: this.#describe(target) };
+    const result = { target: this.#describe(target) };
+    if (target && !target.closest(INTERACTIVE_SELECTOR)) {
+      result.nearby = this.#interactiveNear(x, y);
+    }
+    return result;
+  }
+
+  // Interactive elements within reach of a point, nearest first, for when a
+  // click lands on a container between the controls the model was aiming at.
+  #interactiveNear(x, y) {
+    const doc = this.document;
+    const found = [];
+    for (const el of doc.querySelectorAll(INTERACTIVE_SELECTOR)) {
+      const rect = el.getBoundingClientRect();
+      if (rect.width < 2 || rect.height < 2) {
+        continue;
+      }
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = Math.max(rect.left - x, 0, x - rect.right);
+      const dy = Math.max(rect.top - y, 0, y - rect.bottom);
+      const distance = Math.hypot(dx, dy);
+      if (distance > NEARBY_RADIUS_PX) {
+        continue;
+      }
+      if (
+        !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
+      ) {
+        continue;
+      }
+      found.push({
+        distance,
+        tag: el.localName,
+        label: this.#labelFor(el),
+        x: cx,
+        y: cy,
+      });
+    }
+    found.sort((a, b) => a.distance - b.distance);
+    return found
+      .slice(0, MAX_NEARBY)
+      .map(({ tag, label, x: cx, y: cy }) => ({ tag, label, x: cx, y: cy }));
   }
 
   #type({ text, submit }) {
