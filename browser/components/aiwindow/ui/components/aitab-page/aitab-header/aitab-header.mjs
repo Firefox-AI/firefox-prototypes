@@ -4,6 +4,7 @@
 
 import { html, nothing } from "chrome://global/content/vendor/lit.all.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
+import { editableText } from "chrome://browser/content/aiwindow/components/aitab-editable.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/ai-grouped-chip-container.mjs";
 // eslint-disable-next-line import/no-unassigned-import
@@ -34,6 +35,7 @@ export class AITabHeader extends MozLitElement {
     subhead: { type: String },
     references: { type: Array },
     refreshing: { type: Boolean },
+    edits: { type: Object, attribute: false },
   };
 
   constructor() {
@@ -43,6 +45,11 @@ export class AITabHeader extends MozLitElement {
     this.subhead = "";
     this.references = [];
     this.refreshing = false;
+    this.edits = null;
+  }
+
+  #editable(field) {
+    return editableText(this[field], { edits: this.edits, path: field });
   }
 
   #renderCreatedAt() {
@@ -71,6 +78,7 @@ export class AITabHeader extends MozLitElement {
   }
 
   render() {
+    const subhead = this.#editable("subhead");
     return html`
       <link
         rel="stylesheet"
@@ -86,9 +94,9 @@ export class AITabHeader extends MozLitElement {
           ?refreshing=${this.refreshing}
         ></aitab-page-actions>
         ${this.#renderCreatedAt()}
-        <h1 class="aitab-title">${this.title}</h1>
+        <h1 class="aitab-title">${this.#editable("title")}</h1>
         ${this.subhead
-          ? html`<p class="aitab-title-subtext">${this.subhead}</p>`
+          ? html`<p class="aitab-title-subtext">${subhead}</p>`
           : nothing}
         ${this.#renderReferences()}
       </header>

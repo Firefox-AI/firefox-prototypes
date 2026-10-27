@@ -134,6 +134,23 @@ p {
   font-size: var(--aitab-body);
 }
 
+.aitab-editable {
+  font-size: inherit;
+  border-radius: var(--border-radius-small);
+  box-decoration-break: clone;
+  cursor: text;
+
+  &:hover {
+    background-color: var(--button-background-color-ghost-hover);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-outline);
+    outline-offset: var(--focus-outline-offset);
+    background-color: transparent;
+  }
+}
+
 .aitab-eyebrow {
   margin: 0;
   color: var(--aitab-eyebrow-text-color);

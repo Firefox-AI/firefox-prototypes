@@ -291,6 +291,7 @@ let JSWINDOWACTORS = {
         "AITab:DeletePage": { wantUntrusted: true },
         "AITab:OpenLink": { wantUntrusted: true },
         "AITab:RecordView": { wantUntrusted: true },
+        "AITab:SaveLocalState": { wantUntrusted: true },
       },
     },
     matches: ["about:smartpage", "about:smartpage?*"],

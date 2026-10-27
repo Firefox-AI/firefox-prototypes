@@ -4,6 +4,7 @@
 
 import { html, nothing } from "chrome://global/content/vendor/lit.all.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
+import { editableText } from "chrome://browser/content/aiwindow/components/aitab-editable.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/ai-website-chip.mjs";
 
@@ -20,6 +21,7 @@ export class AITextBlock extends MozLitElement {
     heading: { type: String },
     paragraphs: { type: Array },
     references: { type: Array },
+    edits: { type: Object, attribute: false },
   };
 
   constructor() {
@@ -27,6 +29,7 @@ export class AITextBlock extends MozLitElement {
     this.heading = "";
     this.paragraphs = [];
     this.references = [];
+    this.edits = null;
   }
 
   #renderReferences() {
@@ -62,11 +65,17 @@ export class AITextBlock extends MozLitElement {
       />
       <section class="aitab-text-block">
         <h2 class="aitab-text-block-heading aitab-heading-3">
-          ${this.heading}
+          ${editableText(this.heading, { edits: this.edits, path: "heading" })}
         </h2>
         <div class="aitab-text-block-content">
           ${this.paragraphs.map(
-            p => html`<p class="aitab-text-block-p">${p}</p>`
+            (p, index) =>
+              html`<p class="aitab-text-block-p">
+                ${editableText(p, {
+                  edits: this.edits,
+                  path: `paragraphs/${index}`,
+                })}
+              </p>`
           )}
           ${this.#renderReferences()}
         </div>

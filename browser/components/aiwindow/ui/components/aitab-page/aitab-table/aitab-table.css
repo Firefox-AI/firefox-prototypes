@@ -19,6 +19,15 @@
   color: var(--text-color-deemphasized);
 }
 
+.aitab-table-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-medium);
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  margin-block-start: var(--aitab-table-margin-top);
+}
+
 table {
   width: 100%;
   /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
@@ -76,6 +85,59 @@ tbody td {
 
 tbody tr + tr {
   border-block-start: 1px solid var(--aitab-table-content-border-color);
+}
+
+.aitab-table-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xsmall);
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--border-radius-small);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  text-transform: inherit;
+  cursor: pointer;
+
+  &::after {
+    content: "";
+    flex-shrink: 0;
+    inline-size: var(--icon-size-xsmall);
+    block-size: var(--icon-size-xsmall);
+    background: url("chrome://global/skin/icons/arrow-up-12.svg") center / contain no-repeat;
+    -moz-context-properties: fill;
+    fill: currentColor;
+    opacity: 0;
+  }
+
+  &:hover::after {
+    opacity: var(--opacity-deemphasized-strong);
+  }
+
+  &[data-sort]::after {
+    opacity: 1;
+  }
+
+  &[data-sort="descending"]::after {
+    background-image: url("chrome://global/skin/icons/arrow-down-12.svg");
+  }
+
+  &:hover {
+    color: var(--text-color);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-outline);
+    outline-offset: var(--focus-outline-offset);
+  }
+}
+
+.aitab-table-empty {
+  color: var(--text-color-deemphasized);
+  text-align: center;
 }
 
 .aitab-table-name-cell {

@@ -4,6 +4,7 @@
 
 import { html, nothing } from "chrome://global/content/vendor/lit.all.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
+import { editableText } from "chrome://browser/content/aiwindow/components/aitab-editable.mjs";
 
 /**
  * @typedef {object} TimelineItem
@@ -29,6 +30,7 @@ export class AITabTimeline extends MozLitElement {
     title: { type: String },
     description: { type: String },
     items: { type: Array },
+    edits: { type: Object, attribute: false },
   };
 
   constructor() {
@@ -36,6 +38,7 @@ export class AITabTimeline extends MozLitElement {
     this.title = "";
     this.description = "";
     this.items = [];
+    this.edits = null;
   }
 
   #renderIntro() {
@@ -46,12 +49,15 @@ export class AITabTimeline extends MozLitElement {
     return html`<div class="aitab-timeline-intro">
       ${this.title
         ? html`<h2 class="aitab-timeline-title aitab-heading-3">
-            ${this.title}
+            ${editableText(this.title, { edits: this.edits, path: "title" })}
           </h2>`
         : nothing}
       ${this.description
         ? html`<p class="aitab-timeline-description aitab-deemphasized">
-            ${this.description}
+            ${editableText(this.description, {
+              edits: this.edits,
+              path: "description",
+            })}
           </p>`
         : nothing}
     </div>`;
@@ -71,26 +77,35 @@ export class AITabTimeline extends MozLitElement {
       : html`<h2 class=${classes}>${text}</h2>`;
   }
 
-  #renderItem(item) {
+  #editable(item, index, field) {
+    return editableText(item[field], {
+      edits: this.edits,
+      path: `items/${index}/${field}`,
+    });
+  }
+
+  #renderItem(item, index) {
     return item
       ? html`<li class="aitab-timeline-item">
           <div class="aitab-timeline-date">
             ${item.date_label
               ? html`<span class="aitab-timeline-date-label"
-                  >${item.date_label}</span
+                  >${this.#editable(item, index, "date_label")}</span
                 >`
               : nothing}
             ${item.date_eyebrow
               ? html`<span class="aitab-timeline-date-eyebrow aitab-eyebrow"
-                  >${item.date_eyebrow}</span
+                  >${this.#editable(item, index, "date_eyebrow")}</span
                 >`
               : nothing}
           </div>
           <div class="aitab-timeline-entry">
-            ${item.title ? this.#renderEntryTitle(item.title) : nothing}
+            ${item.title
+              ? this.#renderEntryTitle(this.#editable(item, index, "title"))
+              : nothing}
             ${item.description
               ? html`<p class="aitab-timeline-item-description">
-                  ${item.description}
+                  ${this.#editable(item, index, "description")}
                 </p>`
               : nothing}
           </div>
@@ -118,7 +133,7 @@ export class AITabTimeline extends MozLitElement {
       <section class="aitab-timeline">
         ${this.#renderIntro()}
         <ol class="aitab-timeline-items">
-          ${items.map(item => this.#renderItem(item))}
+          ${items.map((item, index) => this.#renderItem(item, index))}
         </ol>
       </section>
     `;

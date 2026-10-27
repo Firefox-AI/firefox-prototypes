@@ -5,6 +5,7 @@
 import { html, nothing } from "chrome://global/content/vendor/lit.all.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
 import { httpUrl } from "chrome://browser/content/aiwindow/modules/AITabUtils.mjs";
+import { editableText } from "chrome://browser/content/aiwindow/components/aitab-editable.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/ai-website-chip.mjs";
 
@@ -31,12 +32,14 @@ export class AITabHighlights extends MozLitElement {
   static properties = {
     title: { type: String },
     items: { type: Array, attribute: false },
+    edits: { type: Object, attribute: false },
   };
 
   constructor() {
     super();
     this.title = "";
     this.items = [];
+    this.edits = null;
   }
 
   #renderSource(source, url) {
@@ -62,21 +65,31 @@ export class AITabHighlights extends MozLitElement {
     </div>`;
   }
 
-  #renderItem(item) {
+  #editable(item, index, field) {
+    return editableText(item[field], {
+      edits: this.edits,
+      path: `items/${index}/${field}`,
+    });
+  }
+
+  #renderItem(item, index) {
+    const body = this.#editable(item, index, "body");
     return html`<li class="aitab-highlight">
       <div class="aitab-highlight-statement">
         ${item.eyebrow
-          ? html`<span class="aitab-eyebrow">${item.eyebrow}</span>`
+          ? html`<span class="aitab-eyebrow"
+              >${this.#editable(item, index, "eyebrow")}</span
+            >`
           : nothing}
         ${item.title
           ? html`<p class="aitab-highlight-title aitab-heading-3">
-              ${item.title}
+              ${this.#editable(item, index, "title")}
             </p>`
           : nothing}
       </div>
       <div class="aitab-highlight-evidence">
         ${item.body
-          ? html`<p class="aitab-highlight-body">${item.body}</p>`
+          ? html`<p class="aitab-highlight-body">${body}</p>`
           : nothing}
         ${this.#renderSources(item.sources)}
       </div>
@@ -92,7 +105,7 @@ export class AITabHighlights extends MozLitElement {
       class="aitab-highlights-list"
       aria-labelledby=${this.title ? "title" : nothing}
     >
-      ${items.map(item => this.#renderItem(item))}
+      ${items.map((item, index) => this.#renderItem(item, index))}
     </ul>`;
   }
 
@@ -109,7 +122,7 @@ export class AITabHighlights extends MozLitElement {
       <section class="aitab-highlights">
         ${this.title
           ? html`<h2 id="title" class="aitab-highlights-title">
-              ${this.title}
+              ${editableText(this.title, { edits: this.edits, path: "title" })}
             </h2>`
           : nothing}
         ${this.#renderHighlights()}

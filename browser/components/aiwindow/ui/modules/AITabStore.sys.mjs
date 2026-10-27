@@ -22,6 +22,7 @@ import {
   DELETE_AITAB_PAGES_BY_SLUG,
   SLUG_EXISTS,
   DELETE_AITAB_VERSIONS_BEFORE,
+  UPDATE_AITAB_LOCAL_STATE,
 } from "moz-src:///browser/components/aiwindow/ui/modules/AITabSql.sys.mjs";
 import { SQLiteStoreBase } from "moz-src:///browser/components/aiwindow/ui/modules/SQLiteStoreBase.sys.mjs";
 import {
@@ -126,6 +127,16 @@ class AITabStore extends SQLiteStoreBase {
    */
   async edit(page) {
     return this.#insertNextVersion(page, { expectNew: false });
+  }
+
+  async updateLocalState(slug, localState) {
+    await this.#ensureConnection();
+
+    await this.connection.executeCached(UPDATE_AITAB_LOCAL_STATE, {
+      slug,
+      localstate: toJSONOrNull(localState),
+      updated_at: Date.now() * 1000,
+    });
   }
 
   /**

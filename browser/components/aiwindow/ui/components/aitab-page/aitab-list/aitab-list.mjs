@@ -4,6 +4,7 @@
 
 import { html, nothing } from "chrome://global/content/vendor/lit.all.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
+import { editableText } from "chrome://browser/content/aiwindow/components/aitab-editable.mjs";
 
 /** @typedef {{ text: string }} ListItem */
 /** @typedef {{ heading?: string, items: ListItem[] }} ListGroup */
@@ -32,6 +33,7 @@ export class AITabList extends MozLitElement {
     description: { type: String },
     groups: { type: Array },
     layout: { type: String, reflect: true },
+    edits: { type: Object, attribute: false },
   };
 
   constructor() {
@@ -40,6 +42,7 @@ export class AITabList extends MozLitElement {
     this.description = "";
     this.groups = [];
     this.layout = DEFAULT_LAYOUT;
+    this.edits = null;
   }
 
   #renderIntro() {
@@ -49,26 +52,42 @@ export class AITabList extends MozLitElement {
 
     return html`<div class="aitab-list-intro">
       ${this.title
-        ? html`<h2 class="aitab-list-title aitab-heading-3">${this.title}</h2>`
+        ? html`<h2 class="aitab-list-title aitab-heading-3">
+            ${editableText(this.title, { edits: this.edits, path: "title" })}
+          </h2>`
         : nothing}
       ${this.description
         ? html`<p class="aitab-list-description aitab-deemphasized">
-            ${this.description}
+            ${editableText(this.description, {
+              edits: this.edits,
+              path: "description",
+            })}
           </p>`
         : nothing}
     </div>`;
   }
 
-  #renderGroup(group) {
+  #renderGroup(group, groupIndex) {
     return html`<div class="aitab-list-group">
       ${group.heading
         ? html`<h3 class="aitab-list-group-heading aitab-heading-4">
-            ${group.heading}
+            ${editableText(group.heading, {
+              edits: this.edits,
+              path: `groups/${groupIndex}/heading`,
+            })}
           </h3>`
         : nothing}
       <ul class="aitab-list-items">
         ${group.items.map(
-          item => html`<li class="aitab-list-item">${item?.text ?? ""}</li>`
+          (item, itemIndex) =>
+            html`<li class="aitab-list-item">
+              ${item?.text
+                ? editableText(item.text, {
+                    edits: this.edits,
+                    path: `groups/${groupIndex}/items/${itemIndex}/text`,
+                  })
+                : nothing}
+            </li>`
         )}
       </ul>
     </div>`;
@@ -92,7 +111,9 @@ export class AITabList extends MozLitElement {
       <section class="aitab-list">
         ${this.#renderIntro()}
         <div class="aitab-list-groups">
-          ${groups.map(group => this.#renderGroup(group))}
+          ${groups.map((group, groupIndex) =>
+            this.#renderGroup(group, groupIndex)
+          )}
         </div>
       </section>
     `;

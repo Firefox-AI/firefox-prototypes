@@ -389,6 +389,23 @@ ai-tab-create-page-prompt =
 #   $max (String) - The highest possible rating.
 ai-tab-table-rating = { $value } / { $max }
 
+# Option in a table column filter that shows every row.
+aitab-table-filter-all =
+    .label = All
+
+# Button that removes every filter applied to a table.
+aitab-table-filter-clear =
+    .label = Clear filters
+
+# Shown in place of the table rows when no row matches the filters.
+aitab-table-filter-empty = No rows match these filters.
+
+# Progress shown above a checklist on a generated page.
+# Variables:
+#   $checked (Number) - Number of items ticked off.
+#   $total (Number) - Number of items in the checklist.
+aitab-checklist-progress = { $checked } of { $total } done
+
 ## Smartbar command palette
 ## Slash commands shown in the smartbar when the user types "/".
 

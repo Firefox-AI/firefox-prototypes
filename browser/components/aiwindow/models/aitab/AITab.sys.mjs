@@ -131,6 +131,8 @@ const RAW_CONTENT_HEADING = "## Provided content (not fetched from a URL)";
 // instructions apply to: the one the model wrote last.
 const MODIFY_CONTENT_HEADING =
   "## Instructions for modifications from previous response";
+const READER_CHANGES_HEADING =
+  "## Changes the reader made on the page since your previous response. Keep them unless the instructions say otherwise";
 
 // Cap on each free-text parameter the model fills in (`focus` and
 // `modifyInstructions`). Both re-enter the generation prompt, and nothing the
@@ -1015,6 +1017,12 @@ export class AITab {
     if (prior) {
       instructions =
         AITab.#capped(modifyInstructions) || (sourceText ? "" : focusText);
+      const readerChanges = AITab.#describeReaderChanges(prior.page.localState);
+      if (readerChanges && (instructions || sourceText)) {
+        instructions = [instructions, readerChanges]
+          .filter(Boolean)
+          .join("\n\n");
+      }
     }
     const structured = await AITab.#generateStructuredSurface({
       sourceText,
@@ -1111,6 +1119,34 @@ export class AITab {
     return typeof text == "string"
       ? text.trim().slice(0, MAX_INSTRUCTION_CHARS)
       : "";
+  }
+
+  static #describeReaderChanges(localState) {
+    const lines = [];
+    for (const [checklistId, items] of Object.entries(
+      localState?.checked ?? {}
+    )) {
+      const ids = Object.keys(items ?? {});
+      if (ids.length) {
+        lines.push(
+          `- Ticked off in Checklist "${checklistId}": ${ids.join(", ")}`
+        );
+      }
+    }
+    for (const paths of Object.values(localState?.edits ?? {})) {
+      for (const { original, text } of Object.values(paths ?? {})) {
+        lines.push(
+          `- Corrected ${JSON.stringify(original)} to ${JSON.stringify(text)}`
+        );
+      }
+    }
+    if (!lines.length) {
+      return "";
+    }
+    return AITab.#truncateToBudget(
+      `${READER_CHANGES_HEADING}\n\n${lines.join("\n")}`,
+      MAX_INSTRUCTION_CHARS
+    );
   }
 
   /**

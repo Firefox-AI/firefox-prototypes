@@ -54,6 +54,34 @@ ChromeUtils.defineESModuleGetters(lazy, {
   URILoadingHelper: "resource:///modules/URILoadingHelper.sys.mjs",
 });
 
+const MAX_LOCAL_STATE_TEXT = 5000;
+
+function entriesOf(value) {
+  return value && typeof value == "object" ? Object.entries(value) : [];
+}
+
+function sanitizeLocalState(state) {
+  const checked = {};
+  for (const [blockKey, items] of entriesOf(state?.checked)) {
+    checked[blockKey] = Object.fromEntries(
+      entriesOf(items).filter(([, value]) => value === true)
+    );
+  }
+
+  const isText = text =>
+    typeof text == "string" && text.length <= MAX_LOCAL_STATE_TEXT;
+  const edits = {};
+  for (const [blockKey, paths] of entriesOf(state?.edits)) {
+    edits[blockKey] = Object.fromEntries(
+      entriesOf(paths)
+        .filter(([, edit]) => isText(edit?.original) && isText(edit?.text))
+        .map(([path, { original, text }]) => [path, { original, text }])
+    );
+  }
+
+  return { checked, edits };
+}
+
 ChromeUtils.defineLazyGetter(lazy, "fluentStrings", () => {
   return new Localization(["preview/aiWindow.ftl"], true);
 });
@@ -149,6 +177,11 @@ export class AITabParent extends JSWindowActorParent {
         return null;
       case "AITab:RecordView":
         this.#recordView(data);
+        return null;
+      case "AITab:SaveLocalState":
+        this.#saveLocalState(data).catch(error => {
+          console.error("Could not save Smart Page state", error);
+        });
         return null;
       default:
         console.warn(`AITabParent received unknown message: ${name}`);
@@ -456,6 +489,17 @@ export class AITabParent extends JSWindowActorParent {
     }
 
     Glean.smartWindow.aitabLinkClick.record({ component_type, result });
+  }
+
+  async #saveLocalState(data) {
+    const currentPage = this.#currentPage;
+    if (!currentPage) {
+      return;
+    }
+    await AITabStore.updateLocalState(
+      currentPage.pageName,
+      sanitizeLocalState(data?.localState)
+    );
   }
 
   /**

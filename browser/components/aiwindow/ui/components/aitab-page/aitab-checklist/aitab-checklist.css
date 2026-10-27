@@ -1,0 +1,113 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+:host {
+  --aitab-checklist-column-min: 240px;
+  --aitab-checklist-split: 1fr 2fr;
+  --aitab-checklist-gap: 32px;
+  --aitab-checklist-group-gap: 36px;
+  --aitab-checklist-item-padding-block: 12px 14px;
+  --aitab-checklist-checkbox-size: 20px;
+  --aitab-checklist-item-line-height: 27px;
+  --aitab-checklist-heading-border-color: var(--border-color);
+  --aitab-checklist-item-border-color: light-dark(var(--color-gray-20), var(--color-gray-50));
+
+  @media (not (-moz-pref("browser.nova.enabled"))) and (not (forced-colors)) {
+    --aitab-checklist-heading-border-color: light-dark(var(--color-gray-30), var(--color-gray-60));
+    --aitab-checklist-item-border-color: light-dark(var(--color-gray-20), var(--color-gray-70));
+  }
+
+  display: block;
+}
+
+.aitab-checklist {
+  display: grid;
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  gap: var(--aitab-checklist-gap);
+
+  @media (width > 900px) {
+    --aitab-checklist-gap: 48px;
+    grid-template-columns: var(--aitab-checklist-split);
+  }
+}
+
+.aitab-checklist-intro {
+  display: grid;
+  align-content: start;
+  gap: var(--space-small);
+}
+
+.aitab-checklist-progress {
+  margin-block-start: var(--space-small);
+}
+
+.aitab-checklist-groups {
+  display: grid;
+  align-items: start;
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  gap: var(--aitab-checklist-group-gap);
+
+  @media (width > 900px) {
+    grid-template-columns: repeat(auto-fit, minmax(var(--aitab-checklist-column-min), 1fr));
+  }
+}
+
+.aitab-checklist-group-heading {
+  padding-block: var(--space-small);
+  border-block-end: var(--border-width) solid var(--aitab-checklist-heading-border-color);
+}
+
+.aitab-checklist-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.aitab-checklist-item {
+  display: flex;
+  align-items: start;
+  gap: var(--space-medium);
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  padding-block: var(--aitab-checklist-item-padding-block);
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  font-size: var(--aitab-body);
+  line-height: var(--aitab-checklist-item-line-height);
+
+  &:not(:last-child) {
+    border-block-end: var(--border-width) solid var(--aitab-checklist-item-border-color);
+  }
+}
+
+.aitab-checklist-checkbox {
+  flex-shrink: 0;
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  inline-size: var(--aitab-checklist-checkbox-size);
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  block-size: var(--aitab-checklist-checkbox-size);
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  margin: calc((var(--aitab-checklist-item-line-height) - var(--aitab-checklist-checkbox-size)) / 2) 0 0;
+  accent-color: var(--color-accent-primary);
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: var(--focus-outline);
+    outline-offset: var(--focus-outline-offset);
+  }
+}
+
+.aitab-checklist-item-content {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.aitab-checklist-item-detail {
+  font-size: var(--font-size-small);
+  line-height: normal;
+}
+
+.aitab-checklist-item[data-checked] .aitab-checklist-item-text {
+  color: var(--text-color-deemphasized);
+  text-decoration-line: line-through;
+}

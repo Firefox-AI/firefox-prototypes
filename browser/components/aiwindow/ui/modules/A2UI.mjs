@@ -46,6 +46,7 @@ export class A2UI {
     this.#hydrators.set("Cards", this.#hydrateCards.bind(this));
     this.#hydrators.set("Timeline", this.#hydrateTimeline.bind(this));
     this.#hydrators.set("List", this.#hydrateList.bind(this));
+    this.#hydrators.set("Checklist", this.#hydrateList.bind(this));
   }
 
   /**

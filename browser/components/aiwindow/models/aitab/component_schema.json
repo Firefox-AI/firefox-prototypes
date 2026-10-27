@@ -130,6 +130,38 @@
         "items": { "type": "array", "items": { "$ref": "#/$defs/ListItem" } }
       }
     },
+    "ChecklistItem": {
+      "type": "object",
+      "required": ["id", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Short snake_case key, unique within the checklist. Keep an item's id unchanged when revising the page so the reader's tick stays with it."
+        },
+        "text": {
+          "type": "string",
+          "description": "The thing to buy, pack, book or do, as a short phrase."
+        },
+        "detail": {
+          "type": "string",
+          "description": "Optional short note such as a quantity, price or deadline."
+        }
+      }
+    },
+    "ChecklistGroup": {
+      "type": "object",
+      "description": "A group of checklist items; omit `heading` for an ungrouped checklist.",
+      "required": ["items"],
+      "additionalProperties": false,
+      "properties": {
+        "heading": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ChecklistItem" }
+        }
+      }
+    },
     "TimelineItem": {
       "type": "object",
       "required": ["date_label", "title"],
@@ -260,6 +292,23 @@
           "description": "Groups of list items; omit `heading` for an ungrouped list. A literal array, or a binding to one.",
           "oneOf": [
             { "type": "array", "items": { "$ref": "#/$defs/ListGroup" } },
+            { "$ref": "#/$defs/DataBinding" }
+          ]
+        }
+      }
+    },
+    "Checklist": {
+      "type": "object",
+      "description": "Things the reader needs to buy, pack, book or do, which they tick off on the page. Ticks are saved with the page. Use instead of List when every item is an action to complete. If ungrouped leave heading field off.",
+      "required": ["groups"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "$ref": "#/$defs/DynamicString" },
+        "description": { "$ref": "#/$defs/DynamicString" },
+        "groups": {
+          "description": "Groups of checklist items; omit `heading` for an ungrouped checklist. A literal array, or a binding to one.",
+          "oneOf": [
+            { "type": "array", "items": { "$ref": "#/$defs/ChecklistGroup" } },
             { "$ref": "#/$defs/DataBinding" }
           ]
         }

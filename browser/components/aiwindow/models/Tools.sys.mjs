@@ -1573,7 +1573,11 @@ async function persistAITabPage(
     return lazy.AITabStore.create(page);
   }
 
-  const stored = await lazy.AITabStore.edit(page);
+  const prior = await lazy.AITabStore.getBySlug(page.slug);
+  const stored = await lazy.AITabStore.edit({
+    ...page,
+    localState: prior?.localState,
+  });
 
   // Nothing loads an older version yet, so keeping them would leave behind a
   // full copy of the page once per revision. Best-effort: the version just

@@ -4,6 +4,7 @@
 
 import { html, nothing } from "chrome://global/content/vendor/lit.all.mjs";
 import { componentTypeName } from "chrome://browser/content/aiwindow/modules/AITabUtils.mjs";
+import { editedText } from "chrome://browser/content/aiwindow/components/aitab-editable.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/aitab-header.mjs";
@@ -15,6 +16,8 @@ import "chrome://browser/content/aiwindow/components/aitab-timeline.mjs";
 import "chrome://browser/content/aiwindow/components/aitab-table.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/aitab-highlights.mjs";
+// eslint-disable-next-line import/no-unassigned-import
+import "chrome://browser/content/aiwindow/components/aitab-checklist.mjs";
 
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/aitab-error.mjs";
@@ -28,6 +31,7 @@ import "chrome://browser/content/aiwindow/components/aitab-text-block.mjs";
 const GET_PAGE_EVENT = "AITab:GetPage";
 const GET_HEADING_FONT_EVENT = "AITab:GetHeadingFont";
 const DELETE_PAGE_EVENT = "AITab:DeletePage";
+const SAVE_LOCAL_STATE_EVENT = "AITab:SaveLocalState";
 
 /**
  * Page data received from the parent actor.
@@ -63,6 +67,7 @@ export class AITabPage extends MozLitElement {
     this.#renderers.set("cards", this.#renderCards.bind(this));
     this.#renderers.set("timeline", this.#renderTimeline.bind(this));
     this.#renderers.set("list", this.#renderList.bind(this));
+    this.#renderers.set("checklist", this.#renderChecklist.bind(this));
   }
 
   connectedCallback() {
@@ -219,10 +224,57 @@ export class AITabPage extends MozLitElement {
     });
   }
 
+  get #localState() {
+    return this.page?.localState ?? {};
+  }
+
+  #editsFor(blockKey) {
+    return this.#localState.edits?.[blockKey] ?? null;
+  }
+
+  #saveLocalState(changes) {
+    const localState = { ...this.#localState, ...changes };
+    this.page = { ...this.page, localState };
+    this.dispatchEvent(
+      new CustomEvent(SAVE_LOCAL_STATE_EVENT, {
+        bubbles: true,
+        detail: { localState },
+      })
+    );
+  }
+
+  #onEditText(blockKey, event) {
+    const { path, original, text } = event.detail;
+    const blockEdits = { ...this.#editsFor(blockKey) };
+    if (text === original) {
+      delete blockEdits[path];
+    } else {
+      blockEdits[path] = { original, text };
+    }
+    this.#saveLocalState({
+      edits: { ...this.#localState.edits, [blockKey]: blockEdits },
+    });
+  }
+
+  #onToggleItem(blockKey, event) {
+    const { id, checked } = event.detail;
+    const blockChecked = { ...this.#localState.checked?.[blockKey] };
+    if (checked) {
+      blockChecked[id] = true;
+    } else {
+      delete blockChecked[id];
+    }
+    this.#saveLocalState({
+      checked: { ...this.#localState.checked, [blockKey]: blockChecked },
+    });
+  }
+
   #renderHeader(header) {
+    const blockKey = header.id ?? "header";
+    const edits = this.#editsFor(blockKey);
     // The title is what shows up for this page in history and in the tab strip.
     if (header.title) {
-      document.title = header.title;
+      document.title = editedText(header.title, edits?.title);
     }
 
     // The header block leaves `eyebrow` blank; the run date comes from the
@@ -234,6 +286,8 @@ export class AITabPage extends MozLitElement {
         .title=${header.title ?? ""}
         .subhead=${header.subhead ?? ""}
         .references=${header.references?.items ?? []}
+        .edits=${edits}
+        @aitab-editable:change=${event => this.#onEditText(blockKey, event)}
         @aitab-page-actions:delete=${() => {
           this.#deletePage().catch(error => {
             console.error("Failed to delete AI Tab page:", error);
@@ -244,13 +298,14 @@ export class AITabPage extends MozLitElement {
     `;
   }
 
-  #renderHighlights(highlights) {
+  #renderHighlights(highlights, blockKey) {
     const markup = html`<aitab-highlights
       .title=${highlights.title}
       .items=${highlights.items}
+      .edits=${this.#editsFor(blockKey)}
     ></aitab-highlights>`;
 
-    return this.#renderBlock(highlights, markup);
+    return this.#renderBlock(highlights, markup, blockKey);
   }
 
   // TODO: Bug 2075400 - SourceLinks appear in multiple components
@@ -260,53 +315,70 @@ export class AITabPage extends MozLitElement {
     return nothing;
   }
 
-  #renderTextBlock(textBlock) {
+  #renderTextBlock(textBlock, blockKey) {
     const markup = html`<aitab-text-block
       .heading=${textBlock.lead ?? ""}
       .paragraphs=${textBlock.paragraphs ?? []}
       .references=${textBlock.references ?? []}
+      .edits=${this.#editsFor(blockKey)}
     ></aitab-text-block>`;
 
-    return this.#renderBlock(textBlock, markup);
+    return this.#renderBlock(textBlock, markup, blockKey);
   }
 
-  #renderRankedTable(rankedTable) {
+  #renderRankedTable(rankedTable, blockKey) {
     const markup = html`<aitab-table
       .heading=${rankedTable.title}
       .description=${rankedTable.description}
       .columns=${rankedTable.columns}
       .rows=${rankedTable.rows}
+      .edits=${this.#editsFor(blockKey)}
     ></aitab-table>`;
 
-    return this.#renderBlock(rankedTable, markup);
+    return this.#renderBlock(rankedTable, markup, blockKey);
   }
 
   #renderCards(_cards) {
     return nothing;
   }
 
-  #renderTimeline(timeline) {
+  #renderTimeline(timeline, blockKey) {
     const markup = html`<aitab-timeline
       .title=${timeline.title ?? ""}
       description=${timeline.description ?? ""}
       .items=${timeline.items ?? []}
+      .edits=${this.#editsFor(blockKey)}
     ></aitab-timeline>`;
 
-    return this.#renderBlock(timeline, markup);
+    return this.#renderBlock(timeline, markup, blockKey);
   }
 
-  #renderList(list) {
+  #renderList(list, blockKey) {
     const markup = html`<aitab-list
       .title=${list.title ?? ""}
       description=${list.description ?? ""}
       .groups=${list.groups ?? []}
       layout=${list.layout ?? "column"}
+      .edits=${this.#editsFor(blockKey)}
     ></aitab-list>`;
 
-    return this.#renderBlock(list, markup);
+    return this.#renderBlock(list, markup, blockKey);
   }
 
-  #renderBlock(block, markup) {
+  #renderChecklist(checklist, blockKey) {
+    const markup = html`<aitab-checklist
+      .title=${checklist.title ?? ""}
+      .description=${checklist.description ?? ""}
+      .groups=${checklist.groups ?? []}
+      .checked=${this.#localState.checked?.[blockKey] ?? null}
+      .edits=${this.#editsFor(blockKey)}
+      @aitab-checklist:toggle=${event => this.#onToggleItem(blockKey, event)}
+    ></aitab-checklist>`;
+
+    return this.#renderBlock(checklist, markup, blockKey);
+  }
+
+  #renderBlock(block, markup, blockKey) {
     const type = block?.component?.toLowerCase?.();
     if (!type) {
       return nothing;
@@ -317,6 +389,7 @@ export class AITabPage extends MozLitElement {
         class="aitab-block"
         data-block-type=${type}
         data-aitab-component=${componentTypeName(block)}
+        @aitab-editable:change=${event => this.#onEditText(blockKey, event)}
       >
         ${markup}
       </section>
@@ -353,12 +426,19 @@ export class AITabPage extends MozLitElement {
   }
 
   #renderBlocks(blocks) {
+    const seen = new Map();
     return html`
       <div class="aitab-blocks">
-        ${blocks.map(block => {
+        ${blocks.map((block, index) => {
           const componentKey = block.component?.toLowerCase?.();
           const renderer = this.#renderers.get(componentKey);
-          return renderer ? renderer(block) : nothing;
+          if (!renderer) {
+            return nothing;
+          }
+          const id = block.id ?? `block-${index}`;
+          const count = seen.get(id) ?? 0;
+          seen.set(id, count + 1);
+          return renderer(block, count ? `${id}:${count}` : id);
         })}
       </div>
     `;

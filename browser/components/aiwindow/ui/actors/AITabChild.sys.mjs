@@ -25,6 +25,7 @@ export class AITabChild extends JSWindowActorChild {
         });
         break;
       case "AITab:RecordView":
+      case "AITab:SaveLocalState":
         this.sendAsyncMessage(event.type, event.detail);
         break;
       default:

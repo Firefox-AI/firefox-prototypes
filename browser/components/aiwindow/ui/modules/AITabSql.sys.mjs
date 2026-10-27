@@ -101,6 +101,13 @@ ORDER BY version DESC
 LIMIT 1;
 `;
 
+export const UPDATE_AITAB_LOCAL_STATE = `
+UPDATE aitab_pages
+SET localstate_jsonb = jsonb(:localstate), updated_at = :updated_at
+WHERE slug = :slug
+  AND version = (SELECT MAX(version) FROM aitab_pages WHERE slug = :slug);
+`;
+
 export const GET_AITAB_BY_SLUG_AND_VERSION = `
 SELECT ${AITAB_PAGE_COLUMNS}
 FROM aitab_pages
