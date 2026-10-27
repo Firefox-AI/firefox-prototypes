@@ -171,6 +171,13 @@ h2 {
   border: 1px solid var(--border-color-deemphasized);
 }
 
+.model {
+  margin: 0;
+  padding-inline: var(--space-medium);
+  color: var(--text-color-deemphasized);
+  font-size: var(--font-size-small);
+}
+
 .composer {
   display: flex;
   flex-direction: column;

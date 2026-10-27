@@ -423,7 +423,7 @@ browse-agent-status-done = Done
 browse-agent-status-stopped = Stopped
 browse-agent-status-error = Stopped with an error
 browse-agent-setup-heading = Connect a model
-browse-agent-setup-description = This prototype calls the Anthropic API directly. Paste an API key to get started; it is stored in the browser.smartwindow.browseAgent.apiKey preference.
+browse-agent-setup-description = The Anthropic provider is selected. Paste an API key to get started; it is stored in the browser.smartwindow.browseAgent.apiKey preference. Switch browser.smartwindow.browseAgent.provider to “smartwindow” to use the Smart Window model instead.
 browse-agent-setup-key-label =
     .label = API key
 browse-agent-setup-save = Save key
@@ -438,6 +438,8 @@ browse-agent-run = Run
 browse-agent-stop = Stop
 browse-agent-send = Send
 browse-agent-show-thinking = Show reasoning
+# $model (String) - Identifier of the model driving the agent.
+browse-agent-model-label = Model: { $model }
 
 ## Smart Form Fill
 

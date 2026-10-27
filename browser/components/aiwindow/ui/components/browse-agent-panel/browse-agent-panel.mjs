@@ -88,7 +88,7 @@ export class BrowseAgentPanel extends MozLitElement {
 
   connectedCallback() {
     super.connectedCallback();
-    this.hasApiKey = lazy.BrowseAgent.hasApiKey();
+    this.hasApiKey = !lazy.BrowseAgent.needsApiKey();
     const existing = lazy.BrowseAgent.getSession(this.#chromeWindow);
     if (existing) {
       this.#attach(existing);
@@ -202,7 +202,7 @@ export class BrowseAgentPanel extends MozLitElement {
     }
     lazy.BrowseAgent.setApiKey(key);
     this.apiKeyDraft = "";
-    this.hasApiKey = lazy.BrowseAgent.hasApiKey();
+    this.hasApiKey = !lazy.BrowseAgent.needsApiKey();
     this.focusInput();
   }
 
@@ -387,6 +387,11 @@ export class BrowseAgentPanel extends MozLitElement {
           ? this.entries.map(entry => this.#entryTemplate(entry))
           : html`<p class="empty" data-l10n-id="browse-agent-empty-hint"></p>`}
       </div>
+      <p
+        class="model"
+        data-l10n-id="browse-agent-model-label"
+        data-l10n-args=${JSON.stringify({ model: lazy.BrowseAgent.model })}
+      ></p>
       ${this.#composerTemplate()}
     `;
   }

@@ -7,13 +7,27 @@
  * of the user's tabs: it sees the page through screenshots and acts through
  * synthesized clicks, keystrokes, scrolling and navigation, until it calls
  * `done` or needs the user.
+ *
+ * The model is reached through one of two providers: the Smart Window's own
+ * OpenAI-style engine (Firefox Account token, Mozilla endpoint, a vision model
+ * such as qwen3.8-flash-next) or the Anthropic Messages API with an API key.
  */
+
+import {
+  MODEL_FEATURES,
+  PURPOSES,
+  SERVICE_TYPES,
+} from "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   AIWindow:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
+  AuthProvider:
+    "moz-src:///browser/components/aiwindow/models/AuthProvider.sys.mjs",
   clearTimeout: "resource://gre/modules/Timer.sys.mjs",
+  openAIEngine:
+    "moz-src:///browser/components/aiwindow/models/openAIEngine.sys.mjs",
   setTimeout: "resource://gre/modules/Timer.sys.mjs",
 });
 
@@ -27,6 +41,7 @@ ChromeUtils.defineLazyGetter(lazy, "console", () =>
 const PREF_PREFIX = "browser.smartwindow.browseAgent.";
 const HTML_NS = "http://www.w3.org/1999/xhtml";
 const ANTHROPIC_VERSION = "2023-06-01";
+const ANTHROPIC_DEFAULT_ENDPOINT = "https://api.anthropic.com/v1/messages";
 const MAX_TOKENS = 8192;
 const SETTLE_POLL_MS = 150;
 const ACTION_SETTLE_MS = 700;
@@ -35,6 +50,14 @@ const READY_TIMEOUT_MS = 5000;
 const MAX_WAIT_SECONDS = 10;
 const MAX_REQUEST_ATTEMPTS = 3;
 const JPEG_QUALITY = 0.85;
+// Screenshots older than this many steps are dropped from the OpenAI-style
+// history so a smaller model's context is not filled with stale images.
+const MAX_IMAGES_IN_CONTEXT = 3;
+
+export const PROVIDERS = Object.freeze({
+  SMART_WINDOW: "smartwindow",
+  ANTHROPIC: "anthropic",
+});
 
 export const SESSION_STATE = Object.freeze({
   IDLE: "idle",
@@ -69,7 +92,7 @@ How to work
 - Hard limits: never complete a purchase, place an order, submit a payment, or send a message, email or post on the user's behalf. Adding items to a cart is fine; stop before any order confirmation and tell the user the cart is ready for review. Never enter passwords, card numbers or other credentials. If a site requires signing in, use ask_user so the user can sign in themselves, then continue.
 - When the task is complete, or cannot be completed, call done with a short summary of what you did and what the user should check.
 
-You are operating autonomously. The user is not watching every step and cannot answer questions mid-task except through ask_user, so proceed without asking for permission on reversible actions that follow from the task. When you have enough information to act, act. Keep your visible messages short: one sentence on what you are doing or found.`;
+You are operating autonomously. The user is not watching every step and cannot answer questions mid-task except through ask_user, so proceed without asking for permission on reversible actions that follow from the task. When you have enough information to act, act. Always respond with a tool call until the task is finished; finish with the done tool. Keep your visible messages short: one sentence on what you are doing or found.`;
 
 const TOOLS = [
   {
@@ -225,6 +248,11 @@ const TOOLS = [
   },
 ];
 
+const OPENAI_TOOLS = TOOLS.map(({ name, description, input_schema }) => ({
+  type: "function",
+  function: { name, description, parameters: input_schema },
+}));
+
 function getPref(name, fallback) {
   const key = PREF_PREFIX + name;
   switch (typeof fallback) {
@@ -264,23 +292,296 @@ function isAbortError(error) {
   return error?.name === "AbortError";
 }
 
+function imageDataURL(image) {
+  return `data:image/jpeg;base64,${image}`;
+}
+
 /**
- * One request to the Claude Messages API. Optional features (thinking summary
- * display, server-side refusal fallbacks) are dropped and the request retried
- * once when the server rejects them, so the prototype keeps working across
- * models and accounts with different capabilities.
+ * @typedef {object} ModelReply
+ * @property {string} text - Visible assistant text, possibly empty
+ * @property {string} thinking - Reasoning summary when the provider returns one
+ * @property {Array<{id: string, name: string, input: object, inputError?: string}>} toolCalls - Requested tool calls
+ * @property {"tool_use"|"end_turn"|"max_tokens"|"refusal"} stopReason - Why the model stopped
+ * @property {string} [refusalDetail] - Explanation attached to a refusal
+ * @property {object[]} [anthropicContent] - Raw content blocks to replay
+ * @property {object} [usage] - Token usage when the provider reports it
+ */
+
+/**
+ * Provider-neutral transcript turn. `user` turns carry the task or an
+ * observation, `assistant` turns the model's reply, `tools` turns the results
+ * of the tool calls of the preceding assistant turn.
+ *
+ * @typedef {object} Turn
+ * @property {"user"|"assistant"|"tools"} role - Who produced the turn
+ * @property {string} [text] - Text of a user turn
+ * @property {string} [image] - base64 JPEG attached to a user turn
+ * @property {ModelReply} [reply] - The model's reply, for assistant turns
+ * @property {Array<{id: string, name: string, text: string, image?: string, isError?: boolean}>} [results] - Tool results, for tools turns
+ */
+
+// ---------------------------------------------------------------------------
+// Smart Window provider: the OpenAI-style engine the chat already uses.
+// ---------------------------------------------------------------------------
+
+let gSmartWindowEngine = null;
+
+async function getSmartWindowEngine(model) {
+  const endpoint = getPref("endpoint", "");
+  if (
+    !gSmartWindowEngine ||
+    gSmartWindowEngine.model !== model ||
+    gSmartWindowEngine.endpoint !== endpoint
+  ) {
+    const options = {
+      model,
+      serviceType: SERVICE_TYPES.AI,
+      purpose: PURPOSES.CHAT,
+      flowId: null,
+      feature: MODEL_FEATURES.CHAT,
+    };
+    if (endpoint) {
+      options.baseURL = endpoint;
+      options.apiKey = getPref("apiKey", "");
+    }
+    const engine = await lazy.openAIEngine.build(options);
+    gSmartWindowEngine = { engine, model, endpoint };
+  }
+  return gSmartWindowEngine.engine;
+}
+
+function toOpenAIMessages(turns) {
+  const messages = [{ role: "system", content: SYSTEM_PROMPT }];
+
+  // Only the most recent screenshots stay in context as images.
+  let imageBudget = MAX_IMAGES_IN_CONTEXT;
+  const keepImage = new Set();
+  for (let i = turns.length - 1; i >= 0 && imageBudget > 0; i--) {
+    const turn = turns[i];
+    const hasImage =
+      turn.role === "user"
+        ? !!turn.image
+        : turn.role === "tools" && turn.results.some(r => r.image);
+    if (hasImage) {
+      keepImage.add(i);
+      imageBudget--;
+    }
+  }
+
+  const imagePart = image => ({
+    type: "image_url",
+    image_url: { url: imageDataURL(image) },
+  });
+
+  turns.forEach((turn, index) => {
+    switch (turn.role) {
+      case "user":
+        if (turn.image && keepImage.has(index)) {
+          messages.push({
+            role: "user",
+            content: [{ type: "text", text: turn.text }, imagePart(turn.image)],
+          });
+        } else {
+          messages.push({
+            role: "user",
+            content: turn.image
+              ? `${turn.text}\n(Screenshot omitted from context.)`
+              : turn.text,
+          });
+        }
+        break;
+
+      case "assistant": {
+        const { reply } = turn;
+        const message = { role: "assistant", content: reply.text || null };
+        if (reply.toolCalls.length) {
+          message.tool_calls = reply.toolCalls.map(call => ({
+            id: call.id,
+            type: "function",
+            function: {
+              name: call.name,
+              arguments: JSON.stringify(call.input ?? {}),
+            },
+          }));
+        } else if (!reply.text) {
+          message.content = "";
+        }
+        messages.push(message);
+        break;
+      }
+
+      case "tools": {
+        for (const result of turn.results) {
+          messages.push({
+            role: "tool",
+            tool_call_id: result.id,
+            content: result.image
+              ? `${result.text}\n(The screenshot after this action follows${
+                  keepImage.has(index) ? "" : ", omitted from context"
+                }.)`
+              : result.text,
+          });
+        }
+        const latest = turn.results.findLast(r => r.image);
+        if (latest && keepImage.has(index)) {
+          messages.push({
+            role: "user",
+            content: [
+              { type: "text", text: `Screenshot after ${latest.name}:` },
+              imagePart(latest.image),
+            ],
+          });
+        }
+        break;
+      }
+    }
+  });
+  return messages;
+}
+
+async function requestSmartWindow({ turns, signal }) {
+  const model = BrowseAgent.model;
+  const endpoint = getPref("endpoint", "");
+  let token = null;
+  if (!endpoint) {
+    token = await lazy.AuthProvider.getToken();
+    if (!token) {
+      const error = new Error(
+        "Sign in to your Firefox account to use the Smart Window model, or set a custom endpoint."
+      );
+      error.code = "signin-required";
+      throw error;
+    }
+  }
+  const engine = await getSmartWindowEngine(model);
+  const request = {
+    args: toOpenAIMessages(turns),
+    token,
+    tools: OPENAI_TOOLS,
+    inferenceParams: { tool_choice: "auto" },
+  };
+
+  let lastError;
+  for (let attempt = 1; attempt <= MAX_REQUEST_ATTEMPTS; attempt++) {
+    if (signal.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+    try {
+      const response = await engine.run(request);
+      return normalizeOpenAIReply(response);
+    } catch (error) {
+      lastError = error;
+      if (!lazy.openAIEngine.isRetryableError(error)) {
+        break;
+      }
+      lazy.console.warn(`attempt ${attempt} failed, retrying`, error);
+      await sleep(1000 * 2 ** attempt, signal);
+    }
+  }
+  throw new Error(
+    `Smart Window model request failed: ${lastError?.message ?? lastError}`
+  );
+}
+
+function normalizeOpenAIReply(response) {
+  const toolCalls = (response?.toolCalls ?? []).map((call, index) => {
+    const name = call.function?.name ?? call.name ?? "";
+    const raw = call.function?.arguments ?? "";
+    let input = {};
+    let inputError;
+    if (raw) {
+      try {
+        input = typeof raw === "string" ? JSON.parse(raw) : raw;
+      } catch {
+        inputError = `The arguments for ${name} were not valid JSON: ${truncate(raw, 200)}`;
+      }
+    }
+    return {
+      id: call.id || `call_${Date.now()}_${index}`,
+      name,
+      input: input && typeof input === "object" ? input : {},
+      inputError,
+    };
+  });
+  return {
+    text: (response?.finalOutput ?? "").trim(),
+    thinking: "",
+    toolCalls,
+    stopReason: toolCalls.length ? "tool_use" : "end_turn",
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Anthropic provider: the Messages API with an API key.
+// ---------------------------------------------------------------------------
+
+function toAnthropicMessages(turns) {
+  const messages = [];
+  const imageBlock = image => ({
+    type: "image",
+    source: { type: "base64", media_type: "image/jpeg", data: image },
+  });
+  for (const turn of turns) {
+    switch (turn.role) {
+      case "user":
+        messages.push({
+          role: "user",
+          content: [
+            { type: "text", text: turn.text },
+            ...(turn.image ? [imageBlock(turn.image)] : []),
+          ],
+        });
+        break;
+      case "assistant": {
+        const { reply } = turn;
+        messages.push({
+          role: "assistant",
+          content: reply.anthropicContent ?? [
+            ...(reply.text ? [{ type: "text", text: reply.text }] : []),
+            ...reply.toolCalls.map(call => ({
+              type: "tool_use",
+              id: call.id,
+              name: call.name,
+              input: call.input,
+            })),
+          ],
+        });
+        break;
+      }
+      case "tools":
+        messages.push({
+          role: "user",
+          content: turn.results.map(result => ({
+            type: "tool_result",
+            tool_use_id: result.id,
+            ...(result.isError ? { is_error: true } : {}),
+            content: result.image
+              ? [{ type: "text", text: result.text }, imageBlock(result.image)]
+              : result.text,
+          })),
+        });
+        break;
+    }
+  }
+  return messages;
+}
+
+/**
+ * Optional features (thinking summary display, server-side refusal
+ * fallbacks) are dropped and the request retried once when the server rejects
+ * them, so the prototype keeps working across models and accounts.
  *
  * @param {object} options
- * @param {object[]} options.messages - Conversation so far, API message shape.
+ * @param {Turn[]} options.turns
  * @param {AbortSignal} options.signal
  * @param {{thinkingDisplay: boolean, fallbacks: boolean}} options.optionalFeatures
  * @returns {Promise<object>} The Messages API response body.
  */
-async function requestCompletion({ messages, signal, optionalFeatures }) {
+async function requestAnthropicRaw({ turns, signal, optionalFeatures }) {
   const apiKey = BrowseAgent.getApiKey();
   if (!apiKey) {
     const error = new Error(
-      "No model API key is configured. Add one in the panel or set the browser.smartwindow.browseAgent.apiKey preference."
+      "No API key is configured for the Anthropic provider. Add one in the panel or set the browser.smartwindow.browseAgent.apiKey preference."
     );
     error.code = "no-api-key";
     throw error;
@@ -299,11 +600,11 @@ async function requestCompletion({ messages, signal, optionalFeatures }) {
   }
 
   const body = {
-    model: getPref("model", "claude-fable-5-1"),
+    model: BrowseAgent.model,
     max_tokens: MAX_TOKENS,
     system: SYSTEM_PROMPT,
     tools: TOOLS,
-    messages,
+    messages: toAnthropicMessages(turns),
     output_config: { effort: getPref("effort", "medium") },
     cache_control: { type: "ephemeral" },
   };
@@ -318,7 +619,7 @@ async function requestCompletion({ messages, signal, optionalFeatures }) {
     headers.set("anthropic-beta", betas.join(","));
   }
 
-  const endpoint = getPref("endpoint", "https://api.anthropic.com/v1/messages");
+  const endpoint = getPref("endpoint", "") || ANTHROPIC_DEFAULT_ENDPOINT;
   let lastError;
   for (let attempt = 1; attempt <= MAX_REQUEST_ATTEMPTS; attempt++) {
     let response;
@@ -359,6 +660,43 @@ async function requestCompletion({ messages, signal, optionalFeatures }) {
   throw lastError;
 }
 
+function normalizeAnthropicReply(response) {
+  const reply = {
+    text: "",
+    thinking: "",
+    toolCalls: [],
+    stopReason: "end_turn",
+    anthropicContent: response.content,
+    usage: response.usage,
+  };
+  for (const block of response.content ?? []) {
+    if (block.type === "text" && block.text.trim()) {
+      reply.text = `${reply.text}${reply.text ? "\n" : ""}${block.text.trim()}`;
+    } else if (block.type === "thinking" && block.thinking?.trim()) {
+      reply.thinking = block.thinking.trim();
+    } else if (block.type === "tool_use") {
+      reply.toolCalls.push({
+        id: block.id,
+        name: block.name,
+        input: block.input,
+      });
+    }
+  }
+  if (response.stop_reason === "refusal") {
+    reply.stopReason = "refusal";
+    reply.refusalDetail = response.stop_details?.explanation;
+  } else if (reply.toolCalls.length) {
+    reply.stopReason = "tool_use";
+  } else if (response.stop_reason === "max_tokens") {
+    reply.stopReason = "max_tokens";
+  }
+  return reply;
+}
+
+// ---------------------------------------------------------------------------
+// Session
+// ---------------------------------------------------------------------------
+
 /**
  * One agentic run against one tab of one window.
  */
@@ -368,7 +706,8 @@ export class BrowseAgentSession {
   /** @type {AbortController} */
   #abort = new AbortController();
   #listeners = new Set();
-  #messages = [];
+  /** @type {Turn[]} */
+  #turns = [];
   #pendingAnswer = null;
   #scale = { x: 1, y: 1 };
   #optionalFeatures = {
@@ -452,10 +791,11 @@ export class BrowseAgentSession {
       this.#win.gBrowser.tabContainer.addEventListener("TabClose", this);
 
       await this.#settle();
-      const initial = await this.#observe("Starting state of the tab.");
-      this.#messages.push({
+      const shot = await this.#observe("Starting state of the tab.");
+      this.#turns.push({
         role: "user",
-        content: [{ type: "text", text: `Task: ${this.task}` }, ...initial],
+        text: `Task: ${this.task}\n\n${shot.text}`,
+        image: shot.image,
       });
       await this.#loop(signal);
     } catch (error) {
@@ -575,75 +915,65 @@ export class BrowseAgentSession {
         );
       }
 
-      const response = await this.#request(signal);
-      if (response.usage) {
+      const reply = await this.#request(signal);
+      if (reply.usage) {
         this.usage.inputTokens +=
-          (response.usage.input_tokens ?? 0) +
-          (response.usage.cache_read_input_tokens ?? 0) +
-          (response.usage.cache_creation_input_tokens ?? 0);
-        this.usage.outputTokens += response.usage.output_tokens ?? 0;
+          (reply.usage.input_tokens ?? 0) +
+          (reply.usage.cache_read_input_tokens ?? 0) +
+          (reply.usage.cache_creation_input_tokens ?? 0);
+        this.usage.outputTokens += reply.usage.output_tokens ?? 0;
       }
 
-      if (response.stop_reason === "refusal") {
-        const detail = response.stop_details?.explanation;
+      if (reply.stopReason === "refusal") {
         throw new Error(
-          `The model declined to continue${detail ? `: ${detail}` : "."}`
+          `The model declined to continue${
+            reply.refusalDetail ? `: ${reply.refusalDetail}` : "."
+          }`
         );
       }
 
-      this.#messages.push({ role: "assistant", content: response.content });
-
-      const toolUses = [];
-      let lastText = "";
-      for (const block of response.content) {
-        if (block.type === "text" && block.text.trim()) {
-          lastText = block.text.trim();
-          this.#emit({ type: ENTRY_TYPE.ASSISTANT, text: lastText });
-        } else if (block.type === "thinking" && block.thinking?.trim()) {
-          this.#emit({
-            type: ENTRY_TYPE.THINKING,
-            text: block.thinking.trim(),
-          });
-        } else if (block.type === "tool_use") {
-          toolUses.push(block);
-        }
+      this.#turns.push({ role: "assistant", reply });
+      if (reply.thinking) {
+        this.#emit({ type: ENTRY_TYPE.THINKING, text: reply.thinking });
+      }
+      if (reply.text) {
+        this.#emit({ type: ENTRY_TYPE.ASSISTANT, text: reply.text });
       }
 
-      if (!toolUses.length) {
-        if (response.stop_reason === "max_tokens") {
-          this.#messages.push({
+      if (!reply.toolCalls.length) {
+        if (reply.stopReason === "max_tokens") {
+          this.#turns.push({
             role: "user",
-            content: "Your reply was cut off. Continue with the task.",
+            text: "Your reply was cut off. Continue with the task.",
           });
           continue;
         }
-        this.#finish({ summary: lastText, success: true });
+        this.#finish({ summary: reply.text, success: true });
         return;
       }
 
       const results = [];
       let failed = false;
       let finished = null;
-      for (const toolUse of toolUses) {
+      for (const call of reply.toolCalls) {
         if (signal.aborted) {
           return;
         }
         if (failed) {
           results.push({
-            type: "tool_result",
-            tool_use_id: toolUse.id,
-            is_error: true,
-            content: "Not executed: an earlier action in this turn failed.",
+            id: call.id,
+            name: call.name,
+            isError: true,
+            text: "Not executed: an earlier action in this turn failed.",
           });
           continue;
         }
         try {
-          const { content, finish } = await this.#runTool(toolUse);
-          results.push({
-            type: "tool_result",
-            tool_use_id: toolUse.id,
-            content,
-          });
+          if (call.inputError) {
+            throw new Error(call.inputError);
+          }
+          const { text, image, finish } = await this.#runTool(call);
+          results.push({ id: call.id, name: call.name, text, image });
           if (finish) {
             finished = finish;
             break;
@@ -653,19 +983,19 @@ export class BrowseAgentSession {
             throw error;
           }
           failed = true;
-          lazy.console.warn(`tool ${toolUse.name} failed`, error);
+          lazy.console.warn(`tool ${call.name} failed`, error);
           this.#emit({
             type: ENTRY_TYPE.ACTION,
-            name: toolUse.name,
-            input: toolUse.input,
+            name: call.name,
+            input: call.input,
             status: `Failed: ${error.message}`,
             failed: true,
           });
           results.push({
-            type: "tool_result",
-            tool_use_id: toolUse.id,
-            is_error: true,
-            content: error.message,
+            id: call.id,
+            name: call.name,
+            isError: true,
+            text: error.message,
           });
         }
       }
@@ -674,17 +1004,26 @@ export class BrowseAgentSession {
         this.#finish(finished);
         return;
       }
-      this.#messages.push({ role: "user", content: results });
+      this.#turns.push({ role: "tools", results });
     }
   }
 
   async #request(signal) {
-    try {
-      return await requestCompletion({
-        messages: this.#messages,
+    if (BrowseAgent.provider === PROVIDERS.ANTHROPIC) {
+      return this.#requestAnthropic(signal);
+    }
+    return requestSmartWindow({ turns: this.#turns, signal });
+  }
+
+  async #requestAnthropic(signal) {
+    const run = () =>
+      requestAnthropicRaw({
+        turns: this.#turns,
         signal,
         optionalFeatures: this.#optionalFeatures,
       });
+    try {
+      return normalizeAnthropicReply(await run());
     } catch (error) {
       const anyOptional =
         this.#optionalFeatures.thinkingDisplay ||
@@ -695,11 +1034,7 @@ export class BrowseAgentSession {
           error.message
         );
         this.#optionalFeatures = { thinkingDisplay: false, fallbacks: false };
-        return requestCompletion({
-          messages: this.#messages,
-          signal,
-          optionalFeatures: this.#optionalFeatures,
-        });
+        return normalizeAnthropicReply(await run());
       }
       throw error;
     }
@@ -711,6 +1046,12 @@ export class BrowseAgentSession {
     this.#setState(SESSION_STATE.DONE);
   }
 
+  /**
+   * @param {object} call
+   * @param {string} call.name - Tool name
+   * @param {object} call.input - Parsed tool arguments
+   * @returns {Promise<{text: string, image?: string, finish?: object}>}
+   */
   async #runTool({ name, input }) {
     switch (name) {
       case "screenshot":
@@ -738,7 +1079,12 @@ export class BrowseAgentSession {
       }
 
       case "click": {
-        const point = this.#toCss(input.x, input.y);
+        const x = Number(input.x);
+        const y = Number(input.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+          throw new Error("click needs numeric x and y coordinates.");
+        }
+        const point = this.#toCss(x, y);
         const result = await this.#query("Click", {
           ...point,
           button: input.button ?? "left",
@@ -748,7 +1094,7 @@ export class BrowseAgentSession {
         return this.#actionResult(
           name,
           input,
-          `${input.double ? "Double-clicked" : "Clicked"} (${input.x}, ${input.y})${
+          `${input.double ? "Double-clicked" : "Clicked"} (${x}, ${y})${
             result.target ? ` on ${result.target}` : ""
           }.`
         );
@@ -784,8 +1130,8 @@ export class BrowseAgentSession {
 
       case "scroll": {
         const data = {
-          direction: input.direction,
-          amount: input.amount ?? 0.75,
+          direction: input.direction ?? "down",
+          amount: Number(input.amount) || 0.75,
         };
         if (Number.isFinite(input.x) && Number.isFinite(input.y)) {
           Object.assign(data, this.#toCss(input.x, input.y));
@@ -795,7 +1141,7 @@ export class BrowseAgentSession {
         return this.#actionResult(
           name,
           input,
-          `Scrolled ${input.direction} in ${result.target}. Now at ${Math.round(
+          `Scrolled ${data.direction} in ${result.target}. Now at ${Math.round(
             result.scrollY
           )} of ${result.scrollHeight} px${result.atBottom ? " (bottom reached)" : ""}.`
         );
@@ -834,7 +1180,7 @@ export class BrowseAgentSession {
           input,
           status: `Listed ${lines.length} interactive elements.`,
         });
-        return { content: [{ type: "text", text }] };
+        return { text };
       }
 
       case "read_page": {
@@ -846,12 +1192,7 @@ export class BrowseAgentSession {
           status: `Read the page text (${text.length} characters).`,
         });
         return {
-          content: [
-            {
-              type: "text",
-              text: `Page: ${title} — ${url}${truncated ? " (text truncated)" : ""}\n\n${text}`,
-            },
-          ],
+          text: `Page: ${title} — ${url}${truncated ? " (text truncated)" : ""}\n\n${text}`,
         };
       }
 
@@ -873,20 +1214,18 @@ export class BrowseAgentSession {
         const answer = await promise;
         this.#setState(SESSION_STATE.RUNNING);
         this.#emit({ type: ENTRY_TYPE.ANSWER, text: answer });
-        const observed = await this.#observe(
+        const shot = await this.#observe(
           "Current state of the tab after the user replied."
         );
         return {
-          content: [
-            { type: "text", text: `User reply: ${answer || "(empty)"}` },
-            ...observed,
-          ],
+          text: `User reply: ${answer || "(empty)"}\n${shot.text}`,
+          image: shot.image,
         };
       }
 
       case "done":
         return {
-          content: [{ type: "text", text: "OK" }],
+          text: "OK",
           finish: {
             summary: String(input.summary ?? "").trim(),
             success: input.success !== false,
@@ -918,10 +1257,10 @@ export class BrowseAgentSession {
   }
 
   // Emits the action to the panel together with the screenshot taken after it
-  // and returns the tool result blocks for the model.
+  // and returns the tool result for the model.
   async #actionResult(name, input, status) {
-    const blocks = await this.#observe(status, { name, input });
-    return { content: blocks };
+    const shot = await this.#observe(status, { name, input });
+    return { text: shot.text, image: shot.image };
   }
 
   async #observe(status, action = null) {
@@ -940,13 +1279,7 @@ export class BrowseAgentSession {
       title: shot.title,
       image: shot.dataURL,
     });
-    return [
-      { type: "text", text },
-      {
-        type: "image",
-        source: { type: "base64", media_type: "image/jpeg", data: shot.base64 },
-      },
-    ];
+    return { text, image: shot.base64 };
   }
 
   async #screenshot() {
@@ -1033,8 +1366,14 @@ export const BrowseAgent = {
     return getPref("enabled", false);
   },
 
+  get provider() {
+    return getPref("provider", PROVIDERS.SMART_WINDOW) === PROVIDERS.ANTHROPIC
+      ? PROVIDERS.ANTHROPIC
+      : PROVIDERS.SMART_WINDOW;
+  },
+
   get model() {
-    return getPref("model", "claude-fable-5-1");
+    return getPref("model", "qwen3.8-flash-next");
   },
 
   getApiKey() {
@@ -1050,8 +1389,12 @@ export const BrowseAgent = {
     Services.prefs.setStringPref(PREF_PREFIX + "apiKey", key.trim());
   },
 
-  hasApiKey() {
-    return !!this.getApiKey();
+  /**
+   * Whether the panel has to collect an API key before a run can start. The
+   * Smart Window provider authenticates with the Firefox Account instead.
+   */
+  needsApiKey() {
+    return this.provider === PROVIDERS.ANTHROPIC && !this.getApiKey();
   },
 
   getSession(win) {

@@ -2493,10 +2493,15 @@ pref("browser.smartwindow.agent.expiry.maxAgeDays", 90);
 // Smart Window: Browse Agent prototype. A vision model drives a tab through
 // screenshots and synthesized input (the /browse command).
 pref("browser.smartwindow.browseAgent.enabled", true);
+// "smartwindow" uses the Smart Window engine (Firefox Account, Mozilla
+// endpoint); "anthropic" calls the Anthropic Messages API with apiKey.
+pref("browser.smartwindow.browseAgent.provider", "smartwindow");
+pref("browser.smartwindow.browseAgent.model", "qwen3.8-flash-next");
+// Empty means the provider's default. For "smartwindow" a custom value is an
+// OpenAI-compatible base URL used with apiKey instead of the account token.
+pref("browser.smartwindow.browseAgent.endpoint", "");
 pref("browser.smartwindow.browseAgent.apiKey", "");
-pref("browser.smartwindow.browseAgent.endpoint", "https://api.anthropic.com/v1/messages");
-pref("browser.smartwindow.browseAgent.model", "claude-fable-5-1");
-// low | medium | high | xhigh | max
+// Anthropic only: low | medium | high | xhigh | max
 pref("browser.smartwindow.browseAgent.effort", "medium");
 pref("browser.smartwindow.browseAgent.maxSteps", 60);
 // Longest screenshot edge in pixels; anything up to 1568 fits every model.
