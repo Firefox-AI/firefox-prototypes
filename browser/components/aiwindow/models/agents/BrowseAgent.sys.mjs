@@ -10,7 +10,7 @@
  *
  * The model is reached through one of two providers: the Smart Window's own
  * OpenAI-style engine (Firefox Account token, Mozilla endpoint, a vision model
- * such as qwen3.8-flash-next) or the Anthropic Messages API with an API key.
+ * such as gemini-3.1-flash-lite) or the Anthropic Messages API with an API key.
  */
 
 import {
@@ -53,6 +53,8 @@ const JPEG_QUALITY = 0.85;
 // Screenshots older than this many steps are dropped from the OpenAI-style
 // history so a smaller model's context is not filled with stale images.
 const MAX_IMAGES_IN_CONTEXT = 3;
+// Identical consecutive actions tolerated before the model is told about it.
+const REPEAT_WARNING_THRESHOLD = 2;
 
 export const PROVIDERS = Object.freeze({
   SMART_WINDOW: "smartwindow",
@@ -338,11 +340,12 @@ function imageDataURL(image) {
  * @typedef {object} ModelReply
  * @property {string} text - Visible assistant text, possibly empty
  * @property {string} thinking - Reasoning summary when the provider returns one
- * @property {Array<{id: string, name: string, input: object, inputError?: string}>} toolCalls - Requested tool calls
+ * @property {Array<{id: string, name: string, input: object, inputError?: string, providerFields?: object}>} toolCalls - Requested tool calls
  * @property {"tool_use"|"end_turn"|"max_tokens"|"refusal"} stopReason - Why the model stopped
  * @property {string} [refusalDetail] - Explanation attached to a refusal
  * @property {object[]} [anthropicContent] - Raw content blocks to replay
  * @property {object} [usage] - Token usage when the provider reports it
+ * @property {object} [providerFields] - Provider-specific message fields to echo back
  */
 
 /**
@@ -432,6 +435,11 @@ function toOpenAIMessages(turns) {
       case "assistant": {
         const { reply } = turn;
         const message = { role: "assistant", content: reply.text || null };
+        // Gemini signs its tool calls and wants the signatures back on the
+        // next turn; they ride along in provider_specific_fields.
+        if (reply.providerFields) {
+          message.provider_specific_fields = reply.providerFields;
+        }
         if (reply.toolCalls.length) {
           message.tool_calls = reply.toolCalls.map(call => ({
             id: call.id,
@@ -440,6 +448,9 @@ function toOpenAIMessages(turns) {
               name: call.name,
               arguments: JSON.stringify(call.input ?? {}),
             },
+            ...(call.providerFields
+              ? { provider_specific_fields: call.providerFields }
+              : {}),
           }));
         } else if (!reply.text) {
           message.content = "";
@@ -539,6 +550,7 @@ function normalizeOpenAIReply(response) {
       name,
       input: input && typeof input === "object" ? input : {},
       inputError,
+      providerFields: call.provider_specific_fields ?? undefined,
     };
   });
   return {
@@ -546,6 +558,7 @@ function normalizeOpenAIReply(response) {
     thinking: "",
     toolCalls,
     stopReason: toolCalls.length ? "tool_use" : "end_turn",
+    providerFields: response?.providerSpecificFields ?? undefined,
   };
 }
 
@@ -748,6 +761,9 @@ export class BrowseAgentSession {
   #turns = [];
   #pendingAnswer = null;
   #scale = { x: 1, y: 1 };
+  #lastShotSize = { width: 0, height: 0 };
+  #repeatedCalls = 0;
+  #lastCallKey = "";
   #optionalFeatures = {
     thinkingDisplay: getPref("showThinking", true),
     fallbacks: getPref("fallbacks", true),
@@ -1011,7 +1027,12 @@ export class BrowseAgentSession {
             throw new Error(call.inputError);
           }
           const { text, image, finish } = await this.#runTool(call);
-          results.push({ id: call.id, name: call.name, text, image });
+          results.push({
+            id: call.id,
+            name: call.name,
+            text: this.#withRepeatWarning(call, text),
+            image,
+          });
           if (finish) {
             finished = finish;
             break;
@@ -1076,6 +1097,24 @@ export class BrowseAgentSession {
       }
       throw error;
     }
+  }
+
+  // The same action issued again and again means the page is not reacting
+  // the way the model expects; say so instead of letting it loop.
+  #withRepeatWarning(call, text) {
+    const key = `${call.name}:${JSON.stringify(call.input ?? {})}`;
+    if (key === this.#lastCallKey) {
+      this.#repeatedCalls++;
+    } else {
+      this.#lastCallKey = key;
+      this.#repeatedCalls = 0;
+    }
+    if (this.#repeatedCalls >= REPEAT_WARNING_THRESHOLD) {
+      return `${text}\n\nNote: you have now performed this exact action ${
+        this.#repeatedCalls + 1
+      } times in a row. If the page has not changed, it is not responding to it: try pressing Escape, use find or list_elements to locate another target, scroll, or navigate directly to the URL you need.`;
+    }
+    return text;
   }
 
   #finish({ summary, success }) {
@@ -1381,6 +1420,7 @@ export class BrowseAgentSession {
       x: canvas.width / Math.max(viewport.width, 1),
       y: canvas.height / Math.max(viewport.height, 1),
     };
+    this.#lastShotSize = { width: canvas.width, height: canvas.height };
     return {
       ...viewport,
       cssWidth: viewport.width,
@@ -1392,7 +1432,16 @@ export class BrowseAgentSession {
     };
   }
 
+  // Converts screenshot pixels to CSS pixels, refusing points outside the
+  // last screenshot so a stray coordinate is reported instead of clicking
+  // somewhere unintended.
   #toCss(x, y) {
+    const { width, height } = this.#lastShotSize;
+    if (width && (x < 0 || y < 0 || x >= width || y >= height)) {
+      throw new Error(
+        `(${x}, ${y}) is outside the screenshot, which is ${width}x${height} px. Scroll or use find to bring the target into view first.`
+      );
+    }
     return { x: x / this.#scale.x, y: y / this.#scale.y };
   }
 
@@ -1452,7 +1501,7 @@ export const BrowseAgent = {
   },
 
   get model() {
-    return getPref("model", "qwen3.8-flash-next");
+    return getPref("model", "gemini-3.1-flash-lite");
   },
 
   getApiKey() {

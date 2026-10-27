@@ -2496,7 +2496,8 @@ pref("browser.smartwindow.browseAgent.enabled", true);
 // "smartwindow" uses the Smart Window engine (Firefox Account, Mozilla
 // endpoint); "anthropic" calls the Anthropic Messages API with apiKey.
 pref("browser.smartwindow.browseAgent.provider", "smartwindow");
-pref("browser.smartwindow.browseAgent.model", "qwen3.8-flash-next");
+// Any vision-capable model the endpoint serves with function calling.
+pref("browser.smartwindow.browseAgent.model", "gemini-3.1-flash-lite");
 // Empty means the provider's default. For "smartwindow" a custom value is an
 // OpenAI-compatible base URL used with apiKey instead of the account token.
 pref("browser.smartwindow.browseAgent.endpoint", "");

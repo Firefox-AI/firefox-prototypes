@@ -193,6 +193,16 @@ add_task(async function test_session_runs_tools_until_done() {
     );
     respond({
       finalOutput: "",
+      toolCalls: [toolCall("c4b", "click", { x: 99999, y: 99999 })],
+    });
+
+    ({ request, respond } = await nextRequest());
+    Assert.ok(
+      lastToolMessage(request).content.includes("outside the screenshot"),
+      "clicks outside the screenshot are refused"
+    );
+    respond({
+      finalOutput: "",
       toolCalls: [
         toolCall("c5", "done", { summary: "Chair added.", success: true }),
       ],
@@ -206,7 +216,7 @@ add_task(async function test_session_runs_tools_until_done() {
       summary: "Chair added.",
       success: true,
     });
-    Assert.equal(session.stepCount, 5, "five model turns were used");
+    Assert.equal(session.stepCount, 6, "six model turns were used");
     const types = session.entries.map(e => e.type);
     Assert.ok(types.includes(ENTRY_TYPE.TASK));
     Assert.ok(types.includes(ENTRY_TYPE.ASSISTANT));
@@ -237,6 +247,10 @@ add_task(async function test_only_recent_screenshots_stay_in_context() {
       ({ request, respond } = await nextRequest());
     }
     Assert.equal(countImages(request), 3, "older screenshots are dropped");
+    Assert.ok(
+      lastToolMessage(request).content.includes("times in a row"),
+      "identical repeated actions are called out to the model"
+    );
     Assert.ok(
       request.args.some(
         m => m.role === "tool" && m.content.includes("omitted from context")
