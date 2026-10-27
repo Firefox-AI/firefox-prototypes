@@ -53,6 +53,9 @@ const JPEG_QUALITY = 0.85;
 // Screenshots older than this many steps are dropped from the OpenAI-style
 // history so a smaller model's context is not filled with stale images.
 const MAX_IMAGES_IN_CONTEXT = 3;
+// How many clickable elements get a number in each screenshot and listing.
+const MAX_ANNOTATED_ELEMENTS = 60;
+const MARKER_FONT_PX = 11;
 // Identical consecutive actions tolerated before the model is told about it.
 const REPEAT_WARNING_THRESHOLD = 2;
 
@@ -85,8 +88,9 @@ export const ENTRY_TYPE = Object.freeze({
 const SYSTEM_PROMPT = `You are the Firefox Browse Agent. You operate one of the user's real Firefox tabs to complete the task they gave you, with their own cookies and logins. You see the page through screenshots and act with the tools provided.
 
 How to work
-- Every action tool (navigate, click, type, key, scroll, wait, go_back) returns a fresh screenshot of the tab taken after the action, so you rarely need the screenshot tool.
-- Coordinates are pixels in the most recent screenshot, origin at the top left. list_elements returns exact click targets with coordinates; prefer it over estimating coordinates, especially on dense pages. Use read_page to read long text such as a recipe or a list of search results.
+- Every action tool (navigate, click_element, click, type, key, scroll, wait, go_back) returns a fresh screenshot of the tab taken after the action, so you rarely need the screenshot tool.
+- Clickable elements are numbered in each screenshot and listed under it with their number, text and coordinates. Click them with click_element and the number. Only use click with coordinates for something that has no number, and take the coordinates from find or list_elements rather than estimating them. To type into a field, click_element it first, then type.
+- Coordinates are pixels in the most recent screenshot, origin at the top left. Use read_page to read long text such as a recipe or a list of search results.
 - To search or go to a site, use navigate with a full URL, for example https://duckduckgo.com/?q=brownie+recipe or the site's own URL. After typing into a search box, press Enter with the key tool or use type with submit set to true.
 - Verify the outcome in the screenshot before moving on, for example that an item really was added to the cart. If an action did not work, try a different approach instead of repeating it.
 - find locates things by their text anywhere on the page (a product name, "Add to cart", "Search") and scrolls to the first match, so use it instead of scrolling around. select_option sets native dropdowns such as size or quantity; custom dropdowns are clicked like buttons. hover reveals menus that open on mouse-over.
@@ -129,9 +133,20 @@ const TOOLS = [
     },
   },
   {
+    name: "click_element",
+    description:
+      "Click an element by the number it carries in the latest screenshot and element list. The most reliable way to click.",
+    input_schema: {
+      type: "object",
+      properties: { index: { type: "integer", minimum: 1 } },
+      required: ["index"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "click",
     description:
-      "Click at a point in the latest screenshot. Prefer coordinates from list_elements.",
+      "Click at a point in the latest screenshot when the target has no number. Take coordinates from find or list_elements.",
     input_schema: {
       type: "object",
       properties: {
@@ -389,6 +404,43 @@ async function getSmartWindowEngine(model) {
     gSmartWindowEngine = { engine, model, endpoint };
   }
   return gSmartWindowEngine.engine;
+}
+
+/**
+ * Outlines each element and tags it with its number so the model can refer
+ * to elements by number instead of estimating coordinates.
+ *
+ * @param {CanvasRenderingContext2D} context
+ * @param {object[]} elements - Entries from the ListElements query, CSS px.
+ * @param {{x: number, y: number}} scale - CSS px to screenshot px.
+ */
+function drawMarkers(context, elements, scale) {
+  context.save();
+  context.font = `bold ${MARKER_FONT_PX}px sans-serif`;
+  context.textBaseline = "top";
+  context.lineWidth = 1;
+  for (const el of elements) {
+    const left = el.left * scale.x;
+    const top = el.top * scale.y;
+    const width = el.width * scale.x;
+    const height = el.height * scale.y;
+    context.strokeStyle = "rgba(220, 38, 38, 0.9)";
+    context.strokeRect(left + 0.5, top + 0.5, width - 1, height - 1);
+    const label = String(el.index);
+    const padding = 2;
+    const labelWidth = context.measureText(label).width + padding * 2;
+    const labelHeight = MARKER_FONT_PX + padding * 2;
+    const labelLeft = Math.max(
+      0,
+      Math.min(left, context.canvas.width - labelWidth)
+    );
+    const labelTop = Math.max(0, top - labelHeight + 1);
+    context.fillStyle = "rgba(220, 38, 38, 0.95)";
+    context.fillRect(labelLeft, labelTop, labelWidth, labelHeight);
+    context.fillStyle = "white";
+    context.fillText(label, labelLeft + padding, labelTop + padding);
+  }
+  context.restore();
 }
 
 function isStaleEngineError(error) {
@@ -775,6 +827,8 @@ export class BrowseAgentSession {
   #pendingAnswer = null;
   #scale = { x: 1, y: 1 };
   #lastShotSize = { width: 0, height: 0 };
+  /** Elements numbered in the latest screenshot, in CSS pixels. */
+  #lastElements = [];
   #repeatedCalls = 0;
   #lastCallKey = "";
   #optionalFeatures = {
@@ -1168,6 +1222,30 @@ export class BrowseAgentSession {
         return this.#actionResult(name, input, "Went back one page.");
       }
 
+      case "click_element": {
+        const index = Number(input.index);
+        const element = this.#lastElements.find(el => el.index === index);
+        if (!element) {
+          throw new Error(
+            `There is no element ${index} in the latest screenshot; the numbers go from 1 to ${this.#lastElements.length}. Take a screenshot or call list_elements for a fresh list.`
+          );
+        }
+        const result = await this.#query("Click", {
+          x: element.x,
+          y: element.y,
+          button: "left",
+          double: false,
+        });
+        await this.#settle();
+        return this.#actionResult(
+          name,
+          input,
+          `Clicked element ${index}, <${element.tag}> "${element.label}"${
+            result.target ? ` (hit ${result.target})` : ""
+          }.`
+        );
+      }
+
       case "click": {
         const x = Number(input.x);
         const y = Number(input.y);
@@ -1401,11 +1479,27 @@ export class BrowseAgentSession {
   }
 
   async #observe(status, action = null) {
-    const shot = await this.#screenshot();
+    let elements = [];
+    try {
+      ({ elements } = await this.#query("ListElements"));
+    } catch (error) {
+      lazy.console.debug("could not list elements for the screenshot", error);
+    }
+    elements = elements.slice(0, MAX_ANNOTATED_ELEMENTS);
+    const shot = await this.#screenshot(elements);
+    this.#lastElements = elements;
+    const listing = elements.map(el => {
+      const { x, y } = this.#toScreenshot(el.x, el.y);
+      const extra = el.value ? ` value="${truncate(el.value, 30)}"` : "";
+      return `[${el.index}] <${el.tag}> "${truncate(el.label, 40)}" @(${x},${y})${extra}`;
+    });
     const text = [
       status,
       `Page: ${shot.title || "(untitled)"} — ${shot.url}`,
       `Screenshot ${shot.width}x${shot.height} px covering the ${shot.cssWidth}x${shot.cssHeight} CSS px viewport; page scrolled to ${Math.round(shot.scrollY)} of ${shot.scrollHeight} px.`,
+      listing.length
+        ? `Clickable elements, numbered in the screenshot (use click_element with the number):\n${listing.join("\n")}`
+        : "No clickable elements are visible in the viewport.",
     ].join("\n");
     this.#emit({
       type: ENTRY_TYPE.ACTION,
@@ -1419,7 +1513,7 @@ export class BrowseAgentSession {
     return { text, image: shot.base64 };
   }
 
-  async #screenshot() {
+  async #screenshot(elements = []) {
     const browser = this.#requireBrowser();
     const viewport = await this.#query("Viewport");
     const windowGlobal = browser.browsingContext?.currentWindowGlobal;
@@ -1432,8 +1526,15 @@ export class BrowseAgentSession {
     const canvas = this.#win.document.createElementNS(HTML_NS, "canvas");
     canvas.width = bitmap.width;
     canvas.height = bitmap.height;
-    canvas.getContext("2d").drawImage(bitmap, 0, 0);
+    const context = canvas.getContext("2d");
+    context.drawImage(bitmap, 0, 0);
     bitmap.close();
+    if (elements.length && getPref("annotate", true)) {
+      drawMarkers(context, elements, {
+        x: canvas.width / Math.max(viewport.width, 1),
+        y: canvas.height / Math.max(viewport.height, 1),
+      });
+    }
     const dataURL = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
     this.#scale = {
       x: canvas.width / Math.max(viewport.width, 1),

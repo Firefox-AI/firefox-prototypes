@@ -124,10 +124,15 @@ add_task(async function test_session_runs_tools_until_done() {
       listing.content
     );
     Assert.ok(match, "the listing has screenshot coordinates for the button");
+    // Every screenshot also numbers the clickable elements; click by number.
+    const numbered = /\[(\d+)\] <button> "Add to cart"/.exec(
+      task.content[0].text
+    );
+    Assert.ok(numbered, "the task screenshot lists the button with a number");
     respond({
       finalOutput: "",
       toolCalls: [
-        toolCall("c2", "click", { x: Number(match[1]), y: Number(match[2]) }),
+        toolCall("c2", "click_element", { index: Number(numbered[1]) }),
       ],
     });
 
@@ -138,7 +143,7 @@ add_task(async function test_session_runs_tools_until_done() {
       "the click reached the page"
     );
     Assert.ok(
-      lastToolMessage(request).content.includes("Clicked"),
+      lastToolMessage(request).content.includes("Clicked element"),
       "click result is reported"
     );
     const last = request.args.at(-1);
@@ -203,6 +208,16 @@ add_task(async function test_session_runs_tools_until_done() {
     );
     respond({
       finalOutput: "",
+      toolCalls: [toolCall("c4c", "click_element", { index: 9999 })],
+    });
+
+    ({ request, respond } = await nextRequest());
+    Assert.ok(
+      lastToolMessage(request).content.includes("no element 9999"),
+      "unknown element numbers are refused"
+    );
+    respond({
+      finalOutput: "",
       toolCalls: [
         toolCall("c5", "done", { summary: "Chair added.", success: true }),
       ],
@@ -216,7 +231,7 @@ add_task(async function test_session_runs_tools_until_done() {
       summary: "Chair added.",
       success: true,
     });
-    Assert.equal(session.stepCount, 6, "six model turns were used");
+    Assert.equal(session.stepCount, 7, "seven model turns were used");
     const types = session.entries.map(e => e.type);
     Assert.ok(types.includes(ENTRY_TYPE.TASK));
     Assert.ok(types.includes(ENTRY_TYPE.ASSISTANT));

@@ -43,6 +43,32 @@ const INTERACTIVE_SELECTOR = [
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 
+// Real controls, as opposed to focusable containers such as a cookie banner
+// with tabindex="0": a click that lands outside these deserves a hint.
+const CONTROL_SELECTOR = [
+  "a[href]",
+  "button",
+  "input:not([type=hidden])",
+  "select",
+  "textarea",
+  "summary",
+  "label",
+  "[role=button]",
+  "[role=link]",
+  "[role=tab]",
+  "[role=menuitem]",
+  "[role=menuitemcheckbox]",
+  "[role=menuitemradio]",
+  "[role=option]",
+  "[role=checkbox]",
+  "[role=radio]",
+  "[role=switch]",
+  "[role=combobox]",
+  "[role=textbox]",
+  "[role=searchbox]",
+  "[onclick]",
+].join(",");
+
 const NON_TEXT_INPUT_TYPES = new Set([
   "button",
   "submit",
@@ -186,7 +212,7 @@ export class BrowseAgentChild extends JSWindowActorChild {
       );
     }
     const result = { target: this.#describe(target) };
-    if (target && !target.closest(INTERACTIVE_SELECTOR)) {
+    if (target && !target.closest(CONTROL_SELECTOR)) {
       result.nearby = this.#interactiveNear(x, y);
     }
     return result;
@@ -393,6 +419,10 @@ export class BrowseAgentChild extends JSWindowActorChild {
         label,
         x: cx,
         y: cy,
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
       };
       if (
         typeof el.value === "string" &&

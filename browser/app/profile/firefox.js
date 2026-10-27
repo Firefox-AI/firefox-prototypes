@@ -2507,6 +2507,8 @@ pref("browser.smartwindow.browseAgent.effort", "medium");
 pref("browser.smartwindow.browseAgent.maxSteps", 60);
 // Longest screenshot edge in pixels; anything up to 1568 fits every model.
 pref("browser.smartwindow.browseAgent.maxImageEdge", 1568);
+// Number the clickable elements on every screenshot sent to the model.
+pref("browser.smartwindow.browseAgent.annotate", true);
 pref("browser.smartwindow.browseAgent.showThinking", true);
 pref("browser.smartwindow.browseAgent.fallbacks", true);
 pref("browser.smartwindow.browseAgent.loglevel", "Warn");
