@@ -271,6 +271,7 @@ skip-if = [
 ["browser_aiwindow_website_select.js"]
 
 ["browser_aiwindowui.js"]
+["browser_browse_agent_panel.js"]
 
 ["browser_chat_assistant_citations.js"]
 

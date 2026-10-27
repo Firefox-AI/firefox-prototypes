@@ -84,9 +84,42 @@ h2 {
 }
 
 .empty {
-  margin: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-small);
+  margin: auto 0;
   color: var(--text-color-deemphasized);
-  text-align: center;
+
+  p {
+    margin: 0;
+  }
+}
+
+.suggestions-heading {
+  margin-block-start: var(--space-medium);
+  font-weight: var(--font-weight-bold);
+}
+
+.suggestion {
+  appearance: none;
+  margin: 0;
+  padding: var(--space-small) var(--space-medium);
+  border: 1px solid var(--border-color-deemphasized);
+  border-radius: var(--border-radius-medium);
+  background-color: var(--background-color-box);
+  color: var(--text-color);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--button-background-color-hover);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-outline);
+    outline-offset: var(--focus-outline-offset);
+  }
 }
 
 .entry {

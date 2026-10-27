@@ -87,6 +87,7 @@ How to work
 - Coordinates are pixels in the most recent screenshot, origin at the top left. list_elements returns exact click targets with coordinates; prefer it over estimating coordinates, especially on dense pages. Use read_page to read long text such as a recipe or a list of search results.
 - To search or go to a site, use navigate with a full URL, for example https://duckduckgo.com/?q=brownie+recipe or the site's own URL. After typing into a search box, press Enter with the key tool or use type with submit set to true.
 - Verify the outcome in the screenshot before moving on, for example that an item really was added to the cart. If an action did not work, try a different approach instead of repeating it.
+- find locates things by their text anywhere on the page (a product name, "Add to cart", "Search") and scrolls to the first match, so use it instead of scrolling around. select_option sets native dropdowns such as size or quantity; custom dropdowns are clicked like buttons. hover reveals menus that open on mouse-over.
 - Dismiss cookie banners, popups and dialogs that block the page.
 - Choose sensible defaults instead of asking. If the task does not name a store or site, use a well known one that fits the task and say which one you used in your summary. Use ask_user only for choices that are the user's alone (which account, which address, whether to sign in) or when you are stuck.
 - Hard limits: never complete a purchase, place an order, submit a payment, or send a message, email or post on the user's behalf. Adding items to a cart is fine; stop before any order confirmation and tell the user the cart is ready for review. Never enter passwords, card numbers or other credentials. If a site requires signing in, use ask_user so the user can sign in themselves, then continue.
@@ -205,6 +206,43 @@ const TOOLS = [
     input_schema: {
       type: "object",
       properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "find",
+    description:
+      "Find elements whose visible text or label contains the given text, anywhere on the page (for example a product name, 'Add to cart' or 'Search'). Scrolls the first match into view and returns matches with screenshot coordinates ready to click, plus a screenshot.",
+    input_schema: {
+      type: "object",
+      properties: { text: { type: "string" } },
+      required: ["text"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "select_option",
+    description:
+      "Choose an option in a native dropdown (a <select> element) at the given point, by the option's visible text or value. Custom dropdowns are not <select>: click to open those, then click the option.",
+    input_schema: {
+      type: "object",
+      properties: {
+        x: { type: "integer" },
+        y: { type: "integer" },
+        option: { type: "string" },
+      },
+      required: ["x", "y", "option"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "hover",
+    description:
+      "Move the mouse over a point to reveal menus or buttons that appear on hover.",
+    input_schema: {
+      type: "object",
+      properties: { x: { type: "integer" }, y: { type: "integer" } },
+      required: ["x", "y"],
       additionalProperties: false,
     },
   },
@@ -1196,6 +1234,47 @@ export class BrowseAgentSession {
         };
       }
 
+      case "find": {
+        const text = String(input.text ?? "").trim();
+        const { matches } = await this.#query("Find", { text });
+        await sleep(300, this.#abort.signal);
+        const lines = matches.map(m => {
+          const { x, y } = this.#toScreenshot(m.x, m.y);
+          return `[${m.index}] <${m.tag}> "${m.label}" @(${x},${y})${
+            m.inViewport ? "" : " (outside the viewport)"
+          }${m.href ? ` ${m.href}` : ""}`;
+        });
+        const status = lines.length
+          ? `Found ${lines.length} match${lines.length === 1 ? "" : "es"} for "${text}"; scrolled the first one into view:\n${lines.join("\n")}`
+          : `Nothing on the page matches "${text}".`;
+        return this.#actionResult(name, input, status);
+      }
+
+      case "select_option": {
+        const point = this.#toCss(Number(input.x), Number(input.y));
+        const result = await this.#query("SelectOption", {
+          ...point,
+          option: String(input.option ?? ""),
+        });
+        await this.#settle();
+        return this.#actionResult(
+          name,
+          input,
+          `Selected "${result.selected}" in ${result.target}.`
+        );
+      }
+
+      case "hover": {
+        const point = this.#toCss(Number(input.x), Number(input.y));
+        const result = await this.#query("Hover", point);
+        await sleep(400, this.#abort.signal);
+        return this.#actionResult(
+          name,
+          input,
+          `Hovered (${input.x}, ${input.y}) over ${result.target}.`
+        );
+      }
+
       case "wait": {
         const seconds = Math.min(
           Math.max(Number(input.seconds) || 1, 0.5),
@@ -1399,6 +1478,10 @@ export const BrowseAgent = {
 
   getSession(win) {
     return this._sessions.get(win) ?? null;
+  },
+
+  _resetEngineForTests() {
+    gSmartWindowEngine = null;
   },
 
   /**

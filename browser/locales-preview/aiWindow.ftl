@@ -438,6 +438,10 @@ browse-agent-run = Run
 browse-agent-stop = Stop
 browse-agent-send = Send
 browse-agent-show-thinking = Show reasoning
+browse-agent-suggestions-heading = Try one of these
+browse-agent-suggestion-recipe = I want to make brownies. Find a recipe and put the ingredients in my cart.
+browse-agent-suggestion-chair = Browse hermanmiller.com, search for a new office chair, open one and add it to the cart.
+browse-agent-suggestion-flight = Find the cheapest nonstop flight from San Francisco to New York next Friday and stop at the booking page.
 # $model (String) - Identifier of the model driving the agent.
 browse-agent-model-label = Model: { $model }
 

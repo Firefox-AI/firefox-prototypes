@@ -11,6 +11,8 @@ const EVENT_UTILS_URL = "chrome://remote/content/external/EventUtils.js";
 const MAX_ELEMENTS = 150;
 const MAX_TEXT_CHARS = 20000;
 const MAX_LABEL_CHARS = 80;
+const MAX_FIND_MATCHES = 10;
+const MAX_FIND_TEXT_NODES = 5000;
 
 const INTERACTIVE_SELECTOR = [
   "a[href]",
@@ -141,6 +143,12 @@ export class BrowseAgentChild extends JSWindowActorChild {
         return this.#listElements();
       case "BrowseAgent:ReadPage":
         return this.#readPage();
+      case "BrowseAgent:Find":
+        return this.#find(data);
+      case "BrowseAgent:SelectOption":
+        return this.#selectOption(data);
+      case "BrowseAgent:Hover":
+        return this.#hover(data);
     }
     return undefined;
   }
@@ -366,6 +374,136 @@ export class BrowseAgentChild extends JSWindowActorChild {
       elements.push(entry);
     }
     return { elements, total: candidates.length };
+  }
+
+  #hover({ x, y }) {
+    const win = this.contentWindow;
+    this.#EventUtils.synthesizeMouseAtPoint(x, y, { type: "mousemove" }, win);
+    return { target: this.#describe(this.document.elementFromPoint(x, y)) };
+  }
+
+  // Finds elements whose label or text contains `text` anywhere on the page,
+  // scrolls the first match into view and reports viewport coordinates taken
+  // after that scroll.
+  #find({ text, limit = MAX_FIND_MATCHES }) {
+    const needle = collapseWhitespace(text).toLowerCase();
+    if (!needle) {
+      throw new Error("find needs some text to look for.");
+    }
+    const win = this.contentWindow;
+    const doc = this.document;
+    const matches = [];
+    const seen = new Set();
+    const consider = (el, label) => {
+      if (matches.length >= limit || !el || seen.has(el)) {
+        return;
+      }
+      if (!label.toLowerCase().includes(needle)) {
+        return;
+      }
+      if (
+        !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
+      ) {
+        return;
+      }
+      const rect = el.getBoundingClientRect();
+      if (rect.width < 1 || rect.height < 1) {
+        return;
+      }
+      seen.add(el);
+      matches.push({ el, label: label.slice(0, MAX_LABEL_CHARS) });
+    };
+
+    for (const el of doc.querySelectorAll(INTERACTIVE_SELECTOR)) {
+      consider(el, this.#labelFor(el));
+    }
+    // Plain text too: product names, prices, headings.
+    const root = doc.body ?? doc.documentElement;
+    const walker = doc.createTreeWalker(root, win.NodeFilter.SHOW_TEXT);
+    let visited = 0;
+    while (matches.length < limit && visited++ < MAX_FIND_TEXT_NODES) {
+      const node = walker.nextNode();
+      if (!node) {
+        break;
+      }
+      if (node.data.toLowerCase().includes(needle)) {
+        const el = node.parentElement;
+        consider(
+          el?.closest(INTERACTIVE_SELECTOR) ?? el,
+          collapseWhitespace(node.data)
+        );
+      }
+    }
+
+    if (matches.length) {
+      matches[0].el.scrollIntoView({
+        block: "center",
+        inline: "nearest",
+        behavior: "instant",
+      });
+    }
+    const maxX = win.innerWidth - 1;
+    const maxY = win.innerHeight - 1;
+    return {
+      matches: matches.map(({ el, label }, index) => {
+        const rect = el.getBoundingClientRect();
+        return {
+          index: index + 1,
+          tag: el.localName,
+          label,
+          x: Math.min(Math.max(rect.left + rect.width / 2, 0), maxX),
+          y: Math.min(Math.max(rect.top + rect.height / 2, 0), maxY),
+          inViewport:
+            rect.bottom > 0 &&
+            rect.right > 0 &&
+            rect.top < win.innerHeight &&
+            rect.left < win.innerWidth,
+          href: el.localName === "a" ? el.href.slice(0, 120) : undefined,
+        };
+      }),
+    };
+  }
+
+  #selectOption({ x, y, option }) {
+    const doc = this.document;
+    const win = this.contentWindow;
+    const hit = doc.elementFromPoint(x, y);
+    const select = hit?.closest("select");
+    if (!select) {
+      throw new Error(
+        `There is no <select> at (${Math.round(x)}, ${Math.round(
+          y
+        )}); found ${this.#describe(
+          hit
+        )}. Custom dropdowns are opened by clicking them and then clicking the option.`
+      );
+    }
+    const wanted = collapseWhitespace(option).toLowerCase();
+    const options = [...select.options];
+    const labelOf = o => collapseWhitespace(o.textContent).toLowerCase();
+    const match =
+      options.find(
+        o => labelOf(o) === wanted || o.value.toLowerCase() === wanted
+      ) ?? options.find(o => labelOf(o).includes(wanted));
+    if (!match) {
+      throw new Error(
+        `No option matches "${option}". Options: ${options
+          .map(o => collapseWhitespace(o.textContent))
+          .slice(0, 40)
+          .join(" | ")}`
+      );
+    }
+    select.focus();
+    select.value = match.value;
+    select.dispatchEvent(
+      new win.Event("input", { bubbles: true, composed: true })
+    );
+    select.dispatchEvent(new win.Event("change", { bubbles: true }));
+    return {
+      target: this.#describe(select),
+      selected: collapseWhitespace(match.textContent),
+      value: match.value,
+    };
   }
 
   #readPage() {

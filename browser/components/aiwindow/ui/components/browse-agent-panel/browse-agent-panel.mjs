@@ -34,6 +34,12 @@ const STATUS_L10N_IDS = {
   error: "browse-agent-status-error",
 };
 
+const SUGGESTION_L10N_IDS = [
+  "browse-agent-suggestion-recipe",
+  "browse-agent-suggestion-chair",
+  "browse-agent-suggestion-flight",
+];
+
 const ACTION_ICONS = {
   navigate: "chrome://global/skin/icons/open-in-new.svg",
   go_back: "chrome://browser/skin/back.svg",
@@ -294,6 +300,31 @@ export class BrowseAgentPanel extends MozLitElement {
     }
   }
 
+  #onSuggestionClick(event) {
+    this.task = event.currentTarget.textContent.trim();
+    this.focusInput();
+  }
+
+  #emptyTemplate() {
+    return html`
+      <div class="empty">
+        <p data-l10n-id="browse-agent-empty-hint"></p>
+        <p
+          class="suggestions-heading"
+          data-l10n-id="browse-agent-suggestions-heading"
+        ></p>
+        ${SUGGESTION_L10N_IDS.map(
+          id =>
+            html`<button
+              class="suggestion"
+              data-l10n-id=${id}
+              @click=${this.#onSuggestionClick}
+            ></button>`
+        )}
+      </div>
+    `;
+  }
+
   #composerTemplate() {
     if (this.state === lazy.SESSION_STATE.WAITING_FOR_USER) {
       return html`
@@ -385,7 +416,7 @@ export class BrowseAgentPanel extends MozLitElement {
       <div class="log" role="log" aria-live="polite">
         ${this.entries.length
           ? this.entries.map(entry => this.#entryTemplate(entry))
-          : html`<p class="empty" data-l10n-id="browse-agent-empty-hint"></p>`}
+          : this.#emptyTemplate()}
       </div>
       <p
         class="model"
