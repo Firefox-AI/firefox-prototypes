@@ -2490,6 +2490,21 @@ pref("browser.smartwindow.agent.monitorAnnouncement", false);
 pref("browser.smartwindow.agent.expiry.noMatchDays", 60);
 pref("browser.smartwindow.agent.expiry.maxAgeDays", 90);
 
+// Smart Window: Browse Agent prototype. A vision model drives a tab through
+// screenshots and synthesized input (the /browse command).
+pref("browser.smartwindow.browseAgent.enabled", true);
+pref("browser.smartwindow.browseAgent.apiKey", "");
+pref("browser.smartwindow.browseAgent.endpoint", "https://api.anthropic.com/v1/messages");
+pref("browser.smartwindow.browseAgent.model", "claude-fable-5-1");
+// low | medium | high | xhigh | max
+pref("browser.smartwindow.browseAgent.effort", "medium");
+pref("browser.smartwindow.browseAgent.maxSteps", 60);
+// Longest screenshot edge in pixels; anything up to 1568 fits every model.
+pref("browser.smartwindow.browseAgent.maxImageEdge", 1568);
+pref("browser.smartwindow.browseAgent.showThinking", true);
+pref("browser.smartwindow.browseAgent.fallbacks", true);
+pref("browser.smartwindow.browseAgent.loglevel", "Warn");
+
 
 // Smart Window: Exa search endpoint, used by the search_the_web agentic flow (bug 2037948)
 pref("browser.smartwindow.searchQuery.endpointURL", "https://mlpa-prod-prod-mozilla.freetls.fastly.net/v1/search");

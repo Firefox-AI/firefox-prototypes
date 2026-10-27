@@ -14,6 +14,8 @@ const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   AutoTabGrouping:
     "moz-src:///browser/components/aiwindow/ui/modules/AutoTabGrouping.sys.mjs",
+  BrowseAgentUI:
+    "moz-src:///browser/components/aiwindow/ui/modules/BrowseAgentUI.sys.mjs",
   MonitorPanel:
     "moz-src:///browser/components/aiwindow/ui/modules/MonitorPanel.sys.mjs",
   URILoadingHelper: "resource:///modules/URILoadingHelper.sys.mjs",
@@ -463,6 +465,14 @@ export const AIWindowUI = {
   closeSidebar(win, source = null) {
     if (!this.isSidebarOpen(win)) {
       return;
+    }
+    // The Browse Agent panel keeps the sidebar while it drives the tab, so tab
+    // switches it causes must not close it; an explicit toggle still does.
+    if (lazy.BrowseAgentUI.isPinned(win)) {
+      if (source !== "toggle") {
+        return;
+      }
+      lazy.BrowseAgentUI.unpin(win);
     }
     const { box, splitter } = this._getSidebarElements(win);
 

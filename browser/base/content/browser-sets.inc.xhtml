@@ -107,6 +107,7 @@
     <command id="Tools:Addons" />
     <command id="cmd_openUnifiedExtensionsPanel" />
     <command id="Tools:AIWindow" />
+    <command id="Tools:BrowseAgent" />
     <command id="Tools:ChatsHistory" />
     <command id="Tools:ClassicWindow" />
     <command id="Tools:Sanitize" />
@@ -304,6 +305,15 @@
 
     <key id="viewGenaiChatSidebarKb"
          data-l10n-id="ai-chatbot-sidebar-shortcut"
+#ifdef XP_MACOSX
+         modifiers="control"
+#else
+         modifiers="accel,alt"
+#endif
+         />
+    <key id="browseAgentKb"
+         data-l10n-id="browse-agent-shortcut"
+         command="Tools:BrowseAgent"
 #ifdef XP_MACOSX
          modifiers="control"
 #else

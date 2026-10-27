@@ -10,6 +10,8 @@ document.addEventListener(
       TranslationsParent: "resource://gre/actors/TranslationsParent.sys.mjs",
       AIWindowUI:
         "moz-src:///browser/components/aiwindow/ui/modules/AIWindowUI.sys.mjs",
+      BrowseAgentUI:
+        "moz-src:///browser/components/aiwindow/ui/modules/BrowseAgentUI.sys.mjs",
       ContainerCreationPanel:
         "chrome://browser/content/usercontext/ContainerCreationPanel.mjs",
       Referrals: "moz-src:///browser/components/referrals/Referrals.sys.mjs",
@@ -302,6 +304,9 @@ document.addEventListener(
             break;
           case "Tools:AIWindow":
             AIWindow.launchWindow(gBrowser?.selectedBrowser, true, "menu");
+            break;
+          case "Tools:BrowseAgent":
+            lazy.BrowseAgentUI.toggle(window);
             break;
           case "Tools:ChatsHistory":
             FirefoxViewHandler.openTab("chats");

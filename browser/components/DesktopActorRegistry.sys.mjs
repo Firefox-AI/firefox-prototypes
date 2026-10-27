@@ -968,6 +968,20 @@ let JSWINDOWACTORS = {
     safeForUntrustedWebProcess: true,
   },
 
+  BrowseAgent: {
+    parent: {
+      esModuleURI:
+        "moz-src:///browser/components/aiwindow/ui/actors/BrowseAgentParent.sys.mjs",
+    },
+    child: {
+      esModuleURI:
+        "moz-src:///browser/components/aiwindow/ui/actors/BrowseAgentChild.sys.mjs",
+    },
+    messageManagerGroups: ["browsers"],
+    safeForUntrustedWebProcess: true,
+    enablePreference: "browser.smartwindow.browseAgent.enabled",
+  },
+
   SmartFormFill: {
     parent: {
       esModuleURI:

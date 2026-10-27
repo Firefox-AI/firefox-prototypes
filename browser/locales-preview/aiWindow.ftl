@@ -401,6 +401,44 @@ smartbar-command-watch-description = Get notified when pages change
 # task command types will be added later.
 smartbar-command-coming-soon = More types of tasks are coming soon
 
+## Browse Agent (prototype): a model that browses and acts on sites for the
+## user from the Smart Window sidebar.
+
+menu-tools-browse-agent =
+    .label = Browse with Agent
+    .accesskey = g
+browse-agent-shortcut =
+    .key = B
+# The /browse command starts an agent that browses sites and acts on them.
+smartbar-command-browse-label = /browse
+smartbar-command-browse-description = Let the agent browse sites and act for you
+browse-agent-panel-title = Browse Agent
+browse-agent-back-to-chat =
+    .title = Back to chat
+    .aria-label = Back to chat
+browse-agent-status-idle = Ready
+browse-agent-status-running = Working…
+browse-agent-status-waiting = Needs your reply
+browse-agent-status-done = Done
+browse-agent-status-stopped = Stopped
+browse-agent-status-error = Stopped with an error
+browse-agent-setup-heading = Connect a model
+browse-agent-setup-description = This prototype calls the Anthropic API directly. Paste an API key to get started; it is stored in the browser.smartwindow.browseAgent.apiKey preference.
+browse-agent-setup-key-label =
+    .label = API key
+browse-agent-setup-save = Save key
+browse-agent-empty-hint = Describe a task and the agent will browse, click and type in this tab to get it done. It stops before any purchase or sign-in and asks you.
+browse-agent-task-input =
+    .label = Task
+    .placeholder = e.g. Find a brownie recipe and add the ingredients to my Instacart cart
+browse-agent-answer-input =
+    .label = Your reply
+    .placeholder = Type your reply, then press Enter
+browse-agent-run = Run
+browse-agent-stop = Stop
+browse-agent-send = Send
+browse-agent-show-thinking = Show reasoning
+
 ## Smart Form Fill
 
 ai-smart-form-fill-autocomplete-label = Smart Form Fill

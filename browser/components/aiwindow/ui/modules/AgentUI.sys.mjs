@@ -31,6 +31,8 @@ import {
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
+  BrowseAgentUI:
+    "moz-src:///browser/components/aiwindow/ui/modules/BrowseAgentUI.sys.mjs",
   MonitorAgent:
     "moz-src:///browser/components/aiwindow/models/agents/MonitorAgent.sys.mjs",
   MonitorUIUtils:
@@ -734,6 +736,10 @@ export class AgentUI {
     window,
     isFullPage = false,
   }) {
+    if (lazy.BrowseAgentUI.tryHandleCommand({ command, value, window })) {
+      return true;
+    }
+
     if (
       !lazy.MonitorUIUtils.isMonitorRegionSupported() ||
       !Services.prefs.getBoolPref(PREF_AGENT_ENABLED, false)

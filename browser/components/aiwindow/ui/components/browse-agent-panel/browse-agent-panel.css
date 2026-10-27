@@ -1,0 +1,196 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  color: var(--text-color);
+  font: message-box;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-small);
+  padding: var(--space-small) var(--space-medium);
+  border-block-end: 1px solid var(--border-color-deemphasized);
+}
+
+h1 {
+  flex: 1;
+  margin: 0;
+  font-size: var(--font-size-large);
+  font-weight: var(--font-weight-bold);
+}
+
+h2 {
+  margin: 0;
+  font-size: var(--font-size-root);
+  font-weight: var(--font-weight-bold);
+}
+
+.status {
+  padding: var(--space-xxsmall) var(--space-small);
+  border-radius: var(--border-radius-circle);
+  background-color: var(--background-color-box);
+  border: 1px solid var(--border-color-deemphasized);
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+
+  &.running,
+  &.waiting {
+    border-color: var(--color-accent-primary);
+    color: var(--color-accent-primary);
+  }
+
+  &.error {
+    border-color: var(--border-color-error);
+    color: var(--text-color-error);
+  }
+}
+
+.setup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-small);
+  margin: var(--space-medium);
+  padding: var(--space-medium);
+  border-radius: var(--border-radius-medium);
+  background-color: var(--background-color-box);
+  border: 1px solid var(--border-color-deemphasized);
+
+  p {
+    margin: 0;
+    color: var(--text-color-deemphasized);
+    font-size: var(--font-size-small);
+  }
+
+  moz-button {
+    align-self: flex-end;
+  }
+}
+
+.log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-small);
+  padding: var(--space-medium);
+}
+
+.empty {
+  margin: auto;
+  color: var(--text-color-deemphasized);
+  text-align: center;
+}
+
+.entry {
+  max-width: 100%;
+
+  p {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}
+
+.task,
+.answer {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: var(--space-small) var(--space-medium);
+  border-radius: var(--border-radius-medium);
+  background-color: var(--color-accent-primary);
+  color: var(--button-text-color-primary);
+}
+
+.assistant {
+  padding-inline: var(--space-xsmall);
+}
+
+.thinking {
+  padding: var(--space-small);
+  border-inline-start: 2px solid var(--border-color-deemphasized);
+  color: var(--text-color-deemphasized);
+  font-size: var(--font-size-small);
+}
+
+.question {
+  padding: var(--space-small) var(--space-medium);
+  border-radius: var(--border-radius-medium);
+  background-color: var(--background-color-information);
+  border: 1px solid var(--border-color-deemphasized);
+}
+
+.action {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xsmall);
+  padding: var(--space-xsmall) var(--space-small);
+  border-radius: var(--border-radius-small);
+  background-color: var(--background-color-box);
+  border: 1px solid var(--border-color-deemphasized);
+  font-size: var(--font-size-small);
+
+  &.failed {
+    border-color: var(--border-color-error);
+  }
+}
+
+.action-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xsmall);
+}
+
+.action-icon {
+  flex: none;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  margin-block-start: 1px;
+  -moz-context-properties: fill;
+  fill: currentColor;
+  color: var(--icon-color);
+}
+
+.action-status {
+  overflow-wrap: anywhere;
+}
+
+.action-shot {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  object-position: top;
+  border-radius: var(--border-radius-small);
+  border: 1px solid var(--border-color-deemphasized);
+}
+
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-small);
+  padding: var(--space-medium);
+  border-block-start: 1px solid var(--border-color-deemphasized);
+}
+
+.composer-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-small);
+}
+
+.thinking-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xsmall);
+  margin-inline-end: auto;
+  color: var(--text-color-deemphasized);
+  font-size: var(--font-size-small);
+}

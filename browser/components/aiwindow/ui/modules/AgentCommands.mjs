@@ -13,6 +13,7 @@
  */
 export const AGENT_COMMANDS = Object.freeze({
   WATCH: "watch",
+  BROWSE: "browse",
   RESEARCH: "research", //not in use
   SCHEDULE: "schedule", //not in use
 });
@@ -37,6 +38,14 @@ export const AGENT_COMMAND_ITEMS = new Map([
       l10nId: "smartbar-command-watch-label",
       descriptionL10nId: "smartbar-command-watch-description",
       icon: "chrome://browser/content/aiwindow/assets/agent-watch.svg",
+    },
+  ],
+  [
+    AGENT_COMMANDS.BROWSE,
+    {
+      l10nId: "smartbar-command-browse-label",
+      descriptionL10nId: "smartbar-command-browse-description",
+      icon: "chrome://browser/content/aiwindow/assets/smart-page-16.svg",
     },
   ],
 ]);
