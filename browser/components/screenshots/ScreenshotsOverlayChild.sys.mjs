@@ -129,6 +129,7 @@ export class ScreenshotsOverlay {
       instructions,
       downloadAttributes,
       copyAttributes,
+      describeAttributes,
       previewFaceAriaLabel,
       popAttributes,
       reselectAttributes,
@@ -147,6 +148,7 @@ export class ScreenshotsOverlay {
         id: "screenshots-component-copy-button-2",
         args: { shortcut: copyShorcut },
       },
+      { id: "screenshots-component-describe-button" },
       { id: "screenshots-overlay-preview-face-label" },
       { id: "screenshots-component-mini-window-button" },
       { id: "screenshots-component-reselect-button" },
@@ -170,6 +172,7 @@ export class ScreenshotsOverlay {
         : `
               <button id="cancel" class="screenshots-button" title="${cancelAttributes.attributes[0].value}" aria-label="${cancelAttributes.attributes[1].value}"><img/></button>
               <button id="copy" class="screenshots-button" title="${copyAttributes.attributes[0].value}" aria-label="${copyAttributes.attributes[1].value}"><img/><label>${copyAttributes.value}</label></button>
+              <button id="describe" class="screenshots-button" title="${describeAttributes.attributes[0].value}" aria-label="${describeAttributes.attributes[1].value}"><img/><label>${describeAttributes.value}</label></button>
               <button id="download" class="screenshots-button primary" title="${downloadAttributes.attributes[0].value}" aria-label="${downloadAttributes.attributes[1].value}"><img/><label>${downloadAttributes.value}</label></button>`;
 
     return `
@@ -343,6 +346,7 @@ export class ScreenshotsOverlay {
     this.previewCancelButton = this.getElementById("screenshots-cancel-button");
     this.cancelButton = this.getElementById("cancel");
     this.copyButton = this.getElementById("copy");
+    this.describeButton = this.getElementById("describe");
     this.downloadButton = this.getElementById("download");
     this.popButton = this.getElementById("pop");
     this.miniWindowCancelButton = this.getElementById(
@@ -498,6 +502,9 @@ export class ScreenshotsOverlay {
         break;
       case "copy":
         this.copySelectedRegion();
+        break;
+      case "describe":
+        this.describeSelectedRegion();
         break;
       case "download":
         this.downloadSelectedRegion();
@@ -1275,6 +1282,9 @@ export class ScreenshotsOverlay {
       case this.copyButton:
         this.copySelectedRegion();
         break;
+      case this.describeButton:
+        this.describeSelectedRegion();
+        break;
       case this.downloadButton:
         this.downloadSelectedRegion();
         break;
@@ -1377,6 +1387,12 @@ export class ScreenshotsOverlay {
 
   copySelectedRegion() {
     this.#dispatchEvent("Screenshots:Copy", {
+      region: this.selectionRegion.dimensions,
+    });
+  }
+
+  describeSelectedRegion() {
+    this.#dispatchEvent("Screenshots:Describe", {
       region: this.selectionRegion.dimensions,
     });
   }

@@ -191,6 +191,10 @@
   content: url("chrome://global/skin/icons/edit-copy.svg");
 }
 
+#describe > img {
+  content: url("chrome://global/skin/icons/highlights.svg");
+}
+
 #download > img {
   content: url("chrome://browser/skin/downloads/downloads.svg");
 }
