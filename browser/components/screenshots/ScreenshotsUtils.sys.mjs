@@ -75,6 +75,25 @@ const AlertNotification = Components.Constructor(
 
 let imageToTextEnginePromise = null;
 
+/** @type {WeakMap<Browser, (text: ?string) => void>} */
+const describeWaiters = new WeakMap();
+
+/**
+ * Resolves a selection started by captureDescribedSelection. A later call is
+ * ignored so exit() after a finished description does not clear the text.
+ *
+ * @param {Browser} browser
+ * @param {?string} text
+ */
+function settleDescribedSelection(browser, text) {
+  const resolve = describeWaiters.get(browser);
+  if (!resolve) {
+    return;
+  }
+  describeWaiters.delete(browser);
+  resolve(text || null);
+}
+
 function getImageToTextEngine() {
   if (!imageToTextEnginePromise) {
     imageToTextEnginePromise = lazy
@@ -707,6 +726,7 @@ export var ScreenshotsUtils = {
    * @param browser The current browser.
    */
   exit(browser) {
+    settleDescribedSelection(browser, null);
     this.captureFocusedElement(browser, "currentFocusRef");
     this.closeDialogBox(browser);
     this.closePanel(browser);
@@ -1454,11 +1474,34 @@ export var ScreenshotsUtils = {
   },
 
   /**
+   * Open the selection overlay and resolve with the image-to-text caption
+   * when the user describes the selection. Resolves null if they leave the
+   * overlay without describing it.
+   *
+   * @param {Browser} browser
+   * @returns {Promise<?string>}
+   */
+  captureDescribedSelection(browser) {
+    return new Promise(resolve => {
+      settleDescribedSelection(browser, null);
+      describeWaiters.set(browser, resolve);
+      try {
+        this.start(browser, "ToolbarButton");
+      } catch (error) {
+        console.error("Failed to open the selection overlay:", error);
+        settleDescribedSelection(browser, null);
+      }
+    });
+  },
+
+  /**
    * Run the moz-image-to-text backend on the selection.
-   * The caption is logged to the Browser Console.
+   * The caption is logged to the Browser Console and returned to anyone
+   * waiting in captureDescribedSelection.
    *
    * @param {object} region The bounds of the screenshot
    * @param browser The current browser
+   * @returns {Promise<?string>}
    */
   async describeScreenshotFromRegion(region, browser) {
     // eslint-disable-next-line no-console
@@ -1470,12 +1513,17 @@ export var ScreenshotsUtils = {
       let text = response?.output;
       if (typeof text !== "string" || !text) {
         console.error("Screenshots image-to-text returned no text", response);
-        return;
+        settleDescribedSelection(browser, null);
+        return null;
       }
       // eslint-disable-next-line no-console
       console.log("Screenshots image-to-text:", text);
+      settleDescribedSelection(browser, text);
+      return text;
     } catch (error) {
       console.error("Screenshots image-to-text failed", error);
+      settleDescribedSelection(browser, null);
+      return null;
     }
   },
 

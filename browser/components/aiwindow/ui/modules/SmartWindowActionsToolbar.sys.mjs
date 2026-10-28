@@ -33,6 +33,9 @@ const PAGE_ICON_SRC =
 const ASK_ICON_SRC = "chrome://browser/content/aiwindow/assets/ask-icon.svg";
 const WATCH_ICON_SRC =
   "chrome://browser/content/aiwindow/assets/agent-watch.svg";
+const PICK_ICON_SRC = "resource://devtools-shared-images/command-pick.svg";
+const PICK_ID = "smartwindow-actions-pick";
+const MAX_SELECTION_CHARS = 1000;
 
 const SUGGESTION_COUNT = 3;
 const MAX_CONTEXT_TABS = 6;
@@ -78,6 +81,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/AgentPageDetector.sys.mjs",
   MonitorPanel:
     "moz-src:///browser/components/aiwindow/ui/modules/MonitorPanel.sys.mjs",
+  ScreenshotsUtils:
+    "moz-src:///browser/components/screenshots/ScreenshotsUtils.sys.mjs",
   generateConversationStartersSidebar:
     "moz-src:///browser/components/aiwindow/models/ConversationSuggestions.sys.mjs",
   openSuggestedPage:
@@ -191,6 +196,7 @@ async function pageSuggestionActions(win, signal) {
     url: tab.url,
     pageTitle: tab.title,
     browser: win.gBrowser.selectedBrowser,
+    selectionText: windowStates.get(win)?.selectionText ?? "",
     signal,
   });
   const actions = ideas.map((idea, index) => ({
@@ -228,7 +234,8 @@ async function conversationSuggestionActions(win, signal) {
     SUGGESTION_COUNT,
     useMemories,
     null,
-    signal
+    signal,
+    windowStates.get(win)?.selectionText ?? ""
   );
 
   return suggestions
@@ -315,7 +322,8 @@ function contextKey(win) {
       ? "1"
       : "0";
   const url = win.gBrowser?.selectedTab?.linkedBrowser?.currentURI?.spec ?? "";
-  return `${memories}\n${url == "about:blank" ? "" : url}`;
+  const selection = windowStates.get(win)?.selectionText ?? "";
+  return `${memories}\n${url == "about:blank" ? "" : url}\n${selection}`;
 }
 
 /**
@@ -371,13 +379,18 @@ export const SmartWindowActionsToolbar = {
       cacheKey: null,
       pageRetryKey: null,
       pendingKey: null,
+      picking: false,
       renderedKey: null,
       refreshTimer: 0,
+      selectionText: "",
       starting: false,
     };
     windowStates.set(win, state);
 
-    state.onTabSelect = () => this._scheduleRefresh(win);
+    state.onTabSelect = () => {
+      this._clearSelection(win);
+      this._scheduleRefresh(win);
+    };
     win.gBrowser.tabContainer.addEventListener("TabSelect", state.onTabSelect);
 
     state.progressListener = {
@@ -395,6 +408,7 @@ export const SmartWindowActionsToolbar = {
         if (!webProgress.isTopLevel) {
           return;
         }
+        SmartWindowActionsToolbar._clearSelection(win);
         SmartWindowActionsToolbar._scheduleRefresh(win);
       },
       onStateChange(webProgress, _request, flags) {
@@ -643,10 +657,18 @@ export const SmartWindowActionsToolbar = {
     icon.setAttribute("src", ICON_SRC);
     icon.setAttribute("role", "presentation");
 
+    const pick = this._createButton(doc);
+    pick.id = PICK_ID;
+    pick.type = "icon";
+    pick.iconSrc = PICK_ICON_SRC;
+    pick.dataset.l10nAttrs = "aria-label";
+    doc.l10n.setAttributes(pick, "smartwindow-actions-pick");
+    pick.addEventListener("click", () => this._pickSelection(win));
+
     const actions = doc.createXULElement("hbox");
     actions.id = ACTIONS_ID;
     actions.setAttribute("flex", "1");
-    toolbar.append(icon, actions);
+    toolbar.append(icon, pick, actions);
 
     const navBar = doc.getElementById("nav-bar");
     if (navBar) {
@@ -668,6 +690,10 @@ export const SmartWindowActionsToolbar = {
     const toolbar = this._ensureToolbar(win);
     const box = toolbar.querySelector(`#${ACTIONS_ID}`);
     const doc = win.document;
+    const pick = doc.getElementById(PICK_ID);
+    if (pick) {
+      pick.ariaPressed = state.selectionText ? "true" : "false";
+    }
     box.replaceChildren();
     state.actions = loading ? [] : actions;
 
@@ -681,7 +707,7 @@ export const SmartWindowActionsToolbar = {
     }
 
     if (!actions.length) {
-      toolbar.collapsed = true;
+      toolbar.collapsed = false;
       return;
     }
 
@@ -714,6 +740,68 @@ export const SmartWindowActionsToolbar = {
     const button = doc.createElement("moz-button");
     button.size = "small";
     return button;
+  },
+
+  /**
+   * Drops a selection when the page it described is no longer the current one.
+   *
+   * @param {ChromeWindow} win
+   */
+  _clearSelection(win) {
+    const state = windowStates.get(win);
+    if (!state?.selectionText) {
+      return;
+    }
+    state.selectionText = "";
+    state.cacheKey = null;
+    state.renderedKey = null;
+  },
+
+  /**
+   * Lets the user select part of the page. The image description becomes the
+   * primary context and the row is generated again.
+   *
+   * @param {ChromeWindow} win
+   */
+  async _pickSelection(win) {
+    const state = windowStates.get(win);
+    const browser = win.gBrowser?.selectedBrowser;
+    const button = win.document.getElementById(PICK_ID);
+    if (!state || !browser || state.picking) {
+      return;
+    }
+    const url = browser.currentURI?.spec ?? "";
+    state.picking = true;
+    if (button) {
+      button.disabled = true;
+    }
+    try {
+      const text =
+        await lazy.ScreenshotsUtils.captureDescribedSelection(browser);
+      if (
+        !text ||
+        win.closed ||
+        !windowStates.has(win) ||
+        win.gBrowser?.selectedBrowser !== browser ||
+        browser.currentURI?.spec !== url
+      ) {
+        return;
+      }
+      state.selectionText = text
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, MAX_SELECTION_CHARS);
+      state.cacheKey = null;
+      state.renderedKey = null;
+      this._scheduleRefresh(win);
+    } catch (error) {
+      console.error("Failed to read a page selection:", error);
+    } finally {
+      state.picking = false;
+      if (button?.isConnected) {
+        button.disabled = false;
+      }
+    }
   },
 
   /**

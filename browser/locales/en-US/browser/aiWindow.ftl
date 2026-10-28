@@ -223,6 +223,10 @@ smartwindow-actions-watch-headlines =
     .label = Watch the headlines
     .condition = A story I care about is on the front page
 
+smartwindow-actions-pick =
+    .tooltiptext = Select part of this page to refresh actions
+    .aria-label = Select part of this page
+
 ## Memories toggle button
 
 aiwindow-memories-on =

@@ -190,6 +190,8 @@ export const NewTabStarterGenerator = {
  * @param {boolean} useMemories - Whether to include user memories in prompt (default false)
  * @param {string | null} flowId - Flow ID for correlating with firefox_ai_runtime telemetry
  * @param {AbortSignal} signal - Signal to cancel the inference request
+ * @param {string} [selectionText] - Image description of a region the user
+ *   selected. When present it is the primary context and the page is background.
  * @returns {Promise<Array>} Array of {text, type} suggestion objects
  */
 export async function generateConversationStartersSidebar(
@@ -197,7 +199,8 @@ export async function generateConversationStartersSidebar(
   n = 2,
   useMemories = false,
   flowId = null,
-  signal = new AbortController().signal
+  signal = new AbortController().signal,
+  selectionText = ""
 ) {
   try {
     const today = new Date().toISOString().slice(0, 10);
@@ -266,7 +269,20 @@ export async function generateConversationStartersSidebar(
       filled = await addMemoriesToPrompt(base, conversationMemoriesPrompt);
     }
 
-    conversation.setSystemMessage(conversationStarterSystemPrompt);
+    const selection = selectionText?.trim() ?? "";
+    if (selection) {
+      const rule =
+        "The user selected a region of the current page. The text below is an image description of that region. Every suggestion must be about this selection. Do not suggest prompts about the rest of the page, the other tabs, or memories unless they help with this selection.\n" +
+        selection;
+      filled = `${rule}\n\n${filled}\n\n${rule}\nWrite every suggestion about the selected region. The page is background only.`;
+    }
+
+    conversation.setSystemMessage(
+      selection
+        ? "The user selected a region of the page. Every starter must be about that selection. The page, other tabs, and memories are background only.\n\n" +
+            conversationStarterSystemPrompt
+        : conversationStarterSystemPrompt
+    );
     conversation.addUserMessage(filled);
 
     const token = await AuthProvider.getToken();

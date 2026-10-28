@@ -66,12 +66,23 @@ The page text may be missing. When it is, use the title and URL.
 Only suggest a new page. Do not suggest summarizing, chatting, or watching the page.
 Return JSON {"pages": [{"label", "focus"}]} and nothing else.`;
 
+const SELECTION_SYSTEM_PROMPT = `You suggest up to 2 toolbar buttons for making a new page about the region the user selected.
+The selection is an image description of that region. It is the only subject.
+Every label and every focus must be about the selection. Do not make a button about the rest of the page.
+Use names, amounts, and details from the selection. Use the page only to interpret the selection.
+label is the button text: at most 4 words, no ending punctuation.
+focus is one or two sentences telling the page generator what to make from the selection.
+Only suggest a new page. Do not suggest summarizing, chatting, or watching the page.
+Return JSON {"pages": [{"label", "focus"}]} and nothing else.`;
+
 /**
  * @param {object} options
  * @param {string} options.url
  * @param {string} [options.pageTitle]
  * @param {Element} [options.browser] - Selected browser. Read in place so a
  *   Classic window is not limited to tabs open in a Smart Window.
+ * @param {string} [options.selectionText] - Image description of a region the
+ *   user selected. When present it is the primary subject.
  * @param {AbortSignal} [options.signal]
  * @returns {Promise<{
  *   ideas: Array<{label: string, focus: string}>,
@@ -79,14 +90,21 @@ Return JSON {"pages": [{"label", "focus"}]} and nothing else.`;
  * }>} pending is true when the document is still loading and has no text yet.
  *   The caller should ask again and should not cache that result.
  */
-export async function suggestPageActions({ url, pageTitle, browser, signal }) {
+export async function suggestPageActions({
+  url,
+  pageTitle,
+  browser,
+  selectionText,
+  signal,
+}) {
   signal?.throwIfAborted();
   if (!/^https?:/i.test(url ?? "")) {
     return { ideas: [], pending: false };
   }
 
+  const selection = selectionText?.trim() ?? "";
   const { text, pending } = await readSelectedPage(browser, url, signal);
-  if (pending) {
+  if (pending && !selection) {
     return { ideas: [], pending: true };
   }
 
@@ -94,10 +112,18 @@ export async function suggestPageActions({ url, pageTitle, browser, signal }) {
     MODEL_FEATURES.AGENT_MONITOR
   );
   signal?.throwIfAborted();
-  conversation.setSystemMessage(SYSTEM_PROMPT);
-  const body = text ? `\n\n${text}` : "";
+  conversation.setSystemMessage(
+    selection ? SELECTION_SYSTEM_PROMPT : SYSTEM_PROMPT
+  );
+  const body = text ? `\n\nPage text, background only:\n${text}` : "";
+  const selected = selection
+    ? `The user selected this region. Every button must be about it:\n${selection}\n\n`
+    : "";
+  const again = selection
+    ? "\n\nEvery button is a new page about the selected region above. Do not use the rest of the page as the subject."
+    : "";
   conversation.addUserMessage(
-    `Title: ${pageTitle || "Untitled"}\nURL: ${url}${body}`
+    `${selected}Title: ${pageTitle || "Untitled"}\nURL: ${url}${body}${again}`
   );
   const response = await conversation.run({
     token: await AuthProvider.getToken(),

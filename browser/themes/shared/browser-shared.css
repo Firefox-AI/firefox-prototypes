@@ -638,7 +638,7 @@ body {
   }
 }
 
-/* Smart Window actions toolbar. Collapsed until a page has actions to offer. */
+/* Smart Window actions toolbar. The pick button stays when a page has no actions. */
 
 #smartwindow-actions-toolbar {
   align-items: center;
@@ -656,6 +656,11 @@ body {
   height: var(--icon-size-small);
   margin-inline: var(--space-small);
   width: var(--icon-size-small);
+}
+
+#smartwindow-actions-pick {
+  flex-shrink: 0;
+  margin-inline: var(--space-small);
 }
 
 #smartwindow-actions {
