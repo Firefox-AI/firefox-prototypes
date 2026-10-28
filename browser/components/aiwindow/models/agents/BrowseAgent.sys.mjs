@@ -9,8 +9,8 @@
  * `done` or needs the user.
  *
  * The model is reached through one of two providers: the Smart Window's own
- * OpenAI-style engine (Firefox Account token, Mozilla endpoint, a vision model
- * such as qwen38-flash-next) or the Anthropic Messages API with an API key.
+ * OpenAI-style engine (Firefox Account token, Mozilla endpoint, the Qwen
+ * vision model qwen38-flash-next) or the Anthropic Messages API with an API key.
  */
 
 import {

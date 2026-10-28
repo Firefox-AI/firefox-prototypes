@@ -2498,10 +2498,10 @@ pref("browser.smartwindow.browseAgent.enabled", true);
 pref("browser.smartwindow.browseAgent.provider", "smartwindow");
 // Any vision-capable model the endpoint serves with function calling.
 pref("browser.smartwindow.browseAgent.model", "qwen38-flash-next");
-// Empty means the provider's default. For "smartwindow" a custom value is an
-// OpenAI-compatible base URL; apiKey, when set, replaces the account token
-// there. Mozilla's stage endpoint serves the Qwen vision model.
-pref("browser.smartwindow.browseAgent.endpoint", "https://mlpa-nonprod-stage-mozilla.freetls.fastly.net/v1");
+// Empty means the provider's default (the Smart Window endpoint, with the
+// account token). For "smartwindow" a custom value is an OpenAI-compatible
+// base URL; apiKey, when set, replaces the account token there.
+pref("browser.smartwindow.browseAgent.endpoint", "");
 pref("browser.smartwindow.browseAgent.apiKey", "");
 // Anthropic only: low | medium | high | xhigh | max
 pref("browser.smartwindow.browseAgent.effort", "medium");
