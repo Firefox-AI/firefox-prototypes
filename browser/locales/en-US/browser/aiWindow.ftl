@@ -199,6 +199,15 @@ aiwindow-firstrun-default-checkbox-description = Switch in settings anytime
 smartwindow-ask-button =
     .label = Ask
 
+## Actions toolbar
+## Suggestions for the current page, and later actions that do not open a chat.
+
+smartwindow-actions-toolbar =
+    .aria-label = Smart Window actions
+    .toolbarname = Smart Window actions
+smartwindow-actions-loading =
+    .label = Looking at this page…
+
 ## Memories toggle button
 
 aiwindow-memories-on =

@@ -638,6 +638,34 @@ body {
   }
 }
 
+/* Smart Window actions toolbar. Collapsed until a page has actions to offer. */
+
+#smartwindow-actions-toolbar {
+  align-items: center;
+  min-height: 0;
+  padding-block: var(--space-xsmall);
+  padding-inline: var(--space-small);
+
+  &[collapsed] {
+    display: none;
+  }
+}
+
+#smartwindow-actions-icon {
+  flex-shrink: 0;
+  height: var(--icon-size-small);
+  margin-inline: var(--space-small);
+  width: var(--icon-size-small);
+}
+
+#smartwindow-actions {
+  align-items: center;
+  display: flex;
+  gap: var(--space-small);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
 /* Bookmarks toolbar */
 
 #PersonalToolbar {
@@ -1609,6 +1637,10 @@ popupnotificationcontent {
     height: 0;
     min-height: 0;
     visibility: hidden;
+  }
+
+  #smartwindow-actions-toolbar {
+    display: none;
   }
 
   #urlbar-container,

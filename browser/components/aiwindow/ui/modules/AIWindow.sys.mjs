@@ -89,6 +89,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/MonitorAttention.sys.mjs",
   MonitorUIUtils:
     "moz-src:///browser/components/aiwindow/ui/modules/MonitorUIUtils.sys.mjs",
+  SmartWindowActionsToolbar:
+    "moz-src:///browser/components/aiwindow/ui/modules/SmartWindowActionsToolbar.sys.mjs",
   SmartWindowLocation:
     "moz-src:///browser/components/aiwindow/models/SmartWindowLocation.sys.mjs",
   SmartWindowTelemetry:
@@ -175,6 +177,7 @@ export const AIWindow = {
       this._updateHamburgerMenuPosition(win);
       this._initializeAskButtonOnToolbox(win);
       this._updateMonitorButtonForWindow(win);
+      lazy.SmartWindowActionsToolbar.init(win);
       const windowArgs = win?.arguments?.[1];
       if (
         windowArgs instanceof Ci.nsIPropertyBag2 &&
@@ -399,6 +402,7 @@ export const AIWindow = {
     this._updateGroupTabsWidgetRegistration();
     this._updateSwitcherWidgetRegistration();
     this._updateMonitorWidgetRegistration();
+    lazy.SmartWindowActionsToolbar.onFeatureChanged();
     const widget = lazy.CustomizableUI.getWidget("ai-window-toggle");
     for (const { node } of widget?.instances ?? []) {
       this._updateButtonVisibility(node);
@@ -1281,6 +1285,7 @@ export const AIWindow = {
       this._recordSmartWindowUsage();
     }
     this._uninitTabStateManager(win);
+    lazy.SmartWindowActionsToolbar.uninit(win);
     this._windowStates.delete(win);
   },
 

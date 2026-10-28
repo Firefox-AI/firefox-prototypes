@@ -67,6 +67,7 @@ MOZ_SRC_FILES += [
     "modules/SmartFormFillReviewSession.sys.mjs",
     "modules/SmartFormFillTelemetry.sys.mjs",
     "modules/SmartFormFillUtils.sys.mjs",
+    "modules/SmartWindowActionsToolbar.sys.mjs",
     "modules/SmartWindowTelemetry.sys.mjs",
     "modules/SQLiteStoreBase.sys.mjs",
     "modules/TabManagementService.sys.mjs",

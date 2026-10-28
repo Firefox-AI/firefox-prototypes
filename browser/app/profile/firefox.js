@@ -2413,6 +2413,9 @@ pref("browser.ml.pageAssist.enabled", false);
 
 // Smart Window Feature
 pref("browser.smartwindow.enabled", false);
+// Spike toolbar of Smart Window actions for the current page. Shows in a
+// Smart Window and in Classic while Smart Window is enabled.
+pref("browser.smartwindow.actionsToolbar.enabled", true);
 // Default endpoint for preset models
 pref("browser.smartwindow.endpoint", "https://mlpa-prod-prod-mozilla.freetls.fastly.net/v1");
 pref("browser.smartwindow.memories.generateFromHistory", true);
