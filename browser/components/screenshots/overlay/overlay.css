@@ -47,6 +47,45 @@
   pointer-events: none;
 }
 
+#scribble {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: var(--screenshots-high-layer);
+}
+
+#scribble-outline,
+#scribble-stroke {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#scribble-outline {
+  stroke: #000;
+  stroke-width: 7px;
+  stroke-opacity: 0.55;
+}
+
+#scribble-stroke {
+  stroke: #fff;
+  stroke-width: 3px;
+}
+
+@media (forced-colors) {
+  #scribble-outline {
+    stroke: Canvas;
+    stroke-opacity: 1;
+  }
+
+  #scribble-stroke {
+    stroke: CanvasText;
+  }
+}
+
 #preview-container {
   overflow: clip;
   display: flex;
@@ -150,6 +189,10 @@
 
 #copy > img {
   content: url("chrome://global/skin/icons/edit-copy.svg");
+}
+
+#describe > img {
+  content: url("chrome://global/skin/icons/highlights.svg");
 }
 
 #download > img {

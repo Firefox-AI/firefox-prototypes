@@ -904,6 +904,7 @@ let JSWINDOWACTORS = {
       events: {
         "Screenshots:Close": {},
         "Screenshots:Copy": {},
+        "Screenshots:Describe": {},
         "Screenshots:MiniWindow": {},
         "Screenshots:Download": {},
         "Screenshots:HidePanel": {},

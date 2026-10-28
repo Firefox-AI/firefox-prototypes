@@ -19,7 +19,7 @@
  *  "draggingReady":
  *    The user has pressed the mouse button, but hasn't moved enough to create a selection
  *  "dragging":
- *    The user has pressed down a mouse button, and is dragging out an area far enough to show a selection
+ *    The user is scribbling a path. The selection is the bounding box of that path.
  *  "selected":
  *    The user has selected an area
  *  "resizing":
@@ -69,6 +69,8 @@ XPCOMUtils.defineLazyPreferenceGetter(
 
 const REGION_CHANGE_THRESHOLD = 5;
 const SCROLL_BY_EDGE = 20;
+// Skip pointer samples closer than this so the scribble stays a short polyline.
+const SCRIBBLE_POINT_MIN_DISTANCE = 2;
 
 // Minimum size of a mini-window crop selection, in content CSS px. An
 // undersized selection is grown to this on selection.
@@ -107,6 +109,14 @@ export class ScreenshotsOverlay {
   #lastClientY;
   #previousDimensions;
   #methodsUsed;
+  #scribblePoints = "";
+  #scribbleMinX = 0;
+  #scribbleMinY = 0;
+  #scribbleMaxX = 0;
+  #scribbleMaxY = 0;
+  #scribbleLastX = null;
+  #scribbleLastY = null;
+  #scribbleLength = 0;
 
   get markup() {
     let accelString = ShortcutUtils.getModifierString("accel");
@@ -119,6 +129,7 @@ export class ScreenshotsOverlay {
       instructions,
       downloadAttributes,
       copyAttributes,
+      describeAttributes,
       previewFaceAriaLabel,
       popAttributes,
       reselectAttributes,
@@ -137,6 +148,7 @@ export class ScreenshotsOverlay {
         id: "screenshots-component-copy-button-2",
         args: { shortcut: copyShorcut },
       },
+      { id: "screenshots-component-describe-button" },
       { id: "screenshots-overlay-preview-face-label" },
       { id: "screenshots-component-mini-window-button" },
       { id: "screenshots-component-reselect-button" },
@@ -160,6 +172,7 @@ export class ScreenshotsOverlay {
         : `
               <button id="cancel" class="screenshots-button" title="${cancelAttributes.attributes[0].value}" aria-label="${cancelAttributes.attributes[1].value}"><img/></button>
               <button id="copy" class="screenshots-button" title="${copyAttributes.attributes[0].value}" aria-label="${copyAttributes.attributes[1].value}"><img/><label>${copyAttributes.value}</label></button>
+              <button id="describe" class="screenshots-button" title="${describeAttributes.attributes[0].value}" aria-label="${describeAttributes.attributes[1].value}"><img/><label>${describeAttributes.value}</label></button>
               <button id="download" class="screenshots-button primary" title="${downloadAttributes.attributes[0].value}" aria-label="${downloadAttributes.attributes[1].value}"><img/><label>${downloadAttributes.value}</label></button>`;
 
     return `
@@ -225,6 +238,10 @@ export class ScreenshotsOverlay {
               </div>
             </div>
           </div>
+          <svg id="scribble" xmlns="http://www.w3.org/2000/svg" hidden>
+            <polyline id="scribble-outline"></polyline>
+            <polyline id="scribble-stroke"></polyline>
+          </svg>
           <div id="buttons-container" hidden>
             <div class="buttons-wrapper">${buttonsContainerMarkup}</div>
           </div>
@@ -329,6 +346,7 @@ export class ScreenshotsOverlay {
     this.previewCancelButton = this.getElementById("screenshots-cancel-button");
     this.cancelButton = this.getElementById("cancel");
     this.copyButton = this.getElementById("copy");
+    this.describeButton = this.getElementById("describe");
     this.downloadButton = this.getElementById("download");
     this.popButton = this.getElementById("pop");
     this.miniWindowCancelButton = this.getElementById(
@@ -351,6 +369,9 @@ export class ScreenshotsOverlay {
     this.rightBackgroundEl = this.getElementById("right-background");
     this.bottomBackgroundEl = this.getElementById("bottom-background");
     this.highlightEl = this.getElementById("highlight");
+    this.scribbleEl = this.getElementById("scribble");
+    this.scribbleOutline = this.getElementById("scribble-outline");
+    this.scribbleStroke = this.getElementById("scribble-stroke");
 
     this.topLeftMover = this.getElementById("mover-topLeft");
     this.topRightMover = this.getElementById("mover-topRight");
@@ -481,6 +502,9 @@ export class ScreenshotsOverlay {
         break;
       case "copy":
         this.copySelectedRegion();
+        break;
+      case "describe":
+        this.describeSelectedRegion();
         break;
       case "download":
         this.downloadSelectedRegion();
@@ -1258,6 +1282,9 @@ export class ScreenshotsOverlay {
       case this.copyButton:
         this.copySelectedRegion();
         break;
+      case this.describeButton:
+        this.describeSelectedRegion();
+        break;
       case this.downloadButton:
         this.downloadSelectedRegion();
         break;
@@ -1364,6 +1391,12 @@ export class ScreenshotsOverlay {
     });
   }
 
+  describeSelectedRegion() {
+    this.#dispatchEvent("Screenshots:Describe", {
+      region: this.selectionRegion.dimensions,
+    });
+  }
+
   downloadSelectedRegion() {
     this.#dispatchEvent("Screenshots:Download", {
       region: this.selectionRegion.dimensions,
@@ -1389,6 +1422,7 @@ export class ScreenshotsOverlay {
     this.hideHoverElementContainer();
     this.hideSelectionContainer();
     this.hideButtonsContainer();
+    this.#hideScribble();
     this.showPreviewContainer();
     this.#dispatchEvent("Screenshots:ShowPanel");
     this.#previousDimensions = null;
@@ -1426,6 +1460,7 @@ export class ScreenshotsOverlay {
     this.#ensureMiniWindowRegionSize();
     this.hidePreviewContainer();
     this.hideHoverElementContainer();
+    this.#hideScribble();
     this.drawSelectionContainer();
     this.drawButtonsContainer();
 
@@ -1476,12 +1511,7 @@ export class ScreenshotsOverlay {
    * @param {number} pageY The y position relative to the page
    */
   crosshairsDragStart(pageX, pageY) {
-    this.selectionRegion.dimensions = {
-      left: pageX,
-      top: pageY,
-      right: pageX,
-      bottom: pageY,
-    };
+    this.#beginScribble(pageX, pageY);
 
     this.#setState(STATES.DRAGGING_READY);
   }
@@ -1520,36 +1550,31 @@ export class ScreenshotsOverlay {
   }
 
   /**
-   * Set the selection region dimensions and if the region is at least 40
-   * pixels diagnally in distance, set the state to dragging.
+   * Extend the scribble and, once the stroke is long enough to be a drag,
+   * set the state to dragging. A straight drag still uses the 40px diagonal.
+   * A circle can cross that length inside a smaller box.
    *
    * @param {number} pageX The x position relative to the page
    * @param {number} pageY The y position relative to the page
    */
   draggingReadyDrag(pageX, pageY) {
-    this.selectionRegion.dimensions = {
-      right: pageX,
-      bottom: pageY,
-    };
+    this.#recordScribblePoint(pageX, pageY);
 
-    if (this.selectionRegion.distance > 40) {
+    if (this.selectionRegion.distance > 40 || this.#scribbleLength > 40) {
       this.#setState(STATES.DRAGGING);
     }
   }
 
   /**
-   * Scroll if along the edge of the viewport, update the selection region
-   * dimensions and draw the selection container.
+   * Scroll if along the edge of the viewport, extend the scribble, and draw
+   * the selection container around the scribble's bounding box.
    *
    * @param {number} pageX The x position relative to the page
    * @param {number} pageY The y position relative to the page
    */
   draggingDrag(pageX, pageY) {
     this.scrollIfByEdge(pageX, pageY);
-    this.selectionRegion.dimensions = {
-      right: pageX,
-      bottom: pageY,
-    };
+    this.#recordScribblePoint(pageX, pageY);
 
     this.drawSelectionContainer();
   }
@@ -1698,19 +1723,156 @@ export class ScreenshotsOverlay {
   }
 
   /**
-   * Update the selection region dimensions and set the state to selected.
+   * Include the final scribble point and set the state to selected.
+   * The committed selection is the bounding box of the path.
    *
    * @param {number} pageX The x position relative to the page
    * @param {number} pageY The y position relative to the page
    */
   draggingDragEnd(pageX, pageY) {
-    this.selectionRegion.dimensions = {
-      right: pageX,
-      bottom: pageY,
-    };
+    this.#recordScribblePoint(pageX, pageY, true);
     this.#setState(STATES.SELECTED);
     this.maybeRecordRegionSelected();
     this.#methodsUsed.region += 1;
+  }
+
+  /**
+   * Start a new scribble at the pointer. The selection region is a point
+   * until the path grows.
+   *
+   * @param {number} pageX The x position relative to the page
+   * @param {number} pageY The y position relative to the page
+   */
+  #beginScribble(pageX, pageY) {
+    this.#hideScribble();
+    let { x, y } = this.#clampPagePoint(pageX, pageY);
+    this.#scribbleMinX = x;
+    this.#scribbleMinY = y;
+    this.#scribbleMaxX = x;
+    this.#scribbleMaxY = y;
+    this.#scribbleLength = 0;
+    this.#applyScribbleBounds();
+    this.#recordScribblePoint(x, y, true);
+  }
+
+  /**
+   * Add a pointer sample to the scribble, grow the bounding box, and draw
+   * the path. Samples closer than SCRIBBLE_POINT_MIN_DISTANCE are ignored
+   * unless `force` is set.
+   *
+   * @param {number} pageX The x position relative to the page
+   * @param {number} pageY The y position relative to the page
+   * @param {boolean} [force=false] Record the point even if it barely moved
+   */
+  #recordScribblePoint(pageX, pageY, force = false) {
+    let { x, y } = this.#clampPagePoint(pageX, pageY);
+
+    if (
+      x < this.#scribbleMinX ||
+      y < this.#scribbleMinY ||
+      x > this.#scribbleMaxX ||
+      y > this.#scribbleMaxY
+    ) {
+      this.#scribbleMinX = Math.min(this.#scribbleMinX, x);
+      this.#scribbleMinY = Math.min(this.#scribbleMinY, y);
+      this.#scribbleMaxX = Math.max(this.#scribbleMaxX, x);
+      this.#scribbleMaxY = Math.max(this.#scribbleMaxY, y);
+      this.#applyScribbleBounds();
+    }
+
+    if (this.#scribbleLastX != null && !force) {
+      let dx = x - this.#scribbleLastX;
+      let dy = y - this.#scribbleLastY;
+      if (
+        dx * dx + dy * dy <
+        SCRIBBLE_POINT_MIN_DISTANCE * SCRIBBLE_POINT_MIN_DISTANCE
+      ) {
+        return;
+      }
+    }
+    if (x === this.#scribbleLastX && y === this.#scribbleLastY) {
+      return;
+    }
+
+    if (this.#scribbleLastX != null) {
+      let dx = x - this.#scribbleLastX;
+      let dy = y - this.#scribbleLastY;
+      this.#scribbleLength += Math.hypot(dx, dy);
+    }
+    this.#scribbleLastX = x;
+    this.#scribbleLastY = y;
+    this.#scribblePoints += this.#scribblePoints ? ` ${x},${y}` : `${x},${y}`;
+    this.#drawScribble();
+  }
+
+  /**
+   * Clamp a page point the same way Region clamps selection coordinates.
+   *
+   * @param {number} pageX The x position relative to the page
+   * @param {number} pageY The y position relative to the page
+   * @returns {{ x: number, y: number }}
+   */
+  #clampPagePoint(pageX, pageY) {
+    let {
+      scrollX,
+      scrollY,
+      clientWidth,
+      clientHeight,
+      scrollWidth,
+      scrollHeight,
+    } = this.windowDimensions.dimensions;
+
+    let x;
+    let y;
+    if (this.mode === SELECTION_MODES.MINI_WINDOW) {
+      x = Math.min(scrollX + clientWidth, Math.max(scrollX, pageX));
+      y = Math.min(scrollY + clientHeight, Math.max(scrollY, pageY));
+    } else {
+      x = Math.min(scrollWidth, Math.max(0, pageX));
+      y = Math.min(scrollHeight, Math.max(0, pageY));
+    }
+    return { x, y };
+  }
+
+  #syncScribbleBox() {
+    if (!this.scribbleEl) {
+      return;
+    }
+    let { scrollWidth, scrollHeight } = this.windowDimensions.dimensions;
+    this.scribbleEl.setAttribute("width", `${scrollWidth}`);
+    this.scribbleEl.setAttribute("height", `${scrollHeight}`);
+  }
+
+  #applyScribbleBounds() {
+    this.selectionRegion.dimensions = {
+      left: this.#scribbleMinX,
+      top: this.#scribbleMinY,
+      right: this.#scribbleMaxX,
+      bottom: this.#scribbleMaxY,
+    };
+  }
+
+  #drawScribble() {
+    this.#syncScribbleBox();
+    this.scribbleOutline.setAttribute("points", this.#scribblePoints);
+    this.scribbleStroke.setAttribute("points", this.#scribblePoints);
+    // SVG elements do not implement the HTML hidden IDL. Assigning
+    // `.hidden` only creates an expando and leaves the content attribute,
+    // so [hidden] keeps the path at display:none.
+    this.scribbleEl.removeAttribute("hidden");
+  }
+
+  #hideScribble() {
+    this.#scribblePoints = "";
+    this.#scribbleLastX = null;
+    this.#scribbleLastY = null;
+    this.#scribbleLength = 0;
+    if (!this.scribbleEl) {
+      return;
+    }
+    this.scribbleEl.setAttribute("hidden", "");
+    this.scribbleOutline.setAttribute("points", "");
+    this.scribbleStroke.setAttribute("points", "");
   }
 
   /**
@@ -1788,6 +1950,7 @@ export class ScreenshotsOverlay {
     let { scrollWidth, scrollHeight, scrollMinX } =
       this.windowDimensions.dimensions;
     this.screenshotsContainer.style = `left:${scrollMinX}px;width:${scrollWidth}px;height:${scrollHeight}px;`;
+    this.#syncScribbleBox();
   }
 
   showScreenshotsOverlayContainer() {

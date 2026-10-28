@@ -48,6 +48,10 @@ screenshots-component-copy-button-2 = Copy
   .title = Copy ({ $shortcut })
   .aria-label = Copy
 
+screenshots-component-describe-button = Describe
+  .title = Describe this selection
+  .aria-label = Describe this selection
+
 # Variables
 #   $shortcut (String) - A keyboard shortcut for saving/downloading the screenshot.
 screenshots-component-download-button-2 = Download

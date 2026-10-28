@@ -11,6 +11,9 @@ const SCREENSHOTS_LAST_SCREENSHOT_METHOD_PREF =
 const SCREENSHOTS_LAST_SAVED_METHOD_PREF =
   "screenshots.browser.component.last-saved-method";
 const SCREENSHOTS_ENABLED_PREF = "screenshots.browser.component.enabled";
+// DistilViT resizes internally. Cap the buffer we send across to the
+// inference process.
+const DESCRIBE_MAX_IMAGE_SIDE = 512;
 
 // Screenshots' own `reason` strings, mapped to the entry points
 // mini_window.created reports.
@@ -23,6 +26,7 @@ const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
   BrowserUtils: "resource://gre/modules/BrowserUtils.sys.mjs",
+  createEngine: "chrome://global/content/ml/EngineProcess.sys.mjs",
   CustomizableUI:
     "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs",
   Downloads: "resource://gre/modules/Downloads.sys.mjs",
@@ -68,6 +72,56 @@ const AlertNotification = Components.Constructor(
   "nsIAlertNotification",
   "initWithObject"
 );
+
+let imageToTextEnginePromise = null;
+
+function getImageToTextEngine() {
+  if (!imageToTextEnginePromise) {
+    imageToTextEnginePromise = lazy
+      .createEngine({
+        featureId: "about-inference",
+        taskName: "moz-image-to-text",
+      })
+      .catch(error => {
+        imageToTextEnginePromise = null;
+        throw error;
+      });
+  }
+  return imageToTextEnginePromise;
+}
+
+/**
+ * RGBA pixels for moz-image-to-text. `url` is omitted so the pipeline uses
+ * the raw buffer instead of RawImage.fromURL.
+ *
+ * @param {object} region The bounds of the screenshot
+ * @param browser The current browser
+ * @returns {Promise<{data: Uint8Array, width: number, height: number, channels: number}>}
+ */
+async function imageRequestFromRegion(region, browser) {
+  let canvas = await ScreenshotsUtils.createCanvas(region, browser);
+  let longest = Math.max(canvas.width, canvas.height);
+  if (longest > DESCRIBE_MAX_IMAGE_SIDE) {
+    let scale = DESCRIBE_MAX_IMAGE_SIDE / longest;
+    let scaled = new OffscreenCanvas(
+      Math.max(1, Math.round(canvas.width * scale)),
+      Math.max(1, Math.round(canvas.height * scale))
+    );
+    scaled
+      .getContext("2d")
+      .drawImage(canvas, 0, 0, scaled.width, scaled.height);
+    canvas = scaled;
+  }
+
+  let { width, height } = canvas;
+  let { data } = canvas.getContext("2d").getImageData(0, 0, width, height);
+  return {
+    data: new Uint8Array(data),
+    width,
+    height,
+    channels: 4,
+  };
+}
 
 // The max dimension for a canvas is 32,767 https://searchfox.org/mozilla-central/rev/f40d29a11f2eb4685256b59934e637012ea6fb78/gfx/cairo/cairo/src/cairo-image-surface.c#62.
 // The max number of pixels for a canvas is 472,907,776 pixels (i.e., 22,528 x 20,992) https://developer.mozilla.org/en-US/docs/Web/HTML/Element/canvas#maximum_canvas_size
@@ -134,6 +188,12 @@ export class ScreenshotsComponentParent extends JSWindowActorParent {
         ScreenshotsUtils.closePanel(browser);
         ({ region } = message.data);
         await ScreenshotsUtils.copyScreenshotFromRegion(region, browser);
+        ScreenshotsUtils.exit(browser);
+        break;
+      case "Screenshots:DescribeScreenshot":
+        ScreenshotsUtils.closePanel(browser);
+        ({ region } = message.data);
+        await ScreenshotsUtils.describeScreenshotFromRegion(region, browser);
         ScreenshotsUtils.exit(browser);
         break;
       case "Screenshots:DownloadScreenshot":
@@ -1391,6 +1451,32 @@ export var ScreenshotsUtils = {
     let blob = await canvas.convertToBlob();
 
     await this.copyScreenshot(blob, browser, "OverlayCopy");
+  },
+
+  /**
+   * Run the moz-image-to-text backend on the selection.
+   * The caption is logged to the Browser Console.
+   *
+   * @param {object} region The bounds of the screenshot
+   * @param browser The current browser
+   */
+  async describeScreenshotFromRegion(region, browser) {
+    // eslint-disable-next-line no-console
+    console.log("Screenshots image-to-text: running");
+    try {
+      let request = await imageRequestFromRegion(region, browser);
+      let engine = await getImageToTextEngine();
+      let response = await engine.run(request);
+      let text = response?.output;
+      if (typeof text !== "string" || !text) {
+        console.error("Screenshots image-to-text returned no text", response);
+        return;
+      }
+      // eslint-disable-next-line no-console
+      console.log("Screenshots image-to-text:", text);
+    } catch (error) {
+      console.error("Screenshots image-to-text failed", error);
+    }
   },
 
   async copyScreenshotFromBlobURL(blobURL, browser, eventName) {

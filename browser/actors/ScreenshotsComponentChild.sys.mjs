@@ -141,6 +141,9 @@ export class ScreenshotsComponentChild extends JSWindowActorChild {
       case "Screenshots:Copy":
         this.requestCopyScreenshot(event.detail.region);
         break;
+      case "Screenshots:Describe":
+        this.requestDescribeScreenshot(event.detail.region);
+        break;
       case "Screenshots:Download":
         this.requestDownloadScreenshot(event.detail.region);
         break;
@@ -196,6 +199,17 @@ export class ScreenshotsComponentChild extends JSWindowActorChild {
   requestCopyScreenshot(region) {
     region.devicePixelRatio = this.contentWindow.devicePixelRatio;
     this.sendAsyncMessage("Screenshots:CopyScreenshot", { region });
+    this.endScreenshotsOverlay({ doNotResetMethods: true });
+  }
+
+  /**
+   * Send a request to describe the screenshot with image-to-text.
+   *
+   * @param {object} region The region dimensions of the screenshot
+   */
+  requestDescribeScreenshot(region) {
+    region.devicePixelRatio = this.contentWindow.devicePixelRatio;
+    this.sendAsyncMessage("Screenshots:DescribeScreenshot", { region });
     this.endScreenshotsOverlay({ doNotResetMethods: true });
   }
 
