@@ -66,8 +66,8 @@ The page text may be missing. When it is, use the title and URL.
 Only suggest a new page. Do not suggest summarizing, chatting, or watching the page.
 Return JSON {"pages": [{"label", "focus"}]} and nothing else.`;
 
-const SELECTION_SYSTEM_PROMPT = `You suggest up to 2 toolbar buttons for making a new page about the region the user selected.
-The selection is an image description of that region. It is the only subject.
+const SELECTION_SYSTEM_PROMPT = `You suggest up to 2 toolbar buttons for making a new page about the part of the page the user selected.
+The selection is highlighted text, or a description of a region they circled. It is the only subject.
 Every label and every focus must be about the selection. Do not make a button about the rest of the page.
 Use names, amounts, and details from the selection. Use the page only to interpret the selection.
 label is the button text: at most 4 words, no ending punctuation.

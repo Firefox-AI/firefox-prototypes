@@ -26,6 +26,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   ReaderMode: "moz-src:///toolkit/components/reader/ReaderMode.sys.mjs",
   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
   SearchUIUtils: "moz-src:///browser/components/search/SearchUIUtils.sys.mjs",
+  SmartWindowActionsToolbar:
+    "moz-src:///browser/components/aiwindow/ui/modules/SmartWindowActionsToolbar.sys.mjs",
   SidebarManager:
     "moz-src:///browser/components/sidebar/SidebarManager.sys.mjs",
 });
@@ -1157,6 +1159,8 @@ export const GenAI = {
    * @param {MozBrowser} browser that provided the message
    */
   handleShortcutsMessage(name, data, browser) {
+    this._updateActionsSelection(name, data, browser);
+
     const isInBrowserStack = browser?.closest(".browserStack");
 
     const isSmartWindow =
@@ -1266,6 +1270,31 @@ export const GenAI = {
         );
         break;
       }
+    }
+  },
+
+  /**
+   * Feeds a content text selection into the Smart Window actions toolbar.
+   * Show carries the selected text. A hide from a click or a selection
+   * change drops it. Scroll and resize hides leave the text in place.
+   *
+   * @param {string} name
+   * @param {object | string} data
+   * @param {MozBrowser} browser
+   */
+  _updateActionsSelection(name, data, browser) {
+    if (!browser) {
+      return;
+    }
+    if (name == "GenAI:ShowShortcuts" && data?.selection) {
+      lazy.SmartWindowActionsToolbar.onTextSelection(browser, data.selection);
+      return;
+    }
+    if (
+      name == "GenAI:HideShortcuts" &&
+      (data == "mousedown" || data == "selectionchange")
+    ) {
+      lazy.SmartWindowActionsToolbar.onTextSelection(browser, "");
     }
   },
 

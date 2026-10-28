@@ -272,7 +272,7 @@ export async function generateConversationStartersSidebar(
     const selection = selectionText?.trim() ?? "";
     if (selection) {
       const rule =
-        "The user selected a region of the current page. The text below is an image description of that region. Every suggestion must be about this selection. Do not suggest prompts about the rest of the page, the other tabs, or memories unless they help with this selection.\n" +
+        "The user selected part of the current page. The text below is highlighted text or a description of a region they circled. Every suggestion must be about this selection. Do not suggest prompts about the rest of the page, the other tabs, or memories unless they help with this selection.\n" +
         selection;
       filled = `${rule}\n\n${filled}\n\n${rule}\nWrite every suggestion about the selected region. The page is background only.`;
     }

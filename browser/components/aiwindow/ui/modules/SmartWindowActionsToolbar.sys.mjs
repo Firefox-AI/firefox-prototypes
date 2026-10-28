@@ -312,6 +312,17 @@ function currentPageMention(win) {
 }
 
 /**
+ * @param {string} text
+ * @returns {string}
+ */
+function clipSelection(text) {
+  return String(text ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAX_SELECTION_CHARS);
+}
+
+/**
  * @param {ChromeWindow} win
  * @returns {string}
  */
@@ -382,6 +393,7 @@ export const SmartWindowActionsToolbar = {
       picking: false,
       renderedKey: null,
       refreshTimer: 0,
+      selectionKind: "",
       selectionText: "",
       starting: false,
     };
@@ -753,8 +765,47 @@ export const SmartWindowActionsToolbar = {
       return;
     }
     state.selectionText = "";
+    state.selectionKind = "";
     state.cacheKey = null;
     state.renderedKey = null;
+  },
+
+  /**
+   * Uses highlighted page text as the selection context. An empty value
+   * clears a text selection and leaves a circled-region selection alone.
+   * A remote tab's ownerGlobal is not the chrome window init stored, so
+   * the window is the document global's top chrome window.
+   *
+   * @param {Element} browser
+   * @param {string} text
+   */
+  onTextSelection(browser, text) {
+    const global = browser?.documentGlobal;
+    const win = global?.browsingContext?.topChromeWindow ?? global;
+    const state = win && windowStates.get(win);
+    if (!state || state.picking || win.closed) {
+      return;
+    }
+    if (win.gBrowser?.selectedBrowser !== browser) {
+      return;
+    }
+    const clipped = clipSelection(text);
+    if (!clipped) {
+      if (state.selectionKind != "text") {
+        return;
+      }
+      this._clearSelection(win);
+      this._scheduleRefresh(win);
+      return;
+    }
+    if (clipped == state.selectionText && state.selectionKind == "text") {
+      return;
+    }
+    state.selectionText = clipped;
+    state.selectionKind = "text";
+    state.cacheKey = null;
+    state.renderedKey = null;
+    this._scheduleRefresh(win);
   },
 
   /**
@@ -787,10 +838,8 @@ export const SmartWindowActionsToolbar = {
       ) {
         return;
       }
-      state.selectionText = text
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, MAX_SELECTION_CHARS);
+      state.selectionText = clipSelection(text);
+      state.selectionKind = "image";
       state.cacheKey = null;
       state.renderedKey = null;
       this._scheduleRefresh(win);
