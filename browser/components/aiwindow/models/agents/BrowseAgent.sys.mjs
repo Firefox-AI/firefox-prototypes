@@ -347,6 +347,21 @@ function isAbortError(error) {
   return error?.name === "AbortError";
 }
 
+function describeNow() {
+  const now = new Date();
+  const date = now.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const time = now.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return `${date}, ${time} local time`;
+}
+
 function imageDataURL(image) {
   return `data:image/jpeg;base64,${image}`;
 }
@@ -915,7 +930,7 @@ export class BrowseAgentSession {
       const shot = await this.#observe("Starting state of the tab.");
       this.#turns.push({
         role: "user",
-        text: `Task: ${this.task}\n\n${shot.text}`,
+        text: `Task: ${this.task}\n\nToday is ${describeNow()}.\n\n${shot.text}`,
         image: shot.image,
       });
       await this.#loop(signal);
@@ -1227,7 +1242,7 @@ export class BrowseAgentSession {
         const element = this.#lastElements.find(el => el.index === index);
         if (!element) {
           throw new Error(
-            `There is no element ${index} in the latest screenshot; the numbers go from 1 to ${this.#lastElements.length}. Take a screenshot or call list_elements for a fresh list.`
+            `There is no element ${index} in the latest element list; the numbers go from 1 to ${this.#lastElements.length}. Call list_elements or take a screenshot for a fresh list and use a number from it.`
           );
         }
         const result = await this.#query("Click", {
@@ -1323,6 +1338,7 @@ export class BrowseAgentSession {
 
       case "list_elements": {
         const { elements, total } = await this.#query("ListElements");
+        this.#lastElements = elements;
         const lines = elements.map(el => {
           const { x, y } = this.#toScreenshot(el.x, el.y);
           const extras = [];
@@ -1346,7 +1362,7 @@ export class BrowseAgentSession {
           }`;
         });
         const text = lines.length
-          ? `${lines.length} of ${total} interactive elements visible (coordinates are screenshot pixels):\n${lines.join("\n")}`
+          ? `${lines.length} of ${total} interactive elements visible (click them with click_element and the number, or click with the screenshot coordinates):\n${lines.join("\n")}`
           : "No interactive elements are visible in the viewport.";
         this.#emit({
           type: ENTRY_TYPE.ACTION,
