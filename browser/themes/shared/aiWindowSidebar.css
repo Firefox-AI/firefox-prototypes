@@ -22,6 +22,14 @@
   width: var(--ai-window-sidebar-width-default);
 }
 
+/* Exactly one of the chat browser and the Browse Agent panel browser owns the
+ * box; the box's browse-agent-active attribute decides which, independent of
+ * each browser's hidden attribute and of their order in the stack. */
+#ai-window-box[browse-agent-active] > .ai-window-browser-stack > #ai-window-browser,
+#ai-window-box:not([browse-agent-active]) > .ai-window-browser-stack > #browse-agent-browser {
+  display: none;
+}
+
 /* Splitter styling to match the left sidebar */
 #ai-window-splitter {
   background-clip: padding-box;

@@ -369,6 +369,12 @@ export const AIWindowUI = {
     const { box, splitter } = nodes;
     const aiBrowser = this.ensureBrowserIsAppended(win.document, box);
 
+    // While the Browse Agent panel owns the box, tab switches it causes must
+    // not surface the chat browser over it; the panel hands the box back.
+    if (lazy.BrowseAgentUI.isPinned(win)) {
+      aiBrowser.hidden = true;
+    }
+
     if (!this.isSidebarOpen(win)) {
       this._setSidebarCollapsed(win, box, splitter, false, { animate: false });
       this._updateAskButtonChecked(win, true);

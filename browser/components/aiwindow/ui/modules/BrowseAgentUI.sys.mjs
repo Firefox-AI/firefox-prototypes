@@ -95,11 +95,11 @@ export const BrowseAgentUI = {
       });
     }
 
+    // Create the chat browser first so that a later openSidebar() finds the
+    // hidden one instead of appending a visible one on top of the panel.
+    const chatBrowser = lazy.AIWindowUI.ensureBrowserIsAppended(chromeDoc, box);
     const browser = ensureBrowser(chromeDoc, box);
-    const chatBrowser = chromeDoc.getElementById(lazy.AIWindowUI.BROWSER_ID);
-    if (chatBrowser) {
-      chatBrowser.hidden = true;
-    }
+    chatBrowser.hidden = true;
     browser.hidden = false;
     box.toggleAttribute(PINNED_ATTR, true);
 
