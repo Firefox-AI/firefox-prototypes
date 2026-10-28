@@ -208,6 +208,21 @@ smartwindow-actions-toolbar =
 smartwindow-actions-loading =
     .label = Looking at this page…
 
+## .condition is copied into the tasks form by script. It is not a widget attribute.
+
+smartwindow-actions-watch-price-drop =
+    .label = Price drop
+    .condition = The price drops
+smartwindow-actions-watch-back-in-stock =
+    .label = Back in stock
+    .condition = It is back in stock
+smartwindow-actions-watch-deal =
+    .label = Watch for a deal
+    .condition = A product I want goes on sale
+smartwindow-actions-watch-headlines =
+    .label = Watch the headlines
+    .condition = A story I care about is on the front page
+
 ## Memories toggle button
 
 aiwindow-memories-on =

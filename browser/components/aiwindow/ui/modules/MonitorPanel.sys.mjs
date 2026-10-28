@@ -105,24 +105,42 @@ export const MonitorPanel = {
    * @param {ChromeWindow} win
    * @param {object} [options]
    * @param {boolean} [options.create] Open straight to the create form.
+   * @param {Element} [options.anchor] Element the panel opens beside. The
+   *   tasks toolbar button is used when this is omitted.
+   * @param {string} [options.condition] Task description to seed when opening
+   *   the create form.
    */
-  showMonitorPanel(win, { create = false } = {}) {
+  showMonitorPanel(
+    win,
+    { create = false, anchor = null, condition = "" } = {}
+  ) {
     const doc = win.document;
     const button = doc.getElementById(BUTTON_ID);
     const popupSet = doc.getElementById("mainPopupSet");
-    if (!button || !popupSet) {
+    // Anchor to the overflow button rather than the button itself when the
+    // widget has been moved into the overflow panel.
+    const popupAnchor =
+      anchor ??
+      lazy.CustomizableUI.getWidget(BUTTON_ID)?.forWindow(win)?.anchor ??
+      button;
+    if (!popupAnchor || !popupSet) {
+      return;
+    }
+
+    const position = anchor ? "bottomleft topleft" : "bottomright topright";
+    const existing = anchor ? this._getOpenPanel(doc) : null;
+    if (existing) {
+      this._trackExpanded(existing, anchor);
+      if (create) {
+        this._openCreateView(existing, win, condition);
+      }
+      existing.openPopup(popupAnchor, position, 0, 4, false, false);
       return;
     }
 
     // Opening the panel answers the attention dot. Taking the ids and
     // it only clears once the panel has committed to opening.
     const attentionIds = lazy.AIWindow.takeMonitorAttentionIds();
-
-    // Anchor to the overflow button rather than the button itself when the
-    // widget has been moved into the overflow panel.
-    const anchor =
-      lazy.CustomizableUI.getWidget(BUTTON_ID)?.forWindow(win)?.anchor ??
-      button;
 
     const panel = this._createPanel(win);
     panel._contents.attentionIds = attentionIds;
@@ -132,21 +150,23 @@ export const MonitorPanel = {
     panel.addEventListener(
       "popupshown",
       () => {
-        button.setAttribute("aria-expanded", "true");
+        this._trackExpanded(panel, button, anchor);
         observingMonitors = true;
         Services.obs.addObserver(
           onMonitorsChanged,
           lazy.MONITOR_AGENTS_CHANGED_TOPIC
         );
         if (create) {
-          this._openCreateView(panel, win);
+          this._openCreateView(panel, win, condition);
         }
       },
       { once: true }
     );
     const teardown = () => {
       win.removeEventListener("unload", teardown);
-      button.setAttribute("aria-expanded", "false");
+      for (const control of panel._expandedControls ?? []) {
+        control.setAttribute("aria-expanded", "false");
+      }
       // A click landing while the panel is still opening hides it without it
       // ever having been shown, so the observer may never have been added.
       // Removing one that isn't registered throws, which used to leave the
@@ -164,8 +184,25 @@ export const MonitorPanel = {
     win.addEventListener("unload", teardown, { once: true });
 
     popupSet.appendChild(panel);
-    panel.openPopup(anchor, "bottomright topright", 0, 4, false, false);
+    panel.openPopup(popupAnchor, position, 0, 4, false, false);
     this._syncContents(panel);
+  },
+
+  /**
+   * Marks the controls a panel was opened from so they collapse when it does.
+   *
+   * @param {XULElement} panel
+   * @param {...?(Element|XULElement)} controls
+   */
+  _trackExpanded(panel, ...controls) {
+    panel._expandedControls ??= new Set();
+    for (const control of controls) {
+      if (!control || panel._expandedControls.has(control)) {
+        continue;
+      }
+      panel._expandedControls.add(control);
+      control.setAttribute("aria-expanded", "true");
+    }
   },
 
   /**
@@ -344,8 +381,17 @@ export const MonitorPanel = {
 
   // Switching to the create view while the list is already showing animates
   // the form sliding in.
-  _openCreateView(panel, win) {
-    panel._contents.agent = { url: this._watchableUrl(win) };
+  _openCreateView(panel, win, condition = "") {
+    const url = this._watchableUrl(win);
+    const agent = { url };
+    if (condition) {
+      agent.condition = condition;
+      panel._contents.draft = {
+        condition,
+        watchUrls: url ? [url] : [],
+      };
+    }
+    panel._contents.agent = agent;
     this._setView(panel, "create");
   },
 

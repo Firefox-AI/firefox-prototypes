@@ -31,6 +31,8 @@ const ICON_SRC = "chrome://browser/skin/smart-window-simplified.svg";
 const PAGE_ICON_SRC =
   "chrome://browser/content/aiwindow/assets/smart-page-16.svg";
 const ASK_ICON_SRC = "chrome://browser/content/aiwindow/assets/ask-icon.svg";
+const WATCH_ICON_SRC =
+  "chrome://browser/content/aiwindow/assets/agent-watch.svg";
 
 const SUGGESTION_COUNT = 3;
 const MAX_CONTEXT_TABS = 6;
@@ -50,12 +52,16 @@ export const ACTION_KIND = Object.freeze({
  * @property {string} id - Stable id for this render of the row.
  * @property {SmartWindowActionKind} kind - "chat" starts a conversation.
  *   "command" runs without opening one.
- * @property {string} label - Text shown on the toolbar button.
+ * @property {string} [label] - Text shown on the toolbar button.
+ * @property {string} [l10nId] - Fluent id for a label that is not model text.
+ *   A condition attribute on that message seeds the tasks form.
  * @property {string} [iconSrc] - Icon shown beside the label. Page actions use
- *   the smart page mark. Chat actions use the ask mark.
+ *   the smart page mark. Chat actions use the ask mark. Watch actions use
+ *   the agent watch mark.
  * @property {string} [prompt] - Message a chat action submits.
- * @property {(win: ChromeWindow) => void} [run] - What a command action does.
- *   Must not open a conversation.
+ * @property {(win: ChromeWindow, button?: Element) => void} [run] - What a
+ *   command action does. Must not open a conversation. The button is the one
+ *   that was clicked.
  */
 
 const lazy = {};
@@ -66,6 +72,12 @@ ChromeUtils.defineESModuleGetters(lazy, {
   AIWindowUI:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowUI.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+  AgentPageCategory:
+    "moz-src:///browser/components/aiwindow/ui/modules/AgentPageDetector.sys.mjs",
+  AgentPageDetector:
+    "moz-src:///browser/components/aiwindow/ui/modules/AgentPageDetector.sys.mjs",
+  MonitorPanel:
+    "moz-src:///browser/components/aiwindow/ui/modules/MonitorPanel.sys.mjs",
   generateConversationStartersSidebar:
     "moz-src:///browser/components/aiwindow/models/ConversationSuggestions.sys.mjs",
   openSuggestedPage:
@@ -80,6 +92,85 @@ XPCOMUtils.defineLazyPreferenceGetter(lazy, "enabled", PREF_ENABLED, true, () =>
 
 /** @type {WeakMap<ChromeWindow, object>} */
 const windowStates = new WeakMap();
+
+/**
+ * Watch suggestions for the page categories AgentPageDetector knows about.
+ * Each one opens the tasks panel beside the button that was clicked.
+ *
+ * @returns {Record<string, Array<{id: string, l10nId: string}>>}
+ */
+function watchSuggestions() {
+  const { PRODUCT_DETAIL, SHOPPING_HOME, NEWS_HOME } = lazy.AgentPageCategory;
+  return {
+    [PRODUCT_DETAIL]: [
+      {
+        id: "watch-price-drop",
+        l10nId: "smartwindow-actions-watch-price-drop",
+      },
+      {
+        id: "watch-back-in-stock",
+        l10nId: "smartwindow-actions-watch-back-in-stock",
+      },
+    ],
+    [SHOPPING_HOME]: [
+      {
+        id: "watch-deal",
+        l10nId: "smartwindow-actions-watch-deal",
+      },
+    ],
+    [NEWS_HOME]: [
+      {
+        id: "watch-headlines",
+        l10nId: "smartwindow-actions-watch-headlines",
+      },
+    ],
+  };
+}
+
+/**
+ * @param {ChromeWindow} win
+ * @param {string} l10nId
+ * @returns {Promise<string>} The task description for this suggestion.
+ */
+async function watchCondition(win, l10nId) {
+  const [message] = await win.document.l10n.formatMessages([{ id: l10nId }]);
+  return (
+    message?.attributes?.find(attr => attr.name == "condition")?.value ?? ""
+  );
+}
+
+/**
+ * Tasks for a product page, a shopping home page, or a news home page.
+ * Other pages get none. Clicking opens the tasks panel beside the button.
+ *
+ * @param {ChromeWindow} win
+ * @param {AbortSignal} signal
+ * @returns {Promise<SmartWindowAction[]>}
+ */
+async function monitorSuggestionActions(win, signal) {
+  signal?.throwIfAborted();
+  if (!lazy.AIWindow.monitorButtonEnabled) {
+    return [];
+  }
+  const uri = win.gBrowser?.selectedBrowser?.currentURI;
+  const category = uri
+    ? lazy.AgentPageDetector.getPageInfo(uri)?.category
+    : null;
+  const suggestions = category ? (watchSuggestions()[category] ?? []) : [];
+  return suggestions.map(suggestion => ({
+    id: suggestion.id,
+    kind: ACTION_KIND.COMMAND,
+    l10nId: suggestion.l10nId,
+    iconSrc: WATCH_ICON_SRC,
+    run: async (target, button) => {
+      lazy.MonitorPanel.showMonitorPanel(target, {
+        create: true,
+        anchor: button,
+        condition: await watchCondition(target, suggestion.l10nId),
+      });
+    },
+  }));
+}
 
 /**
  * Generated-page ideas for the current tab. A recipe might offer "Vegan
@@ -258,7 +349,11 @@ export const SmartWindowActionsToolbar = {
    *   signal: AbortSignal
    * ) => Promise<SmartWindowAction[]>>}
    */
-  actionProviders: [pageSuggestionActions, conversationSuggestionActions],
+  actionProviders: [
+    monitorSuggestionActions,
+    pageSuggestionActions,
+    conversationSuggestionActions,
+  ],
 
   /**
    * @param {ChromeWindow} win
@@ -592,8 +687,12 @@ export const SmartWindowActionsToolbar = {
 
     for (const action of actions) {
       const button = this._createButton(doc);
-      button.label = action.label;
-      button.title = action.label;
+      if (action.l10nId) {
+        doc.l10n.setAttributes(button, action.l10nId);
+      } else {
+        button.label = action.label;
+        button.title = action.label;
+      }
       if (action.iconSrc) {
         button.iconSrc = action.iconSrc;
       }
@@ -633,7 +732,7 @@ export const SmartWindowActionsToolbar = {
       if (button) {
         button.disabled = true;
       }
-      Promise.resolve(action.run?.(win))
+      Promise.resolve(action.run?.(win, button))
         .catch(error => {
           console.error("Failed to run a Smart Window action:", error);
         })
