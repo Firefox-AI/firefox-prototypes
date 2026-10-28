@@ -10,7 +10,7 @@
  *
  * The model is reached through one of two providers: the Smart Window's own
  * OpenAI-style engine (Firefox Account token, Mozilla endpoint, a vision model
- * such as gemini-3.1-flash-lite) or the Anthropic Messages API with an API key.
+ * such as qwen38-flash-next) or the Anthropic Messages API with an API key.
  */
 
 import {
@@ -564,17 +564,15 @@ function toOpenAIMessages(turns) {
 
 async function requestSmartWindow({ turns, signal }) {
   const model = BrowseAgent.model;
-  const endpoint = getPref("endpoint", "");
-  let token = null;
-  if (!endpoint) {
-    token = await lazy.AuthProvider.getToken();
-    if (!token) {
-      const error = new Error(
-        "Sign in to your Firefox account to use the Smart Window model, or set a custom endpoint."
-      );
-      error.code = "signin-required";
-      throw error;
-    }
+  // A custom endpoint with an API key uses the key; otherwise the account
+  // token is sent, which Mozilla's production and stage endpoints both take.
+  const token = await lazy.AuthProvider.getToken().catch(() => null);
+  if (!token && !(getPref("endpoint", "") && getPref("apiKey", ""))) {
+    const error = new Error(
+      "Sign in to your Firefox account to use the Smart Window model, or set a custom endpoint and API key."
+    );
+    error.code = "signin-required";
+    throw error;
   }
   const request = {
     args: toOpenAIMessages(turns),
@@ -1638,7 +1636,7 @@ export const BrowseAgent = {
   },
 
   get model() {
-    return getPref("model", "gemini-3.1-flash-lite");
+    return getPref("model", "qwen38-flash-next");
   },
 
   getApiKey() {
