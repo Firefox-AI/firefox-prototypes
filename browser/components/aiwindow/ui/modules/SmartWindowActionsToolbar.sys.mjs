@@ -28,11 +28,15 @@ const TOOLBAR_ID = "smartwindow-actions-toolbar";
 const ACTIONS_ID = "smartwindow-actions";
 const ICON_ID = "smartwindow-actions-icon";
 const ICON_SRC = "chrome://browser/skin/smart-window-simplified.svg";
+const PAGE_ICON_SRC =
+  "chrome://browser/content/aiwindow/assets/smart-page-16.svg";
+const ASK_ICON_SRC = "chrome://browser/content/aiwindow/assets/ask-icon.svg";
 
 const SUGGESTION_COUNT = 3;
 const MAX_CONTEXT_TABS = 6;
 const MAX_CACHE_KEYS = 8;
 const REFRESH_DELAY_MS = 400;
+const PAGE_CONTENT_RETRY_MS = 800;
 
 /** @typedef {"chat"|"command"} SmartWindowActionKind */
 
@@ -47,6 +51,8 @@ export const ACTION_KIND = Object.freeze({
  * @property {SmartWindowActionKind} kind - "chat" starts a conversation.
  *   "command" runs without opening one.
  * @property {string} label - Text shown on the toolbar button.
+ * @property {string} [iconSrc] - Icon shown beside the label. Page actions use
+ *   the smart page mark. Chat actions use the ask mark.
  * @property {string} [prompt] - Message a chat action submits.
  * @property {(win: ChromeWindow) => void} [run] - What a command action does.
  *   Must not open a conversation.
@@ -62,6 +68,10 @@ ChromeUtils.defineESModuleGetters(lazy, {
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   generateConversationStartersSidebar:
     "moz-src:///browser/components/aiwindow/models/ConversationSuggestions.sys.mjs",
+  openSuggestedPage:
+    "moz-src:///browser/components/aiwindow/ui/modules/PageActionSuggestions.sys.mjs",
+  suggestPageActions:
+    "moz-src:///browser/components/aiwindow/ui/modules/PageActionSuggestions.sys.mjs",
 });
 
 XPCOMUtils.defineLazyPreferenceGetter(lazy, "enabled", PREF_ENABLED, true, () =>
@@ -70,6 +80,40 @@ XPCOMUtils.defineLazyPreferenceGetter(lazy, "enabled", PREF_ENABLED, true, () =>
 
 /** @type {WeakMap<ChromeWindow, object>} */
 const windowStates = new WeakMap();
+
+/**
+ * Generated-page ideas for the current tab. A recipe might offer "Vegan
+ * version". Clicking builds that page and does not open a chat.
+ *
+ * @param {ChromeWindow} win
+ * @param {AbortSignal} signal
+ * @returns {Promise<SmartWindowAction[] & {pending?: boolean}>} pending when
+ *   the document is still loading, so the row can be asked again.
+ */
+async function pageSuggestionActions(win, signal) {
+  const tab = contextTabs(win)[0];
+  if (!tab || !/^https?:/i.test(tab.url)) {
+    return [];
+  }
+
+  const { ideas, pending } = await lazy.suggestPageActions({
+    url: tab.url,
+    pageTitle: tab.title,
+    browser: win.gBrowser.selectedBrowser,
+    signal,
+  });
+  const actions = ideas.map((idea, index) => ({
+    id: `page-${index}`,
+    kind: ACTION_KIND.COMMAND,
+    label: idea.label,
+    iconSrc: PAGE_ICON_SRC,
+    run: target => lazy.openSuggestedPage(target, idea),
+  }));
+  if (pending) {
+    actions.pending = true;
+  }
+  return actions;
+}
 
 /**
  * Conversation starters for the current page, same generator the sidebar uses.
@@ -102,6 +146,7 @@ async function conversationSuggestionActions(win, signal) {
       id: `chat-${index}`,
       kind: ACTION_KIND.CHAT,
       label: item.text,
+      iconSrc: ASK_ICON_SRC,
       prompt: item.text,
     }));
 }
@@ -213,7 +258,7 @@ export const SmartWindowActionsToolbar = {
    *   signal: AbortSignal
    * ) => Promise<SmartWindowAction[]>>}
    */
-  actionProviders: [conversationSuggestionActions],
+  actionProviders: [pageSuggestionActions, conversationSuggestionActions],
 
   /**
    * @param {ChromeWindow} win
@@ -229,7 +274,9 @@ export const SmartWindowActionsToolbar = {
       actions: [],
       cache: new Map(),
       cacheKey: null,
+      pageRetryKey: null,
       pendingKey: null,
+      renderedKey: null,
       refreshTimer: 0,
       starting: false,
     };
@@ -255,7 +302,24 @@ export const SmartWindowActionsToolbar = {
         }
         SmartWindowActionsToolbar._scheduleRefresh(win);
       },
-      onStateChange() {},
+      onStateChange(webProgress, _request, flags) {
+        const done =
+          flags & Ci.nsIWebProgressListener.STATE_STOP &&
+          flags & Ci.nsIWebProgressListener.STATE_IS_NETWORK;
+        if (!done || !webProgress.isTopLevel) {
+          return;
+        }
+        const selected = win.gBrowser?.selectedBrowser?.browsingContext;
+        if (!selected || webProgress.browsingContext != selected) {
+          return;
+        }
+        // A read that started before the body existed must run again.
+        const current = windowStates.get(win);
+        if (current) {
+          current.pageRetryKey = null;
+        }
+        SmartWindowActionsToolbar._scheduleRefresh(win);
+      },
       onProgressChange() {},
       onStatusChange() {},
       onSecurityChange() {},
@@ -263,7 +327,7 @@ export const SmartWindowActionsToolbar = {
     };
     win.gBrowser.addProgressListener(
       state.progressListener,
-      Ci.nsIWebProgress.NOTIFY_LOCATION
+      Ci.nsIWebProgress.NOTIFY_LOCATION | Ci.nsIWebProgress.NOTIFY_STATE_NETWORK
     );
 
     this._scheduleRefresh(win);
@@ -356,6 +420,7 @@ export const SmartWindowActionsToolbar = {
     state.abortController = null;
     state.pendingKey = null;
     state.cacheKey = null;
+    state.renderedKey = null;
     state.actions = [];
     win.document.getElementById(TOOLBAR_ID)?.remove();
   },
@@ -370,6 +435,9 @@ export const SmartWindowActionsToolbar = {
     }
 
     const key = contextKey(win);
+    if (state.pageRetryKey && state.pageRetryKey != key) {
+      state.pageRetryKey = null;
+    }
     if (key == state.cacheKey || key == state.pendingKey) {
       return;
     }
@@ -380,6 +448,7 @@ export const SmartWindowActionsToolbar = {
       state.cache.set(key, cached);
       state.cacheKey = key;
       state.pendingKey = null;
+      state.renderedKey = key;
       this._render(win, cached);
       return;
     }
@@ -388,26 +457,33 @@ export const SmartWindowActionsToolbar = {
     const controller = new AbortController();
     state.abortController = controller;
     state.pendingKey = key;
-    this._render(win, [], { loading: true });
-
-    /** @type {SmartWindowAction[]} */
-    const actions = [];
-    for (const provider of this.actionProviders) {
-      try {
-        const provided = await provider(win, controller.signal);
-        if (controller.signal.aborted || win.closed) {
-          return;
-        }
-        if (provided?.length) {
-          actions.push(...provided);
-        }
-      } catch (error) {
-        if (error?.name == "AbortError" || controller.signal.aborted) {
-          return;
-        }
-        console.error("Smart Window actions toolbar provider failed:", error);
-      }
+    if (state.renderedKey != key) {
+      state.renderedKey = key;
+      this._render(win, [], { loading: true });
     }
+
+    const batches = await Promise.all(
+      this.actionProviders.map(async provider => {
+        try {
+          return (await provider(win, controller.signal)) ?? [];
+        } catch (error) {
+          if (error?.name == "AbortError" || controller.signal.aborted) {
+            return null;
+          }
+          console.error("Smart Window actions toolbar provider failed:", error);
+          return [];
+        }
+      })
+    );
+    if (
+      controller.signal.aborted ||
+      win.closed ||
+      batches.some(batch => batch == null)
+    ) {
+      return;
+    }
+    const pageStillLoading = batches.some(batch => batch?.pending);
+    const actions = batches.flat();
 
     if (controller.signal.aborted || win.closed) {
       return;
@@ -422,6 +498,21 @@ export const SmartWindowActionsToolbar = {
     }
 
     state.pendingKey = null;
+    if (pageStillLoading) {
+      // Chat starters can show now. Page buttons wait until the body is
+      // readable, and this result must not stick for the URL.
+      state.renderedKey = key;
+      this._render(win, actions);
+      if (state.pageRetryKey != key) {
+        state.pageRetryKey = key;
+        state.refreshTimer = win.setTimeout(
+          () => this._refresh(win),
+          PAGE_CONTENT_RETRY_MS
+        );
+      }
+      return;
+    }
+    state.renderedKey = key;
     state.cacheKey = key;
     state.cache.delete(key);
     state.cache.set(key, actions);
@@ -503,9 +594,13 @@ export const SmartWindowActionsToolbar = {
       const button = this._createButton(doc);
       button.label = action.label;
       button.title = action.label;
+      if (action.iconSrc) {
+        button.iconSrc = action.iconSrc;
+      }
       button.setAttribute("data-action-id", action.id);
       button.addEventListener("click", event => {
-        this._run(win, event.currentTarget.getAttribute("data-action-id"));
+        const clicked = event.currentTarget;
+        this._run(win, clicked.getAttribute("data-action-id"), clicked);
       });
       box.appendChild(button);
     }
@@ -525,8 +620,9 @@ export const SmartWindowActionsToolbar = {
   /**
    * @param {ChromeWindow} win
    * @param {string} actionId
+   * @param {MozButton} [button] - Disabled while a command action runs.
    */
-  _run(win, actionId) {
+  _run(win, actionId, button) {
     const action = windowStates
       .get(win)
       ?.actions.find(item => item.id == actionId);
@@ -534,7 +630,18 @@ export const SmartWindowActionsToolbar = {
       return;
     }
     if (action.kind == ACTION_KIND.COMMAND) {
-      action.run?.(win);
+      if (button) {
+        button.disabled = true;
+      }
+      Promise.resolve(action.run?.(win))
+        .catch(error => {
+          console.error("Failed to run a Smart Window action:", error);
+        })
+        .finally(() => {
+          if (button?.isConnected) {
+            button.disabled = false;
+          }
+        });
       return;
     }
     if (action.kind == ACTION_KIND.CHAT) {
