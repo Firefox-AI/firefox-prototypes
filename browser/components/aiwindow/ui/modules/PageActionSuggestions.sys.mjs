@@ -149,7 +149,7 @@ export async function suggestPageActions({
  * @param {AbortSignal} [signal]
  * @returns {Promise<{text: string, pending: boolean}>}
  */
-async function readSelectedPage(browser, url, signal) {
+export async function readSelectedPage(browser, url, signal) {
   signal?.throwIfAborted();
   let loading = false;
   try {

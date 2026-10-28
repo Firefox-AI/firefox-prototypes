@@ -9,7 +9,7 @@
  *
  * It is built for a Smart Window and also shows in a Classic window when the
  * spike pref is on. Chat actions start a conversation. Command actions run on
- * their own (the tasks panel, an AI Tab for this page) and do not open a chat.
+ * their own (the tasks panel, a web search, an AI Tab) and do not open a chat.
  */
 
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
@@ -33,6 +33,7 @@ const PAGE_ICON_SRC =
 const ASK_ICON_SRC = "chrome://browser/content/aiwindow/assets/ask-icon.svg";
 const WATCH_ICON_SRC =
   "chrome://browser/content/aiwindow/assets/agent-watch.svg";
+const SEARCH_ICON_SRC = "chrome://browser/skin/preferences/category-search.svg";
 const PICK_ICON_SRC = "resource://devtools-shared-images/command-pick.svg";
 const PICK_ID = "smartwindow-actions-pick";
 const MAX_SELECTION_CHARS = 1000;
@@ -60,7 +61,7 @@ export const ACTION_KIND = Object.freeze({
  *   A condition attribute on that message seeds the tasks form.
  * @property {string} [iconSrc] - Icon shown beside the label. Page actions use
  *   the smart page mark. Chat actions use the ask mark. Watch actions use
- *   the agent watch mark.
+ *   the agent watch mark. Search actions use the search mark.
  * @property {string} [prompt] - Message a chat action submits.
  * @property {(win: ChromeWindow, button?: Element) => void} [run] - What a
  *   command action does. Must not open a conversation. The button is the one
@@ -89,6 +90,10 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/PageActionSuggestions.sys.mjs",
   suggestPageActions:
     "moz-src:///browser/components/aiwindow/ui/modules/PageActionSuggestions.sys.mjs",
+  openSearchQuery:
+    "moz-src:///browser/components/aiwindow/ui/modules/SearchActionSuggestions.sys.mjs",
+  suggestSearchActions:
+    "moz-src:///browser/components/aiwindow/ui/modules/SearchActionSuggestions.sys.mjs",
 });
 
 XPCOMUtils.defineLazyPreferenceGetter(lazy, "enabled", PREF_ENABLED, true, () =>
@@ -205,6 +210,43 @@ async function pageSuggestionActions(win, signal) {
     label: idea.label,
     iconSrc: PAGE_ICON_SRC,
     run: target => lazy.openSuggestedPage(target, idea),
+  }));
+  if (pending) {
+    actions.pending = true;
+  }
+  return actions;
+}
+
+/**
+ * Web searches for the current tab. Each query looks up something the page
+ * does not already show. A Best Buy MacBook page might offer
+ * "MacBook Air open-box near me", not "MacBook price". Clicking loads that
+ * query in a new tab and does not open a chat.
+ *
+ * @param {ChromeWindow} win
+ * @param {AbortSignal} signal
+ * @returns {Promise<SmartWindowAction[] & {pending?: boolean}>} pending when
+ *   the document is still loading, so the row can be asked again.
+ */
+async function searchSuggestionActions(win, signal) {
+  const tab = contextTabs(win)[0];
+  if (!tab || !/^https?:/i.test(tab.url)) {
+    return [];
+  }
+
+  const { queries, pending } = await lazy.suggestSearchActions({
+    url: tab.url,
+    pageTitle: tab.title,
+    browser: win.gBrowser.selectedBrowser,
+    selectionText: windowStates.get(win)?.selectionText ?? "",
+    signal,
+  });
+  const actions = queries.map((query, index) => ({
+    id: `search-${index}`,
+    kind: ACTION_KIND.COMMAND,
+    label: query,
+    iconSrc: SEARCH_ICON_SRC,
+    run: target => lazy.openSearchQuery(target, query),
   }));
   if (pending) {
     actions.pending = true;
@@ -362,6 +404,7 @@ export const SmartWindowActionsToolbar = {
   /**
    * Sources for the row, in order. Chat providers return conversation
    * starters. Command providers return actions that run without a chat.
+   * Search queries are listed before conversation starters.
    *
    * @type {Array<(
    *   win: ChromeWindow,
@@ -371,6 +414,7 @@ export const SmartWindowActionsToolbar = {
   actionProviders: [
     monitorSuggestionActions,
     pageSuggestionActions,
+    searchSuggestionActions,
     conversationSuggestionActions,
   ],
 
@@ -620,8 +664,8 @@ export const SmartWindowActionsToolbar = {
 
     state.pendingKey = null;
     if (pageStillLoading) {
-      // Chat starters can show now. Page buttons wait until the body is
-      // readable, and this result must not stick for the URL.
+      // Chat starters can show now. Page and search buttons wait until the
+      // body is readable, and this result must not stick for the URL.
       state.renderedKey = key;
       this._render(win, actions);
       if (state.pageRetryKey != key) {

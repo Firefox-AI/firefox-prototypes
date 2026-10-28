@@ -62,6 +62,7 @@ MOZ_SRC_FILES += [
     "modules/MonitorUIUtils.sys.mjs",
     "modules/PageActionSuggestions.sys.mjs",
     "modules/ResumeActivity.sys.mjs",
+    "modules/SearchActionSuggestions.sys.mjs",
     "modules/SmartFormFillAutocomplete.sys.mjs",
     "modules/SmartFormFillController.sys.mjs",
     "modules/SmartFormFillDocument.sys.mjs",
