@@ -2377,6 +2377,7 @@ dom::ModelContext* Navigator::ModelContext() {
 /* static */
 bool Navigator::Webdriver() {
 #ifdef ENABLE_WEBDRIVER
+  return false;
   nsCOMPtr<nsIMarionette> marionette = do_GetService(NS_MARIONETTE_CONTRACTID);
   if (marionette) {
     bool isBrowserAutomationRunning = false;
