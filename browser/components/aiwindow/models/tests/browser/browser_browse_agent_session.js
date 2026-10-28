@@ -338,3 +338,97 @@ add_task(async function test_provider_configuration() {
   await SpecialPowers.popPrefEnv();
   Assert.equal(BrowseAgent.provider, "smartwindow", "pref change is live");
 });
+
+function openDialog(browser) {
+  const box = gBrowser.getTabDialogBox(browser);
+  const managers = [
+    box.getTabDialogManager(),
+    box._contentDialogManager,
+  ].filter(Boolean);
+  for (const manager of managers) {
+    for (const dialog of manager._dialogs ?? []) {
+      if (dialog._isClosing) {
+        continue;
+      }
+      const commonDialog = dialog._frame?.contentWindow?.Dialog;
+      if (commonDialog?.args) {
+        return commonDialog;
+      }
+    }
+  }
+  return null;
+}
+
+add_task(async function test_handle_dialog() {
+  await BrowserTestUtils.withNewTab(SESSION_TEST_PAGE, async browser => {
+    const session = BrowseAgent.startSession(window, "Deal with a dialog");
+    let { respond } = await nextRequest();
+
+    // Open a confirm() in the page. Don't await: confirm() blocks the page's
+    // JavaScript until it is answered.
+    SpecialPowers.spawn(browser, [], () => {
+      content.setTimeout(() => content.confirm("Proceed with the booking?"), 0);
+    }).catch(() => {});
+    await TestUtils.waitForCondition(
+      () => openDialog(browser),
+      "the confirm dialog opened"
+    );
+
+    // An observation while the dialog is open reports it from chrome instead
+    // of hanging on the blocked content queries, and adds no screenshot.
+    respond({ finalOutput: "", toolCalls: [toolCall("g1", "screenshot", {})] });
+    let req = await nextRequest();
+    const note = lastToolMessage(req.request).content;
+    Assert.ok(note.includes("dialog is open"), "the open dialog is reported");
+    Assert.ok(
+      note.includes("Proceed with the booking?"),
+      "the dialog text is included"
+    );
+    Assert.equal(
+      countImages(req.request),
+      1,
+      "no new screenshot is taken while the dialog blocks the page"
+    );
+
+    // Accepting presses OK and lets the page's JavaScript continue.
+    req.respond({
+      finalOutput: "",
+      toolCalls: [toolCall("g2", "handle_dialog", { action: "accept" })],
+    });
+    req = await nextRequest();
+    Assert.ok(
+      lastToolMessage(req.request).content.includes("Accepted"),
+      "accepting the dialog is reported"
+    );
+    await TestUtils.waitForCondition(
+      () => !openDialog(browser),
+      "the dialog closed"
+    );
+
+    req.respond({ finalOutput: "Done.", toolCalls: [] });
+    await TestUtils.waitForCondition(
+      () => session.state === SESSION_STATE.DONE,
+      "the session finishes after the dialog is handled"
+    );
+  });
+});
+
+add_task(async function test_handle_dialog_without_one_open() {
+  await BrowserTestUtils.withNewTab(SESSION_TEST_PAGE, async () => {
+    const session = BrowseAgent.startSession(window, "Try to handle a dialog");
+    let { respond } = await nextRequest();
+    respond({
+      finalOutput: "",
+      toolCalls: [toolCall("n1", "handle_dialog", { action: "accept" })],
+    });
+    const { request, respond: respond2 } = await nextRequest();
+    Assert.ok(
+      lastToolMessage(request).content.includes("No native browser dialog"),
+      "handle_dialog with nothing open is reported as an error"
+    );
+    respond2({ finalOutput: "Nothing to do.", toolCalls: [] });
+    await TestUtils.waitForCondition(
+      () => session.state === SESSION_STATE.DONE
+    );
+  });
+});

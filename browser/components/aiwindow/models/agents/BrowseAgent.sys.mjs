@@ -95,9 +95,11 @@ How to work
 - Verify the outcome in the screenshot before moving on, for example that an item really was added to the cart. If an action did not work, try a different approach instead of repeating it.
 - find locates things by their text anywhere on the page (a product name, "Add to cart", "Search") and scrolls to the first match, so use it instead of scrolling around. select_option sets native dropdowns such as size or quantity; custom dropdowns are clicked like buttons. hover reveals menus that open on mouse-over.
 - Dismiss cookie banners, popups and dialogs that block the page.
+- When a native browser dialog (a JavaScript alert, confirm, or prompt) is open it blocks the page and is reported at the top of the observation. Clear it with handle_dialog before doing anything else: "accept" presses OK, "dismiss" presses Cancel, and for a prompt you pass the answer as text.
 - Dates and times: the task context states today's date; trust it over any date a page shows, since pickers remember earlier choices. In a calendar widget, read the month heading first and use the previous or next month buttons until the right month shows, then click the day; afterwards read the field's label to verify the chosen date, time and party size. When a site encodes search options in the URL (date, time, number of guests, location), navigate to a URL with the right parameters instead of fighting the widgets.
 - Choose sensible defaults instead of asking. If the task does not name a store or site, use a well known one that fits the task and say which one you used in your summary. Use ask_user only for choices that are the user's alone (which account, which address, whether to sign in) or when you are stuck.
 - Hard limits: never complete a purchase, place an order, submit a payment, or send a message, email or post on the user's behalf. Adding items to a cart is fine; stop before any order confirmation and tell the user the cart is ready for review. Never enter passwords, card numbers or other credentials. If a site requires signing in, use ask_user so the user can sign in themselves, then continue.
+- Before finishing a task that changed something, such as adding an item to a cart or filling a form, verify it first: open the cart or re-read the page, confirm the change is actually there, and report what you confirmed. If you could not verify it, say so plainly.
 - When the task is complete, or cannot be completed, call done with a short summary of what you did and what the user should check.
 
 You are operating autonomously. The user is not watching every step and cannot answer questions mid-task except through ask_user, so proceed without asking for permission on reversible actions that follow from the task. When you have enough information to act, act. Always respond with a tool call until the task is finished; finish with the done tool. Keep your visible messages short: one sentence on what you are doing or found.`;
@@ -274,6 +276,20 @@ const TOOLS = [
         seconds: { type: "number", minimum: 0.5, maximum: MAX_WAIT_SECONDS },
       },
       required: ["seconds"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "handle_dialog",
+    description:
+      'Respond to a native browser dialog (a JavaScript alert, confirm, or prompt) that is blocking the page. action "accept" presses OK/Accept; "dismiss" presses Cancel. For a prompt, pass the typed answer as text.',
+    input_schema: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["accept", "dismiss"] },
+        text: { type: "string" },
+      },
+      required: ["action"],
       additionalProperties: false,
     },
   },
@@ -1435,6 +1451,9 @@ export class BrowseAgentSession {
         return this.#actionResult(name, input, `Waited ${seconds} seconds.`);
       }
 
+      case "handle_dialog":
+        return this.#runHandleDialog(name, input);
+
       case "ask_user": {
         const question = String(input.question ?? "").trim();
         this.#emit({ type: ENTRY_TYPE.QUESTION, text: question });
@@ -1467,6 +1486,82 @@ export class BrowseAgentSession {
     }
   }
 
+  // Finds a native alert/confirm/prompt open on the agent's tab. These are
+  // tab- or content-modal dialogs painted over the content area, so they do
+  // not appear in a content screenshot and have to be found through the
+  // chrome dialog managers.
+  #getOpenDialog() {
+    if (!this.tab?.isConnected) {
+      return null;
+    }
+    const browser = this.browser;
+    const dialogBox = this.#win.gBrowser.getTabDialogBox?.(browser);
+    if (!dialogBox) {
+      return null;
+    }
+    const managers = [
+      dialogBox.getTabDialogManager?.(),
+      dialogBox._contentDialogManager,
+    ].filter(Boolean);
+    for (const manager of managers) {
+      for (const subDialog of manager._dialogs ?? []) {
+        if (subDialog._isClosing) {
+          continue;
+        }
+        const commonDialog = subDialog._frame?.contentWindow?.Dialog;
+        if (commonDialog?.args && commonDialog.ui?.button0) {
+          return { commonDialog, subDialog };
+        }
+      }
+    }
+    return null;
+  }
+
+  #describeOpenDialog() {
+    const info = this.#getOpenDialog();
+    if (!info) {
+      return null;
+    }
+    const { args } = info.commonDialog;
+    const type = args.promptType || "dialog";
+    const hasField = ["prompt", "promptUserAndPass", "promptPassword"].includes(
+      type
+    );
+    return `A native browser ${type} dialog is open and is blocking the page: "${truncate(
+      args.text ?? args.title ?? "",
+      300
+    )}". Respond with handle_dialog (action "accept" to press OK, "dismiss" to cancel${
+      hasField ? ", and pass your answer as text" : ""
+    }) before anything else.`;
+  }
+
+  async #runHandleDialog(name, input) {
+    const info = this.#getOpenDialog();
+    if (!info) {
+      throw new Error("No native browser dialog is open right now.");
+    }
+    const { commonDialog } = info;
+    const action = input.action === "dismiss" ? "dismiss" : "accept";
+    const promptType = commonDialog.args?.promptType ?? "";
+    if (
+      input.text != null &&
+      ["prompt", "promptUserAndPass", "promptPassword"].includes(promptType)
+    ) {
+      commonDialog.ui.loginTextbox.value = String(input.text);
+    }
+    const button =
+      action === "accept"
+        ? commonDialog.ui.button0
+        : (commonDialog.ui.button1 ?? commonDialog.ui.button0);
+    button.click();
+    await this.#settle();
+    return this.#actionResult(
+      name,
+      input,
+      `${action === "accept" ? "Accepted" : "Dismissed"} the ${promptType || "dialog"}.`
+    );
+  }
+
   #parseNavigableURL(value) {
     const raw = String(value ?? "").trim();
     if (!raw) {
@@ -1494,6 +1589,23 @@ export class BrowseAgentSession {
   }
 
   async #observe(status, action = null) {
+    // A native dialog blocks the page's JavaScript, so the content actor
+    // queries below would hang. Report the dialog from chrome instead and
+    // let the model clear it with handle_dialog.
+    const dialogNote = this.#describeOpenDialog();
+    if (dialogNote) {
+      this.#lastElements = [];
+      this.#emit({
+        type: ENTRY_TYPE.ACTION,
+        name: action?.name ?? "screenshot",
+        input: action?.input ?? {},
+        status,
+      });
+      return {
+        text: `${dialogNote}
+${status}`,
+      };
+    }
     let elements = [];
     try {
       ({ elements } = await this.#query("ListElements"));
@@ -1593,15 +1705,24 @@ export class BrowseAgentSession {
     const signal = this.#abort.signal;
     const browser = this.#requireBrowser();
     await sleep(ACTION_SETTLE_MS, signal);
+    if (this.#getOpenDialog()) {
+      return;
+    }
     const start = Date.now();
     while (
       browser.webProgress?.isLoadingDocument &&
       Date.now() - start < LOAD_TIMEOUT_MS
     ) {
+      if (this.#getOpenDialog()) {
+        return;
+      }
       await sleep(SETTLE_POLL_MS, signal);
     }
     const readyStart = Date.now();
     while (Date.now() - readyStart < READY_TIMEOUT_MS) {
+      if (this.#getOpenDialog()) {
+        return;
+      }
       let viewport = null;
       try {
         viewport = await browser.browsingContext.currentWindowGlobal
