@@ -8,8 +8,9 @@
  * Toolbar of things Smart Window can do with the current page.
  *
  * It is built for a Smart Window and also shows in a Classic window when the
- * spike pref is on. Chat actions start a conversation. Command actions run on
- * their own (the tasks panel, a web search, an AI Tab) and do not open a chat.
+ * spike pref is on. One suggestion call ranks the best actions, at most six.
+ * Chat actions start a conversation. Command actions run on their own (the
+ * tasks panel, a web search, an AI Tab) and do not open a chat.
  */
 
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
@@ -38,7 +39,6 @@ const PICK_ICON_SRC = "resource://devtools-shared-images/command-pick.svg";
 const PICK_ID = "smartwindow-actions-pick";
 const MAX_SELECTION_CHARS = 1000;
 
-const SUGGESTION_COUNT = 3;
 const MAX_CONTEXT_TABS = 6;
 const MAX_CACHE_KEYS = 8;
 const REFRESH_DELAY_MS = 400;
@@ -84,16 +84,12 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/MonitorPanel.sys.mjs",
   ScreenshotsUtils:
     "moz-src:///browser/components/screenshots/ScreenshotsUtils.sys.mjs",
-  generateConversationStartersSidebar:
-    "moz-src:///browser/components/aiwindow/models/ConversationSuggestions.sys.mjs",
   openSuggestedPage:
-    "moz-src:///browser/components/aiwindow/ui/modules/PageActionSuggestions.sys.mjs",
-  suggestPageActions:
     "moz-src:///browser/components/aiwindow/ui/modules/PageActionSuggestions.sys.mjs",
   openSearchQuery:
     "moz-src:///browser/components/aiwindow/ui/modules/SearchActionSuggestions.sys.mjs",
-  suggestSearchActions:
-    "moz-src:///browser/components/aiwindow/ui/modules/SearchActionSuggestions.sys.mjs",
+  suggestToolbarActions:
+    "moz-src:///browser/components/aiwindow/ui/modules/ToolbarActionSuggestions.sys.mjs",
 });
 
 XPCOMUtils.defineLazyPreferenceGetter(lazy, "enabled", PREF_ENABLED, true, () =>
@@ -107,7 +103,11 @@ const windowStates = new WeakMap();
  * Watch suggestions for the page categories AgentPageDetector knows about.
  * Each one opens the tasks panel beside the button that was clicked.
  *
- * @returns {Record<string, Array<{id: string, l10nId: string}>>}
+ * @returns {Record<string, Array<{
+ *   id: string,
+ *   l10nId: string,
+ *   description: string,
+ * }>>}
  */
 function watchSuggestions() {
   const { PRODUCT_DETAIL, SHOPPING_HOME, NEWS_HOME } = lazy.AgentPageCategory;
@@ -116,25 +116,43 @@ function watchSuggestions() {
       {
         id: "watch-price-drop",
         l10nId: "smartwindow-actions-watch-price-drop",
+        description: "watch this product for a price drop",
       },
       {
         id: "watch-back-in-stock",
         l10nId: "smartwindow-actions-watch-back-in-stock",
+        description: "watch this product until it is back in stock",
       },
     ],
     [SHOPPING_HOME]: [
       {
         id: "watch-deal",
         l10nId: "smartwindow-actions-watch-deal",
+        description: "watch this shopping site for a deal",
       },
     ],
     [NEWS_HOME]: [
       {
         id: "watch-headlines",
         l10nId: "smartwindow-actions-watch-headlines",
+        description: "watch this news site for new headlines",
       },
     ],
   };
+}
+
+/**
+ * @param {string} id
+ * @returns {?{id: string, l10nId: string, description: string}}
+ */
+function watchById(id) {
+  for (const list of Object.values(watchSuggestions())) {
+    const found = list.find(item => item.id == id);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
 }
 
 /**
@@ -150,145 +168,113 @@ async function watchCondition(win, l10nId) {
 }
 
 /**
- * Tasks for a product page, a shopping home page, or a news home page.
- * Other pages get none. Clicking opens the tasks panel beside the button.
- *
- * @param {ChromeWindow} win
- * @param {AbortSignal} signal
- * @returns {Promise<SmartWindowAction[]>}
- */
-async function monitorSuggestionActions(win, signal) {
-  signal?.throwIfAborted();
-  if (!lazy.AIWindow.monitorButtonEnabled) {
-    return [];
-  }
-  const uri = win.gBrowser?.selectedBrowser?.currentURI;
-  const category = uri
-    ? lazy.AgentPageDetector.getPageInfo(uri)?.category
-    : null;
-  const suggestions = category ? (watchSuggestions()[category] ?? []) : [];
-  return suggestions.map(suggestion => ({
-    id: suggestion.id,
-    kind: ACTION_KIND.COMMAND,
-    l10nId: suggestion.l10nId,
-    iconSrc: WATCH_ICON_SRC,
-    run: async (target, button) => {
-      lazy.MonitorPanel.showMonitorPanel(target, {
-        create: true,
-        anchor: button,
-        condition: await watchCondition(target, suggestion.l10nId),
-      });
-    },
-  }));
-}
-
-/**
- * Generated-page ideas for the current tab. A recipe might offer "Vegan
- * version". Clicking builds that page and does not open a chat.
+ * One ranked list for the current page. The model picks the most useful
+ * mix of chat, search, new page, and watch, and stops at six.
  *
  * @param {ChromeWindow} win
  * @param {AbortSignal} signal
  * @returns {Promise<SmartWindowAction[] & {pending?: boolean}>} pending when
  *   the document is still loading, so the row can be asked again.
  */
-async function pageSuggestionActions(win, signal) {
-  const tab = contextTabs(win)[0];
-  if (!tab || !/^https?:/i.test(tab.url)) {
-    return [];
-  }
-
-  const { ideas, pending } = await lazy.suggestPageActions({
-    url: tab.url,
-    pageTitle: tab.title,
-    browser: win.gBrowser.selectedBrowser,
-    selectionText: windowStates.get(win)?.selectionText ?? "",
-    signal,
-  });
-  const actions = ideas.map((idea, index) => ({
-    id: `page-${index}`,
-    kind: ACTION_KIND.COMMAND,
-    label: idea.label,
-    iconSrc: PAGE_ICON_SRC,
-    run: target => lazy.openSuggestedPage(target, idea),
-  }));
-  if (pending) {
-    actions.pending = true;
-  }
-  return actions;
-}
-
-/**
- * Web searches for the current tab. Each query looks up something the page
- * does not already show. A Best Buy MacBook page might offer
- * "MacBook Air open-box near me", not "MacBook price". Clicking loads that
- * query in a new tab and does not open a chat.
- *
- * @param {ChromeWindow} win
- * @param {AbortSignal} signal
- * @returns {Promise<SmartWindowAction[] & {pending?: boolean}>} pending when
- *   the document is still loading, so the row can be asked again.
- */
-async function searchSuggestionActions(win, signal) {
-  const tab = contextTabs(win)[0];
-  if (!tab || !/^https?:/i.test(tab.url)) {
-    return [];
-  }
-
-  const { queries, pending } = await lazy.suggestSearchActions({
-    url: tab.url,
-    pageTitle: tab.title,
-    browser: win.gBrowser.selectedBrowser,
-    selectionText: windowStates.get(win)?.selectionText ?? "",
-    signal,
-  });
-  const actions = queries.map((query, index) => ({
-    id: `search-${index}`,
-    kind: ACTION_KIND.COMMAND,
-    label: query,
-    iconSrc: SEARCH_ICON_SRC,
-    run: target => lazy.openSearchQuery(target, query),
-  }));
-  if (pending) {
-    actions.pending = true;
-  }
-  return actions;
-}
-
-/**
- * Conversation starters for the current page, same generator the sidebar uses.
- * Each one is a chat action: clicking it starts a conversation.
- *
- * @param {ChromeWindow} win
- * @param {AbortSignal} signal
- * @returns {Promise<SmartWindowAction[]>}
- */
-async function conversationSuggestionActions(win, signal) {
+async function rankedSuggestionActions(win, signal) {
   const tabs = contextTabs(win);
-  if (!tabs.length) {
+  const tab = tabs[0];
+  if (!tab) {
     return [];
   }
 
+  const uri = win.gBrowser?.selectedBrowser?.currentURI;
+  const category =
+    uri && lazy.AIWindow.monitorButtonEnabled
+      ? lazy.AgentPageDetector.getPageInfo(uri)?.category
+      : null;
+  const watches = category ? (watchSuggestions()[category] ?? []) : [];
   const useMemories =
     Services.prefs.getBoolPref(PREF_MEMORIES_CONVERSATION, false) ||
     Services.prefs.getBoolPref(PREF_MEMORIES_HISTORY, false);
-  const suggestions = await lazy.generateConversationStartersSidebar(
-    tabs,
-    SUGGESTION_COUNT,
+  const { actions: suggested, pending } = await lazy.suggestToolbarActions({
+    url: tab.url,
+    pageTitle: tab.title,
+    browser: win.gBrowser.selectedBrowser,
+    selectionText: windowStates.get(win)?.selectionText ?? "",
+    otherTabs: tabs.slice(1),
     useMemories,
-    null,
+    watches,
     signal,
-    windowStates.get(win)?.selectionText ?? ""
-  );
+  });
 
-  return suggestions
-    .filter(item => item?.text && item.type === "chat")
-    .map((item, index) => ({
+  const actions = [];
+  for (const [index, action] of suggested.entries()) {
+    const built = toToolbarAction(action, index);
+    if (built) {
+      actions.push(built);
+    }
+  }
+  if (pending) {
+    actions.pending = true;
+  }
+  return actions;
+}
+
+/**
+ * @param {object} action
+ * @param {string} action.kind
+ * @param {string} [action.label]
+ * @param {string} [action.focus]
+ * @param {string} [action.id]
+ * @param {number} index
+ * @returns {?SmartWindowAction}
+ */
+function toToolbarAction(action, index) {
+  if (action.kind == "chat" && action.label) {
+    return {
       id: `chat-${index}`,
       kind: ACTION_KIND.CHAT,
-      label: item.text,
+      label: action.label,
       iconSrc: ASK_ICON_SRC,
-      prompt: item.text,
-    }));
+      prompt: action.label,
+    };
+  }
+  if (action.kind == "search" && action.label) {
+    const query = action.label;
+    return {
+      id: `search-${index}`,
+      kind: ACTION_KIND.COMMAND,
+      label: query,
+      iconSrc: SEARCH_ICON_SRC,
+      run: target => lazy.openSearchQuery(target, query),
+    };
+  }
+  if (action.kind == "page" && action.label && action.focus) {
+    const idea = { label: action.label, focus: action.focus };
+    return {
+      id: `page-${index}`,
+      kind: ACTION_KIND.COMMAND,
+      label: idea.label,
+      iconSrc: PAGE_ICON_SRC,
+      run: target => lazy.openSuggestedPage(target, idea),
+    };
+  }
+  if (action.kind == "watch") {
+    const suggestion = watchById(action.id);
+    if (!suggestion) {
+      return null;
+    }
+    return {
+      id: suggestion.id,
+      kind: ACTION_KIND.COMMAND,
+      l10nId: suggestion.l10nId,
+      iconSrc: WATCH_ICON_SRC,
+      run: async (target, button) => {
+        lazy.MonitorPanel.showMonitorPanel(target, {
+          create: true,
+          anchor: button,
+          condition: await watchCondition(target, suggestion.l10nId),
+        });
+      },
+    };
+  }
+  return null;
 }
 
 /**
@@ -402,21 +388,14 @@ function fullpageAiWindow(win) {
 
 export const SmartWindowActionsToolbar = {
   /**
-   * Sources for the row, in order. Chat providers return conversation
-   * starters. Command providers return actions that run without a chat.
-   * Search queries are listed before conversation starters.
+   * Sources for the row. The ranked provider returns one mixed list.
    *
    * @type {Array<(
    *   win: ChromeWindow,
    *   signal: AbortSignal
    * ) => Promise<SmartWindowAction[]>>}
    */
-  actionProviders: [
-    monitorSuggestionActions,
-    pageSuggestionActions,
-    searchSuggestionActions,
-    conversationSuggestionActions,
-  ],
+  actionProviders: [rankedSuggestionActions],
 
   /**
    * @param {ChromeWindow} win
@@ -664,10 +643,10 @@ export const SmartWindowActionsToolbar = {
 
     state.pendingKey = null;
     if (pageStillLoading) {
-      // Chat starters can show now. Page and search buttons wait until the
-      // body is readable, and this result must not stick for the URL.
+      // The page body is not readable yet. Keep the loading button, and
+      // do not cache an empty row for this URL.
       state.renderedKey = key;
-      this._render(win, actions);
+      this._render(win, actions, { loading: !actions.length });
       if (state.pageRetryKey != key) {
         state.pageRetryKey = key;
         state.refreshTimer = win.setTimeout(
