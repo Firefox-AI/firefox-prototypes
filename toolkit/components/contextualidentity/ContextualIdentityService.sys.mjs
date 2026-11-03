@@ -433,6 +433,37 @@ _ContextualIdentityService.prototype = {
     return Cu.cloneInto(identity, {});
   },
 
+  createForAI(agentId) {
+    this.ensureDataReady();
+    const userContextId = ++this._lastUserContextId;
+    if (userContextId >= MAX_USER_CONTEXT_ID) {
+      throw new Error("Unable to allocate an AI user context");
+    }
+    const identity = {
+      userContextId,
+      public: false,
+      name: `userContextIdInternal.ai.${agentId}`,
+      aiAgent: true,
+    };
+    this._identities.push(identity);
+    this.saveSoon();
+    return Cu.cloneInto(identity, {});
+  },
+
+  removeAIIdentity(userContextId) {
+    this.ensureDataReady();
+    const index = this._identities.findIndex(
+      identity => identity.userContextId === userContextId && identity.aiAgent
+    );
+    if (index === -1) {
+      return false;
+    }
+    Services.clearData.deleteDataFromOriginAttributesPattern({ userContextId });
+    this._identities.splice(index, 1);
+    this.saveSoon();
+    return true;
+  },
+
   createForPolicy(policyId) {
     this.ensureDataReady();
 

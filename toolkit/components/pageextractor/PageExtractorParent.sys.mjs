@@ -311,6 +311,7 @@ export class PageExtractorParent extends JSWindowActorParent {
    *   to pass into a follow-up `actor.getText(options, traceId)` call so it
    *   correlates with this request.
    * @param {boolean} [options.anonymousFetch]
+   * @param {{userContextId: number}} [options.originAttributes] - Cookie jar for the page load.
    * @param {number} [options.settleDelayMs] - Extra wait once the page is ready.
    * @param {AbortSignal} [options.signal] - Tears down the headless browser
    *   when it aborts before the page is ready.
@@ -322,6 +323,7 @@ export class PageExtractorParent extends JSWindowActorParent {
     anonymousFetch,
     settleDelayMs,
     signal,
+    originAttributes,
   }) {
     const url = URL.parse(urlString);
     if (!url) {
@@ -553,7 +555,9 @@ export class PageExtractorParent extends JSWindowActorParent {
             /** @type {LoadURIOptions} */
             const loadURIOptions = {
               triggeringPrincipal:
-                Services.scriptSecurityManager.createNullPrincipal({}),
+                Services.scriptSecurityManager.createNullPrincipal(
+                  originAttributes ?? {}
+                ),
             };
             if (anonymousFetch) {
               // Suppress the Referer header so the origin can't learn where the
@@ -636,6 +640,7 @@ export class PageExtractorParent extends JSWindowActorParent {
             // actor can communicate with it. The actor is registered to use this custom
             // message manager group.
             messageManagerGroup: "headless-browsers",
+            originAttributes,
           }
         );
       }

@@ -318,7 +318,164 @@ export class AIActionResult extends MozLitElement {
             </span>`
           )}
         </button>
+        ${this.rows.some(row => row.subAgent?.originAttributes)
+          ? html`
+              <div class="sub-agent-sessions">
+                ${this.rows.map(row => this.#renderSessionBadge(row.subAgent))}
+              </div>
+            `
+          : nothing}
         ${this.#renderDetails()}
+      </div>
+    `;
+  }
+
+  #renderSessionBadge(agent) {
+    if (!agent?.originAttributes) {
+      return nothing;
+    }
+    const id = agent.originAttributes.userContextId;
+    return html`
+      <span class="sub-agent-session-badge" data-context-id=${id}>
+        <span class="sub-agent-session-marker" aria-hidden="true"></span>
+        <span>${agent.name}</span>
+        <span
+          data-l10n-id="action-log-sub-agent-isolated-browser"
+          data-l10n-args=${JSON.stringify({ id })}
+        ></span>
+      </span>
+    `;
+  }
+
+  #renderOrigins(agent) {
+    if (!agent.originAttributes) {
+      return nothing;
+    }
+    return html`
+      <div class="sub-agent-origin-comparison">
+        <div class="sub-agent-origin-main">
+          <span data-l10n-id="action-log-sub-agent-main-origin"></span>
+          <pre>
+${JSON.stringify(
+              agent.parentOriginAttributes ?? { userContextId: 0 },
+              null,
+              2
+            )}</pre
+          >
+        </div>
+        <div class="sub-agent-origin-isolated">
+          <span data-l10n-id="action-log-sub-agent-ai-origin"></span>
+          <pre>${JSON.stringify(agent.originAttributes, null, 2)}</pre>
+        </div>
+      </div>
+      <p
+        class="sub-agent-isolation-description"
+        data-l10n-id="action-log-sub-agent-isolation-description"
+      ></p>
+    `;
+  }
+
+  #showSubAgentTab(agent) {
+    this.dispatchEvent(
+      new CustomEvent("AIChatContent:ShowSubAgentTab", {
+        bubbles: true,
+        composed: true,
+        detail: {
+          agentId: agent.agent_id,
+          userContextId: agent.originAttributes?.userContextId,
+        },
+      })
+    );
+  }
+
+  #renderSubAgent(agent) {
+    if (!agent) {
+      return nothing;
+    }
+    return html`
+      <div class="sub-agent-details">
+        <strong>${agent.name}</strong>
+        ${this.#renderOrigins(agent)}
+        ${agent.tabGroup
+          ? html`
+              <p
+                data-l10n-id="action-log-sub-agent-tab-group"
+                data-l10n-args=${JSON.stringify({ name: agent.tabGroup.label })}
+              ></p>
+            `
+          : nothing}
+        ${agent.browserTab
+          ? html`
+              <p data-l10n-id="action-log-sub-agent-background-tab"></p>
+              <moz-button
+                data-l10n-id="action-log-sub-agent-show-tab"
+                @click=${() => this.#showSubAgentTab(agent)}
+              ></moz-button>
+            `
+          : nothing}
+        <dl>
+          <dt data-l10n-id="action-log-sub-agent-system-prompt"></dt>
+          <dd><pre>${agent.system_prompt}</pre></dd>
+          <dt data-l10n-id="action-log-sub-agent-task"></dt>
+          <dd><pre>${agent.task}</pre></dd>
+          <dt data-l10n-id="action-log-sub-agent-tools"></dt>
+          <dd>
+            <pre>
+${Array.isArray(agent.tools) ? agent.tools.join(", ") : ""}</pre
+            >
+          </dd>
+        </dl>
+        <ol class="sub-agent-events">
+          ${(agent.execution ?? [])
+            .filter(event => event.type !== "message" || event.text)
+            .map(
+              event => html`
+                <li>
+                  ${event.type === "tool"
+                    ? html`
+                        <details>
+                          <summary>
+                            <code>${event.name}</code>
+                            <span
+                              data-l10n-id=${`action-log-sub-agent-status-${event.status}`}
+                            ></span>
+                          </summary>
+                          <dl>
+                            <dt
+                              data-l10n-id="action-log-sub-agent-arguments"
+                            ></dt>
+                            <dd><pre>${event.arguments}</pre></dd>
+                            <dt data-l10n-id="action-log-sub-agent-result"></dt>
+                            <dd>
+                              <pre>
+${event.result === undefined ? "" : JSON.stringify(event.result, null, 2)}</pre
+                              >
+                            </dd>
+                          </dl>
+                        </details>
+                      `
+                    : html`<pre>${event.text}</pre>`}
+                </li>
+              `
+            )}
+        </ol>
+        ${agent.error ? html`<pre>${agent.error}</pre>` : nothing}
+      </div>
+    `;
+  }
+
+  #renderToolCall(toolCall) {
+    if (!toolCall) {
+      return nothing;
+    }
+    return html`
+      <div class="sub-agent-details">
+        <dl>
+          <dt data-l10n-id="action-log-sub-agent-arguments"></dt>
+          <dd><pre>${toolCall.arguments ?? ""}</pre></dd>
+          <dt data-l10n-id="action-log-sub-agent-result"></dt>
+          <dd><pre>${JSON.stringify(toolCall.result, null, 2)}</pre></dd>
+        </dl>
       </div>
     `;
   }
@@ -350,6 +507,8 @@ export class AIActionResult extends MozLitElement {
                         </span>`
                       )}
                     </div>
+                    ${this.#renderSubAgent(row.subAgent)}
+                    ${this.#renderToolCall(row.toolCall)}
                     ${row.items?.length
                       ? html`
                           <website-chip-container

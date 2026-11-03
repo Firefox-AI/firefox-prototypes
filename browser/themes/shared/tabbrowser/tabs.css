@@ -1191,6 +1191,45 @@ tab-split-view-wrapper[dragtarget] {
   }
 }
 
+.tabbrowser-tab[ai-sub-agent-id] {
+  --ai-agent-tab-color: light-dark(var(--tab-group-color, var(--color-purple-60)), var(--tab-group-color-pale, var(--color-purple-30)));
+  --ai-agent-tab-glow: color-mix(in srgb, var(--ai-agent-tab-color) 15%, transparent);
+  --ai-agent-tab-glow-size: var(--space-small);
+  --ai-agent-tab-border-width: var(--border-width);
+
+  &[ai-sub-agent-running] {
+    --ai-agent-tab-glow: color-mix(in srgb, var(--ai-agent-tab-color) 35%, transparent);
+    --ai-agent-tab-glow-size: var(--space-medium);
+    --ai-agent-tab-border-width: calc(2 * var(--border-width));
+  }
+
+  > .tab-stack > .tab-background {
+    box-shadow:
+      inset 0 0 0 var(--ai-agent-tab-border-width) var(--ai-agent-tab-color),
+      inset 0 0 var(--ai-agent-tab-glow-size) var(--ai-agent-tab-glow),
+      0 0 var(--space-small) var(--ai-agent-tab-glow);
+  }
+}
+
+tab-group[ai-sub-agent-group] {
+  --ai-agent-group-color: light-dark(var(--tab-group-color), var(--tab-group-color-pale));
+  --ai-agent-group-glow: color-mix(in srgb, var(--ai-agent-group-color) 25%, transparent);
+
+  &:has(.tabbrowser-tab[ai-sub-agent-running]) {
+    --ai-agent-group-glow: color-mix(in srgb, var(--ai-agent-group-color) 55%, transparent);
+  }
+
+  .tab-group-label:not([dragover-groupTarget]) {
+    max-width: 18em;
+    box-shadow: 0 0 var(--space-small) var(--ai-agent-group-glow);
+
+    &:not(.tablist-keyboard-focus) {
+      outline: var(--border-width) dashed currentColor;
+      outline-offset: calc(-3 * var(--border-width));
+    }
+  }
+}
+
 /* Keyboard focus outline */
 
 #TabsToolbar #firefox-view-button:focus-visible > .toolbarbutton-icon,

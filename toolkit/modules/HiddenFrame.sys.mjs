@@ -159,8 +159,9 @@ export const HiddenBrowserManager = new (class HiddenBrowserManager {
    * Creates and returns a new hidden browser.
    *
    * @param {string} [messageManagerGroup]
+   * @param {{userContextId: number}} [originAttributes]
    */
-  async #acquireBrowser(messageManagerGroup) {
+  async #acquireBrowser(messageManagerGroup, originAttributes) {
     this.#browsers++;
     if (!this.#frame) {
       this.#frame = new HiddenFrame();
@@ -177,6 +178,9 @@ export const HiddenBrowserManager = new (class HiddenBrowserManager {
     browser.style.minHeight = `${BACKGROUND_HEIGHT}px`;
     browser.setAttribute("maychangeremoteness", "true");
     browser.setAttribute("nodefaultsrc", "true");
+    if (originAttributes) {
+      browser.setAttribute("usercontextid", originAttributes.userContextId);
+    }
     if (messageManagerGroup) {
       browser.setAttribute("messagemanagergroup", messageManagerGroup);
     }
@@ -211,10 +215,17 @@ export const HiddenBrowserManager = new (class HiddenBrowserManager {
    *   be asynchronous.
    * @param {object} [options]
    * @param {string} [options.messageManagerGroup] Specify a custom message manager group for this browser.
+   * @param {{userContextId: number}} [options.originAttributes] Cookie jar for the browser.
    * @returns {Promise<T>}
    */
-  async withHiddenBrowser(callback, { messageManagerGroup = undefined } = {}) {
-    let browser = await this.#acquireBrowser(messageManagerGroup);
+  async withHiddenBrowser(
+    callback,
+    { messageManagerGroup = undefined, originAttributes = undefined } = {}
+  ) {
+    let browser = await this.#acquireBrowser(
+      messageManagerGroup,
+      originAttributes
+    );
     try {
       return await callback(browser);
     } finally {

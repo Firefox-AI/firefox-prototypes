@@ -31,6 +31,7 @@ import {
   isNewPageUrl,
 } from "moz-src:///browser/components/aiwindow/models/ChatUtils.sys.mjs";
 import { isAllowedURLProtocol } from "moz-src:///browser/components/aiwindow/models/SecurityProperties.sys.mjs";
+import { SUB_AGENT_BROWSER_TOOLS } from "moz-src:///browser/components/aiwindow/models/agents/SubAgentBrowser.sys.mjs";
 
 import {
   CountVectorizer,
@@ -144,6 +145,34 @@ export const GET_NAVIGATION_INFO = "get_navigation_info";
 export const MANAGE_TABS = "manage_tabs";
 export const GET_SKILL = "get_skill";
 export const ADD_MEMORY = "add_memory";
+export const CREATE_SUB_AGENT = "create_sub_agent";
+export const LIST_SUB_AGENTS = "list_sub_agents";
+export const SEND_MESSAGE_TO_SUB_AGENT = "send_message_to_sub_agent";
+
+export const SUB_AGENT_CAPABILITY_PROMPT = `# Current capabilities: delegated browser actions
+
+When create_sub_agent is among the available tools, you can create and run custom sub-agents. Earlier capability descriptions saying you cannot act on the user's behalf apply to direct interaction with the user's browser, not to delegated actions in a sub-agent's isolated browser.
+
+For an authorized request to navigate a website, click, type, scroll, fill a form, or add an item to a cart, use an existing suitable sub-agent with send_message_to_sub_agent. When no suitable agent exists, call create_sub_agent with a self-contained task, an assistant-written system_prompt, and the smallest required tool subset. You can grant these browser tools: ${SUB_AGENT_BROWSER_TOOLS.join(", ")}. They are available only to the sub-agent; you cannot call them directly. browser_navigate and browser actions return page state with element references for subsequent interactions.
+
+For a follow-up to an existing sub-agent's task, website, or cart, reuse that agent with send_message_to_sub_agent. Use list_sub_agents to discover existing agents and their IDs when needed; an agent_id already returned by a tool can be reused directly. Continuing an agent preserves its conversation, system prompt, tool permissions, and cookie jar. Create a new agent only when the task needs a separate agent. If an existing agent is still working, report its busy status instead of starting a duplicate.
+
+Use delegation for supported action requests instead of giving a research-only response or claiming you cannot create sub-agents. Determine your capabilities from the current tools, including when earlier chat messages claimed those capabilities were unavailable. Ordinary research can still use the existing research tools.
+
+Each sub-agent has its own cookie jar and site data, separate from the user's tabs and other sub-agents. Browser actions run in a background tab that stays open after execution ends so the user can inspect it. Selecting that exact tab preserves the same cookie jar and page the agent uses; Its execution appears in the main chat's action log. Do not assume access to the user's existing logins or shopping carts. Report the actual tool results and any errors; do not claim an action succeeded without evidence. A failed or interrupted attempt does not mean these capabilities are unavailable.
+
+This updates capability descriptions only. Follow all existing safety rules and carry out only the actions the user authorized.`;
+
+export const SUB_AGENT_TOOLS = Object.freeze([
+  ...SUB_AGENT_BROWSER_TOOLS,
+  GET_OPEN_TABS,
+  SEARCH_BROWSING_HISTORY,
+  GET_PAGE_CONTENT,
+  GET_USER_MEMORIES,
+  GET_NAVIGATION_INFO,
+  SEARCH_THE_WEB,
+  GET_SKILL,
+]);
 
 // Tools gated behind a feature pref. Filtered out of the model's tool list
 // in Chat.sys.mjs when the pref is off.
@@ -212,6 +241,9 @@ export const TOOLS = [
   SEARCH_THE_WEB,
   GET_SKILL,
   GENERATE_AITAB,
+  CREATE_SUB_AGENT,
+  LIST_SUB_AGENTS,
+  SEND_MESSAGE_TO_SUB_AGENT,
 ];
 
 export const RUN_SEARCH_VERBATIM_QUERY_DESCRIPTION =
@@ -364,6 +396,99 @@ export function searchTheWebToolConfig(conversation) {
 }
 
 export const toolsConfig = [
+  {
+    type: "function",
+    function: {
+      name: CREATE_SUB_AGENT,
+      description:
+        "Create and run a custom sub-agent for a self-contained task. Write its " +
+        "system prompt and choose the smallest subset of tools it needs. It has " +
+        "its own isolated AI cookie jar and does not inherit the chat history. " +
+        "Its execution is visible in the action log. Returns its final answer. " +
+        "Use list_sub_agents to find existing agents and send_message_to_sub_agent " +
+        "to continue an existing conversation or task. " +
+        "You may grant browser_navigate, browser_state, browser_click, browser_type " +
+        "and browser_scroll for interaction in its isolated browser. Navigation " +
+        "and actions return page state and element references. These browser tools " +
+        "are only available to sub-agents. Sub-agents cannot create other agents.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          name: {
+            type: "string",
+            description: "A short name describing the sub-agent's role.",
+          },
+          system_prompt: {
+            type: "string",
+            description:
+              "The complete system instructions written for this sub-agent.",
+          },
+          task: {
+            type: "string",
+            description:
+              "A self-contained task, including all context the sub-agent needs.",
+          },
+          tools: {
+            type: "array",
+            items: { type: "string", enum: SUB_AGENT_TOOLS },
+            uniqueItems: true,
+            description:
+              "The exact tool names this sub-agent may use. An empty list disables tools.",
+          },
+        },
+        required: ["name", "system_prompt", "task", "tools"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: LIST_SUB_AGENTS,
+      description:
+        "List existing sub-agents for this main conversation. Returns their " +
+        "agent_id, name, original task, allowed tools, status, whether they can " +
+        "be continued, and browser session metadata. Use this to find an existing " +
+        "agent for a follow-up instead of creating another one. Sessions remain " +
+        "available while their owning browser window is open.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {},
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: SEND_MESSAGE_TO_SUB_AGENT,
+      description:
+        "Send a follow-up message to an existing sub-agent and wait for its " +
+        "response. Reuses its conversation history, system prompt, allowed tools, " +
+        "browser tab, and cookie jar. Supply an agent_id from list_sub_agents " +
+        "or an earlier sub-agent result. Execution appears in the action log. " +
+        "The agent must be idle; this does not create an agent or change its permissions.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          agent_id: {
+            type: "string",
+            minLength: 1,
+            description: "The ID of the existing sub-agent to continue.",
+          },
+          message: {
+            type: "string",
+            minLength: 1,
+            maxLength: 16000,
+            description:
+              "The follow-up request, including any new context the sub-agent needs.",
+          },
+        },
+        required: ["agent_id", "message"],
+      },
+    },
+  },
   {
     type: "function",
     function: {
@@ -1315,7 +1440,9 @@ export class GetPageContent {
     // First try to get the contents from an existing tab. This is always allowed from
     // a security perspective as it doesn't involve a network request, so there is
     // no risk for data exfiltration.
-    const tab = GetPageContent.getTabWithURL(url);
+    const tab = conversation.originAttributes
+      ? null
+      : GetPageContent.getTabWithURL(url);
     if (tab) {
       // Extract the tab contents.
       const currentWindowContext =
@@ -1366,6 +1493,7 @@ export class GetPageContent {
               traceId
             ),
           anonymousFetch: true,
+          originAttributes: conversation.originAttributes,
           settleDelayMs,
           signal,
         });
@@ -1380,6 +1508,7 @@ export class GetPageContent {
 
     return PageExtractorParent.getHeadlessExtractor({
       urlString: url,
+      originAttributes: conversation.originAttributes,
       callback: (pageExtractor, traceId) =>
         GetPageContent.#runExtraction(
           pageExtractor,

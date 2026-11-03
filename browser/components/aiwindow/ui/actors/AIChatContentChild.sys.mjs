@@ -49,6 +49,7 @@ export class AIChatContentChild extends JSWindowActorChild {
     "AIChatContent:DispatchAction",
     "AIChatContent:OpenLink",
     "AIChatContent:OpenTabGroup",
+    "AIChatContent:ShowSubAgentTab",
     "AIChatContent:DispatchNewChat",
     "AIChatContent:AccountSignIn",
     "AIChatContent:ToolUIUpdate",

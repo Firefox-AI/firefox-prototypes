@@ -73,7 +73,7 @@ function setupHeadlessExtractionTest(body) {
     Services.obs.removeObserver(channelObserver, "http-on-modify-request")
   );
 
-  function addCookie(name, value) {
+  function addCookie(name, value, originAttributes = {}) {
     const expiry = Date.now() + 60 * 60 * 1000;
     Services.cookies.add(
       uri.host,
@@ -84,11 +84,13 @@ function setupHeadlessExtractionTest(body) {
       false /* httpOnly */,
       true /* session */,
       expiry,
-      {},
+      originAttributes,
       Ci.nsICookie.SAMESITE_UNSET,
       Ci.nsICookie.SCHEME_HTTP
     );
-    cleanupTasks.push(() => Services.cookies.remove(uri.host, name, "/", {}));
+    cleanupTasks.push(() =>
+      Services.cookies.remove(uri.host, name, "/", originAttributes)
+    );
   }
 
   async function cleanup() {
@@ -171,6 +173,56 @@ add_task(async function test_anonymous_fetch_channel_config() {
     assertAnonymousFetch(requests, channelInfo);
   } finally {
     await cleanup();
+  }
+});
+
+add_task(async function test_ai_origin_cookie_isolation() {
+  const { ContextualIdentityService } = ChromeUtils.importESModule(
+    "moz-src:///toolkit/components/contextualidentity/ContextualIdentityService.sys.mjs"
+  );
+  const first = ContextualIdentityService.createForAI(crypto.randomUUID());
+  const second = ContextualIdentityService.createForAI(crypto.randomUUID());
+  const { url, requests, addCookie, cleanup } =
+    setupHeadlessExtractionTest(SIMPLE_PAGE);
+  const firstOrigin = { userContextId: first.userContextId };
+  const secondOrigin = { userContextId: second.userContextId };
+  try {
+    addCookie("user_session", "private");
+    addCookie("agent_session", "first", firstOrigin);
+    addCookie("agent_session", "second", secondOrigin);
+    for (const [originAttributes, expected] of [
+      [firstOrigin, "first"],
+      [secondOrigin, "second"],
+      [firstOrigin, "first"],
+    ]) {
+      await PageExtractorParent.getHeadlessExtractor({
+        urlString: url,
+        originAttributes,
+        callback: async extractor => {
+          is(
+            extractor.browsingContext.originAttributes.userContextId,
+            originAttributes.userContextId
+          );
+          return extractor.getText();
+        },
+      });
+      const cookie = requests.at(-1).Cookie;
+      ok(
+        cookie?.includes(`agent_session=${expected}`),
+        "The agent keeps its own session between page reads"
+      );
+      ok(!cookie?.includes("user_session"), "The user's cookies are isolated");
+      ok(
+        !cookie?.includes(
+          `agent_session=${expected === "first" ? "second" : "first"}`
+        ),
+        "Other agents' cookies are isolated"
+      );
+    }
+  } finally {
+    await cleanup();
+    ContextualIdentityService.removeAIIdentity(first.userContextId);
+    ContextualIdentityService.removeAIIdentity(second.userContextId);
   }
 });
 

@@ -512,3 +512,68 @@ add_task(async function test_expand_while_loading() {
     });
   });
 });
+
+add_task(async function test_sub_agent_execution_details() {
+  await withTestPage(async browser => {
+    const subAgent = {
+      name: "Research helper",
+      originAttributes: { userContextId: 77 },
+      parentOriginAttributes: { userContextId: 9 },
+      system_prompt: "Read pages and report sources.",
+      task: "Find an answer.",
+      tools: ["get_page_content"],
+      execution: [
+        { type: "message", text: "Reading the source.", status: "completed" },
+        {
+          type: "tool",
+          name: "get_page_content",
+          arguments: '{"url_list":["https://example.com/"]}',
+          result: ["<img src=x onerror=alert(1)>"],
+          status: "completed",
+        },
+      ],
+    };
+    await setProps(browser, {
+      label: "Custom sub-agent completed",
+      isExpanded: false,
+      rows: [{ label: "Custom sub-agent completed", subAgent }],
+    });
+    await SpecialPowers.spawn(browser, [subAgent], async expected => {
+      const el = content.document.getElementById("test-action-result");
+      const shadow = el.shadowRoot;
+      const badge = shadow.querySelector(".sub-agent-session-badge");
+      Assert.equal(
+        badge.dataset.contextId,
+        "77",
+        "The isolated identity is visible when the log is collapsed"
+      );
+      Assert.ok(!shadow.querySelector(".sub-agent-details"));
+      shadow.querySelector(".action-result-header").click();
+      await el.updateComplete;
+      const detail = shadow.querySelector(".sub-agent-details");
+      Assert.ok(
+        detail
+          .querySelector(".sub-agent-origin-main")
+          .textContent.includes('"userContextId": 9')
+      );
+      Assert.ok(
+        detail
+          .querySelector(".sub-agent-origin-isolated")
+          .textContent.includes('"userContextId": 77')
+      );
+      Assert.ok(detail.textContent.includes(expected.name));
+      Assert.ok(detail.textContent.includes(expected.system_prompt));
+      Assert.ok(detail.textContent.includes(expected.task));
+      Assert.equal(detail.querySelectorAll("li").length, 2);
+      const call = detail.querySelector("details");
+      call.querySelector("summary").click();
+      Assert.ok(
+        call.open,
+        "Tool calls can be expanded using a native disclosure"
+      );
+      Assert.ok(call.textContent.includes(expected.execution[1].arguments));
+      Assert.ok(call.textContent.includes(expected.execution[1].result[0]));
+      Assert.ok(!detail.querySelector("img"), "Tool output renders as text");
+    });
+  });
+});

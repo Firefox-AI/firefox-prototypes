@@ -213,6 +213,81 @@
   margin: 0;
 }
 
+.sub-agent-details {
+  padding-inline-start: calc(1px + var(--icon-size) + var(--space-small));
+
+  dd {
+    margin-inline-start: var(--space-small);
+  }
+
+  pre {
+    font: inherit;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-block-size: 30em;
+    overflow: auto;
+  }
+}
+
+.sub-agent-events {
+  padding-inline-start: var(--space-large);
+}
+
+.sub-agent-sessions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-small);
+}
+
+.sub-agent-session-badge {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-small);
+  padding: var(--space-xsmall) var(--space-small);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-small);
+  font-size: var(--font-size-small);
+}
+
+.sub-agent-session-marker {
+  inline-size: var(--icon-size-small);
+  block-size: var(--icon-size-small);
+  border: 2px double currentColor;
+  border-radius: var(--border-radius-small);
+  background: var(--background-color-box-info);
+}
+
+.sub-agent-origin-comparison {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12em, 1fr));
+  gap: var(--space-small);
+  margin-block-start: var(--space-small);
+
+  > div {
+    padding: var(--space-small);
+    border-radius: var(--border-radius-small);
+  }
+
+  pre {
+    margin-block-end: 0;
+    font-family: monospace;
+  }
+}
+
+.sub-agent-origin-main {
+  border: 1px dashed var(--border-color);
+}
+
+.sub-agent-origin-isolated {
+  border: 1px solid var(--border-color);
+  background: var(--background-color-box-info);
+}
+
+.sub-agent-isolation-description {
+  font-size: var(--font-size-small);
+}
+
 /* TODO: Extract shared button into its own component */
 .action-result-undo {
   align-self: flex-start;

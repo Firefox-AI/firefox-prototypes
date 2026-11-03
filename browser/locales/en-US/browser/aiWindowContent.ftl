@@ -213,6 +213,47 @@ action-log-reading-page = Reading page
 # Read is past tense, to indicate that the action has been completed.
 action-log-read-page = Read page content
 action-log-searching-web = Searching the web
+
+# Variables:
+#   $name (String) - The name of the sub-agent.
+#   $id (Number) - The sub-agent's isolated browser session ID.
+sub-agent-tab-group-label = AI { $id } · { $name }
+sub-agent-tab-default-name = Agent
+sub-agent-tab-group-description = These tabs belong to an AI agent and use its separate browser session.
+sub-agent-conversation-picker-label = Chat with
+sub-agent-conversation-main-assistant = Main assistant
+sub-agent-tab-working = An AI agent is working in this tab.
+sub-agent-tab-idle = AI agent tab. The agent has finished working in this tab.
+# Variables:
+#   $error (String) - The reason the sub-agent stopped.
+sub-agent-run-error = Sub-agent stopped: { $error }
+action-log-sub-agent-running = Running a custom sub-agent
+action-log-listed-sub-agents = Listed available sub-agents
+action-log-sub-agent-message-running = Continuing a sub-agent
+action-log-sub-agent-message-completed = Sub-agent replied
+action-log-sub-agent-completed = Custom sub-agent completed
+action-log-sub-agent-failed = Custom sub-agent failed
+action-log-sub-agent-cancelled = Custom sub-agent cancelled
+action-log-sub-agent-system-prompt = System prompt
+action-log-sub-agent-task = Task
+action-log-sub-agent-tools = Allowed tools
+# Variables:
+#   $id (Number) - The isolated sub-agent browser's userContextId.
+action-log-sub-agent-isolated-browser = Isolated AI browser · Container { $id }
+action-log-sub-agent-main-origin = Main assistant origin attributes
+action-log-sub-agent-ai-origin = Sub-agent origin attributes
+action-log-sub-agent-isolation-description = This sub-agent uses its own cookie jar and site data, separate from the main assistant and other sub-agents.
+action-log-sub-agent-background-tab = Browser actions run in a background tab that stays open after execution ends.
+# Variables:
+#   $name (String) - The label of the sub-agent's tab group.
+action-log-sub-agent-tab-group = Tab group: { $name }
+action-log-sub-agent-show-tab = Show browser tab
+action-log-sub-agent-arguments = Arguments
+action-log-sub-agent-result = Result
+action-log-sub-agent-status-running = Running
+action-log-sub-agent-status-completed = Completed
+action-log-sub-agent-status-failed = Failed
+action-log-sub-agent-status-cancelled = Cancelled
 action-log-searched-web = Searched the web
 # Exa is the name of a third-party web search API and a brand name that
 # should not be translated. The <a> wraps "Exa" as a link to a support

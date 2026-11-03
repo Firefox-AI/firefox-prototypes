@@ -110,6 +110,10 @@ export class AIChatContentParent extends JSWindowActorParent {
         this.#handleOpenTabGroup(data);
         break;
 
+      case "AIChatContent:ShowSubAgentTab":
+        this.#handleShowSubAgentTab(data);
+        break;
+
       case "AIChatContent:AccountSignIn":
         this.#handleAccountSignIn();
         break;
@@ -261,6 +265,28 @@ export class AIChatContentParent extends JSWindowActorParent {
       return;
     }
     tabGroup.select();
+  }
+
+  #handleShowSubAgentTab({ agentId, userContextId } = {}) {
+    if (typeof agentId !== "string" || !agentId || !Number.isInteger(userContextId) || userContextId <= 0) {
+      return;
+    }
+    const window = this.browsingContext.topChromeWindow;
+    const tab = window?.gBrowser?.tabs.find(
+      candidate =>
+        !candidate.closing &&
+        candidate.getAttribute("ai-sub-agent-id") === agentId &&
+        candidate.linkedBrowser.browsingContext.originAttributes.userContextId === userContextId
+    );
+    if (!tab) {
+      console.warn("The sub-agent browser tab is no longer available");
+      return;
+    }
+    if (tab.group) {
+      tab.group.collapsed = false;
+    }
+    window.gBrowser.selectedTab = tab;
+    window.focus();
   }
 
   async #handleAccountSignIn() {

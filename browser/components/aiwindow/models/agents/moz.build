@@ -6,8 +6,10 @@ with Files("**"):
     BUG_COMPONENT = ("Core", "Machine Learning: General")
 
 MOZ_SRC_FILES += [
+    "CustomSubAgent.sys.mjs",
     "Monitor.sys.mjs",
     "MonitorAgent.sys.mjs",
     "MonitorStore.sys.mjs",
     "Schedule.sys.mjs",
+    "SubAgentBrowser.sys.mjs",
 ]

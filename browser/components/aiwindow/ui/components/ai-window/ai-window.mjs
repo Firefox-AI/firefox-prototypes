@@ -27,6 +27,10 @@ ChromeUtils.defineESModuleGetters(lazy, {
   AuthProvider:
     "moz-src:///browser/components/aiwindow/models/AuthProvider.sys.mjs",
   Chat: "moz-src:///browser/components/aiwindow/models/Chat.sys.mjs",
+  getCustomSubAgents:
+    "moz-src:///browser/components/aiwindow/models/agents/CustomSubAgent.sys.mjs",
+  continueCustomSubAgent:
+    "moz-src:///browser/components/aiwindow/models/agents/CustomSubAgent.sys.mjs",
   GET_PAGE_CONTENT:
     "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs",
   MAX_TAB_GROUP_MEMBERS:
@@ -294,6 +298,9 @@ export class AIWindow extends MozLitElement {
   #smartbar;
   #smartbarToggleButton;
   #conversation = null;
+  #selectedSubAgentId = null;
+  #listeningSubAgent = null;
+  #mainIsGenerating = false;
   #memoriesButton = null;
   #memoriesToggled = null;
   #visibilityChangeHandler;
@@ -605,6 +612,11 @@ export class AIWindow extends MozLitElement {
       "chat-conversation:seen-urls-updated",
       this.#onSeenUrlsUpdated
     );
+    this.#conversation.on(
+      "chat-conversation:sub-agents-updated",
+      this.#onSubAgentsUpdated
+    );
+    this.#onSubAgentsUpdated();
     lazy.AgentUI.observeMonitorChanges(this.#conversation);
   }
 
@@ -625,6 +637,11 @@ export class AIWindow extends MozLitElement {
       "chat-conversation:seen-urls-updated",
       this.#onSeenUrlsUpdated
     );
+    this.#conversation.off(
+      "chat-conversation:sub-agents-updated",
+      this.#onSubAgentsUpdated
+    );
+    this.#detachSubAgentListeners();
     lazy.AgentUI.unobserveMonitorChanges(this.#conversation);
   }
 
@@ -636,6 +653,9 @@ export class AIWindow extends MozLitElement {
   };
 
   #onMessageUpdate = (_event, message) => {
+    if (this.#selectedSubAgentId) {
+      return;
+    }
     // In fullpage, Kit must anchor to the chrome viewport (bottom of the
     // page, alongside the footer) — `position: fixed` inside the embedded
     // chat-content document would anchor to that browser's viewport, not
@@ -658,6 +678,130 @@ export class AIWindow extends MozLitElement {
     }
     this.#dispatchMessageToChatContent(message);
   };
+
+  get #selectedSubAgent() {
+    return lazy.getCustomSubAgents(this.#conversation).find(
+      session => session.id === this.#selectedSubAgentId
+    );
+  }
+
+  get #displayConversation() {
+    return this.#selectedSubAgent?.conversation ?? this.#conversation;
+  }
+
+  #syncGeneratingState() {
+    const session = this.#selectedSubAgent;
+    this.isGenerating = session
+      ? session.state.status === "running" && !session.controller?.signal.aborted
+      : this.#mainIsGenerating;
+  }
+
+  #onSubAgentsUpdated = () => {
+    if (this.#selectedSubAgentId && !this.#selectedSubAgent) {
+      this.#selectConversation({ target: { value: "main" } });
+    }
+    this.#syncGeneratingState();
+    this.requestUpdate();
+  };
+
+  #detachSubAgentListeners() {
+    const conversation = this.#listeningSubAgent?.conversation;
+    conversation?.off("chat-conversation:message-update", this.#onSubAgentMessageUpdate);
+    conversation?.off("chat-conversation:message-complete", this.#onSubAgentMessageComplete);
+    conversation?.off("chat-conversation:seen-urls-updated", this.#onSeenUrlsUpdated);
+    this.#listeningSubAgent = null;
+  }
+
+  #onSubAgentMessageUpdate = (_event, message) => {
+    if (
+      message.convId === this.#displayConversation?.id &&
+      message.content?.type !== "function"
+    ) {
+      this.#dispatchMessageToChatContent(message);
+    }
+  };
+
+  #onSubAgentMessageComplete = (_event, message) => {
+    if (message.convId !== this.#displayConversation?.id) {
+      return;
+    }
+    this.#dispatchMessageToChatContent({
+      role: "assistant-message-complete",
+      content: { id: message.id },
+      historyResults: this.#displayConversation.getHistoryResultsSnapshot(),
+      citations: message.citations ?? [],
+    });
+  };
+
+  #selectConversation = event => {
+    this.#detachSubAgentListeners();
+    this.#selectedSubAgentId = event.target.value === "main" ? null : event.target.value;
+    const session = this.#selectedSubAgent;
+    if (session) {
+      this.#listeningSubAgent = session;
+      session.conversation.on("chat-conversation:message-update", this.#onSubAgentMessageUpdate);
+      session.conversation.on("chat-conversation:message-complete", this.#onSubAgentMessageComplete);
+      session.conversation.on("chat-conversation:seen-urls-updated", this.#onSeenUrlsUpdated);
+    } else {
+      this.#selectedSubAgentId = null;
+    }
+    this.#syncGeneratingState();
+    const actor = this.#getAIChatContentActor();
+    if (actor) {
+      this.#dispatchMessageToActor(actor, {
+        role: "clear-conversation",
+        content: { body: "" },
+      });
+      this.#pendingMessageDelivery = true;
+      this.#deliverConversationMessages(actor);
+      actor.setGeneratingOnChatContent(this.isGenerating);
+    }
+    this.requestUpdate();
+  };
+
+  async #continueSubAgent(text) {
+    const parent = this.#conversation;
+    const session = this.#selectedSubAgent;
+    if (!session || session.controller) {
+      return;
+    }
+    this.#initActiveChatlayout();
+    try {
+      await lazy.continueCustomSubAgent(parent, session.id, text);
+    } catch (error) {
+      session.conversation.addAssistantWithL10nMessage("sub-agent-run-error", {
+        error: String(error),
+      });
+    } finally {
+      if (this.#conversation === parent) {
+        this.#onSubAgentsUpdated();
+      }
+    }
+  }
+
+  #conversationPickerTemplate() {
+    const sessions = lazy.getCustomSubAgents(this.#conversation);
+    if (!sessions.length) {
+      return nothing;
+    }
+    return html`
+      <label class="conversation-picker">
+        <span data-l10n-id="sub-agent-conversation-picker-label"></span>
+        <select @change=${this.#selectConversation}>
+          <option
+            value="main"
+            .selected=${!this.#selectedSubAgentId}
+            data-l10n-id="sub-agent-conversation-main-assistant"
+          ></option>
+          ${sessions.map(session => html`
+            <option value=${session.id} .selected=${session.id === this.#selectedSubAgentId}>
+              ${session.name}
+            </option>
+          `)}
+        </select>
+      </label>
+    `;
+  }
 
   onMemoriesApplied() {
     Glean.smartWindow.memoryApplied.record({
@@ -1961,11 +2105,18 @@ export class AIWindow extends MozLitElement {
    * @private
    */
   #handleStopGeneration = () => {
+    const session = this.#selectedSubAgent;
+    if (session) {
+      session.controller?.abort();
+      this.#syncGeneratingState();
+      return;
+    }
     if (!this.#abortController) {
       return;
     }
     this.#abortController.abort();
-    this.isGenerating = false;
+    this.#mainIsGenerating = false;
+    this.#syncGeneratingState();
     const lastAssistant = this.#conversation?.messages
       ?.filter(
         m => m.role == lazy.MESSAGE_ROLE.ASSISTANT && m?.content?.type == "text"
@@ -2022,6 +2173,11 @@ export class AIWindow extends MozLitElement {
       "ai-window:smartbar-input",
       this.#getAIWindowEventOptions(lazy.EMPTY_SMARTBAR_INPUT_STATE, true)
     );
+
+    if (this.#selectedSubAgentId) {
+      this.submitChatMessage({ text: value, submitType });
+      return;
+    }
 
     if (action === ACTION.CHAT) {
       if (
@@ -2289,6 +2445,11 @@ export class AIWindow extends MozLitElement {
   }) {
     const trimmed = String(text ?? "").trim();
     if (!trimmed) {
+      return;
+    }
+
+    if (this.#selectedSubAgentId) {
+      this.#continueSubAgent(trimmed);
       return;
     }
 
@@ -2819,7 +2980,8 @@ export class AIWindow extends MozLitElement {
     const stopWatchingTabClose =
       this.#watchTabCloseForAbort(browsingContext, this.#abortController) ??
       (() => {});
-    this.isGenerating = true;
+    this.#mainIsGenerating = true;
+    this.#syncGeneratingState();
 
     const requestStart = ChromeUtils.now();
     let assistantMessage;
@@ -2932,7 +3094,8 @@ export class AIWindow extends MozLitElement {
     } finally {
       stopWatchingTabClose();
       if (this.#abortController?.signal === signal) {
-        this.isGenerating = false;
+        this.#mainIsGenerating = false;
+        this.#syncGeneratingState();
         this.#abortController = null;
       }
     }
@@ -2984,6 +3147,9 @@ export class AIWindow extends MozLitElement {
 
   #onMessageComplete = (_event, msg) => {
     this.#addConversationTitle(msg?.content?.body);
+    if (this.#selectedSubAgentId) {
+      return;
+    }
 
     // Check if we need to inject retry toolUIData
     // This handles the case where a user cancelled a website confirmation dialog
@@ -3161,6 +3327,9 @@ export class AIWindow extends MozLitElement {
 
   #handleError(error, { latency, duration }, { isRetry = false } = {}) {
     console.error(error);
+    if (this.#selectedSubAgentId) {
+      return;
+    }
     const newErrorMessage = {
       role: "",
       content: {
@@ -3185,12 +3354,13 @@ export class AIWindow extends MozLitElement {
    * @param {AIChatContentParent} actor
    */
   #dispatchSeenUrls(actor) {
-    if (!this.#conversation?.id) {
+    const conversation = this.#displayConversation;
+    if (!conversation?.id) {
       return;
     }
     actor.dispatchSeenUrlsToChatContent({
-      conversationId: this.#conversation.id,
-      seenUrls: this.#conversation.seenUrls,
+      conversationId: conversation.id,
+      seenUrls: conversation.seenUrls,
     });
   }
 
@@ -3278,6 +3448,9 @@ export class AIWindow extends MozLitElement {
   }
 
   #dispatchMessageToChatContent(message) {
+    if (message.convId && message.convId !== this.#displayConversation?.id) {
+      return null;
+    }
     const actor = this.#getAIChatContentActor();
     return actor ? this.#dispatchMessageToActor(actor, message) : null;
   }
@@ -3295,7 +3468,7 @@ export class AIWindow extends MozLitElement {
     }
     const actor = this.#getAIChatContentActor();
     if (actor) {
-      if (this.#conversation?.messages?.length) {
+      if (this.#displayConversation?.messages?.length) {
         this.#pendingMessageDelivery = true;
       }
       this.#deliverConversationMessages(actor);
@@ -3309,6 +3482,7 @@ export class AIWindow extends MozLitElement {
    * @param {JSActor} actor
    */
   #deliverConversationMessages(actor) {
+    const conversation = this.#displayConversation;
     this.#dispatchSeenUrls(actor);
 
     if (!this.#pendingMessageDelivery) {
@@ -3317,7 +3491,7 @@ export class AIWindow extends MozLitElement {
 
     this.#pendingMessageDelivery = false;
 
-    if (!this.#conversation || !this.#conversation.messages.length) {
+    if (!conversation || !conversation.messages.length) {
       return;
     }
 
@@ -3325,7 +3499,7 @@ export class AIWindow extends MozLitElement {
 
     // @todo Bug2013096
     // Add way to batch these messages to the actor in one message
-    this.#conversation.renderState().forEach(message => {
+    conversation.renderState().forEach(message => {
       this.#dispatchMessageToActor(actor, {
         ...message,
         isPreviousMessage: true,
@@ -3335,7 +3509,7 @@ export class AIWindow extends MozLitElement {
     // send a message to restore the scroll position after a conversation was restored
     this.#dispatchMessageToActor(actor, {
       role: "restored-all-messages-in-a-conversation",
-      convId: this.#conversation.id,
+      convId: conversation.id,
     });
   }
 
@@ -3396,6 +3570,7 @@ export class AIWindow extends MozLitElement {
    */
   #swapConversation(conversation) {
     this.#removeConversationListeners();
+    this.#selectedSubAgentId = null;
     this.#conversation = conversation;
     this.requestUpdate();
     this.#attachConversationListeners();
@@ -3680,6 +3855,15 @@ export class AIWindow extends MozLitElement {
 
   handleFooterAction(data) {
     const { action, messageId, memory } = data ?? {};
+    if (this.#selectedSubAgentId && action?.startsWith("retry")) {
+      const message = this.#displayConversation.messages.findLast(
+        item => item.role === lazy.MESSAGE_ROLE.USER
+      );
+      if (message) {
+        this.#continueSubAgent(message.content.body);
+      }
+      return;
+    }
 
     switch (action) {
       case "retry":
@@ -3758,7 +3942,7 @@ export class AIWindow extends MozLitElement {
   }
 
   #buildChatLogPayload() {
-    const messages = this.#conversation?.messages ?? [];
+    const messages = this.#displayConversation?.messages ?? [];
 
     // Build a version of the log without page content by dropping:
     // - tool result messages that are get_page_content responses (the raw page text)
@@ -3976,6 +4160,7 @@ export class AIWindow extends MozLitElement {
               iconsrc="chrome://browser/content/aiwindow/assets/new-chat.svg"
               @click=${this.onCreateNewChatClick}
             ></moz-button>
+            ${this.#conversationPickerTemplate()}
             ${this.#historyMenu("sidebar")}
             <moz-button
               data-l10n-id="aiwindow-close-sidebar"
@@ -3991,6 +4176,7 @@ export class AIWindow extends MozLitElement {
         ? html`
             <smartwindow-heading></smartwindow-heading>
             <div class="chat-header fullpage-header">
+              ${this.#conversationPickerTemplate()}
               ${this.#historyMenu("fullpage")}
             </div>
           `

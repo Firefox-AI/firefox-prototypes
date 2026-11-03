@@ -208,6 +208,31 @@ smartwindow-prompts {
   max-width: var(--smartwindow-content-max-width);
 }
 
+.conversation-picker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-small);
+  min-inline-size: 0;
+  margin-inline-end: auto;
+  font-size: var(--font-size-small);
+}
+
+.conversation-picker select {
+  min-inline-size: 0;
+  max-inline-size: 24ch;
+  flex: 1;
+  font: inherit;
+  color: var(--text-color);
+  background-color: var(--background-color-box);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius-small);
+  padding: var(--space-small);
+}
+
+.conversation-picker > span {
+  white-space: nowrap;
+}
+
 .chat-header {
   box-sizing: border-box;
   justify-content: flex-end;

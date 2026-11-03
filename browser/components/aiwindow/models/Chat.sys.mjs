@@ -25,8 +25,18 @@ import {
   SEARCH_THE_WEB,
   searchTheWebToolConfig,
   GET_SKILL,
+  CREATE_SUB_AGENT,
+  LIST_SUB_AGENTS,
+  SEND_MESSAGE_TO_SUB_AGENT,
+  SUB_AGENT_CAPABILITY_PROMPT,
 } from "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs";
 import { runSearchTheWeb } from "moz-src:///browser/components/aiwindow/models/search/SearchWorkflow.sys.mjs";
+import {
+  runCustomSubAgent,
+  getCustomSubAgents,
+  listCustomSubAgents,
+  continueCustomSubAgent,
+} from "moz-src:///browser/components/aiwindow/models/agents/CustomSubAgent.sys.mjs";
 
 import { expandUrlTokensInToolParams } from "moz-src:///browser/components/aiwindow/models/ChatUtils.sys.mjs";
 import { runLLMaJTelemetry } from "moz-src:///browser/components/aiwindow/models/TelemetryUtils.sys.mjs";
@@ -55,6 +65,9 @@ export async function executeToolByName(
 ) {
   let result;
   switch (toolName) {
+    case LIST_SUB_AGENTS:
+      result = listCustomSubAgents(conversation);
+      break;
     case GET_PAGE_CONTENT: {
       const startTime = new Date();
       result = await GetPageContent.getPageContentText(
@@ -141,7 +154,47 @@ export async function executeToolByName(
 const FEATURE_GATED_HANDLERS = new Map([
   [SEARCH_THE_WEB, runSearchTheWeb],
   [GENERATE_AITAB, runGenerateAiTab],
+  [CREATE_SUB_AGENT, runCreateSubAgent],
+  [SEND_MESSAGE_TO_SUB_AGENT, runSendMessageToSubAgent],
 ]);
+
+function runSendMessageToSubAgent(
+  params,
+  conversation,
+  signal,
+  _mode,
+  _id,
+  _browsingContext,
+  onProgress
+) {
+  return continueCustomSubAgent(
+    conversation,
+    params.agent_id,
+    params.message,
+    signal,
+    { onProgress }
+  );
+}
+
+function runCreateSubAgent(
+  params,
+  conversation,
+  signal,
+  mode,
+  _id,
+  browsingContext,
+  onProgress
+) {
+  return runCustomSubAgent(params, conversation, signal, mode, {
+    availableTools: filterFeatureGatedTools(toolsConfig, conversation),
+    executeTool: executeToolByName,
+    onProgress,
+    window: browsingContext?.topChromeWindow,
+    parentOriginAttributes: {
+      userContextId: browsingContext?.originAttributes?.userContextId ?? 0,
+    },
+  });
+}
 
 /**
  * @typedef {object} GenerateAiTabFailure
@@ -237,7 +290,12 @@ function reloadSelectedSmartPage(browsingContext, slug) {
  * resolves (not the same as feature-gating). Pending rows use a placeholder
  * body, so tools with body-dependent labels must provide a pendingLabel.
  */
-const TOOLS_WITH_PENDING_ACTION_LOG = new Set([SEARCH_THE_WEB, GENERATE_AITAB]);
+const TOOLS_WITH_PENDING_ACTION_LOG = new Set([
+  SEARCH_THE_WEB,
+  GENERATE_AITAB,
+  CREATE_SUB_AGENT,
+  SEND_MESSAGE_TO_SUB_AGENT,
+]);
 
 /**
  * Splits a tool result into the reply the tool is writing for the user, if any,
@@ -294,6 +352,27 @@ function filterFeatureGatedTools(tools, conversation) {
     filtered = filtered.filter(t => !AITAB_TOOLS.has(t.function?.name));
   }
   return filtered;
+}
+
+function withSubAgentCapabilities(messages, tools) {
+  if (!tools.some(tool => tool.function?.name === CREATE_SUB_AGENT)) {
+    return messages;
+  }
+  const systemIndex = messages.findIndex(message => message.role === "system");
+  if (systemIndex === -1) {
+    return [
+      { role: "system", content: SUB_AGENT_CAPABILITY_PROMPT },
+      ...messages,
+    ];
+  }
+  return messages.map((message, index) =>
+    index === systemIndex
+      ? {
+          ...message,
+          content: `${message.content}\n\n${SUB_AGENT_CAPABILITY_PROMPT}`,
+        }
+      : message
+  );
 }
 
 const lazy = {};
@@ -418,10 +497,31 @@ function logConversationStream(turn, action, data = null, extraText = "") {
  *
  * @returns {ToolUIArgs}
  */
-function getToolUIArgs(toolName, toolParams) {
+function getToolUIArgs(toolName, toolParams, conversation) {
   switch (toolName) {
     case GENERATE_AITAB:
       return { modify_slug: toolParams.modify_slug };
+    case CREATE_SUB_AGENT:
+      return {
+        name: toolParams.name,
+        system_prompt: toolParams.system_prompt,
+        task: toolParams.task,
+        tools: toolParams.tools,
+      };
+    case SEND_MESSAGE_TO_SUB_AGENT: {
+      const session = getCustomSubAgents(conversation).find(
+        agent => agent.id === toolParams.agent_id
+      );
+      return {
+        agent_id: toolParams.agent_id,
+        name: session?.name ?? toolParams.agent_id,
+        system_prompt: session?.conversation.messages.find(
+          message => message.role === MESSAGE_ROLE.SYSTEM
+        )?.content?.body,
+        task: toolParams.message,
+        tools: session?.tools.map(tool => tool.function.name),
+      };
+    }
     default:
       return undefined;
   }
@@ -487,7 +587,10 @@ Object.assign(Chat, {
     const searchExecuted = conversation._searchExecutedTurn === currentTurn;
 
     const streamModelResponse = () => {
-      const snapshot = conversation.compactChatCompletions();
+      const snapshot = withSubAgentCapabilities(
+        conversation.compactChatCompletions(),
+        chatToolsConfig
+      );
 
       const stream = conversation.runWithGenerator({
         streamOptions: { enabled: true },
@@ -734,7 +837,7 @@ Object.assign(Chat, {
         // Emit the tool message up front with a `pending`-marked placeholder
         // body so the action log renders its pending row while the slow work
         // runs; the real result is reconciled into the same row below.
-        const toolUIArgs = getToolUIArgs(toolName, toolParams);
+        let toolUIArgs = getToolUIArgs(toolName, toolParams, conversation);
         let pendingToolMessage = null;
         if (TOOLS_WITH_PENDING_ACTION_LOG.has(toolName)) {
           pendingToolMessage = conversation.addToolCallMessage({
@@ -753,8 +856,23 @@ Object.assign(Chat, {
               signal,
               mode,
               id,
-              browsingContext
+              browsingContext,
+              progress => {
+                const { execution, ...body } = progress;
+                toolUIArgs = { ...toolUIArgs, execution };
+                conversation.updateToolCallMessage(pendingToolMessage, {
+                  tool_call_id: id,
+                  name: toolName,
+                  body: { ...body, pending: body.status === "running" },
+                  args: toolUIArgs,
+                });
+              }
             );
+            if (toolName === CREATE_SUB_AGENT || toolName === SEND_MESSAGE_TO_SUB_AGENT) {
+              const { execution, ...body } = result;
+              toolUIArgs = { ...toolUIArgs, execution };
+              result = body;
+            }
             if (toolName === GENERATE_AITAB) {
               aiTabEndsTurn = result.endsTurn;
               result = result.toolResult;
@@ -827,7 +945,9 @@ Object.assign(Chat, {
         if (
           !toolCallError &&
           !isSearchHandoff &&
-          toolName === SEARCH_THE_WEB &&
+          (toolName === SEARCH_THE_WEB ||
+            toolName === CREATE_SUB_AGENT ||
+            toolName === SEND_MESSAGE_TO_SUB_AGENT) &&
           result?.error
         ) {
           toolCallError = "execution_failed";

@@ -156,9 +156,9 @@ export class openAIEngine {
     feature,
     baseURL = openAIEngine.endpoint,
     apiKey = "",
+    engineId = `${DEFAULT_ENGINE_ID}-${feature}-${model}`,
   }) {
     const engine = new openAIEngine();
-    const engineId = `${DEFAULT_ENGINE_ID}-${feature}-${model}`;
     engine.#engineId = engineId;
     engine.feature = feature;
     engine.model = model;
@@ -178,6 +178,19 @@ export class openAIEngine {
       apiKey
     );
     return engine;
+  }
+
+  fork({ engineId, flowId = this.#flowId }) {
+    return openAIEngine.build({
+      engineId,
+      flowId,
+      feature: this.feature,
+      model: this.model,
+      serviceType: this.#serviceType,
+      purpose: this.#purpose,
+      baseURL: this.#baseURL,
+      apiKey: this.#apiKey,
+    });
   }
 
   /**
@@ -304,6 +317,7 @@ export class openAIEngine {
    */
   async _runWithAuth(content) {
     try {
+      await this._ensureEngineReady();
       return await this.engineInstance.run(content);
     } catch (ex) {
       // Skip the token retry flow when using a custom endpoint,
@@ -365,6 +379,37 @@ export class openAIEngine {
     );
   }
 
+  async _ensureEngineReady() {
+    if (
+      !this.engineInstance ||
+      (this.engineInstance.engineStatus && this.engineInstance.engineStatus !== "ready")
+    ) {
+      await this._recreateEngine();
+    }
+  }
+
+  async *_runWithGeneratorTransport(options, signal) {
+    signal?.throwIfAborted();
+    await this._ensureEngineReady();
+    let receivedChunk = false;
+    try {
+      for await (const chunk of this.engineInstance.runWithGenerator(options)) {
+        receivedChunk = true;
+        yield chunk;
+      }
+    } catch (error) {
+      if (
+        receivedChunk ||
+        !["The port is null", "Port does not exist"].includes(error.message)
+      ) {
+        throw error;
+      }
+      signal?.throwIfAborted();
+      await this._recreateEngine();
+      yield* this.engineInstance.runWithGenerator(options);
+    }
+  }
+
   /**
    * Checks if an error is a 401 authentication error.
    *
@@ -390,7 +435,7 @@ export class openAIEngine {
     // AbortSignal cannot be cloned via postMessage (structured clone algorithm).
     const { signal, ...engineOptions } = options;
     try {
-      const generator = this.engineInstance.runWithGenerator(engineOptions);
+      const generator = this._runWithGeneratorTransport(engineOptions, signal);
       for await (const chunk of generator) {
         if (signal?.aborted) {
           return;
@@ -416,7 +461,7 @@ export class openAIEngine {
       const updatedOptions = { ...engineOptions, token: newToken };
 
       try {
-        const generator = this.engineInstance.runWithGenerator(updatedOptions);
+        const generator = this._runWithGeneratorTransport(updatedOptions, signal);
         for await (const chunk of generator) {
           if (signal?.aborted) {
             return;

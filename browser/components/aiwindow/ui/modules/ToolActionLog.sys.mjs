@@ -11,8 +11,12 @@ import {
   GET_NAVIGATION_INFO,
   SEARCH_THE_WEB,
   GENERATE_AITAB,
+  CREATE_SUB_AGENT,
+  LIST_SUB_AGENTS,
+  SEND_MESSAGE_TO_SUB_AGENT,
   isAITabModification,
 } from "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs";
+import { SUB_AGENT_BROWSER_TOOLS } from "moz-src:///browser/components/aiwindow/models/agents/SubAgentBrowser.sys.mjs";
 
 export const ACTION_LOG_UI_TYPE = "action-log";
 
@@ -63,6 +67,40 @@ function urlListChips(items, getLabel) {
  * @type {Map<string, { show: boolean, label: ActionLogLabel, pendingLabel: ActionLogLabel }>}
  */
 const TOOL_ACTION_LOG_CONFIG = new Map([
+  ...SUB_AGENT_BROWSER_TOOLS.map(name => [name, { label: () => name }]),
+  [
+    LIST_SUB_AGENTS,
+    { label: { l10nId: "action-log-listed-sub-agents" } },
+  ],
+  [
+    SEND_MESSAGE_TO_SUB_AGENT,
+    {
+      label: body => ({
+        l10nId: body?.status === "cancelled"
+          ? "action-log-sub-agent-cancelled"
+          : body?.error
+            ? "action-log-sub-agent-failed"
+            : "action-log-sub-agent-message-completed",
+      }),
+      pendingLabel: { l10nId: "action-log-sub-agent-message-running" },
+    },
+  ],
+  [
+    CREATE_SUB_AGENT,
+    {
+      label: body => {
+        if (body?.status === "cancelled") {
+          return { l10nId: "action-log-sub-agent-cancelled" };
+        }
+        return {
+          l10nId: body?.error
+            ? "action-log-sub-agent-failed"
+            : "action-log-sub-agent-completed",
+        };
+      },
+      pendingLabel: { l10nId: "action-log-sub-agent-running" },
+    },
+  ],
   [
     GENERATE_AITAB,
     {
@@ -233,6 +271,22 @@ export function getActionLogChipsForTool(toolName, body, args) {
  */
 export function buildActionLogRow(toolName, label, body, args, link) {
   const row = { items: getActionLogChipsForTool(toolName, body, args) };
+  if (SUB_AGENT_BROWSER_TOOLS.includes(toolName) || toolName === LIST_SUB_AGENTS) {
+    row.toolCall = { name: toolName, arguments: args?.arguments, result: body };
+  }
+  if (toolName === CREATE_SUB_AGENT || toolName === SEND_MESSAGE_TO_SUB_AGENT) {
+    row.subAgent = {
+      ...args,
+      agent_id: body?.agent_id ?? args?.agent_id,
+      name: body?.name ?? args?.name,
+      status: body?.status,
+      error: body?.error,
+      originAttributes: body?.originAttributes,
+      parentOriginAttributes: body?.parentOriginAttributes,
+      browserTab: body?.browserTab,
+      tabGroup: body?.tabGroup,
+    };
+  }
 
   if (link?.href) {
     row.link = link;

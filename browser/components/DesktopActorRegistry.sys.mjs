@@ -245,6 +245,7 @@ let JSWINDOWACTORS = {
         "AIChatContent:DispatchAction": { wantUntrusted: true },
         "AIChatContent:OpenLink": { wantUntrusted: true },
         "AIChatContent:OpenTabGroup": { wantUntrusted: true },
+        "AIChatContent:ShowSubAgentTab": { wantUntrusted: true },
         "AIChatContent:DispatchNewChat": { wantUntrusted: true },
         "AIChatContent:AccountSignIn": { wantUntrusted: true },
         "AIChatContent:ToolUIUpdate": { wantUntrusted: true },
@@ -1035,6 +1036,16 @@ let JSWINDOWACTORS = {
     matches: ["about:smartformfillreview"],
     remoteTypes: ["privilegedabout"],
     enablePreference: "browser.smartwindow.smartformfill.enabled",
+  },
+
+  SubAgentBrowser: {
+    child: {
+      esModuleURI:
+        "moz-src:///browser/components/aiwindow/ui/actors/SubAgentBrowserChild.sys.mjs",
+    },
+    matches: ["http://*/*", "https://*/*"],
+    messageManagerGroups: ["browsers"],
+    safeForUntrustedWebProcess: true,
   },
 
   SpeechDispatcher: {

@@ -36,6 +36,7 @@ prefs = [
 ["browser_search_the_web.js"]
 ["browser_smart_form_fill_model.js"]
 ["browser_smartwindow_location.js"]
+["browser_sub_agent_browser.js"]
 ["browser_title_generation.js"]
 ["browser_tools_get_page_content.js"]
 ["browser_tools_get_skill.js"]

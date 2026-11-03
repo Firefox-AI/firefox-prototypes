@@ -19,9 +19,57 @@ const {
   GET_NAVIGATION_INFO,
   SEARCH_THE_WEB,
   GENERATE_AITAB,
+  CREATE_SUB_AGENT,
 } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs"
 );
+
+add_task(function test_sub_agent_log_states_and_details() {
+  for (const [body, expected] of [
+    [{ pending: true, status: "running" }, "running"],
+    [{ status: "completed" }, "completed"],
+    [{ status: "failed", error: "Failed" }, "failed"],
+    [{ status: "cancelled", error: "Aborted" }, "cancelled"],
+  ]) {
+    const cfg = getActionLogConfigForTool(CREATE_SUB_AGENT, body);
+    Assert.ok(cfg.show);
+    Assert.equal(cfg.label.l10nId, `action-log-sub-agent-${expected}`);
+    const args = {
+      name: "Helper",
+      tools: [],
+      system_prompt: "Help",
+      task: "Answer",
+      execution: [],
+    };
+    const row = buildActionLogRow(CREATE_SUB_AGENT, cfg.label, body, args);
+    Assert.deepEqual(row.subAgent, {
+      ...args,
+      status: body.status,
+      error: body.error,
+      originAttributes: body.originAttributes,
+      parentOriginAttributes: body.parentOriginAttributes,
+    });
+  }
+});
+
+add_task(function test_sub_agent_log_preserves_browser_identity() {
+  const body = {
+    status: "running",
+    pending: true,
+    originAttributes: { userContextId: 77 },
+    parentOriginAttributes: { userContextId: 9 },
+  };
+  const cfg = getActionLogConfigForTool(CREATE_SUB_AGENT, body);
+  const row = buildActionLogRow(CREATE_SUB_AGENT, cfg.label, body, {
+    name: "Helper",
+  });
+  const restored = JSON.parse(JSON.stringify(row));
+  Assert.deepEqual(restored.subAgent.originAttributes, body.originAttributes);
+  Assert.deepEqual(
+    restored.subAgent.parentOriginAttributes,
+    body.parentOriginAttributes
+  );
+});
 
 add_task(function test_aitab_pending_creation_without_modify_slug() {
   const cfg = getActionLogConfigForTool(GENERATE_AITAB, { pending: true }, {});

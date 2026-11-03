@@ -12,7 +12,7 @@ const { SYSTEM_PROMPT_TYPE, MESSAGE_ROLE } = ChromeUtils.importESModule(
 const { Chat, executeToolByName } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/Chat.sys.mjs"
 );
-const { RunSearch, GetPageContent, toolFns } = ChromeUtils.importESModule(
+const { RunSearch, GetPageContent, toolFns, SUB_AGENT_CAPABILITY_PROMPT } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs"
 );
 const { AuthProvider } = ChromeUtils.importESModule(
@@ -247,7 +247,7 @@ add_task(async function test_Chat_fetchWithHistory_streams_and_forwards_args() {
     );
     Assert.equal(
       capturedArgs[0].content,
-      "You are helpful",
+      `You are helpful\n\n${SUB_AGENT_CAPABILITY_PROMPT}`,
       "System message content should match"
     );
     Assert.equal(
