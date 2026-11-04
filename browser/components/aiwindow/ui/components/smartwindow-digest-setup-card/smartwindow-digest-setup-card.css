@@ -1,0 +1,112 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+dialog {
+  background-color: var(--background-color-box);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius-large);
+  box-shadow: var(--box-shadow-level-4);
+  color: var(--text-color);
+  padding: 0;
+  width: min(360px, calc(100vw - 2 * var(--space-xlarge)));
+
+  &::backdrop {
+    background-color: color-mix(in srgb, var(--color-black) 40%, transparent);
+  }
+}
+
+.digest-setup-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-medium);
+  padding: var(--space-large);
+}
+
+h2 {
+  font-size: var(--font-size-root);
+  font-weight: var(--font-weight-semibold);
+  margin: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xsmall);
+}
+
+.field-label,
+.required-note {
+  color: var(--text-color-deemphasized);
+  font-size: var(--font-size-small);
+}
+
+.title-field {
+  position: relative;
+}
+
+.title-lock-icon {
+  -moz-context-properties: fill;
+  fill: var(--icon-color);
+  height: var(--icon-size-small);
+  inset-block-end: var(--space-small);
+  inset-inline-end: var(--space-small);
+  pointer-events: none;
+  position: absolute;
+  width: var(--icon-size-small);
+}
+
+.memory-chip {
+  align-items: center;
+  align-self: flex-start;
+  background-color: color-mix(in srgb, var(--smartwindow-text-color-accent-primary, var(--color-violet-50)) 20%, transparent);
+  border-radius: var(--border-radius-small);
+  color: var(--smartwindow-text-color-accent-primary, var(--text-color));
+  display: inline-flex;
+  font-size: var(--font-size-small);
+  gap: var(--space-xsmall);
+  padding-block: var(--space-xxsmall);
+  padding-inline: var(--space-xsmall);
+
+  img {
+    -moz-context-properties: fill;
+    fill: currentColor;
+    height: var(--icon-size-xsmall);
+    width: var(--icon-size-xsmall);
+  }
+}
+
+.source-input-row {
+  align-items: end;
+  display: flex;
+  gap: var(--space-small);
+}
+
+.digest-source-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xsmall);
+}
+
+.error-message {
+  color: var(--text-color-error);
+  font-size: var(--font-size-small);
+}
+
+hr {
+  border: none;
+  border-block-start: var(--border-width) solid var(--border-color);
+  margin: 0;
+  width: 100%;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-small);
+  justify-content: flex-end;
+}

@@ -6,7 +6,8 @@ prefs = [
   "browser.newtab.preload=false",
   "browser.search.suggest.enabled=false",
   "browser.urlbar.suggest.searches=false",
-  "browser.smartwindow.endpoint=http://localhost:0/v1"
+  "browser.smartwindow.endpoint=http://localhost:0/v1",
+  "browser.smartwindow.dailyDigest.enabled=false"
 ]
 support-files = [
   "head.js",

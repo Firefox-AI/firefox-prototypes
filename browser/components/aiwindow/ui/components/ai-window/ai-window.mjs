@@ -17,6 +17,8 @@ import { RESUME_SECTION_EMPTY_REASON } from "chrome://browser/content/aiwindow/c
 import "chrome://browser/content/aiwindow/components/kit-mention.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/smartwindow-history-menu.mjs";
+// eslint-disable-next-line import/no-unassigned-import
+import "chrome://browser/content/aiwindow/components/smartwindow-digest-setup-card.mjs";
 
 const { XPCOMUtils } = ChromeUtils.importESModule(
   "resource://gre/modules/XPCOMUtils.sys.mjs"
@@ -97,6 +99,10 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/SmartWindowTelemetry.sys.mjs",
   ResumeActivity:
     "moz-src:///browser/components/aiwindow/ui/modules/ResumeActivity.sys.mjs",
+  CURATED_DIGEST_TOPICS:
+    "moz-src:///browser/components/aiwindow/ui/modules/DailyDigest.sys.mjs",
+  DailyDigest:
+    "moz-src:///browser/components/aiwindow/ui/modules/DailyDigest.sys.mjs",
   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
   isTabGroupMember: "chrome://browser/content/urlbar/SmartbarMentionUtils.mjs",
   tabManagementService:
@@ -218,6 +224,7 @@ const MAX_TOP_SITES = 8;
 const MAX_PILL_COUNT = 6;
 // Show 3 undismissed candidates from the larger generated pool.
 const MAX_RESUME_PILLS_DISPLAYED = 3;
+const DIGEST_TOAST_DURATION_MS = 4000;
 // Show up to 4 cards from the generated pool.
 const MAX_RESUME_CARDS_DISPLAYED = 4;
 // TEMP: English-only workaround. Remove once resume headlines support
@@ -288,6 +295,8 @@ export class AIWindow extends MozLitElement {
     resumeSectionHidden: { type: Boolean, state: true },
     startersResolved: { type: Boolean, state: true },
     recentChats: { type: Array, state: true },
+    digestSetupTopic: { type: Object, state: true },
+    digestFollowedTitle: { type: String, state: true },
   };
 
   #browser;
@@ -322,6 +331,7 @@ export class AIWindow extends MozLitElement {
   #hasMemories = false;
   // Resume starters are only eligible on the first fullpage load.
   #canLoadResumeStarters = true;
+  #digestToastTimer = null;
   #selectedModelChoiceId = null;
   #hasModelChoiceOverride = false;
   #isGeneratingResumeActivityConversation = false;
@@ -572,6 +582,8 @@ export class AIWindow extends MozLitElement {
     this.resumeSectionHidden = lazy.ResumeActivity.isSectionHiddenForSession();
     this.startersResolved = false;
     this.recentChats = [];
+    this.digestSetupTopic = null;
+    this.digestFollowedTitle = null;
     this.showFooter = this.mode === MODE.FULLPAGE;
     this.promoMessage = null;
     this.showDisclaimer = this.mode !== MODE.FULLPAGE;
@@ -1471,6 +1483,7 @@ export class AIWindow extends MozLitElement {
           lazy.log.error("[Prompts] Failed to load initial starters:", e);
           return [];
         });
+      starters = [...(await this.#getDigestStarters()), ...starters];
 
       // Cards render separately, so static starters don't need to wait.
       // TODO Bug 2067871: remove the pill fallback and final render.
@@ -1533,6 +1546,59 @@ export class AIWindow extends MozLitElement {
     if (!rendersCardsIndependently && !abortController.signal.aborted) {
       this.#conversation.transientStarters = starters;
       this.#renderStarterPrompts(starters);
+    }
+  }
+
+  /**
+   * Builds the Daily Digest pills: a "Catch up on" pill per followed topic
+   * plus the inferred topic, followed by the "Follow a topic" menu pill.
+   *
+   * @returns {Promise<Array<object>>}
+   */
+  async #getDigestStarters() {
+    if (this.mode !== MODE.FULLPAGE || !lazy.DailyDigest.enabled) {
+      return [];
+    }
+
+    const catchUpTopics = lazy.DailyDigest.getFollowedTopics();
+    const inferredTopic = lazy.DailyDigest.inferredTopic;
+    if (
+      inferredTopic &&
+      !catchUpTopics.some(
+        ({ title }) => title.toLowerCase() === inferredTopic.toLowerCase()
+      )
+    ) {
+      catchUpTopics.push({ id: null, title: inferredTopic });
+    }
+
+    try {
+      const [followText, ...catchUpTexts] =
+        await this.ownerDocument.l10n.formatValues([
+          { id: "aiwindow-digest-follow-topic" },
+          ...catchUpTopics.map(({ title }) => ({
+            id: "aiwindow-digest-catch-up",
+            args: { topic: title },
+          })),
+        ]);
+
+      return [
+        ...catchUpTopics.map((topic, i) => ({
+          text: catchUpTexts[i],
+          type: "digest-catch-up",
+          topic,
+        })),
+        {
+          text: followText,
+          type: "digest-follow",
+          topics: lazy.CURATED_DIGEST_TOPICS.map(({ id, titleL10nId }) => ({
+            id,
+            titleL10nId,
+          })),
+        },
+      ];
+    } catch (e) {
+      lazy.log.error("[Prompts] Failed to load digest starters:", e);
+      return [];
     }
   }
 
@@ -2377,7 +2443,121 @@ export class AIWindow extends MozLitElement {
       return;
     }
 
+    if (event.detail.type === "digest-catch-up") {
+      this.#handleDigestCatchUpSelected(event.detail.topic).catch(e =>
+        lazy.log.error("[Prompts] Digest catch-up failed:", e)
+      );
+      return;
+    }
+
     this.onQuickPromptClicked(event.detail.text, true);
+  };
+
+  /**
+   * Asks the model for an AI Tab digest page on the topic, using the
+   * followed topic's setup when there is one.
+   *
+   * @param {object} topic
+   */
+  async #handleDigestCatchUpSelected(topic) {
+    this.#recordQuickPromptClicked("digest");
+
+    const text = topic.cover
+      ? await this.ownerDocument.l10n.formatValue(
+          "aiwindow-digest-catch-up-prompt-detailed",
+          {
+            topic: topic.title,
+            cover: topic.cover,
+            length: topic.length,
+            sourceCount: topic.sources.length,
+            sources: topic.sources.join(", "),
+          }
+        )
+      : await this.ownerDocument.l10n.formatValue(
+          "aiwindow-digest-catch-up-prompt",
+          { topic: topic.title }
+        );
+
+    this.submitChatMessage({
+      text,
+      submitType: "starter",
+      contextPageUrl: null,
+    });
+  }
+
+  /**
+   * Opens the setup card pre-filled with the curated topic, or with its
+   * saved settings if it's already followed.
+   *
+   * @param {CustomEvent} event - The digest-topic-selected event
+   * @private
+   */
+  #handleDigestTopicSelected = async event => {
+    const curated = lazy.CURATED_DIGEST_TOPICS.find(
+      ({ id }) => id === event.detail.topicId
+    );
+    if (!curated) {
+      return;
+    }
+
+    const [title, cover, memory] = await this.ownerDocument.l10n.formatValues([
+      { id: curated.titleL10nId },
+      { id: curated.coverL10nId },
+      { id: curated.memoryL10nId },
+    ]);
+    const saved = lazy.DailyDigest.getFollowedTopics().find(
+      ({ id }) => id === curated.id
+    );
+
+    this.digestSetupTopic = {
+      id: curated.id,
+      title,
+      cover,
+      sources: curated.sources,
+      ...saved,
+      memory,
+    };
+  };
+
+  #handleDigestSetupCancel = () => {
+    this.digestSetupTopic = null;
+  };
+
+  /**
+   * Saves the followed topic, confirms it, and adds a highlighted
+   * "Catch up on" pill to the front of the starter row.
+   *
+   * @param {CustomEvent} event - The follow event from the setup card
+   * @private
+   */
+  #handleDigestFollow = async event => {
+    const topic = lazy.DailyDigest.followTopic(event.detail);
+    this.digestSetupTopic = null;
+
+    this.digestFollowedTitle = topic.title;
+    clearTimeout(this.#digestToastTimer);
+    this.#digestToastTimer = setTimeout(() => {
+      this.digestFollowedTitle = null;
+    }, DIGEST_TOAST_DURATION_MS);
+
+    const text = await this.ownerDocument.l10n.formatValue(
+      "aiwindow-digest-catch-up",
+      { topic: topic.title }
+    );
+    const catchUp = { text, type: "digest-catch-up", topic };
+    const otherStarters = (this.#conversation.transientStarters ?? []).filter(
+      starter =>
+        starter.type !== "digest-catch-up" ||
+        (starter.topic.id !== topic.id &&
+          starter.topic.title.toLowerCase() !== topic.title.toLowerCase())
+    );
+
+    this.#conversation.transientStarters = [catchUp, ...otherStarters];
+    this.#renderStarterPrompts(
+      [{ ...catchUp, highlighted: true }, ...otherStarters],
+      true,
+      false
+    );
   };
 
   #handleResumePromptSelected(resumePrompt) {
@@ -4034,9 +4214,31 @@ export class AIWindow extends MozLitElement {
                       .#handlePromptSelected}
                     @SmartWindowPrompt:prompt-dismissed=${this
                       .#handlePromptDismissed}
+                    @SmartWindowPrompt:digest-topic-selected=${this
+                      .#handleDigestTopicSelected}
                   ></smartwindow-prompts>
                 `
               : ""}
+            ${this.digestSetupTopic
+              ? html`
+                  <smartwindow-digest-setup-card
+                    .topic=${this.digestSetupTopic}
+                    @SmartWindowDigestSetup:follow=${this.#handleDigestFollow}
+                    @SmartWindowDigestSetup:cancel=${this
+                      .#handleDigestSetupCancel}
+                  ></smartwindow-digest-setup-card>
+                `
+              : ""}
+            <div class="digest-toast" role="status">
+              ${this.digestFollowedTitle
+                ? html`<span
+                    data-l10n-id="aiwindow-digest-followed-toast"
+                    data-l10n-args=${JSON.stringify({
+                      topic: this.digestFollowedTitle,
+                    })}
+                  ></span>`
+                : ""}
+            </div>
             ${this.startersResolved
               ? html`
                   <smartwindow-topsites

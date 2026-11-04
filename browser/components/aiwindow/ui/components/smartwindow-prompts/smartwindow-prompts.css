@@ -271,6 +271,37 @@
   justify-content: center;
 }
 
+.sw-prompt-menu-button::part(button) {
+  gap: var(--space-xsmall);
+}
+
+.sw-digest-follow-menu panel-item[disabled] {
+  color: var(--text-color-deemphasized);
+  font-style: italic;
+}
+
+/* Signals a "Catch up on" pill that was just added by following a topic. */
+.sw-prompt-highlighted::part(button) {
+  animation: sw-prompt-highlight 4s ease-out forwards;
+}
+
+@keyframes sw-prompt-highlight {
+  0%,
+  60% {
+    box-shadow: 0 0 0 var(--focus-outline-width) var(--smartwindow-text-color-accent-primary, var(--color-violet-40));
+  }
+  100% {
+    box-shadow: 0 0 0 var(--focus-outline-width) transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sw-prompt-highlighted::part(button) {
+    animation: none;
+    box-shadow: 0 0 0 var(--focus-outline-width) var(--smartwindow-text-color-accent-primary, var(--color-violet-40));
+  }
+}
+
 /* A non-interactive placeholder pill shown while a starter's real
  * content is still loading. */
 .sw-prompt-skeleton {

@@ -2428,6 +2428,10 @@ pref("browser.smartwindow.memoriesLogLevel", "Warn");
 pref("browser.smartwindow.resumeActivity.enabled", true);
 // TODO Bug 2067871: remove once journey store is available.
 pref("browser.smartwindow.resumeCards.enabled", true);
+// Daily Digest "Catch up on" / "Follow a topic" new tab starters.
+pref("browser.smartwindow.dailyDigest.enabled", true);
+pref("browser.smartwindow.dailyDigest.inferredTopic", "sustainable outdoor gear");
+pref("browser.smartwindow.dailyDigest.followedTopics", "[]");
 pref("browser.smartwindow.firstrun.autoAdvanceMS", 3000);
 pref("browser.smartwindow.firstrun.hasCompleted", false);
 pref("browser.smartwindow.showThemesNotice", true);

@@ -108,6 +108,8 @@ browser.jar:
   content/browser/aiwindow/components/website-chip-container.css    (components/website-chip-container/website-chip-container.css)
   content/browser/aiwindow/components/smartwindow-prompts.mjs       (components/smartwindow-prompts/smartwindow-prompts.mjs)
   content/browser/aiwindow/components/smartwindow-prompts.css       (components/smartwindow-prompts/smartwindow-prompts.css)
+  content/browser/aiwindow/components/smartwindow-digest-setup-card.mjs (components/smartwindow-digest-setup-card/smartwindow-digest-setup-card.mjs)
+  content/browser/aiwindow/components/smartwindow-digest-setup-card.css (components/smartwindow-digest-setup-card/smartwindow-digest-setup-card.css)
   content/browser/aiwindow/components/smartwindow-resume-card.mjs   (components/smartwindow-resume-card/smartwindow-resume-card.mjs)
   content/browser/aiwindow/components/smartwindow-resume-card.css   (components/smartwindow-resume-card/smartwindow-resume-card.css)
   content/browser/aiwindow/components/smartwindow-resume-section.mjs (components/smartwindow-resume-section/smartwindow-resume-section.mjs)

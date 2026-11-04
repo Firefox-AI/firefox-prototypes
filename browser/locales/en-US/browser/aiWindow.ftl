@@ -409,6 +409,91 @@ aiwindow-starter-browsing-history = Find tabs in history
 aiwindow-starter-browsing-summarize = Summarize tabs
 aiwindow-starter-browsing-compare = Compare tabs
 
+## Daily Digest conversation starters
+## Placeholder copy; final strings to come from content design.
+
+# Variables:
+#   $topic (String) - A topic the user is interested in or follows
+aiwindow-digest-catch-up = Catch up on { $topic }
+# Opens a menu of suggested topics to follow.
+aiwindow-digest-follow-topic = Follow a topic
+aiwindow-digest-custom-topics-coming-soon = Custom topics coming soon
+
+# Sent as the user's message when a "Catch up on" pill is clicked.
+# Variables:
+#   $topic (String) - The topic to summarize
+aiwindow-digest-catch-up-prompt = Create a page with a digest of the latest news and updates on { $topic }.
+# Sent as the user's message when a followed topic's "Catch up on" pill is clicked.
+# Variables:
+#   $topic (String) - The followed topic's title
+#   $cover (String) - What the user asked the digest to cover
+#   $length (String) - "short", "standard" or "detailed"
+#   $sourceCount (Number) - Number of websites to pull content from
+#   $sources (String) - Comma-separated websites to pull content from
+aiwindow-digest-catch-up-prompt-detailed =
+    Create a page with a { $length ->
+        [short] short
+        [detailed] detailed
+       *[standard] standard-length
+    } digest of the latest on { $topic }.
+    What to cover: { $cover }
+    { $sourceCount ->
+        [0] {""}
+       *[other] Pull content from { $sources }.
+    }
+
+aiwindow-digest-topic-top-news = Top news stories
+aiwindow-digest-topic-top-news-cover = The most important headlines and breaking news of the day.
+aiwindow-digest-topic-top-news-memory = Reads the news most mornings
+aiwindow-digest-topic-nutrition = Nutrition research and food news
+aiwindow-digest-topic-nutrition-cover = New nutrition research, dietary guidance and food news.
+aiwindow-digest-topic-nutrition-memory = Follows health and nutrition news
+aiwindow-digest-topic-zero-waste = Zero-waste cooking
+aiwindow-digest-topic-zero-waste-cover = Recipes, tips and ideas for cooking with less food waste.
+aiwindow-digest-topic-zero-waste-memory = Interested in sustainable living
+
+## Daily Digest "Follow a topic" setup card
+
+aiwindow-digest-setup-heading = Follow a topic
+aiwindow-digest-setup-title =
+    .label = Title*
+aiwindow-digest-setup-cover =
+    .label = What to cover*
+aiwindow-digest-setup-based-on-memory = Based on memory
+aiwindow-digest-setup-sources =
+    .label = Pull content from
+    .placeholder = Add a website
+aiwindow-digest-setup-add-source =
+    .aria-label = Add website
+    .tooltiptext = Add website
+aiwindow-digest-setup-source-invalid = Enter a website, like example.com
+aiwindow-digest-setup-frequency =
+    .label = How often to show
+aiwindow-digest-setup-frequency-daily =
+    .label = Daily
+aiwindow-digest-setup-frequency-weekly =
+    .label = Weekly
+aiwindow-digest-setup-time =
+    .label = Time
+aiwindow-digest-setup-length =
+    .label = Length
+aiwindow-digest-setup-length-short =
+    .label = Short
+aiwindow-digest-setup-length-standard =
+    .label = Standard
+aiwindow-digest-setup-length-detailed =
+    .label = Detailed
+aiwindow-digest-setup-required = * Required
+aiwindow-digest-setup-cancel =
+    .label = Cancel
+aiwindow-digest-setup-follow =
+    .label = Follow
+
+# Shown briefly after the user follows a topic.
+# Variables:
+#   $topic (String) - The followed topic's title
+aiwindow-digest-followed-toast = You’re now following { $topic }
+
 ## Conversation Starter Scroll Buttons
 ## Scrolls the conversation-starter pill row toward its start/end.
 

@@ -208,6 +208,36 @@ smartwindow-prompts {
   max-width: var(--smartwindow-content-max-width);
 }
 
+/* Out of grid flow: the card shows as a modal dialog. */
+smartwindow-digest-setup-card {
+  position: absolute;
+}
+
+.digest-toast {
+  inset-block-end: var(--space-xlarge);
+  inset-inline-start: 50%;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-50%);
+  z-index: 2;
+
+  &:dir(rtl) {
+    transform: translateX(50%);
+  }
+
+  > span {
+    background-color: var(--background-color-box);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--border-radius-medium);
+    box-shadow: var(--box-shadow-level-3);
+    color: var(--text-color);
+    display: block;
+    font-size: var(--font-size-small);
+    padding-block: var(--space-small);
+    padding-inline: var(--space-medium);
+  }
+}
+
 .chat-header {
   box-sizing: border-box;
   justify-content: flex-end;

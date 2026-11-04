@@ -10,6 +10,10 @@ import {
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://global/content/elements/moz-button.mjs";
+// eslint-disable-next-line import/no-unassigned-import
+import "chrome://global/content/elements/panel-list.mjs";
+
+const DIGEST_FOLLOW_MENU_ID = "sw-digest-follow-menu";
 
 // The favicon cluster shows at most this many icons; beyond that, the
 // last slot becomes a "+N" overflow badge instead of an icon.
@@ -19,7 +23,7 @@ const MAX_VISIBLE_FAVICONS = 3;
  * A component for displaying conversation starter prompts.
  * Renders a list of prompt buttons that can be clicked to start a conversation.
  *
- * @property {Array<{text: string, type: string, previewIcons?: Array<{iconSrc: string}>, memory?: object, content?: object}>} prompts - Array of prompt objects to display
+ * @property {Array<{text: string, type: string, previewIcons?: Array<{iconSrc: string}>, memory?: object, content?: object, topic?: object, topics?: Array<{id: string, titleL10nId: string}>, highlighted?: boolean}>} prompts - Array of prompt objects to display
  */
 export class SmartWindowPrompts extends MozLitElement {
   static properties = {
@@ -131,15 +135,17 @@ export class SmartWindowPrompts extends MozLitElement {
 
   #promptSelected(swPrompt) {
     const { text, type } = swPrompt;
-    const detail =
-      type === "resume"
-        ? {
-            text,
-            type,
-            memory: swPrompt.memory,
-            content: swPrompt.content,
-          }
-        : { text, type };
+    let detail = { text, type };
+    if (type === "resume") {
+      detail = {
+        text,
+        type,
+        memory: swPrompt.memory,
+        content: swPrompt.content,
+      };
+    } else if (type === "digest-catch-up") {
+      detail = { text, type, topic: swPrompt.topic };
+    }
 
     const event = new CustomEvent("SmartWindowPrompt:prompt-selected", {
       detail,
@@ -162,6 +168,71 @@ export class SmartWindowPrompts extends MozLitElement {
         composed: true,
       })
     );
+  }
+
+  #digestTopicSelected(topicId) {
+    this.dispatchEvent(
+      new CustomEvent("SmartWindowPrompt:digest-topic-selected", {
+        detail: { topicId },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  /**
+   * Renders the "Follow a topic" pill, which opens the curated topic menu
+   * rendered by #renderDigestFollowMenu.
+   *
+   * @param {object} swPrompt
+   */
+  #renderDigestFollowPrompt(swPrompt) {
+    return html`
+      <moz-button
+        class="sw-prompt-button sw-prompt-menu-button"
+        iconsrc="chrome://global/skin/icons/arrow-down-12.svg"
+        iconposition="end"
+        aria-haspopup="menu"
+        .menuId=${DIGEST_FOLLOW_MENU_ID}
+        @mouseenter=${this.#hasInteracted}
+        @focusin=${this.#hasInteracted}
+      >
+        ${swPrompt.text}
+      </moz-button>
+    `;
+  }
+
+  /**
+   * Kept outside the scroll container so its mask doesn't clip the menu.
+   */
+  #renderDigestFollowMenu() {
+    const followPrompt = this.prompts.find(
+      ({ type }) => type === "digest-follow"
+    );
+    if (!followPrompt) {
+      return nothing;
+    }
+
+    return html`
+      <link
+        rel="stylesheet"
+        href="chrome://browser/content/aiwindow/components/smartwindow-panel-list.css"
+      />
+      <panel-list id=${DIGEST_FOLLOW_MENU_ID} class="sw-digest-follow-menu">
+        ${followPrompt.topics.map(
+          topic => html`
+            <panel-item
+              data-l10n-id=${topic.titleL10nId}
+              @click=${() => this.#digestTopicSelected(topic.id)}
+            ></panel-item>
+          `
+        )}
+        <panel-item
+          disabled
+          data-l10n-id="aiwindow-digest-custom-topics-coming-soon"
+        ></panel-item>
+      </panel-list>
+    `;
   }
 
   /**
@@ -258,9 +329,16 @@ export class SmartWindowPrompts extends MozLitElement {
    * @param {object} swPrompt
    */
   #renderPrompt(swPrompt) {
+    if (swPrompt.type === "digest-follow") {
+      return this.#renderDigestFollowPrompt(swPrompt);
+    }
+
     const pillButton = html`
       <moz-button
-        class="sw-prompt-button"
+        class=${classMap({
+          "sw-prompt-button": true,
+          "sw-prompt-highlighted": !!swPrompt.highlighted,
+        })}
         @click=${() => this.#promptSelected(swPrompt)}
         @mouseenter=${this.#hasInteracted}
         @focusin=${this.#hasInteracted}
@@ -320,7 +398,7 @@ export class SmartWindowPrompts extends MozLitElement {
               : this.#renderPrompt(swPrompt)
           )}
         </div>
-        ${this.#renderScrollButtons()}
+        ${this.#renderScrollButtons()}${this.#renderDigestFollowMenu()}
       </div>
     `;
   }
