@@ -7,10 +7,6 @@ const { buildBrowserContextPrompt } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/PromptLoader.sys.mjs"
 );
 
-const { SecurityProperties } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/aiwindow/models/SecurityProperties.sys.mjs"
-);
-
 const { sanitizeUntrustedContent } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/ChatUtils.sys.mjs"
 );
@@ -73,18 +69,11 @@ add_setup(async function verify_browser_context_records_are_available() {
 });
 
 add_task(async function test_returns_null_with_no_context() {
-  const securityProperties = new SecurityProperties();
   const out = await buildBrowserContextPrompt("generic", {
     contextMentions: [],
-    securityProperties,
   });
-  securityProperties.commit();
 
   Assert.equal(out, null, "No prompt is returned without tab or mentions");
-  Assert.ok(
-    !securityProperties.privateData,
-    "No privateData flag is committed without tab or mentions"
-  );
 });
 
 add_task(async function test_renders_current_tab_and_selected_tab_context() {
@@ -92,7 +81,6 @@ add_task(async function test_renders_current_tab_and_selected_tab_context() {
   const currentTab = await openContextTab("Browser Context Test Page");
 
   try {
-    const securityProperties = new SecurityProperties();
     const out = await buildBrowserContextPrompt("generic", {
       contextMentions: [
         {
@@ -106,9 +94,7 @@ add_task(async function test_renders_current_tab_and_selected_tab_context() {
           label: mentionedTab.label,
         },
       ],
-      securityProperties,
     });
-    securityProperties.commit();
 
     Assert.ok(out, "A browser-context prompt is returned");
     Assert.ok(
@@ -135,10 +121,6 @@ add_task(async function test_renders_current_tab_and_selected_tab_context() {
         !out.includes("{contextUrls}"),
       "Remote Settings prompt placeholders are rendered"
     );
-    Assert.ok(
-      securityProperties.privateData,
-      "privateData is committed when tab context is included"
-    );
   } finally {
     await currentTab.cleanup();
     await mentionedTab.cleanup();
@@ -149,7 +131,6 @@ add_task(async function test_renders_selected_tabs_without_current_tab() {
   const mentionedTab = await openContextTab("Only Mentioned Test Page");
 
   try {
-    const securityProperties = new SecurityProperties();
     const out = await buildBrowserContextPrompt("generic", {
       contextMentions: [
         {
@@ -158,7 +139,6 @@ add_task(async function test_renders_selected_tabs_without_current_tab() {
           label: mentionedTab.label,
         },
       ],
-      securityProperties,
     });
 
     Assert.ok(out, "A mentions-only browser-context prompt is returned");
@@ -198,7 +178,6 @@ add_task(async function test_renders_tab_group_members_under_their_group() {
         groupLabel: "Group label",
       },
     ],
-    securityProperties: new SecurityProperties(),
   });
 
   Assert.ok(
@@ -227,7 +206,6 @@ add_task(async function test_renders_an_unnamed_tab_group() {
         groupLabel: "",
       },
     ],
-    securityProperties: new SecurityProperties(),
   });
 
   Assert.ok(

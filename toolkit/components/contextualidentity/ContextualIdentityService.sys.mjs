@@ -840,6 +840,21 @@ _ContextualIdentityService.prototype = {
     );
   },
 
+  getOrCreatePrivateIdentity(name) {
+    const existing = this.getPrivateIdentity(name);
+    if (existing) {
+      return existing;
+    }
+    const userContextId = ++this._lastUserContextId;
+    if (userContextId >= MAX_USER_CONTEXT_ID) {
+      throw new Error("No contextual identity ids available");
+    }
+    const identity = { userContextId, public: false, name };
+    this._identities.push(identity);
+    this.saveSoon();
+    return Cu.cloneInto(identity, {});
+  },
+
   // getDefaultPrivateIdentity is similar to getPrivateIdentity but it only looks in the
   // default identities (e.g. it is used in the data migration methods to retrieve a new default
   // private identity and add it to the containers data stored on file).

@@ -10,10 +10,6 @@ const { ChatConversation, MESSAGE_ROLE, ChatMessage } =
     "moz-src:///browser/components/aiwindow/ui/modules/ChatStore.sys.mjs"
   );
 
-const { SecurityProperties } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/aiwindow/models/SecurityProperties.sys.mjs"
-);
-
 const { MEMORIES_FLAG_SOURCE, SYSTEM_PROMPT_TYPE } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/ui/modules/ChatEnums.sys.mjs"
 );
@@ -1515,161 +1511,6 @@ add_task(
   }
 );
 
-add_task(
-  async function test_injectRealTimeContext_setsPrivateData_when_hasTabInfo() {
-    const conversation = new ChatConversation({});
-    const userMessage = conversation.addUserMessage("hi");
-    const mockGetRealTimeMapping = lazy.sinon.stub().resolves({
-      todayDate: "2024-01-15",
-      url: "https://example.com",
-      title: "Example Page",
-      hasTabInfo: true,
-      locale: "en-US",
-      timezone: "America/Los_Angeles",
-      isoTimestamp: "2024-01-15T10:30:00",
-    });
-    _setRemoteClientForTesting({
-      get: lazy.sinon.stub().resolves([
-        {
-          id: "browser-context--tab--v1--generic",
-          kind: "module",
-          feature: "browser-context",
-          module: "tab",
-          model: "generic",
-          version: "1.0",
-          prompts: "TAB {todayDate}",
-        },
-      ]),
-    });
-
-    await conversation.injectRealTimeContext(userMessage, {
-      getRealTimeMapping: mockGetRealTimeMapping,
-    });
-
-    conversation.securityProperties.commit();
-    Assert.ok(
-      conversation.securityProperties.privateData,
-      "privateData should be true after commit when hasTabInfo is true"
-    );
-  }
-);
-
-add_task(
-  async function test_injectRealTimeContext_doesNotSetPrivateData_when_noTabInfo() {
-    const conversation = new ChatConversation({});
-    const userMessage = conversation.addUserMessage("hi");
-    const mockGetRealTimeMapping = lazy.sinon.stub().resolves({
-      todayDate: "2024-01-15",
-      hasTabInfo: false,
-      locale: "en-US",
-      timezone: "America/Los_Angeles",
-      isoTimestamp: "2024-01-15T10:30:00",
-    });
-    _setRemoteClientForTesting({
-      get: lazy.sinon.stub().resolves([]),
-    });
-
-    await conversation.injectRealTimeContext(userMessage, {
-      getRealTimeMapping: mockGetRealTimeMapping,
-    });
-
-    conversation.securityProperties.commit();
-    Assert.ok(
-      !conversation.securityProperties.privateData,
-      "privateData should remain false when hasTabInfo is false"
-    );
-  }
-);
-
-add_task(
-  async function test_generatePrompt_commitsPrivateData_when_hasTabInfo() {
-    const conversation = new ChatConversation({});
-    const sandbox = lazy.sinon.createSandbox();
-    _setLoadPromptForTesting(lazy.sinon.stub().resolves("system prompt"));
-
-    sandbox.stub(conversation, "injectRealTimeContext").callsFake(async () => {
-      conversation.securityProperties.setPrivateData();
-    });
-    sandbox.stub(conversation, "injectMemoriesContext").resolves(null);
-
-    await conversation.generatePrompt("hello", null);
-
-    Assert.ok(
-      conversation.securityProperties.privateData,
-      "privateData should be committed true when injectRealTimeContext stages it"
-    );
-    _setLoadPromptForTesting(null);
-    sandbox.restore();
-  }
-);
-
-add_task(
-  async function test_generatePrompt_commitsPrivateData_when_memoriesEnabled() {
-    const conversation = new ChatConversation({});
-    const sandbox = lazy.sinon.createSandbox();
-    _setLoadPromptForTesting(lazy.sinon.stub().resolves("system prompt"));
-
-    sandbox.stub(conversation, "injectRealTimeContext").resolves(null);
-    sandbox.stub(conversation, "injectMemoriesContext").callsFake(async () => {
-      conversation.securityProperties.setPrivateData();
-    });
-
-    await conversation.generatePrompt("hello", null, {
-      memoriesEnabled: true,
-    });
-
-    Assert.ok(
-      conversation.securityProperties.privateData,
-      "privateData should be committed true when injectMemoriesContext stages it"
-    );
-    _setLoadPromptForTesting(null);
-    sandbox.restore();
-  }
-);
-
-add_task(
-  async function test_generatePrompt_doesNotSetPrivateData_when_noTabOrMemories() {
-    const conversation = new ChatConversation({});
-    const sandbox = lazy.sinon.createSandbox();
-    _setLoadPromptForTesting(lazy.sinon.stub().resolves("system prompt"));
-
-    sandbox.stub(conversation, "injectRealTimeContext").resolves(null);
-    sandbox.stub(conversation, "injectMemoriesContext").resolves(null);
-
-    await conversation.generatePrompt("hello", null);
-
-    Assert.ok(
-      !conversation.securityProperties.privateData,
-      "privateData should remain false when no private data was staged"
-    );
-    _setLoadPromptForTesting(null);
-    sandbox.restore();
-  }
-);
-
-add_task(function test_securityProperties_plainObject_normalization() {
-  const conversation = new ChatConversation({
-    securityProperties: { untrustedInput: true },
-  });
-
-  Assert.withSoftAssertions(function (soft) {
-    soft.ok(
-      conversation.securityProperties instanceof SecurityProperties,
-      "securityProperties should be a SecurityProperties instance"
-    );
-    soft.equal(
-      conversation.securityProperties.untrustedInput,
-      true,
-      "untrustedInput should be true when explicitly set"
-    );
-    soft.equal(
-      conversation.securityProperties.privateData,
-      false,
-      "privateData should default to false when missing from input"
-    );
-  });
-});
-
 add_task(async function test_convertUrlToToken_tokenGeneration() {
   const cases = [
     {
@@ -1761,10 +1602,16 @@ add_task(async function test_generatePrompt_systemPrompt_from_composer() {
   const systemMessage = conversation.messages.find(
     m => m.role === MESSAGE_ROLE.SYSTEM
   );
-  Assert.equal(
-    systemMessage.content.body,
-    "composed system prompt body",
-    "system message body is whatever loadPrompt returns"
+  Assert.ok(
+    systemMessage.content.body.startsWith("composed system prompt body")
+  );
+  Assert.ok(
+    /separate\s+browsing session/.test(systemMessage.content.body),
+    "The prompt explains independent page fetching"
+  );
+  Assert.ok(
+    systemMessage.content.body.includes("source=user_tab"),
+    "The prompt explains how to request the user's live view"
   );
 });
 

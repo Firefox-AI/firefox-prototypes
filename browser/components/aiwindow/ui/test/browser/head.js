@@ -570,11 +570,7 @@ async function _stubResumeActivityGenerationCore(
   JourneyManager._setBuildConversationForTesting(async () => ({
     setSystemMessage() {},
     addUserMessage() {},
-    securityProperties: {
-      setPrivateData() {},
-      setUntrustedInput() {},
-      commit() {},
-    },
+
     run: sb.stub().resolves({ finalOutput: JSON.stringify(cards) }),
   }));
   sb.stub(AuthProvider, "getToken").resolves(token);

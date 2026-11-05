@@ -19,6 +19,9 @@ BROWSER_CHROME_MANIFESTS += [
 ]
 
 MOZ_SRC_FILES += [
+    "AllowedURLs.sys.mjs",
+    "AssistantGuards.sys.mjs",
+    "AssistantSession.sys.mjs",
     "AuthProvider.sys.mjs",
     "Chat.sys.mjs",
     "ChatUtils.sys.mjs",
@@ -34,7 +37,6 @@ MOZ_SRC_FILES += [
     "PromptOptimizer.sys.mjs",
     "SearchBrowsingHistory.sys.mjs",
     "SearchBrowsingHistoryDomainBoost.sys.mjs",
-    "SecurityProperties.sys.mjs",
     "SmartFormFillModel.sys.mjs",
     "SmartWindowLocation.sys.mjs",
     "SmartWindowNavigationInfo.sys.mjs",

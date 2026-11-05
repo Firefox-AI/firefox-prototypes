@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+import { AssistantGuards } from "moz-src:///browser/components/aiwindow/models/AssistantGuards.sys.mjs";
 import { AuthProvider } from "moz-src:///browser/components/aiwindow/models/AuthProvider.sys.mjs";
 import { MESSAGE_ROLE } from "moz-src:///browser/components/aiwindow/models/Conversation.sys.mjs";
 import {
@@ -42,6 +43,7 @@ import { getSmartPageName } from "chrome://browser/content/aiwindow/modules/Trus
  * @param {ChatConversation} conversation - The conversation context
  * @param {BrowsingContext} browsingContext - The browsing context (can be null for some tools)
  * @param {string} mode - The mode of operation (e.g., "fullpage", "sidebar", "urlbar")
+ * @param {AbortSignal} [signal] - Cancels page reads and guard checks.
  * @returns {Promise<object>} The result of the tool execution
  * @private
  */
@@ -51,14 +53,15 @@ export async function executeToolByName(
   toolCallId,
   conversation,
   browsingContext,
-  mode
+  mode,
+  signal
 ) {
   let result;
   switch (toolName) {
     case GET_PAGE_CONTENT: {
       const startTime = new Date();
       result = await GetPageContent.getPageContentText(
-        toolParams,
+        { ...toolParams, signal },
         conversation
       );
       Glean.smartWindow.getPageContent.record({
@@ -479,6 +482,8 @@ Object.assign(Chat, {
     const chatToolsConfig = filterFeatureGatedTools(toolsConfig, conversation);
 
     let fullResponseText = "";
+    const deniedTools = new Set();
+    let toolIterations = 0;
 
     // A search handoff sets `_searchExecutedTurn` (in executeToolByName). If a
     // later re-entry on the same turn (openSidebarAndContinue -> fetchWithHistory)
@@ -493,20 +498,13 @@ Object.assign(Chat, {
         streamOptions: { enabled: true },
         token,
         chatId: conversation.id,
-        tools: chatToolsConfig,
+        tools: chatToolsConfig.filter(
+          tool => !deniedTools.has(tool.function.name)
+        ),
         args: snapshot,
         inferenceParams: { tool_choice: "auto" },
         signal,
       });
-
-      // Logged after runWithGenerator, which is what commits the flags, so the
-      // ones printed are the ones this request is actually governed by. The
-      // generator body does not run until it is iterated, so nothing has been
-      // sent yet.
-      lazy.console.log(
-        `Request (${conversation.securityProperties.getLogText()})`,
-        snapshot.at(-1)
-      );
 
       // Debug logging: Record only the latest message being sent to the model
       logConversationStream(currentTurn, "CHAT SEND", snapshot.at(-1));
@@ -669,7 +667,7 @@ Object.assign(Chat, {
         `chat-tools-detected(${pendingToolCalls.length})`
       );
 
-      for (const toolCall of pendingToolCalls) {
+      for (const toolCall of pendingToolCalls.slice(0, 1)) {
         const { id, function: functionSpec } = toolCall;
         const toolName = functionSpec?.name || "";
         let toolParams = {};
@@ -681,6 +679,11 @@ Object.assign(Chat, {
         );
         const toolStart = ChromeUtils.now();
 
+        if (++toolIterations > 12) {
+          throw AssistantGuards.terminationError(
+            "Tool guard stopped a task that exceeded its tool budget"
+          );
+        }
         try {
           toolParams = functionSpec?.arguments
             ? JSON.parse(functionSpec.arguments)
@@ -707,6 +710,37 @@ Object.assign(Chat, {
           continue;
         }
 
+        let decision = "DENY";
+        if (!deniedTools.has(toolName)) {
+          decision =
+            toolName === GET_PAGE_CONTENT
+              ? "ALLOW"
+              : await AssistantGuards.checkToolCall(
+                  conversation,
+                  toolName,
+                  toolParams,
+                  signal
+                );
+        }
+        signal?.throwIfAborted();
+        if (decision !== "ALLOW") {
+          conversation.addToolCallMessage({
+            tool_call_id: id,
+            body: "The tool guard did not authorize this request. Find another way to answer without this tool.",
+          });
+          recordToolCallEvent({
+            toolName,
+            mode,
+            conversation,
+            error: "guard_denied",
+          });
+          if (decision === "TERMINATE") {
+            throw AssistantGuards.terminationError();
+          }
+          deniedTools.add(toolName);
+          continue;
+        }
+
         // Capture the embedder element before running tools, as navigation during
         // a tool call such as search handoff can replace the browsing context.
         const originalEmbedderElement = browsingContext?.embedderElement;
@@ -728,7 +762,8 @@ Object.assign(Chat, {
             id,
             conversation,
             browsingContext,
-            mode
+            mode,
+            signal
           );
 
         // Emit the tool message up front with a `pending`-marked placeholder
@@ -803,6 +838,9 @@ Object.assign(Chat, {
           };
           conversation.updateToolCallMessage(pendingToolMessage, content);
         } catch (error) {
+          if (error.name === "AssistantGuardError" || signal?.aborted) {
+            throw error;
+          }
           console.error(error);
           toolCallError = "execution_failed";
           result = { error: `Tool execution failed: ${String(error)}` };
@@ -846,11 +884,6 @@ Object.assign(Chat, {
 
         // These successful tools finish their turns in the UI.
         if (toolName === MANAGE_TABS || aiTabEndsTurn) {
-          // These tool calls need to return early so any staged
-          // security flags that have accumulated up to this point
-          // need to be committed before returning since the commit
-          // at the end of the loop will not be reached.
-          conversation.securityProperties.commit();
           return;
         }
 

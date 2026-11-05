@@ -102,7 +102,7 @@ class ConversationStore extends SQLiteStoreBase {
           created_date: conversation.createdDate,
           updated_date: conversation.updatedDate,
           feature: conversation.feature,
-          security_properties: toJSONOrNull(conversation.securityProperties),
+          security_properties: null,
           seen_urls: JSON.stringify(Array.from(conversation.seenUrls ?? [])),
           serp_urls_for_anonymous_fetch: JSON.stringify(
             Array.from(conversation.serpUrlsForAnonymousFetch ?? [])
@@ -182,7 +182,7 @@ class ConversationStore extends SQLiteStoreBase {
 
   /**
    * Rehydrates a conversation row into a `Conversation`. The constructor wraps
-   * the URL arrays in Sets and runs `SecurityProperties.fromJSON`, so the raw
+   * the URL arrays in Sets, so the raw
    * parsed values can be passed straight through.
    *
    * @param {mozIStorageRow} row
@@ -194,9 +194,7 @@ class ConversationStore extends SQLiteStoreBase {
       createdDate: row.getResultByName("created_date"),
       updatedDate: row.getResultByName("updated_date"),
       feature: row.getResultByName("feature"),
-      securityProperties: parseJSONOrNull(
-        row.getResultByName("security_properties")
-      ),
+
       seenUrls: parseJSONOrNull(row.getResultByName("seen_urls")) ?? [],
       serpUrlsForAnonymousFetch:
         parseJSONOrNull(row.getResultByName("serp_urls_for_anonymous_fetch")) ??

@@ -6,6 +6,8 @@
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
+  AssistantSession:
+    "moz-src:///browser/components/aiwindow/models/AssistantSession.sys.mjs",
   DeferredTask: "resource://gre/modules/DeferredTask.sys.mjs",
   Sqlite: "resource://gre/modules/Sqlite.sys.mjs",
   CONFIRMATION_UI_TYPES:
@@ -87,6 +89,7 @@ import {
   parseConversationRow,
   parseMessageRows,
   parseChatHistoryViewRows,
+  parseJSONOrNull,
   toJSONOrNull,
   stripResolvedAssets,
 } from "./ChatUtils.sys.mjs";
@@ -224,11 +227,12 @@ class ChatStore {
           description: conversation.description,
           page_url: pageUrl?.href ?? null,
           page_meta: toJSONOrNull(conversation.pageMeta),
+          assistant_context: toJSONOrNull(conversation.assistantContext),
           created_date: conversation.createdDate,
           updated_date: conversation.updatedDate,
           status: conversation.status,
           active_branch_tip_message_id: conversation.activeBranchTipMessageId,
-          security_properties: toJSONOrNull(conversation.securityProperties),
+          security_properties: null,
           seen_urls: JSON.stringify(Array.from(conversation.seenUrls ?? [])),
           memories_toggled: conversation.memoriesToggled,
           serp_urls_for_anonymous_fetch: JSON.stringify(
@@ -580,6 +584,7 @@ class ChatStore {
    * @returns {ChatConversation} - The conversation and its messages
    */
   async findConversationById(conversationId) {
+    await lazy.AssistantSession.flushContextWrites();
     await this.#ensureDatabase().catch(e => {
       lazy.log.error(
         "Could not ensure a database connection.",
@@ -924,6 +929,10 @@ class ChatStore {
   async #deleteConversationsByIds(ids) {
     for (let i = 0; i < ids.length; i += DELETE_CHUNK_SIZE) {
       const chunk = ids.slice(i, i + DELETE_CHUNK_SIZE);
+      await this.#clearAssistantContexts(
+        "WHERE conv_id IN (SELECT value FROM json_each(:ids))",
+        { ids: JSON.stringify(chunk) }
+      );
       await this.#conn.executeTransaction(async () => {
         await this.#conn.execute(
           getDeleteConversationsByIdsSql(chunk.length),
@@ -939,6 +948,7 @@ class ChatStore {
    * @param {Array<ChatMessage>} messages
    */
   async deleteMessages(messages) {
+    await lazy.AssistantSession.flushContextWrites();
     // Land any coalesced streaming write for the affected conversations first,
     // so one cannot fire afterwards and resurrect a row removed here, or a
     // conversation the empty-conversation sweep below drops.
@@ -971,6 +981,12 @@ class ChatStore {
         }, new Set())
       );
 
+      const contexts = await this.#conn.execute(
+        `SELECT conv_id, json(assistant_context_jsonb) AS assistant_context
+         FROM conversation WHERE conv_id IN (SELECT value FROM json_each(:ids))`,
+        { ids: JSON.stringify(conversations) }
+      );
+
       await this.#conn.executeTransaction(async () => {
         const deleteMessagesSql = getDeleteMessagesByIdsSql(chunk.length);
         await this.#conn.execute(
@@ -983,6 +999,21 @@ class ChatStore {
         );
         await this.#conn.execute(deleteConvsSql, conversations);
       });
+      for (const row of contexts) {
+        const id = row.getResultByName("conv_id");
+        const remaining = await this.#conn.execute(
+          "SELECT conv_id FROM conversation WHERE conv_id = :id",
+          { id }
+        );
+        if (!remaining.length) {
+          await lazy.AssistantSession.clearConversationContext({
+            id,
+            assistantContext: parseJSONOrNull(
+              row.getResultByName("assistant_context")
+            ),
+          });
+        }
+      }
     }
 
     this.#queueDatabaseSizeRecord();
@@ -1015,6 +1046,9 @@ class ChatStore {
    * @param {string} id - The conv_id of a conversation row to delete
    */
   async deleteConversationById(id) {
+    if (lazy.AssistantSession.conversation.id === id) {
+      await lazy.AssistantSession.clear({ persistContext: false });
+    }
     await this.endStreamingWrites(id);
 
     await this.#ensureDatabase().catch(e => {
@@ -1026,6 +1060,7 @@ class ChatStore {
       throw e;
     });
 
+    await this.#clearAssistantContexts("WHERE conv_id = :id", { id });
     await this.#conn.execute(DELETE_CONVERSATION_BY_ID, {
       conv_id: id,
     });
@@ -1041,6 +1076,10 @@ class ChatStore {
    * @param {Date} endDate - The end date, inclusive
    */
   async deleteConversationsByDateRange(startDate, endDate) {
+    const created = lazy.AssistantSession.conversation.createdDate;
+    if (created >= startDate.getTime() && created <= endDate.getTime()) {
+      await lazy.AssistantSession.clear({ persistContext: false });
+    }
     await this.endStreamingWrites();
 
     await this.#ensureDatabase().catch(e => {
@@ -1052,6 +1091,10 @@ class ChatStore {
       throw e;
     });
 
+    await this.#clearAssistantContexts(
+      "WHERE created_date >= :start_date AND created_date <= :end_date",
+      { start_date: startDate.getTime(), end_date: endDate.getTime() }
+    );
     await this.#conn.execute(DELETE_CONVERSATIONS_BY_DATE, {
       start_date: startDate.getTime(),
       end_date: endDate.getTime(),
@@ -1062,6 +1105,7 @@ class ChatStore {
    * Deletes all conversations and their messages.
    */
   async deleteAllConversations() {
+    await lazy.AssistantSession.clear({ persistContext: false });
     await this.endStreamingWrites();
 
     await this.#ensureDatabase().catch(e => {
@@ -1073,13 +1117,32 @@ class ChatStore {
       throw e;
     });
 
+    await this.#clearAssistantContexts();
     await this.#conn.execute(DELETE_ALL_CONVERSATIONS);
+  }
+
+  async #clearAssistantContexts(where = "", parameters = {}) {
+    await lazy.AssistantSession.flushContextWrites();
+    const rows = await this.#conn.execute(
+      `SELECT conv_id, json(assistant_context_jsonb) AS assistant_context
+       FROM conversation ${where}`,
+      parameters
+    );
+    for (const row of rows) {
+      await lazy.AssistantSession.clearConversationContext({
+        id: row.getResultByName("conv_id"),
+        assistantContext: parseJSONOrNull(
+          row.getResultByName("assistant_context")
+        ),
+      });
+    }
   }
 
   /**
    * This method is meant to only be used for testing cleanup
    */
   async destroyDatabase() {
+    await lazy.AssistantSession.flushContextWrites();
     this.#sizeRecordTask?.disarm();
 
     // Disarm rather than flush: the database is going away, so a coalesced

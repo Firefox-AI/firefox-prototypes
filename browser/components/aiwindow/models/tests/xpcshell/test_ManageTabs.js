@@ -631,16 +631,6 @@ add_task(async function test_manageTabsAction_forces_confirmation_overrides() {
       makeWindow: () =>
         createFakeWindow([createFakeTab(url1, "A"), createFakeTab(url2, "B")]),
     },
-    {
-      name: "untrusted input",
-      validUrls: [url1],
-      conversationOpts: { untrustedInput: true },
-      makeWindow: () => {
-        const target = createFakeTab(url1, "Example");
-        const other = createFakeTab("https://example.com/keep", "Keep");
-        return createFakeWindow([target, other], { selectedTab: other });
-      },
-    },
   ];
 
   for (const { name, validUrls, makeWindow, conversationOpts } of cases) {

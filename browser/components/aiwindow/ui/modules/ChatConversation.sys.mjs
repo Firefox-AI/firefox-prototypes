@@ -65,6 +65,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/models/PromptLoader.sys.mjs",
   loadPrompt:
     "moz-src:///browser/components/aiwindow/models/PromptLoader.sys.mjs",
+  PAGE_ACCESS_INSTRUCTIONS:
+    "moz-src:///browser/components/aiwindow/models/AssistantSession.sys.mjs",
   ToolUI: "moz-src:///browser/components/aiwindow/ui/modules/ToolUI.sys.mjs",
   CONFIRMATION_UI_TYPES:
     "moz-src:///browser/components/aiwindow/ui/modules/ToolUI.sys.mjs",
@@ -115,6 +117,7 @@ export class ChatConversation extends Conversation {
   description;
   pageUrl;
   pageMeta;
+  assistantContext;
   status;
   activeBranchTipMessageId;
 
@@ -220,13 +223,13 @@ export class ChatConversation extends Conversation {
       description,
       pageUrl,
       pageMeta,
+      assistantContext = null,
       createdDate = Date.now(),
       updatedDate = Date.now(),
       messages = [],
       seenUrls,
       serpUrlsForAnonymousFetch,
       memoriesToggled = null,
-      securityProperties = null,
     } = params;
 
     super({
@@ -237,7 +240,6 @@ export class ChatConversation extends Conversation {
       seenUrls,
       serpUrlsForAnonymousFetch,
       feature: "chat",
-      securityProperties,
     });
 
     this.urlTokenizer = new UrlTokenizer();
@@ -245,6 +247,7 @@ export class ChatConversation extends Conversation {
     this.description = description;
     this.pageUrl = pageUrl;
     this.pageMeta = pageMeta;
+    this.assistantContext = assistantContext;
     this.rehydrateHistoryResultsPool();
     this.rehydrateCitationsPool();
     this.memoriesToggled = memoriesToggled;
@@ -732,7 +735,7 @@ export class ChatConversation extends Conversation {
 
     return this.setSystemMessage({
       type: SYSTEM_PROMPT_TYPE.TEXT,
-      body,
+      body: `${body}\n\n${lazy.PAGE_ACCESS_INSTRUCTIONS}`,
       ...(version && { version }),
     });
   }
@@ -740,10 +743,6 @@ export class ChatConversation extends Conversation {
   /**
    * Takes a new prompt and generates LLM context messages before
    * adding new user prompt to messages.
-   *
-   * SECURITY: each data source added here may carry private or untrusted
-   * content and MUST raise the matching SecurityProperties flag before commit(),
-   * and add a security test asserting the flags it sets.
    *
    * @param {string} prompt - new user prompt
    * @param {?URL} pageUrl - The URL of the page when prompt was submitted
@@ -792,7 +791,6 @@ export class ChatConversation extends Conversation {
       }
     }
 
-    this.securityProperties.commit();
     return this;
   }
 
@@ -833,10 +831,6 @@ export class ChatConversation extends Conversation {
    * Fetch browser/tab + mentions context and write it onto
    * `userMessage.content.userContext.realTimeContext`.
    *
-   * SECURITY: current-tab info is private, so it raises setPrivateData() when
-   * hasTabInfo is true. Context mentions inject only a URL and sanitized
-   * label, not page content, so they raise no flag.
-   *
    * @param {ChatMessage} userMessage
    * @param {object} [opts]
    * @param {ContextWebsite[]} [opts.contextMentions]
@@ -849,7 +843,6 @@ export class ChatConversation extends Conversation {
       {
         ...(getRealTimeMapping && { getRealTimeMapping }),
         contextMentions,
-        securityProperties: this.securityProperties,
       }
     );
     if (!realTimePrompt || !userMessage?.content) {
@@ -873,9 +866,6 @@ export class ChatConversation extends Conversation {
    * to its immediate context. The memories retrieved for this message are recorded on
    * `userMessage.content.relevantMemories` to feed the next messages' window.
    *
-   * SECURITY: retrieved memories are private user data, so this raises
-   * setPrivateData() whenever memories are returned.
-   *
    * @todo Bug2009434 Rename type and change enum to renamed values
    * @param {ChatMessage} userMessage
    * @param {string} prompt
@@ -897,7 +887,6 @@ export class ChatConversation extends Conversation {
     if (memoriesContext == null) {
       return;
     }
-    this.securityProperties.setPrivateData();
     if (userMessage?.content) {
       userMessage.content.userContext ??= {};
       userMessage.content.userContext.memoriesContext =
@@ -989,6 +978,7 @@ export class ChatConversation extends Conversation {
    */
   getMessagesInChatCompletionsFormat({ applyUrlTokens = true } = {}) {
     const isWireFiltered = m =>
+      (m.role === MESSAGE_ROLE.TOOL && m.content?.actionLogOnly) ||
       // Empty-body assistant placeholders, added pre-stream to receive the
       // response body. Drop until the stream fills them in.
       (m.role === MESSAGE_ROLE.ASSISTANT && !m?.content?.body) ||

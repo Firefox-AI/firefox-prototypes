@@ -137,6 +137,43 @@ add_atomic_task(async function task_ChatStorage_constructor() {
   Assert.ok(gChatStore, "Should return a ChatStorage instance");
 });
 
+add_atomic_task(
+  async function test_assistant_context_migration_and_round_trip() {
+    const conversation = new ChatConversation({});
+    conversation.addUserMessage(
+      "A conversation with retained browsing context"
+    );
+    await gChatStore.updateConversation(conversation);
+    await gChatStore.connection.execute(
+      "ALTER TABLE conversation DROP COLUMN assistant_context_jsonb"
+    );
+    await gChatStore.applyMigrations(12);
+    await gChatStore.applyMigrations(12);
+    Assert.equal(
+      (await gChatStore.findConversationById(conversation.id)).assistantContext,
+      null,
+      "Migrating and replaying preserves chats without inventing sharing grants"
+    );
+    conversation.assistantContext = {
+      version: 1,
+      identityName: `userContextIdInternal.smartWindow.${conversation.id}`,
+      visitedSites: ["https://example.com"],
+      sharedPrincipals: ["https://example.org^userContextId=2"],
+    };
+    await gChatStore.updateConversation(conversation);
+    Assert.deepEqual(
+      (await gChatStore.findConversationById(conversation.id)).assistantContext,
+      conversation.assistantContext,
+      "History restores the conversation's storage identity, visits, and exact grants"
+    );
+    Assert.deepEqual(
+      (await gChatStore.search("retained browsing"))[0].assistantContext,
+      conversation.assistantContext,
+      "Searching history preserves context metadata too"
+    );
+  }
+);
+
 add_atomic_task(async function test_ChatStorage_updateConversation() {
   let success = true;
   let errorMessage = "";
@@ -1087,32 +1124,6 @@ add_atomic_task(
   }
 );
 
-add_atomic_task(async function test_securityProperties_roundTrip_mixedFlags() {
-  const conversation = new ChatConversation({
-    securityProperties: { privateData: false, untrustedInput: true },
-  });
-  conversation.title = "partially tainted conversation";
-
-  // Provide at least one message so the insert has valid data
-  // to bind in `updateConversation()`. Empty array causes constraint error.
-  conversation.addUserMessage("test content", "https://www.firefox.com");
-  await gChatStore.updateConversation(conversation);
-
-  const restored = await gChatStore.findConversationById(conversation.id);
-
-  Assert.ok(restored, "conversation should restore from DB");
-  Assert.withSoftAssertions(function (soft) {
-    soft.ok(
-      restored.securityProperties.untrustedInput,
-      "untrustedInput should be true after restore"
-    );
-    soft.ok(
-      !restored.securityProperties.privateData,
-      "privateData should be false after restore"
-    );
-  });
-});
-
 add_atomic_task(
   async function test_ChatStorage_deleteAllUrlsFromMessages_marksAllContextMentionsHistoryDeleted() {
     const conversation = new ChatConversation({
@@ -1286,36 +1297,6 @@ add_atomic_task(async function test_serpUrlsForAnonymousFetch_roundTrip() {
     2,
     "serpUrlsForAnonymousFetch should have exactly 2 entries"
   );
-});
-
-add_atomic_task(async function test_securityProperties_upsert_updatesFlags() {
-  const conversation = new ChatConversation({});
-  conversation.title = "conversation that becomes tainted";
-
-  // Provide at least one message so the insert has valid data
-  // to bind in `updateConversation()`. Empty array causes constraint error.
-  conversation.addUserMessage("test content", "https://www.firefox.com");
-  await gChatStore.updateConversation(conversation);
-
-  // Simulate flags being set during conversation lifetime
-  conversation.securityProperties.setUntrustedInput();
-  conversation.securityProperties.setPrivateData();
-  conversation.securityProperties.commit();
-  await gChatStore.updateConversation(conversation);
-
-  const restored = await gChatStore.findConversationById(conversation.id);
-
-  Assert.ok(restored, "conversation should restore from DB");
-  Assert.withSoftAssertions(function (soft) {
-    soft.ok(
-      restored.securityProperties.untrustedInput,
-      "untrustedInput should be true after upsert"
-    );
-    soft.ok(
-      restored.securityProperties.privateData,
-      "privateData should be true after upsert"
-    );
-  });
 });
 
 add_atomic_task(async function test_memoriesToggled_roundTrip() {

@@ -1,6 +1,7 @@
 [DEFAULT]
 firefox-appdir = "browser"
 head = ["asserts.js"]
+prefs = ["privacy.bounceTrackingProtection.mode=0"]
 run-if = [
   "os != 'android'",
 ]

@@ -14,6 +14,8 @@
  * @import { AITabContext, AITabResult } from "moz-src:///browser/components/aiwindow/models/aitab/AITab.sys.mjs"
  */
 
+import { AssistantGuards } from "moz-src:///browser/components/aiwindow/models/AssistantGuards.sys.mjs";
+import { AssistantSession } from "moz-src:///browser/components/aiwindow/models/AssistantSession.sys.mjs";
 import { isSmartPageURL } from "chrome://browser/content/aiwindow/modules/TrustedInternalURLs.mjs";
 import { getSkillPrompt } from "moz-src:///browser/components/aiwindow/models/PromptLoader.sys.mjs";
 import { searchBrowsingHistory as implSearchBrowsingHistory } from "moz-src:///browser/components/aiwindow/models/SearchBrowsingHistory.sys.mjs";
@@ -30,7 +32,7 @@ import {
   sanitizeUntrustedContent,
   isNewPageUrl,
 } from "moz-src:///browser/components/aiwindow/models/ChatUtils.sys.mjs";
-import { isAllowedURLProtocol } from "moz-src:///browser/components/aiwindow/models/SecurityProperties.sys.mjs";
+import { isAllowedURLProtocol } from "moz-src:///browser/components/aiwindow/models/AllowedURLs.sys.mjs";
 
 import {
   CountVectorizer,
@@ -424,7 +426,7 @@ export const toolsConfig = [
     function: {
       name: GET_PAGE_CONTENT,
       description:
-        "Retrieve cleaned text content of all the provided browser page URL Tokens in the list.",
+        "Fetch page content for the provided URL tokens. By default, use an already-shared live tab when available; otherwise fetch independently with the assistant's separate browsing session. An unshared site can still be fetched. Request source=user_tab only when the user's live or signed-in view is needed; the browser asks for sharing consent.",
       parameters: {
         type: "object",
         properties: {
@@ -438,6 +440,12 @@ export const toolsConfig = [
             },
             minItems: 1,
             description: "List of URL tokens to fetch content from.",
+          },
+          source: {
+            type: "string",
+            enum: ["auto", "assistant", "user_tab"],
+            description:
+              "auto (default): use an already-shared live tab, otherwise fetch with the assistant's separate browsing session. assistant: always fetch independently. user_tab: read the user's live tab, requesting sharing permission if necessary.",
           },
         },
         required: ["url_list"],
@@ -739,9 +747,6 @@ export async function getOpenTabs({ topic = "" } = {}, conversation) {
 
   const recentTabs = tabs.slice(0, MAX_TABS);
 
-  // Tab titles are truncated to 100 characters and therefore not expected to
-  // contain enough untrusted data for a prompt injection attack.
-  conversation.securityProperties.setPrivateData();
   lazy.console.log("[Tool] getOpenTabs", recentTabs);
 
   conversation.addSeenUrls(recentTabs.map(({ url }) => url));
@@ -782,7 +787,6 @@ export async function getOpenTabs({ topic = "" } = {}, conversation) {
  *  `error` string on failure.
  */
 export async function searchBrowsingHistory(toolParams, conversation) {
-  // No security check, always allowed because it makes no external requests.
   const params = toolParams && typeof toolParams === "object" ? toolParams : {};
 
   const { searchTerm = "", startTs = null, endTs = null } = params;
@@ -823,7 +827,6 @@ export async function searchBrowsingHistory(toolParams, conversation) {
     })
   );
 
-  conversation.securityProperties.setPrivateData();
   lazy.console.log("[Tool] searchBrowsingHistory", result);
   return result;
 }
@@ -850,9 +853,6 @@ export class RunSearch {
    * @returns {Promise<string>}
    */
   static async runSearch(toolParams, browsingContext, conversation) {
-    // No security check, always allowed because we assume that the search
-    // provider is trusted.
-
     // Decide if we'll use the user message verbatim as the search query or generate one
     let query;
     if (toolParams.query) {
@@ -922,9 +922,6 @@ export class RunSearch {
     if (entry) {
       entry.hasUserInteraction = true;
     }
-
-    conversation.securityProperties.setPrivateData();
-    conversation.securityProperties.setUntrustedInput();
 
     lazy.console.log("[Tool] runSearch", result);
     return result;
@@ -1105,6 +1102,7 @@ export class GetPageContent {
    *
    * @param {object} toolParams
    * @param {string[]} toolParams.url_list
+   * @param {"auto"|"assistant"|"user_tab"} [toolParams.source="auto"]
    * @param {AbortSignal} [toolParams.signal]
    * @param {ChatConversation} conversation
    * @returns {Promise<Array<string>>}
@@ -1127,14 +1125,23 @@ export class GetPageContent {
    *
    * @param {object} toolParams
    * @param {string[]} toolParams.url_list
+   * @param {"auto"|"assistant"|"user_tab"} [toolParams.source="auto"]
    * @param {AbortSignal} [toolParams.signal] - Cancels in-flight extractions
    *   (and tears down any headless browser) when it aborts.
    * @param {number} [toolParams.settleDelayMs] - Extra wait for headless loads.
    * @param {ChatConversation} conversation
    * @returns {Promise<Array<{url: ?string, ok: boolean, content: string}>>}
    */
-  static async getPageContent(
-    { url_list, signal, settleDelayMs },
+  static async getPageContent(toolParams, conversation) {
+    return AssistantSession.withRead(
+      signal =>
+        GetPageContent.#getPageContent({ ...toolParams, signal }, conversation),
+      toolParams.signal
+    );
+  }
+
+  static async #getPageContent(
+    { url_list, signal, settleDelayMs, source = "auto" },
     conversation
   ) {
     // Sanitize the inputs from the language model:
@@ -1147,39 +1154,56 @@ export class GetPageContent {
         },
       ];
     }
-    // This is a decision table for allowing and blocking fetches on the configuration of the
-    // SecurityProperties and the URLs. Tab URLs don't do any new page loads. Mention urls
-    // have been added by the user so they should be allowed. SERP urls came from a
-    // trusted search provider's SERP and are eligible for an anonymous fetch.
-    // AITab URLs are an exception, reading the contents of an open
-    // about:smartpage tab extracts content locally and the content for the
-    // AITab is also stored locally, so there is no risk of data exfiltration.
-    // All other URLs are restricted when both private and untrusted data has been seen.
-    //
-    // │ Flags               │ tab urls │ mention urls │ serp urls          │ any urls │
-    // ├─────────────────────┼──────────┼──────────────┼────────────────────┼──────────┤
-    // │ Private only        │ ALLOW    │ ALLOW        │ ALLOW              │ ALLOW    │
-    // │ Untrusted only      │ ALLOW    │ ALLOW        │ ALLOW              │ ALLOW    │
-    // │ Private + Untrusted │ ALLOW    │ ALLOW        │ ALLOW (anonymous)  │ BLOCK    │
-
-    // Collect these one time before the loop below since it must iterate through
-    // all of the conversations and collect a new Set of mentions.
-    const mentionedUrls = conversation.getAllMentionURLs();
+    if (url_list.length > MAX_TABS) {
+      return [{ url: null, ok: false, content: "Too many pages requested." }];
+    }
+    if (!["auto", "assistant", "user_tab"].includes(source)) {
+      return [
+        {
+          url: null,
+          ok: false,
+          content: "The source must be auto, assistant, or user_tab.",
+        },
+      ];
+    }
+    const decisions = await Promise.all(
+      url_list.map(url =>
+        isAllowedURLProtocol(url) || isSmartPageURL(URL.parse(url))
+          ? AssistantGuards.checkToolCall(
+              conversation,
+              GET_PAGE_CONTENT,
+              { url_list: [url], source },
+              signal
+            )
+          : "DENY"
+      )
+    );
+    if (decisions.includes("TERMINATE")) {
+      throw AssistantGuards.terminationError();
+    }
 
     const results = await Promise.all(
       url_list.map(async (url, index) => {
         if (!isAllowedURLProtocol(url) && !isSmartPageURL(URL.parse(url))) {
           return { url, ok: false, content: "This URL is not allowed: " + url };
         }
+        if (decisions[index] !== "ALLOW") {
+          return {
+            url,
+            ok: false,
+            content:
+              "Page read was not authorized by the tool guard. Do not retry this request.",
+          };
+        }
         const startTime = ChromeUtils.now();
         try {
           const { ok, content } =
             await GetPageContent.#getPageContentsForSingleURL(
               url,
-              mentionedUrls,
               conversation,
               signal,
-              settleDelayMs
+              settleDelayMs,
+              source
             );
           ChromeUtils.addProfilerMarker(
             "SmartWindow",
@@ -1226,165 +1250,111 @@ export class GetPageContent {
   }
 
   /**
-   * Whether getPageContent would surface content for `url` in this
-   * conversation (same allow/deny logic). Lets callers gate other
-   * page-derived data (e.g. AITab's per-tab og:image) on the same decision.
-   *
-   * @param {string} url
-   * @param {ChatConversation} conversation
-   * @returns {boolean}
-   */
-  static isContentAllowed(url, conversation) {
-    if (!isAllowedURLProtocol(url)) {
-      // Only http/https pages may be exposed to the LLM at all; internal
-      // schemes (about:, chrome:, file:, ...) stay out regardless of
-      // conversation state.
-      return false;
-    }
-    if (
-      GetPageContent.getTabWithURL(url) ||
-      conversation.getAllMentionURLs().has(url)
-    ) {
-      // The user deliberately brought this page into the conversation —
-      // it is open as a tab or was mentioned by them — so reading it
-      // reflects direct user intent rather than a model-chosen fetch.
-      return true;
-    }
-    if (
-      conversation.securityProperties.untrustedInput &&
-      conversation.securityProperties.privateData &&
-      !conversation.serpUrlsForAnonymousFetch.has(url)
-    ) {
-      // Anything else requires a headless network fetch of a URL the user
-      // never opened or mentioned. When the conversation holds both untrusted
-      // input (a prompt injection could have chosen this URL) and private
-      // data (something worth stealing), such a fetch is a potential
-      // exfiltration channel, so it is denied. SERP URLs are exempt because
-      // they get an anonymous fetch path that carries no user identity.
-      return false;
-    }
-    // A headless fetch is acceptable here: without the untrusted + private
-    // combination above, there is either no injected URL choice or no private
-    // data for it to leak.
-    return true;
-  }
-
-  /**
    * Search through all AI Windows to find the tab with the matching URL.
    *
    * @param {string} url
    * @returns {Tab | null}
    */
   static getTabWithURL(url) {
-    for (const win of lazy.BrowserWindowTracker.orderedWindows) {
-      if (!lazy.AIWindow.isAIWindowActive(win) || win.closed || !win.gBrowser) {
-        continue;
-      }
-
-      for (const tab of win.gBrowser.tabs) {
-        if (tab?.linkedBrowser?.currentURI?.spec === url) {
-          return tab;
-        }
-      }
-    }
-
-    return null;
+    const tabs = AssistantSession.getTabsWithURL(url);
+    return (
+      tabs.find(
+        tab => AssistantSession.getPageAccess(tab.linkedBrowser)?.shared
+      ) ??
+      tabs[0] ??
+      null
+    );
   }
 
   /**
    * @param {string} url
-   * @param {Set<string>} mentionedUrls
    * @param {ChatConversation} conversation
    * @param {AbortSignal} [signal] - Cancels the extraction (and tears down any
    *   headless browser) when it aborts.
    * @param {number} [settleDelayMs] - Extra wait for headless loads.
+   * @param {"auto"|"assistant"|"user_tab"} [source="auto"]
    *
    * @returns {Promise<{ok: boolean, content: string}>}
    *   ok is false when content is a failure description rather than page text.
    */
   static async #getPageContentsForSingleURL(
     url,
-    mentionedUrls,
     conversation,
     signal,
-    settleDelayMs
+    settleDelayMs,
+    source = "auto"
   ) {
     if (signal?.aborted) {
       throw new DOMException("Aborted", "AbortError");
     }
-    // First try to get the contents from an existing tab. This is always allowed from
-    // a security perspective as it doesn't involve a network request, so there is
-    // no risk for data exfiltration.
     const tab = GetPageContent.getTabWithURL(url);
-    if (tab) {
-      // Extract the tab contents.
-      const currentWindowContext =
-        tab.linkedBrowser.browsingContext?.currentWindowContext;
-
-      if (!currentWindowContext) {
+    const isSmartPage = isSmartPageURL(URL.parse(url));
+    if (
+      tab &&
+      (isSmartPage ||
+        (source !== "assistant" &&
+          (source === "user_tab" ||
+            AssistantSession.getPageAccess(tab.linkedBrowser)?.shared)))
+    ) {
+      if (!isSmartPage) {
+        if (
+          !(await AssistantSession.requestPageAccess(tab.linkedBrowser, signal))
+        ) {
+          return {
+            ok: false,
+            content:
+              "The user's live-tab session was not shared. Do not retry requesting it in this turn. You can still fetch this URL independently with source=assistant; that content may differ from the user's page.",
+          };
+        }
+        if (tab.linkedBrowser.currentURI?.spec !== url) {
+          return {
+            ok: false,
+            content: "The requested tab navigated before it could be read.",
+          };
+        }
+        return AssistantSession.withPageAccess(
+          tab.linkedBrowser,
+          (context, sharedSignal) =>
+            GetPageContent.#runExtraction(
+              context.getActor("PageExtractor"),
+              conversation,
+              `${url} (shared live tab)`,
+              url,
+              sharedSignal
+            ),
+          signal
+        );
+      }
+      const context = tab.linkedBrowser.browsingContext?.currentWindowContext;
+      if (!context) {
         return {
           ok: false,
-          content: `Cannot access content from the following webpage:\n - Title: ${sanitizeUntrustedContent(tab.label)}\n - URL: ${url}.`,
+          content: "The requested tab is no longer available.",
         };
       }
-
-      // Extract page content using PageExtractor
-      const pageExtractor =
-        await currentWindowContext.getActor("PageExtractor");
-
       return GetPageContent.#runExtraction(
-        pageExtractor,
+        await context.getActor("PageExtractor"),
         conversation,
-        `${sanitizeUntrustedContent(tab.label)} (${url})`,
+        url,
         url,
         signal
       );
     }
-
-    // Fetch the page headlessly since it's not loaded as a tab. This requires elevated
-    // security permissions since an external network request is required, and is a
-    // risk for the exfiltration of private data. If the URL is mentioned by the user
-    // then the security properties check is bypassed here. URLs in the serp URL
-    // ledger get a anonymous fetch path that does not carry user identity.
-
-    let label = url; // For headless fetches, use the URL as the label since we don't have a tab title.
-    if (
-      !mentionedUrls.has(url) &&
-      conversation.securityProperties.untrustedInput &&
-      conversation.securityProperties.privateData
-    ) {
-      if (conversation.serpUrlsForAnonymousFetch.has(url)) {
-        return PageExtractorParent.getHeadlessExtractor({
-          urlString: url,
-          callback: (pageExtractor, traceId) =>
-            GetPageContent.#runExtraction(
-              pageExtractor,
-              conversation,
-              label,
-              url,
-              signal,
-              traceId
-            ),
-          anonymousFetch: true,
-          settleDelayMs,
-          signal,
-        });
-      }
+    if (source === "user_tab") {
       return {
         ok: false,
         content:
-          `Access is not allowed for ${url} because of untrusted and private content ` +
-          "in the conversation.",
+          "No matching live tab is available. You can fetch this URL independently with source=assistant.",
       };
     }
-
     return PageExtractorParent.getHeadlessExtractor({
       urlString: url,
-      callback: (pageExtractor, traceId) =>
+      originAttributes: AssistantSession.originAttributes,
+      callback: (extractor, traceId) =>
         GetPageContent.#runExtraction(
-          pageExtractor,
+          extractor,
           conversation,
-          label,
+          `${url} (assistant browsing session; fetched independently)`,
           url,
           signal,
           traceId
@@ -1396,7 +1366,7 @@ export class GetPageContent {
 
   /**
    * Main extraction function.
-   * label is of form `{tab.title} ({tab.url})`.
+   * The label is the source URL.
    *
    * @param {PageExtractorParent} pageExtractor
    * @param {ChatConversation} conversation
@@ -1441,14 +1411,6 @@ export class GetPageContent {
     }
 
     const { text, links } = extraction;
-    conversation.addSeenUrls(links);
-
-    // If an extraction succeeds set the security properties.
-    // The page content is private since it uses a web page load that has credentials.
-    // The information is untrusted since it's arbitrary web content.
-    conversation.securityProperties.setPrivateData();
-    conversation.securityProperties.setUntrustedInput();
-
     if (!text?.trim()) {
       return {
         ok: false,
@@ -1456,7 +1418,23 @@ export class GetPageContent {
       };
     }
 
-    return { ok: true, content: `Content from ${label}:\n\n${text}` };
+    const content = `Content from ${label}:\n\n${text}`;
+    if (
+      !(await AssistantGuards.isPageContentSafe(
+        conversation,
+        { text: content, links },
+        signal
+      ))
+    ) {
+      return {
+        ok: false,
+        content:
+          "Page content was withheld by the prompt-injection check. Do not retry this page.",
+      };
+    }
+    signal?.throwIfAborted();
+    conversation.addSeenUrls(links);
+    return { ok: true, content };
   }
 }
 
@@ -1476,7 +1454,7 @@ export async function getNavigationInfo(toolParams) {
     return [];
   }
 
-  // No flags set: results are static browser UI metadata bundled with Firefox.
+  // Results are static browser UI metadata bundled with Firefox.
   // No network requests are made and no user data is read, so there is no
   // privacy risk and no untrusted content that could carry a prompt injection.
   return lazy.SmartWindowNavigationInfo.getRelevantNavigation(query);
@@ -1485,17 +1463,12 @@ export async function getNavigationInfo(toolParams) {
 /**
  * Retrieves the summaries of all saved memories
  *
- * @param {ChatConversation} conversation
  * @returns {Promise<Array<string>>}
  */
-export async function getUserMemories(conversation) {
-  // No security check, always allowed because it makes no external requests.
+export async function getUserMemories() {
   const memories = await lazy.MemoriesManager.getAllMemories();
 
   const result = memories.map(memory => memory.memory_summary);
-  // Memory summaries are private user data. They are truncated to 100
-  // characters, so they are not considered untrusted input.
-  conversation.securityProperties.setPrivateData();
   lazy.console.log("[Tool] getUserMemories", result);
   return result;
 }
@@ -1508,19 +1481,12 @@ export async function getUserMemories(conversation) {
  * @param {object} toolParams
  * @param {string} toolParams.memorySummary
  * @param {boolean} toolParams.containsPersonallyIdentifiableInfo
- * @param {ChatConversation} conversation
  * @returns {Promise<string>}
  */
-export async function addMemory(
-  { memorySummary, containsPersonallyIdentifiableInfo },
-  conversation
-) {
-  // Until UI confirmation is implemented, we will not allow saving memories when untrusted
-  //  input is present in the conversation. This is to mitigate writes of attacker-influenced content
-  // into durable storage that is later re-injected into the user's future conversations as trusted context.
-  if (conversation.securityProperties.untrustedInput) {
-    return "Memory cannot be saved when untrusted content is present in the conversation.";
-  }
+export async function addMemory({
+  memorySummary,
+  containsPersonallyIdentifiableInfo,
+}) {
   if (containsPersonallyIdentifiableInfo) {
     return "Error: Failed to save memory: Memory contains personally identifiable information.";
   }
@@ -1752,8 +1718,7 @@ export async function createAITab(
   };
 }
 
-// No securityProperties / trust flags: skill prompts are Remote Settings
-// content and carry the same trust level as the system prompt itself.
+// Skill prompts are Remote Settings content with the trust level of the system prompt.
 export async function getSkill({ toolParams, model }) {
   return getSkillPrompt(toolParams?.name, model);
 }

@@ -65,13 +65,9 @@ function findMatchingAIWindowTabs(validUrls) {
  *
  * @param {Array<object>} tabs - list of tabs to check
  * @param {object} topAIWin - the top active AI window
- * @param {object} securityProperties - The security properties of the conversation.
  * @returns {boolean}
  */
-function shouldRequireUserConfirmation(tabs, topAIWin, securityProperties) {
-  if (securityProperties?.untrustedInput) {
-    return true;
-  }
+function shouldRequireUserConfirmation(tabs, topAIWin) {
   if (tabs.some(({ tab }) => tab.pinned === true)) {
     return true;
   }
@@ -116,8 +112,7 @@ async function runManageTabsFlow(state, toolHandler) {
     state.askConfirmation ||
     shouldRequireUserConfirmation(
       gatheredResult.matchedTabs,
-      gatheredResult.topAIWin,
-      state.conversation.securityProperties
+      gatheredResult.topAIWin
     )
   ) {
     const uiType = UI_TYPE_BY_ACTION[toolHandler.action];

@@ -12,6 +12,8 @@
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
+  AssistantGuards:
+    "moz-src:///browser/components/aiwindow/models/AssistantGuards.sys.mjs",
   AITab: "moz-src:///browser/components/aiwindow/models/aitab/AITab.sys.mjs",
   AITabStore:
     "moz-src:///browser/components/aiwindow/ui/modules/AITabStore.sys.mjs",
@@ -321,13 +323,6 @@ add_task(async function test_generateAITab_includes_page_image() {
 });
 
 add_task(async function test_generateAITab_omits_image_for_denied_url() {
-  // Threat model: a prompt injection could ask AITab to build a page from an
-  // attacker-chosen URL. When the conversation holds both untrusted input and
-  // private data, get_page_content refuses to fetch unmentioned, non-SERP URLs
-  // headlessly to block that exfiltration channel. This test asserts the image
-  // path honors the same refusal — the denied URL's cached og:image must reach
-  // neither the model prompt nor the urlsUsed metadata — so it cannot become a
-  // side channel around the existing block.
   const mockEngine = new lazy.MockEngineManager();
   const DENIED_URL = "https://example.com/denied-private-untrusted-page";
   const IMAGE_URL = "https://example.com/denied-hero.jpg";
@@ -336,17 +331,16 @@ add_task(async function test_generateAITab_omits_image_for_denied_url() {
     url: DENIED_URL,
     previewImageURL: IMAGE_URL,
   });
-  // A second, readable URL: generation stops before the model when nothing at
-  // all can be read, and the denied URL alone would trip that. The SERP ledger
-  // exempts this one, so the read is partial rather than empty.
+  // A second readable URL allows generation to proceed after a denied read.
   const { url: ALLOWED_URL, cleanup: stopServing } = servePage();
   try {
     const conversation = await lazy.newChatConversation();
-    // Mark the conversation as holding private data and untrusted input;
-    // commit() makes the staged flags visible to the security getters.
-    conversation.securityProperties.setPrivateData();
-    conversation.securityProperties.setUntrustedInput();
-    conversation.securityProperties.commit();
+    lazy.AssistantGuards.checkToolCall.callsFake(async (_chat, name, args) =>
+      name === "get_page_content" && args.url_list.includes(DENIED_URL)
+        ? "DENY"
+        : "ALLOW"
+    );
+
     conversation.addSerpUrlsForAnonymousFetch([ALLOWED_URL]);
     const call = generatePage(mockEngine, conversation, {
       url_list: [DENIED_URL, ALLOWED_URL],
@@ -356,7 +350,7 @@ add_task(async function test_generateAITab_omits_image_for_denied_url() {
     });
     const serializedRequest = JSON.stringify(request.args);
     Assert.ok(
-      serializedRequest.includes("Access is not allowed"),
+      serializedRequest.includes("not authorized"),
       "the denied URL surfaces the refusal message, not page content"
     );
     Assert.ok(
@@ -511,9 +505,7 @@ add_task(async function test_generateAITab_hydrates_favicon_for_denied_url() {
   const { url: ALLOWED_URL, cleanup: stopServing } = servePage();
   try {
     const conversation = await lazy.newChatConversation();
-    conversation.securityProperties.setPrivateData();
-    conversation.securityProperties.setUntrustedInput();
-    conversation.securityProperties.commit();
+
     conversation.addSerpUrlsForAnonymousFetch([ALLOWED_URL]);
     const call = generatePage(mockEngine, conversation, {
       url_list: [DENIED_URL, ALLOWED_URL],
@@ -876,14 +868,7 @@ add_task(async function test_generateAITab_persists_its_tool_conversation() {
     // Nothing here sets the flags or the URLs: generateAITab does. Reading
     // the row back is what shows it did, and did it before saving.
     const stored = await lazy.ConversationStore.findConversationById(convId);
-    Assert.ok(
-      stored.securityProperties.privateData,
-      "the stored tool conversation is marked as holding private data"
-    );
-    Assert.ok(
-      stored.securityProperties.untrustedInput,
-      "the stored tool conversation is marked as holding untrusted input"
-    );
+
     Assert.deepEqual(
       Array.from(stored.seenUrls),
       [SEEN],

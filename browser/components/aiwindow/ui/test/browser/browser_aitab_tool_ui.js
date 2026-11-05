@@ -253,11 +253,6 @@ describe("AITab ToolUI", () => {
       ),
       "AITab generation extracted the source page"
     );
-    Assert.equal(
-      conversation.securityProperties.untrustedInput,
-      false,
-      "The extracted page's security flags are staged during generation"
-    );
 
     generationRequest.respond(JSON.stringify(SURFACE));
     const ready = await waitForAITabCardState(
@@ -279,18 +274,11 @@ describe("AITab ToolUI", () => {
     );
 
     await TestUtils.waitForCondition(
-      () => conversation.securityProperties.untrustedInput,
+      () =>
+        conversation.messages.some(
+          message => message.content?.name === "generate_aitab"
+        ),
       "Wait for generate_page to commit the staged security flags"
-    );
-    Assert.equal(
-      conversation.securityProperties.privateData,
-      true,
-      "Extracted page content is committed as private data"
-    );
-    Assert.equal(
-      conversation.securityProperties.untrustedInput,
-      true,
-      "Extracted page content is committed as untrusted input"
     );
   });
 

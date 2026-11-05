@@ -41,7 +41,7 @@ async function applyV2(conn, version) {
  */
 async function getColumns(conn, tableName) {
   const columns = await conn.execute(`PRAGMA table_info(${tableName})`);
-  return new Set(columns.map(c => c.name));
+  return new Set(columns.map(c => c.getResultByName("name")));
 }
 
 // Rename insights to memories
@@ -231,6 +231,17 @@ async function applyV12(conn, version) {
   await conn.execute(MESSAGE_ORDINAL_INDEX_DROP);
 }
 
+async function applyV13(conn, version) {
+  if (version < 13) {
+    const columns = await getColumns(conn, "conversation");
+    if (!columns.has("assistant_context_jsonb")) {
+      await conn.execute(
+        "ALTER TABLE conversation ADD COLUMN assistant_context_jsonb BLOB"
+      );
+    }
+  }
+}
+
 /**
  * Array of migration functions to run in the order they should be run in.
  *
@@ -248,4 +259,5 @@ export const migrations = [
   applyV10,
   applyV11,
   applyV12,
+  applyV13,
 ];

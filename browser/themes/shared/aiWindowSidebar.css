@@ -47,3 +47,64 @@
 #tabbrowser-tabbox[ai-window-open] {
   min-width: calc(var(--content-area-min-size) + var(--devtools-toolbox-width, 0px));
 }
+
+.assistant-page-shared-icon {
+  list-style-image: url("chrome://browser/content/aiwindow/assets/smart-window.svg");
+  -moz-context-properties: fill;
+  fill: currentColor;
+  width: var(--icon-size-small);
+  height: var(--icon-size-small);
+  margin-inline-end: var(--space-xsmall);
+  flex-shrink: 0;
+
+  .tabbrowser-tab[pinned] & {
+    position: absolute;
+    inset-inline-end: calc(var(--tab-padding-inline) / 2);
+    inset-block-end: var(--space-xxsmall);
+    width: var(--icon-size-xsmall);
+    height: var(--icon-size-xsmall);
+    margin: 0;
+    border-radius: var(--border-radius-circle);
+    background-color: var(--toolbar-bgcolor);
+  }
+}
+
+tab-group[assistant-context] {
+  --assistant-context-border: calc(2 * var(--border-width)) dotted var(--tab-group-line-color);
+
+  @media (forced-colors: active) {
+    --assistant-context-border: calc(2 * var(--border-width)) dotted CanvasText;
+  }
+}
+
+#tabbrowser-tabs:is([orient="horizontal"], [orient="vertical"]:not([expanded])) tab-group[assistant-context] {
+  > :is(.tab-group-label-container, .tabbrowser-tab, .tab-group-overflow-count-container) {
+    border-block: var(--assistant-context-border);
+    margin-inline: 0;
+  }
+
+  > .tab-group-label-container {
+    border-inline-start: var(--assistant-context-border);
+  }
+
+  > .tabbrowser-tab:last-of-type,
+  &[collapsed] > .tab-group-label-container {
+    border-inline-end: var(--assistant-context-border);
+  }
+}
+
+#tabbrowser-tabs[orient="vertical"][expanded] tab-group[assistant-context] {
+  > :is(.tab-group-label-container, .tabbrowser-tab, .tab-group-overflow-count-container) {
+    border-inline: var(--assistant-context-border);
+    margin-block: 0;
+  }
+
+  > .tab-group-label-container {
+    border-block-start: var(--assistant-context-border);
+  }
+
+  > .tabbrowser-tab:last-of-type,
+  &[collapsed] > .tab-group-label-container {
+    border-block-end: var(--assistant-context-border);
+  }
+}

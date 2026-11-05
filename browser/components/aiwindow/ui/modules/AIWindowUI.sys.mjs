@@ -12,11 +12,12 @@ import {
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
+  AssistantSession:
+    "moz-src:///browser/components/aiwindow/models/AssistantSession.sys.mjs",
   AutoTabGrouping:
     "moz-src:///browser/components/aiwindow/ui/modules/AutoTabGrouping.sys.mjs",
   MonitorPanel:
     "moz-src:///browser/components/aiwindow/ui/modules/MonitorPanel.sys.mjs",
-  URILoadingHelper: "resource:///modules/URILoadingHelper.sys.mjs",
 });
 
 const gFadingWindows = new WeakSet();
@@ -326,26 +327,19 @@ export const AIWindowUI = {
   },
 
   /**
-   * Reopens a conversation in a tab: loads the page it was last about (or the
-   * new tab page) and restores the conversation there once the browser exists.
+   * Restores a conversation in the current assistant view without changing tabs.
    *
    * @param {Window} win
    * @param {ChatConversation} conversation
-   * @param {string} [where="tab"] Destination, as for openTrustedLinkIn.
    */
-  reopenConversationInTab(win, conversation, where = "tab") {
-    const mostRecentPage = conversation.getMostRecentPageVisited();
-    const url = mostRecentPage?.href ?? win.BROWSER_NEW_TAB_URL;
-    lazy.URILoadingHelper.openTrustedLinkIn(win, url, where, {
-      resolveOnContentBrowserCreated: async targetBrowser => {
-        if (url === win.BROWSER_NEW_TAB_URL) {
-          this.openInFullWindow(targetBrowser, conversation);
-        } else {
-          AIWindow.restoreTabConversation(targetBrowser, conversation);
-          this.openSidebar(targetBrowser.documentGlobal, conversation);
-        }
-      },
-    });
+  async reopenConversationInTab(win, conversation) {
+    lazy.AssistantSession.setConversation(conversation);
+    if (
+      !this.isSidebarOpen(win) &&
+      !AIWindow.isAIWindowContentPage(win.gBrowser.selectedBrowser.currentURI)
+    ) {
+      await this.openSidebar(win, conversation);
+    }
   },
 
   /**
@@ -410,7 +404,7 @@ export const AIWindowUI = {
       aiWindowElement.openConversation(conversation);
       return;
     }
-    aiWindowElement.onCreateNewChatClick();
+    aiWindowElement.clearChat();
   },
 
   /**

@@ -114,7 +114,7 @@ const ANSWER_REPLAY_MAX_STEP_MS = 40;
 
 // Answers path only. The answer is model-written prose over untrusted web
 // content, so it follows the get_page_content model rather than the metadata
-// one: bound the length and rely on the security flags this flow sets. It is
+// one: bound the length. It is
 // not whitespace-collapsed the way a snippet is, because it is rendered to the
 // user as markdown; links inside it that the conversation has not seen still
 // get the untrusted-link treatment in ai-chat-message.
@@ -592,8 +592,6 @@ export async function runSearchTheWeb(toolParams, conversation, signal, mode) {
 
   // Every path answers from live web pages, so the conversation has seen
   // private and untrusted content whatever comes back.
-  conversation.securityProperties.setPrivateData();
-  conversation.securityProperties.setUntrustedInput();
 
   switch (selectSearchTheWebPath(conversation)) {
     case SEARCH_THE_WEB_PATH.ANSWERS:

@@ -230,17 +230,6 @@ add_task(async function test_get_user_memories_returns_summaries_in_order() {
   const { win, sidebarBrowser, conversation } =
     await openMemoriesConversation(mockEngineManager);
 
-  Assert.equal(
-    conversation.securityProperties.privateData,
-    false,
-    "privateData starts false on a fresh conversation."
-  );
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrustedInput starts false on a fresh conversation."
-  );
-
   await submitMemoriesQuestion(sidebarBrowser);
   const toolMessage = await runGetUserMemoriesToolCall({
     mockEngineManager,
@@ -279,17 +268,6 @@ add_task(async function test_get_user_memories_returns_summaries_in_order() {
     "A summary with quotes and backslashes is surfaced exactly as stored."
   );
 
-  Assert.equal(
-    conversation.securityProperties.privateData,
-    true,
-    "privateData is true after a memories turn (private user data surfaced)."
-  );
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrustedInput stays false for get_user_memories."
-  );
-
   Assert.deepEqual(
     [...conversation.seenUrls].sort(),
     ["about:blank"],
@@ -308,12 +286,6 @@ add_task(async function test_get_user_memories_empty_store() {
   const { win, sidebarBrowser, conversation } =
     await openMemoriesConversation(mockEngineManager);
 
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrustedInput starts false on a fresh conversation."
-  );
-
   await submitMemoriesQuestion(sidebarBrowser);
   const toolMessage = await runGetUserMemoriesToolCall({
     mockEngineManager,
@@ -325,11 +297,6 @@ add_task(async function test_get_user_memories_empty_store() {
     toolMessage.content.body,
     [],
     "Returns an empty array when no memories are stored."
-  );
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrustedInput stays false with no memories."
   );
 
   await mockEngineManager.rejectAllRequests();
@@ -350,12 +317,6 @@ add_task(async function test_get_user_memories_blocked_when_disabled() {
   const { win, sidebarBrowser, conversation } =
     await openMemoriesConversation(mockEngineManager);
 
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrustedInput starts false before the blocked tool call."
-  );
-
   await submitMemoriesQuestion(sidebarBrowser);
   const toolMessage = await runGetUserMemoriesToolCall({
     mockEngineManager,
@@ -372,12 +333,6 @@ add_task(async function test_get_user_memories_blocked_when_disabled() {
     toolMessage.content.body,
     DISABLED_MEMORIES_ERROR,
     "The tool result is exactly the disabled-memories error, so getUserMemories never ran."
-  );
-
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrustedInput stays false because the blocked tool never surfaced memories."
   );
 
   await mockEngineManager.rejectAllRequests();

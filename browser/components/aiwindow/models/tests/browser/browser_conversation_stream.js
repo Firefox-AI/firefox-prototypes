@@ -778,17 +778,6 @@ add_task(async function test_chat_tool_call_reads_smartpage_and_sets_flags() {
       "A fresh sidebar conversation exists"
     );
 
-    Assert.equal(
-      conversation.securityProperties.privateData,
-      false,
-      "Private data has not been read before the tool call"
-    );
-    Assert.equal(
-      conversation.securityProperties.untrustedInput,
-      false,
-      "Untrusted input has not been read before the tool call"
-    );
-
     firstTurn.respond({
       text: "",
       tokens: null,
@@ -818,16 +807,6 @@ add_task(async function test_chat_tool_call_reads_smartpage_and_sets_flags() {
     );
 
     const followup = await mockEngine.captureRequest({ purpose: "chat" });
-    Assert.equal(
-      conversation.securityProperties.privateData,
-      true,
-      "The chat committed the private-data flag"
-    );
-    Assert.equal(
-      conversation.securityProperties.untrustedInput,
-      true,
-      "The chat committed the untrusted-input flag"
-    );
 
     followup.respond("I read the stored page.");
     await mockEngine.respondTo({

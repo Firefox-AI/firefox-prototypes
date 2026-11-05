@@ -84,28 +84,8 @@ add_task(async function test_getOpenTabs_basic() {
   }
 });
 
-add_task(async function test_getOpenTabs_sets_security_flags() {
+add_task(async function test_getOpenTabs_returns_results() {
   const conversation = makeConversation();
-  await getOpenTabs({}, conversation);
-  conversation.securityProperties.commit();
-
-  Assert.strictEqual(
-    conversation.securityProperties.privateData,
-    true,
-    "private_data true"
-  );
-  Assert.strictEqual(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrusted_input false"
-  );
-});
-
-add_task(async function test_getOpenTabs_allowed_when_flags_set() {
-  const conversation = makeConversation({
-    privateData: true,
-    untrustedInput: true,
-  });
   const tabs = await getOpenTabs({}, conversation);
 
   Assert.ok(Array.isArray(tabs), "returns array, not refusal");

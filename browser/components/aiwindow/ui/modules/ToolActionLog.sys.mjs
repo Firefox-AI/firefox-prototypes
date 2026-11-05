@@ -13,6 +13,10 @@ import {
   GENERATE_AITAB,
   isAITabModification,
 } from "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs";
+import {
+  TOOL_GUARD_ACTION,
+  PROMPT_INJECTION_ACTION,
+} from "moz-src:///browser/components/aiwindow/models/AssistantGuards.sys.mjs";
 
 export const ACTION_LOG_UI_TYPE = "action-log";
 
@@ -63,6 +67,42 @@ function urlListChips(items, getLabel) {
  * @type {Map<string, { show: boolean, label: ActionLogLabel, pendingLabel: ActionLogLabel }>}
  */
 const TOOL_ACTION_LOG_CONFIG = new Map([
+  [
+    TOOL_GUARD_ACTION,
+    {
+      label: (body, args) => ({
+        l10nId: body?.pending
+          ? "action-log-tool-guard-checking-action"
+          : ({
+              ALLOW: "action-log-tool-guard-allowed-action",
+              DENY: "action-log-tool-guard-denied-action",
+              TERMINATE: "action-log-tool-guard-terminated-action",
+              CANCELED: "action-log-tool-guard-canceled-action",
+            }[body?.status] ?? "action-log-tool-guard-failed-action"),
+        l10nArgs: { tool: args?.toolName ?? "unknown" },
+      }),
+      pendingLabel(args, body) {
+        return this.label(body, args);
+      },
+    },
+  ],
+  [
+    PROMPT_INJECTION_ACTION,
+    {
+      label: body => ({
+        l10nId: body?.pending
+          ? "action-log-prompt-injection-checking"
+          : ({
+              CLEAN: "action-log-prompt-injection-passed",
+              INJECTION: "action-log-prompt-injection-detected",
+              CANCELED: "action-log-prompt-injection-canceled",
+            }[body?.status] ?? "action-log-prompt-injection-failed"),
+      }),
+      pendingLabel(args, body) {
+        return this.label(body, args);
+      },
+    },
+  ],
   [
     GENERATE_AITAB,
     {
@@ -188,7 +228,7 @@ export function getActionLogConfigForTool(toolName, body, args) {
     : null;
   let pendingLabel =
     typeof cfg.pendingLabel === "function"
-      ? cfg.pendingLabel(args)
+      ? cfg.pendingLabel(args, body)
       : (cfg.pendingLabel ?? null);
   if (pendingLabel && link) {
     pendingLabel = { ...pendingLabel, link };

@@ -232,9 +232,6 @@ export const JourneyManager = {
     // SECURITY: the prompt mixes private user data (memory summaries, browsing
     // history, past chats) with untrusted webpage titles. Flags set so unallowed
     // tools will not be available for use in this conversation.
-    conversation.securityProperties.setPrivateData();
-    conversation.securityProperties.setUntrustedInput();
-    conversation.securityProperties.commit();
     return conversation;
   },
 
@@ -531,9 +528,6 @@ export const JourneyManager = {
       // history, past chats) with untrusted webpage titles. The conversation is
       // single-shot and exposes no tools, so nothing can act on either, but the
       // flags must be accurate in case of later reuse of this conversation.
-      conversation.securityProperties.setPrivateData();
-      conversation.securityProperties.setUntrustedInput();
-      conversation.securityProperties.commit();
 
       const runResult = await conversation.run({
         token: await lazy.AuthProvider.getToken(),

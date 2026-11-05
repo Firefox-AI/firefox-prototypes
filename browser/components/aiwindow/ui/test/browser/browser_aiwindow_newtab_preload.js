@@ -70,15 +70,18 @@ add_task(async function test_classic_to_ai_newtab_reloads() {
     "Tab should initially load about:newtab"
   );
 
-  lazy.AIWindow.toggleAIWindow(win, true);
-
-  await BrowserTestUtils.browserLoaded(browser, false, url =>
-    lazy.AIWindow.isAIWindowContentPage(Services.io.newURI(url))
+  const reloaded = BrowserTestUtils.browserLoaded(
+    browser,
+    false,
+    "about:newtab"
   );
+  lazy.AIWindow.toggleAIWindow(win, true);
+  await reloaded;
 
-  Assert.ok(
-    lazy.AIWindow.isAIWindowContentPage(browser.currentURI),
-    "New tab should reload to AI Window New Tab after toggle"
+  Assert.equal(
+    browser.currentURI.spec,
+    "about:newtab",
+    "Smart Windows keep the normal new tab page"
   );
 
   await BrowserTestUtils.closeWindow(win);
@@ -86,8 +89,6 @@ add_task(async function test_classic_to_ai_newtab_reloads() {
 });
 
 add_task(async function test_ai_to_classic_newtab_reloads() {
-  const AIWINDOW_URL = lazy.AIWindow.newTabURL;
-
   await SpecialPowers.pushPrefEnv({
     set: [
       ["browser.search.suggest.enabled", false],
@@ -99,21 +100,24 @@ add_task(async function test_ai_to_classic_newtab_reloads() {
 
   let win = await BrowserTestUtils.openNewBrowserWindow({ aiWindow: true });
 
-  let aiTab = BrowserTestUtils.addTab(win.gBrowser, AIWINDOW_URL);
+  let aiTab = BrowserTestUtils.addTab(win.gBrowser, lazy.AIWindow.newTabURL);
   let browser = aiTab.linkedBrowser;
 
-  await BrowserTestUtils.browserLoaded(browser, false, url =>
-    lazy.AIWindow.isAIWindowContentPage(Services.io.newURI(url))
-  );
-
-  Assert.ok(
-    lazy.AIWindow.isAIWindowContentPage(browser.currentURI),
-    "Tab should initially load AI Window URL"
-  );
-
-  lazy.AIWindow.toggleAIWindow(win, false);
-
   await BrowserTestUtils.browserLoaded(browser, false, "about:newtab");
+
+  Assert.equal(
+    browser.currentURI.spec,
+    "about:newtab",
+    "Smart Window tabs initially load about:newtab"
+  );
+
+  const reloaded = BrowserTestUtils.browserLoaded(
+    browser,
+    false,
+    "about:newtab"
+  );
+  lazy.AIWindow.toggleAIWindow(win, false);
+  await reloaded;
 
   Assert.equal(
     browser.currentURI.spec,

@@ -109,27 +109,3 @@ add_task(async function test_add_memory_propagates_save_failure() {
     sandbox.restore();
   }
 });
-
-add_task(async function test_add_memory_fail_with_untrusted_input() {
-  const sandbox = sinon.createSandbox();
-  const saveStub = sandbox.stub(MemoriesManager, "saveRequestedMemory");
-  const conversation = makeConversation({
-    privateData: false,
-    untrustedInput: true,
-  });
-  try {
-    await addMemory(
-      {
-        memorySummary: "Prepares meals for the week each weekend",
-        containsPersonallyIdentifiableInfo: false,
-      },
-      conversation
-    );
-    Assert.ok(
-      saveStub.notCalled,
-      "saveRequestedMemory should not be called when untrustedInput flag is set"
-    );
-  } finally {
-    sandbox.restore();
-  }
-});

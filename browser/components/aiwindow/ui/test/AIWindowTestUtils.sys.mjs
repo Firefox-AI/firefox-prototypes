@@ -21,6 +21,8 @@ import { AIWindowUI } from "moz-src:///browser/components/aiwindow/ui/modules/AI
 import { TestUtils } from "resource://testing-common/TestUtils.sys.mjs";
 import { AuthProvider } from "moz-src:///browser/components/aiwindow/models/AuthProvider.sys.mjs";
 import { Chat } from "moz-src:///browser/components/aiwindow/models/Chat.sys.mjs";
+import { AssistantGuards } from "moz-src:///browser/components/aiwindow/models/AssistantGuards.sys.mjs";
+import { AssistantSession } from "moz-src:///browser/components/aiwindow/models/AssistantSession.sys.mjs";
 import { openAIEngine } from "moz-src:///browser/components/aiwindow/models/openAIEngine.sys.mjs";
 import {
   MODEL_FEATURES,
@@ -139,6 +141,8 @@ export class MockEngineManager {
         return turn;
       });
     this.mocks = [
+      sinon.stub(AssistantGuards, "checkToolCall").resolves("ALLOW"),
+      sinon.stub(AssistantGuards, "isPageContentSafe").resolves(true),
       sinon.stub(openAIEngine, "_createEngine").callsFake(options =>
         // When a new engine is requested create the mock one and track it in
         // the engines map.
@@ -150,6 +154,7 @@ export class MockEngineManager {
       sinon.stub(AuthProvider, "getToken").resolves("mock-fxa-token"),
       fetchWithHistory,
     ];
+    AssistantSession.setConversation(new lazy.ChatConversation({}));
   }
 
   /**
@@ -295,6 +300,7 @@ export class MockEngineManager {
    * Restore all of the mocks.
    */
   cleanupMocks() {
+    AssistantSession.cancel();
     for (const mock of this.mocks) {
       mock.restore();
     }
@@ -612,7 +618,7 @@ export const AIWindowTestUtils = {
 
   /**
    * Opens a new AI Window and waits until it is focused and flagged as an AI
-   * window.
+   * window. Loads the fullpage assistant by default for chat tests.
    *
    * @param {object} [options]
    * @param {string} [options.waitForTabURL] - URL to wait for, or empty string
@@ -624,8 +630,18 @@ export const AIWindowTestUtils = {
   } = {}) {
     const { info, SimpleTest } = context().scope;
     info("Opening new AI Window");
+    let args;
+    if (waitForTabURL === AIWindowTestUtils.AIWINDOW_URL) {
+      args = Cc["@mozilla.org/array;1"].createInstance(Ci.nsIMutableArray);
+      const url = Cc["@mozilla.org/supports-string;1"].createInstance(
+        Ci.nsISupportsString
+      );
+      url.data = waitForTabURL;
+      args.appendElement(url);
+    }
     const win = await BrowserTestUtils.openNewBrowserWindow({
       aiWindow: true,
+      args,
       waitForTabURL,
     });
     info("Waiting for AI window attr");

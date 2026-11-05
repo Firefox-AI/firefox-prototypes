@@ -8,7 +8,7 @@ import {
   isNewPageUrl,
   sanitizeUntrustedContent,
 } from "moz-src:///browser/components/aiwindow/models/ChatUtils.sys.mjs";
-import { isAllowedURLProtocol } from "moz-src:///browser/components/aiwindow/models/SecurityProperties.sys.mjs";
+import { isAllowedURLProtocol } from "moz-src:///browser/components/aiwindow/models/AllowedURLs.sys.mjs";
 
 /**
  * @import { TabGroupColor } from "chrome://browser/content/tabbrowser/tabgroup.mjs"

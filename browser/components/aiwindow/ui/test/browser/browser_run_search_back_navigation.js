@@ -13,10 +13,6 @@ const PAGE_3 = "https://example.net/";
 
 function makeFakeConversation() {
   return {
-    securityProperties: {
-      setPrivateData() {},
-      setUntrustedInput() {},
-    },
     addSeenUrls() {},
   };
 }

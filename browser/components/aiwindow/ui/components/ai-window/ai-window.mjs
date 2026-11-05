@@ -24,6 +24,10 @@ const { XPCOMUtils } = ChromeUtils.importESModule(
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  AssistantSession:
+    "moz-src:///browser/components/aiwindow/models/AssistantSession.sys.mjs",
+  AssistantContext:
+    "moz-src:///browser/components/aiwindow/ui/modules/AssistantContext.sys.mjs",
   AuthProvider:
     "moz-src:///browser/components/aiwindow/models/AuthProvider.sys.mjs",
   Chat: "moz-src:///browser/components/aiwindow/models/Chat.sys.mjs",
@@ -298,6 +302,23 @@ export class AIWindow extends MozLitElement {
   #memoriesToggled = null;
   #visibilityChangeHandler;
   #abortController = null;
+  #pageAccessWindow = null;
+  #pageAccessProgressListener = {
+    QueryInterface: ChromeUtils.generateQI([
+      "nsIWebProgressListener",
+      "nsISupportsWeakReference",
+    ]),
+    onLocationChange: webProgress => {
+      if (webProgress.isTopLevel) {
+        this.requestUpdate();
+      }
+    },
+    onStateChange() {},
+    onProgressChange() {},
+    onStatusChange() {},
+    onSecurityChange() {},
+    onContentBlockingEvent() {},
+  };
 
   /**
    * Context for a response awaiting its first displayed character, allowing
@@ -407,21 +428,6 @@ export class AIWindow extends MozLitElement {
       },
       ""
     );
-  }
-
-  /**
-   * Checks if there's a pending conversation ID to load.
-   *
-   * @returns {string|null} The conversation ID or null if none exists
-   * @private
-   */
-  #getPendingConversationId() {
-    const findId =
-      this.#hostBrowser?.getAttribute("data-conversation-id") ??
-      window.history.state?.conversationId ??
-      null;
-
-    return findId;
   }
 
   /**
@@ -558,7 +564,7 @@ export class AIWindow extends MozLitElement {
     this.userPrompt = "";
     this.#browser = null;
     this.#smartbar = null;
-    this.#conversation = new lazy.ChatConversation({});
+    this.#conversation = lazy.AssistantSession.conversation;
     this.#smartbarReadyPromise = new Promise(resolve => {
       this.#resolveSmartbarReady = resolve;
     });
@@ -628,6 +634,31 @@ export class AIWindow extends MozLitElement {
     lazy.AgentUI.unobserveMonitorChanges(this.#conversation);
   }
 
+  #onSessionConversationChanged = (_event, conversation) => {
+    this.#abortController = null;
+    this.#pendingFirstCharacterContext = null;
+    this.isGenerating = false;
+    this.openConversation(conversation);
+  };
+
+  #onSessionGenerationChanged = (_event, generating) => {
+    this.isGenerating = generating;
+  };
+
+  #onPageAccessChanged = () => {
+    this.requestUpdate();
+    if (
+      this.#abortController &&
+      this.mode === MODE.SIDEBAR &&
+      lazy.AssistantSession.pageAccessRequests.length &&
+      !lazy.AIWindowUI.isSidebarOpen(this.#topChromeWindow)
+    ) {
+      lazy.AIWindowUI.openSidebar(this.#topChromeWindow);
+    }
+  };
+
+  #onPageAccessTabSelect = () => this.requestUpdate();
+
   #onSeenUrlsUpdated = () => {
     const actor = this.#getAIChatContentActor();
     if (actor) {
@@ -682,6 +713,17 @@ export class AIWindow extends MozLitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    lazy.AssistantSession.on(
+      "conversation-changed",
+      this.#onSessionConversationChanged
+    );
+    lazy.AssistantSession.on(
+      "generation-changed",
+      this.#onSessionGenerationChanged
+    );
+    lazy.AssistantSession.on("page-access-changed", this.#onPageAccessChanged);
+    lazy.AssistantSession.on("context-changed", this.#onPageAccessTabSelect);
+    this.isGenerating = lazy.AssistantSession.isGenerating;
     this.setAttribute("mode", this.mode);
     this.#loadAvailableModels();
 
@@ -774,6 +816,19 @@ export class AIWindow extends MozLitElement {
     if (!win) {
       return;
     }
+    this.#pageAccessWindow?.gBrowser?.removeProgressListener(
+      this.#pageAccessProgressListener
+    );
+    this.#pageAccessWindow?.gBrowser?.tabContainer.removeEventListener(
+      "TabSelect",
+      this.#onPageAccessTabSelect
+    );
+    this.#pageAccessWindow = win;
+    win.gBrowser.addProgressListener(this.#pageAccessProgressListener);
+    win.gBrowser.tabContainer.addEventListener(
+      "TabSelect",
+      this.#onPageAccessTabSelect
+    );
 
     this.#swapDocShellsChromeWindow?.removeEventListener(
       "EndSwapDocShells",
@@ -793,7 +848,7 @@ export class AIWindow extends MozLitElement {
     if (event.detail) {
       this.openConversation(event.detail);
     } else if (!this.#conversation?.messages?.length) {
-      this.onCreateNewChatClick();
+      this.clearChat();
     }
   }
 
@@ -854,6 +909,10 @@ export class AIWindow extends MozLitElement {
     browser.setAttribute("maychangeremoteness", "true");
     browser.setAttribute("remote", "true");
     browser.setAttribute("remoteType", "privilegedabout");
+    browser.setAttribute(
+      "usercontextid",
+      lazy.AssistantSession.chatOriginAttributes.userContextId
+    );
     browser.setAttribute("disableglobalhistory", "true");
     browser.setAttribute("transparent", "true");
     browser.setAttribute("src", "about:aichatcontent");
@@ -930,9 +989,26 @@ export class AIWindow extends MozLitElement {
     this.#starterPromptsAbortController?.abort();
     this.#starterPromptsAbortController = null;
 
-    this.#abortController?.abort();
     this.#abortController = null;
     this.#pendingFirstCharacterContext = null;
+    lazy.AssistantSession.off(
+      "conversation-changed",
+      this.#onSessionConversationChanged
+    );
+    lazy.AssistantSession.off(
+      "generation-changed",
+      this.#onSessionGenerationChanged
+    );
+    lazy.AssistantSession.off("page-access-changed", this.#onPageAccessChanged);
+    lazy.AssistantSession.off("context-changed", this.#onPageAccessTabSelect);
+    this.#pageAccessWindow?.gBrowser?.removeProgressListener(
+      this.#pageAccessProgressListener
+    );
+    this.#pageAccessWindow?.gBrowser?.tabContainer.removeEventListener(
+      "TabSelect",
+      this.#onPageAccessTabSelect
+    );
+    this.#pageAccessWindow = null;
 
     // Clean up visibility change handler
     if (this.#visibilityChangeHandler) {
@@ -1182,38 +1258,10 @@ export class AIWindow extends MozLitElement {
    * Loads a conversation if one is set on the data-conversation-id attribute.
    */
   async #loadPendingConversation() {
-    const conversationId = this.#getPendingConversationId();
-    if (!conversationId) {
-      // No externally-provided ID — stamp the fresh constructor conversation
-      // onto the host browser so navigating away and back can recover it,
-      // and record it in history.state for session/undo-close restore.
-      this.#hostBrowser?.setAttribute(
-        "data-conversation-id",
-        this.#conversation.id
-      );
-      this.#syncHistoryState();
-      return;
-    }
-
-    const conversation =
-      await lazy.AIWindow.chatStore.findConversationById(conversationId);
-
-    conversation
-      ? this.openConversation(conversation)
-      : this.#resetConversationState();
-
-    if (conversation) {
-      Glean.smartWindow.chatRetrieved.record({
-        location: this.mode,
-        chat_id: conversation.id,
-        message_seq: this.#conversation?.messageCount ?? 0,
-        time_delta: Date.now() - conversation.updatedDate,
-      });
-    }
-
+    this.openConversation(await lazy.AssistantSession.ready());
     if (this.#hostBrowser?.hasAttribute("data-continue-streaming")) {
       this.#hostBrowser.removeAttribute("data-continue-streaming");
-      this.#continueAfterToolResult();
+      this.reloadAndContinue(lazy.AssistantSession.conversation);
     }
   }
 
@@ -1247,7 +1295,7 @@ export class AIWindow extends MozLitElement {
     // Now that the element is connected, run the initial swap so
     // AIWindowTabStatesManager receives ai-window:conversation-changed
     // so it can trigger the initial starter prompts loading
-    this.#swapConversation(this.#conversation);
+    this.openConversation(await lazy.AssistantSession.ready());
 
     this.#syncTopSites();
 
@@ -1961,10 +2009,10 @@ export class AIWindow extends MozLitElement {
    * @private
    */
   #handleStopGeneration = () => {
-    if (!this.#abortController) {
+    if (!lazy.AssistantSession.isGenerating) {
       return;
     }
-    this.#abortController.abort();
+    lazy.AssistantSession.cancel();
     this.isGenerating = false;
     const lastAssistant = this.#conversation?.messages
       ?.filter(
@@ -2015,6 +2063,20 @@ export class AIWindow extends MozLitElement {
       action === ACTION.CHAT
         ? this.#calculateCurrentMentions(contextMentions)
         : null;
+    if (currentMentions) {
+      const explicitMentions = [
+        ...this.#smartbar.contextChips,
+        ...currentMentions.inlineMentions.map(mention => {
+          const groupId = lazy.parseTabGroupMentionId(mention.id);
+          return groupId
+            ? { type: lazy.CONTEXT_MENTION_TYPE.TAB_GROUP, groupId }
+            : { url: mention.id };
+        }),
+      ];
+      lazy.AssistantSession.shareMentionedPages(
+        this.#withTabGroupMembers(explicitMentions)
+      );
+    }
     this.#smartbar.clearSmartbarInput();
     // clearSmartbarInput() doesn't fire an input event, so explicitly clear the
     // persisted draft to prevent committed text from reappearing on navigation.
@@ -2291,6 +2353,7 @@ export class AIWindow extends MozLitElement {
     if (!trimmed) {
       return;
     }
+    lazy.AssistantSession.shareMentionedPages(contextMentions);
 
     // Auto-cancel any active website confirmation when starting a new prompt
     lazy.ToolUI.autoCancelActiveConfirmation(
@@ -2511,6 +2574,7 @@ export class AIWindow extends MozLitElement {
     // request only needs real-time context injected before it goes out.
     const userMessage = conversation.messages.at(-1);
     await conversation.injectRealTimeContext(userMessage, {});
+    lazy.AssistantSession.setConversation(conversation);
     this.openConversation(conversation);
     this.submitChatMessage({
       text: userMessage?.content?.body ?? resumePrompt.content.headline,
@@ -2552,9 +2616,6 @@ export class AIWindow extends MozLitElement {
     });
     await conversation.loadSystemPrompt();
     conversation.addUserMessage(resumePrompt.content.headline);
-    conversation.securityProperties.setPrivateData();
-    conversation.securityProperties.setUntrustedInput();
-    conversation.securityProperties.commit();
     return conversation;
   }
 
@@ -2672,32 +2733,35 @@ export class AIWindow extends MozLitElement {
    * @private
    */
   async #addConversationTitle(assistantResponse) {
-    if (this.#conversation.title || this.#conversation.titlePromise) {
+    const conversation = this.#conversation;
+    if (conversation.title || conversation.titlePromise) {
       return;
     }
 
     const startTime = ChromeUtils.now();
 
-    const firstUserMessage = this.#conversation.messages.find(
+    const firstUserMessage = conversation.messages.find(
       m => m.role === lazy.MESSAGE_ROLE.USER
     );
 
-    this.#conversation.titlePromise = lazy.generateChatTitle(
+    conversation.titlePromise = lazy.generateChatTitle(
       firstUserMessage?.content?.body,
       {
         url: firstUserMessage?.pageUrl?.href || "",
-        title: this.#conversation.pageMeta?.title || "",
-        description: this.#conversation.pageMeta?.description || "",
+        title: conversation.pageMeta?.title || "",
+        description: conversation.pageMeta?.description || "",
       },
       assistantResponse,
       this.conversationId
     );
-    const title = await this.#conversation.titlePromise;
-    delete this.#conversation.titlePromise;
+    const title = await conversation.titlePromise;
+    delete conversation.titlePromise;
 
-    this.#conversation.title = title;
-    document.title = title;
-    this.#updateConversation();
+    conversation.title = title;
+    if (this.#conversation === conversation) {
+      document.title = title;
+    }
+    lazy.AIWindow.chatStore.updateConversation(conversation).catch(() => {});
 
     ChromeUtils.addProfilerMarker(
       "SmartWindow",
@@ -2712,17 +2776,6 @@ export class AIWindow extends MozLitElement {
     }
     const link = document.getElementById("tabIcon");
     link.href = TAB_FAVICON_CHAT;
-  }
-
-  #resetConversationState() {
-    this.classList.remove("chat-active");
-    this.#updateBrowserTabbable();
-    this.#updateSmartbarSuggestionsPosition();
-    this.#hostBrowser?.setAttribute(
-      "data-conversation-id",
-      this.#conversation.id
-    );
-    this.#syncHistoryState();
   }
 
   #setBrowserContainerActiveState(isActive) {
@@ -2802,7 +2855,12 @@ export class AIWindow extends MozLitElement {
   ) {
     // Capture conversation and browsingContext at call time so that a tab switch
     // mid-stream cannot redirect this request to the wrong target.
-    const conversation = this.#conversation;
+    await lazy.AssistantSession.ready();
+    const controller = lazy.AssistantSession.beginTurn();
+    if (!controller) {
+      return;
+    }
+    const conversation = lazy.AssistantSession.conversation;
     const browsingContext = this.#getBrowsingContext();
 
     this.#starterPromptsAbortController?.abort();
@@ -2812,13 +2870,10 @@ export class AIWindow extends MozLitElement {
     this.#updateTabFavicon();
     this.#setBrowserContainerActiveState(true);
 
-    this.#abortController?.abort();
     this.#pendingFirstCharacterContext = null;
-    this.#abortController = new AbortController();
+    this.#abortController = controller;
     const { signal } = this.#abortController;
-    const stopWatchingTabClose =
-      this.#watchTabCloseForAbort(browsingContext, this.#abortController) ??
-      (() => {});
+
     this.isGenerating = true;
 
     const requestStart = ChromeUtils.now();
@@ -2851,6 +2906,7 @@ export class AIWindow extends MozLitElement {
           modelChoiceIdOverride: this.#selectedModelChoiceId,
         }
       );
+      signal.throwIfAborted();
       conversation.engine = engine;
       conversation.parameters = parameters;
 
@@ -2871,6 +2927,7 @@ export class AIWindow extends MozLitElement {
           skipUserDispatch
         );
 
+        signal.throwIfAborted();
         assistantMessage = conversation.addAssistantMessage("text", "");
 
         this.#sendModelRequestTelemetryEvent();
@@ -2930,38 +2987,13 @@ export class AIWindow extends MozLitElement {
       }
       this.requestUpdate?.();
     } finally {
-      stopWatchingTabClose();
+      conversation.off("chat-conversation:message-update", onUpdate);
+      lazy.AssistantSession.endTurn(controller);
       if (this.#abortController?.signal === signal) {
         this.isGenerating = false;
         this.#abortController = null;
       }
     }
-  }
-
-  /**
-   * Aborts the given controller when the tab that owns the captured
-   * browsingContext is closed. Sidebar mode only — in fullpage mode the AI
-   * window itself owns the browsingContext, and tearing down the element
-   * already stops generation. Returns a cleanup function, or null if no
-   * watcher was installed.
-   *
-   * @param {BrowsingContext} browsingContext
-   * @param {AbortController} controller
-   * @returns {(() => void) | null}
-   */
-  #watchTabCloseForAbort(browsingContext, controller) {
-    if (this.mode != MODE.SIDEBAR || !browsingContext) {
-      return null;
-    }
-    const browser = browsingContext.embedderElement;
-    const chromeWin = window.browsingContext?.topChromeWindow;
-    const tab = browser && chromeWin?.gBrowser?.getTabForBrowser(browser);
-    if (!tab) {
-      return null;
-    }
-    const onTabClose = () => controller.abort();
-    tab.addEventListener("TabClose", onTabClose);
-    return () => tab.removeEventListener("TabClose", onTabClose);
   }
 
   updated(changedProps) {
@@ -3420,11 +3452,12 @@ export class AIWindow extends MozLitElement {
   }
 
   /**
-   * Opens a new conversation and renders the conversation in the child process.
+   * Renders the shared assistant conversation in the child process.
    *
    * @param {ChatConversation} conversation
    */
   openConversation(conversation) {
+    conversation = lazy.AssistantSession.conversation;
     if (conversation?.messageCount) {
       this.#swapConversation(conversation);
 
@@ -3444,12 +3477,8 @@ export class AIWindow extends MozLitElement {
         this.#smartbar.updateContextChips();
       }
 
-      // This assumes "openConversation" opens an active conversation, possible todo to see
-      // if convo has messages before hiding the footer element.
-      this.showFooter = false;
-
+      this.#initActiveChatlayout();
       this.showDisclaimer = true;
-      this.showStarters = false;
       const actor = this.#getAIChatContentActor();
 
       this.#pendingMessageDelivery = true;
@@ -3473,15 +3502,17 @@ export class AIWindow extends MozLitElement {
     );
   }
 
-  onCreateNewChatClick() {
-    this.clearChat();
+  async onCreateNewChatClick() {
+    await lazy.AssistantSession.startNewConversation();
   }
 
   clearChat(conversation = null) {
-    // Clear conversation state. The caller may provide an existing empty
-    // conversation to reuse (tab switch-back case); otherwise create a fresh
-    // one.
-    this.#swapConversation(conversation ?? new lazy.ChatConversation({}));
+    conversation = lazy.AssistantSession.conversation;
+    if (conversation.messageCount) {
+      this.openConversation(conversation);
+      return;
+    }
+    this.#swapConversation(conversation);
 
     this.#syncHistoryState();
 
@@ -3542,7 +3573,7 @@ export class AIWindow extends MozLitElement {
   }
 
   /**
-   * Opens a recent chat: switch to its tab if open, otherwise reopen it.
+   * Restores a recent chat in the current assistant view.
    *
    * @param {string} conversationId
    */
@@ -3555,25 +3586,9 @@ export class AIWindow extends MozLitElement {
 
     const win = this.#topChromeWindow;
     if (!win) {
-      this.openConversation(conversation);
+      lazy.AssistantSession.setConversation(conversation);
       return;
     }
-
-    const existingTab = Array.from(win.gBrowser.tabs).find(tab => {
-      const browser = tab.linkedBrowser;
-      return (
-        browser?.getAttribute("data-conversation-id") === conversationId &&
-        browser.currentURI &&
-        lazy.AIWindow.isAIWindowContentPage(browser.currentURI)
-      );
-    });
-
-    if (existingTab) {
-      win.gBrowser.selectedTab = existingTab;
-      return;
-    }
-
-    // Tab was closed: reopen it on the page it was about.
     lazy.AIWindowUI.reopenConversationInTab(win, conversation);
   }
 
@@ -3643,6 +3658,13 @@ export class AIWindow extends MozLitElement {
 
   async reloadAndContinue(conversation) {
     if (!conversation) {
+      return;
+    }
+    if (
+      !(await lazy.AssistantSession.waitForIdle()) ||
+      lazy.AssistantSession.conversation !== conversation ||
+      !this.isConnected
+    ) {
       return;
     }
     this.openConversation(conversation);
@@ -3957,6 +3979,130 @@ export class AIWindow extends MozLitElement {
     ></smartwindow-promo>`;
   }
 
+  #pageAccessTemplate() {
+    const browser = this.#getEventTab()?.linkedBrowser;
+    const page = lazy.AssistantSession.getPageAccess(browser);
+    const requests = lazy.AssistantSession.pageAccessRequests;
+    const sharedPages = lazy.AssistantSession.sharedPages;
+    return html`
+      <div class="page-access-panel">
+        <moz-button
+          class="assistant-context-button"
+          data-l10n-id="aiwindow-assistant-context-open"
+          data-l10n-args=${JSON.stringify({
+            count: lazy.AssistantSession.visitedSites.length,
+          })}
+          ?disabled=${!lazy.AssistantSession.visitedSites.length}
+          @click=${() => lazy.AssistantContext.show(this.#topChromeWindow)}
+        ></moz-button>
+        ${page
+          ? html`
+              <div class="page-access-status" data-shared=${page.shared}>
+                <div>
+                  <span
+                    role="status"
+                    data-l10n-id=${page.shared
+                      ? "aiwindow-page-session-shared"
+                      : "aiwindow-page-session-private"}
+                  ></span>
+                  <span class="page-access-origin" title=${page.key}
+                    >${page.origin}</span
+                  >
+                </div>
+                <moz-button
+                  class="page-access-toggle"
+                  data-principal=${page.key}
+                  data-l10n-id=${page.shared
+                    ? "aiwindow-page-session-revoke"
+                    : "aiwindow-page-session-share"}
+                  @click=${() => {
+                    if (page.shared) {
+                      lazy.AssistantSession.revokePageAccess(page.key);
+                    } else if (
+                      lazy.AssistantSession.getPageAccess(browser)?.key ===
+                      page.key
+                    ) {
+                      lazy.AssistantSession.sharePage(browser);
+                    }
+                  }}
+                ></moz-button>
+              </div>
+              <p
+                class="page-access-description"
+                data-l10n-id="aiwindow-page-session-description"
+              ></p>
+            `
+          : nothing}
+        <div class="page-access-requests" aria-live="polite">
+          ${requests.map(
+            request => html`
+              <section
+                class="page-access-request"
+                aria-labelledby=${`page-access-${request.id}`}
+                data-request-id=${request.id}
+              >
+                <strong
+                  id=${`page-access-${request.id}`}
+                  data-l10n-id="aiwindow-page-session-request"
+                  data-l10n-args=${JSON.stringify({ origin: request.origin })}
+                ></strong>
+                <p data-l10n-id="aiwindow-page-session-request-description"></p>
+                <code class="page-access-principal">${request.key}</code>
+                <div class="page-access-actions">
+                  <moz-button
+                    class="page-access-allow"
+                    type="primary"
+                    data-l10n-id="aiwindow-page-session-share"
+                    @click=${() =>
+                      lazy.AssistantSession.resolvePageAccessRequest(
+                        request.id,
+                        true
+                      )}
+                  ></moz-button>
+                  <moz-button
+                    class="page-access-deny"
+                    data-l10n-id="aiwindow-page-session-deny"
+                    @click=${() =>
+                      lazy.AssistantSession.resolvePageAccessRequest(
+                        request.id,
+                        false
+                      )}
+                  ></moz-button>
+                </div>
+              </section>
+            `
+          )}
+        </div>
+        ${sharedPages.length
+          ? html`
+              <details class="page-access-sites">
+                <summary
+                  data-l10n-id="aiwindow-page-session-sites"
+                  data-l10n-args=${JSON.stringify({
+                    count: sharedPages.length,
+                  })}
+                ></summary>
+                <ul>
+                  ${sharedPages.map(
+                    site => html`
+                      <li>
+                        <code class="page-access-principal">${site.key}</code>
+                        <moz-button
+                          data-l10n-id="aiwindow-page-session-revoke"
+                          @click=${() =>
+                            lazy.AssistantSession.revokePageAccess(site.key)}
+                        ></moz-button>
+                      </li>
+                    `
+                  )}
+                </ul>
+              </details>
+            `
+          : nothing}
+      </div>
+    `;
+  }
+
   render() {
     return html`
       <link rel="stylesheet" href="chrome://global/content/widgets.css" />
@@ -3996,6 +4142,7 @@ export class AIWindow extends MozLitElement {
           `
         : ""}
       <div id="browser-container"></div>
+      ${this.#pageAccessTemplate()}
       ${this.#isSmartPageSidebar &&
       !this.isGenerating &&
       !this.#conversation?.messageCount

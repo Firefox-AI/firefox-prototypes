@@ -400,7 +400,7 @@ export class AIWindowTabStatesManager {
    * - shouldOpenSidebar defaults to true when no explicit state is set
    * - keepSidebarOpen can be explicitly set to false to close sidebar
    * - When shouldOpenSidebar is true, openSidebar is called with the tab's conversation
-   * - If conversation is null/undefined, openSidebar will kick off creating a new conversation
+   * - New tabs start with the sidebar closed
    * - AI Window tabs (AIWINDOW_URL) always close the sidebar regardless of state
    * - If no conversationId is present, we wait for the restore to settle.
    *   If the tab is pending or still being restored by SessionStore,
@@ -808,6 +808,14 @@ export class AIWindowTabStatesManager {
         tabState.state = saved ? JSON.parse(saved) : {};
       } catch {
         tabState.state = {};
+      }
+      if (
+        !tabState.state.conversationId &&
+        ["about:blank", "about:newtab"].includes(
+          tab.linkedBrowser?.currentURI?.spec
+        )
+      ) {
+        tabState.state.keepSidebarOpen ??= false;
       }
       this.#tabStates.set(tab, tabState);
     }

@@ -84,6 +84,15 @@ export class ChatAssistantError extends MozLitElement {
       return;
     }
 
+    if (this.error.clientReason === "assistantGuardTerminated") {
+      this.errorText = {
+        header: "smartwindow-assistant-error-guard-header",
+        body: "smartwindow-assistant-error-guard-body",
+      };
+      this.actionButton = null;
+      return;
+    }
+
     if (this.error.clientReason === "fxaTokenUnavailable") {
       this.errorText = {
         header: "smartwindow-assistant-error-account-header",

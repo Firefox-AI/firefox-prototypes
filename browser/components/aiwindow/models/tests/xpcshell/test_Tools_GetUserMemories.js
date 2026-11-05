@@ -8,27 +8,8 @@ const { getUserMemories } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs"
 );
 
-add_task(async function test_getUserMemories_sets_security_flags() {
+add_task(async function test_getUserMemories_returns_results() {
   const conversation = makeConversation();
-  await getUserMemories(conversation);
-  conversation.securityProperties.commit();
-  Assert.equal(
-    conversation.securityProperties.privateData,
-    true,
-    "private_data set"
-  );
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrusted_input not set"
-  );
-});
-
-add_task(async function test_getUserMemories_allowed_when_flags_set() {
-  const conversation = makeConversation({
-    privateData: true,
-    untrustedInput: true,
-  });
   const result = await getUserMemories(conversation);
 
   Assert.ok(Array.isArray(result), "returns array, not a refusal");

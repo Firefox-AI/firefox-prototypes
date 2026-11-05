@@ -9,9 +9,6 @@ const { ConversationStore } = ChromeUtils.importESModule(
 const { Conversation, MESSAGE_ROLE } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/Conversation.sys.mjs"
 );
-const { SecurityProperties } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/aiwindow/models/SecurityProperties.sys.mjs"
-);
 
 async function countRows(convId) {
   const rows = await ConversationStore.connection.execute(
@@ -40,7 +37,6 @@ add_task(async function test_save_and_restore() {
     serpUrlsForAnonymousFetch: ["https://serp.example/"],
     // Non-default flags so the round-trip proves the values actually persist,
     // rather than both sides defaulting to false.
-    securityProperties: { privateData: true, untrustedInput: true },
   });
 
   await ConversationStore.updateConversation(conversation);
@@ -70,19 +66,6 @@ add_task(async function test_save_and_restore() {
   Assert.ok(
     loaded.serpUrlsForAnonymousFetch.has("https://serp.example/"),
     "serpUrlsForAnonymousFetch values are restored"
-  );
-
-  Assert.ok(
-    loaded.securityProperties instanceof SecurityProperties,
-    "securityProperties is restored as a SecurityProperties"
-  );
-  Assert.ok(
-    loaded.securityProperties.privateData,
-    "privateData flag survives the round-trip"
-  );
-  Assert.ok(
-    loaded.securityProperties.untrustedInput,
-    "untrustedInput flag survives the round-trip"
   );
 });
 

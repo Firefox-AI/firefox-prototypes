@@ -5,6 +5,10 @@ run-if = [
 head = "head.js"
 firefox-appdir = "browser"
 
+["test_AssistantGuards.js"]
+
+["test_AssistantSession.js"]
+
 ["test_Chat.js"]
 
 ["test_ChatUtils.js"]
@@ -39,7 +43,6 @@ firefox-appdir = "browser"
 
 ["test_SearchBrowsingHistoryDomainBoost.js"]
 
-["test_SecurityProperties.js"]
 
 ["test_SensitiveInfoDetector.js"]
 

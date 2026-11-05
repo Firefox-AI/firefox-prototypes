@@ -45,12 +45,31 @@ add_task(async function test_get_page_content_basic() {
       window.document.documentElement.hasAttribute("ai-window")
   );
 
+  const { AssistantGuards } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/aiwindow/models/AssistantGuards.sys.mjs"
+  );
+  const guard = sinon.stub(AssistantGuards, "checkToolCall").resolves("ALLOW");
+  const classifier = sinon
+    .stub(AssistantGuards, "isPageContentSafe")
+    .resolves(true);
+  registerCleanupFunction(() => {
+    guard.restore();
+    classifier.restore();
+  });
   const conversation = new ChatConversation({
     title: "",
     description: "",
     pageUrl: new URL("https://example.com"),
     pageMeta: {},
   });
+
+  const { AssistantSession } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/aiwindow/models/AssistantSession.sys.mjs"
+  );
+  AssistantSession.sharePage(
+    GetPageContent.getTabWithURL(url_list[0]).linkedBrowser
+  );
+  registerCleanupFunction(() => AssistantSession.clear());
 
   // Call the tool with the URL
   const result_array = await GetPageContent.getPageContent(

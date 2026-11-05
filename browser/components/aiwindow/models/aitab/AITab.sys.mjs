@@ -35,7 +35,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   JsonSchema: "resource://gre/modules/JsonSchema.sys.mjs",
   GetPageContent: "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs",
   isAllowedURLProtocol:
-    "moz-src:///browser/components/aiwindow/models/SecurityProperties.sys.mjs",
+    "moz-src:///browser/components/aiwindow/models/AllowedURLs.sys.mjs",
   buildConversation:
     "moz-src:///browser/components/aiwindow/models/PromptLoader.sys.mjs",
   buildEngineForFeature:
@@ -1033,16 +1033,7 @@ export class AITab {
       return structured;
     }
 
-    // Every page in urlList was extracted into this conversation, so it holds
-    // private data (a credentialed page load) and untrusted input (arbitrary
-    // web content, possibly carrying a prompt injection). Security flags on
-    // this tool conversation will be used when getPageContent is called on the
-    // associated generated page: bug 2069128 propagates untrustedInput from
-    // here to the chat conversation that reads it.
     const toolConversation = structured.conversation;
-    toolConversation.securityProperties.setPrivateData();
-    toolConversation.securityProperties.setUntrustedInput();
-    toolConversation.securityProperties.commit();
 
     // Inherit the chat's URL ledgers, and nothing beyond them. Search result
     // URLs carry their own anonymous-fetch exemption, so they come across
@@ -1201,9 +1192,10 @@ export class AITab {
       // Best-effort og:image lookup ("" when none cached), gated on the same
       // access-control decision as the page text so a refused URL leaks no
       // image either.
-      const imageUrl = lazy.GetPageContent.isContentAllowed(url, conversation)
-        ? await AITab.#getPageImage(url)
-        : "";
+      const imageUrl =
+        contents[index]?.ok && lazy.isAllowedURLProtocol(url)
+          ? await AITab.#getPageImage(url)
+          : "";
       urlsUsed.push({
         url,
         title: heading,
@@ -1240,7 +1232,7 @@ export class AITab {
   /**
    * Load the stored page a modification names, along with the conversation that
    * composed it. The stored conversation carries its messages, URL ledgers and
-   * security flags but no engine; #resolvePromptSet attaches one.
+   * URL ledgers but no engine; #resolvePromptSet attaches one.
    *
    * Only a page belonging to `conversation`, or one the user referenced in it
    * (the current tab or an @mention), can be loaded: slugs are visible in page

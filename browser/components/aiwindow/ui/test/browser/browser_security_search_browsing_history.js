@@ -306,12 +306,6 @@ add_task(async function test_search_browsing_history_returns_sanitized_data() {
     "Conversation should be created when the first message is sent."
   );
 
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrustedInput starts false."
-  );
-
   const toolMessage = await runSearchHistoryToolCall({
     mockEngineManager,
     conversation,
@@ -379,17 +373,6 @@ add_task(async function test_search_browsing_history_returns_sanitized_data() {
     recordNoTitle.title,
     `"${noTitleUrl}" (Untrusted webpage data)`,
     "A missing title falls back to the (sanitized) URL."
-  );
-
-  Assert.equal(
-    conversation.securityProperties.privateData,
-    true,
-    "privateData becomes true once history enters the conversation."
-  );
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrustedInput stays false because titles are truncated and spotlighted."
   );
 
   Assert.deepEqual(
@@ -495,17 +478,6 @@ add_task(
       "No content past the truncation cap leaks through on the time-range path."
     );
 
-    Assert.equal(
-      conversation.securityProperties.privateData,
-      true,
-      "privateData becomes true on the time-range path."
-    );
-    Assert.equal(
-      conversation.securityProperties.untrustedInput,
-      false,
-      "untrustedInput stays false on the time-range path."
-    );
-
     for (const url of [plainUrl, longUrl]) {
       Assert.ok(
         conversation.seenUrls.has(url),
@@ -575,16 +547,6 @@ add_task(async function test_search_browsing_history_no_results_shape() {
   );
 
   // Querying history surfaces the fact it was queried, so privateData flips.
-  Assert.equal(
-    conversation.securityProperties.privateData,
-    true,
-    "privateData flips to true even when there are no results."
-  );
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrustedInput stays false when there are no results."
-  );
 
   await mockEngineManager.rejectAllRequests();
   mockEngineManager.cleanupMocks();
@@ -648,17 +610,6 @@ add_task(async function test_search_browsing_history_caps_results() {
     );
   }
 
-  Assert.equal(
-    conversation.securityProperties.privateData,
-    true,
-    "privateData becomes true once history enters the conversation."
-  );
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrustedInput stays false for search_browsing_history."
-  );
-
   // Even at the cap, no record reaches the model with thumbnail/favicon.
   assertModelHistoryPayloadSanitized(conversation);
 
@@ -690,16 +641,6 @@ add_task(
       () => AIWindow.getActiveConversation(win),
       "Conversation should exist on the active AI window before submit."
     );
-    Assert.equal(
-      conversation.securityProperties.privateData,
-      false,
-      "privateData starts false on a fresh conversation."
-    );
-    Assert.equal(
-      conversation.securityProperties.untrustedInput,
-      false,
-      "untrustedInput starts false on a fresh conversation."
-    );
 
     await typeInSmartbar(sidebarBrowser, "What have I looked at recently?");
     await submitSmartbar(sidebarBrowser);
@@ -710,17 +651,6 @@ add_task(
       callId: "call_search_history_private_flag_1",
       toolArguments: { searchTerm: SEARCH_KEYWORD },
     });
-
-    Assert.equal(
-      conversation.securityProperties.privateData,
-      true,
-      "privateData flips to true once the tool surfaces history."
-    );
-    Assert.equal(
-      conversation.securityProperties.untrustedInput,
-      false,
-      "untrustedInput stays false; the tool never introduces untrusted input."
-    );
 
     const { results } = toolMessage.content.body;
     Assert.ok(results.length, "The seeded entry is returned.");

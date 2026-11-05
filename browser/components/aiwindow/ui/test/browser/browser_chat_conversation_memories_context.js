@@ -207,35 +207,3 @@ add_task(async function test_injectMemoriesContext_messageCount_override() {
     "A window of 1 reads no previous messages rather than all of them"
   );
 });
-
-add_task(
-  async function test_injectMemoriesContext_setsPrivateData_when_memoriesFound() {
-    await gMemoriesRetrieval.seedMemories([COFFEE_MEMORY]);
-
-    const conversation = new ChatConversation({});
-    const userMessage = conversation.addUserMessage("hi");
-    await conversation.injectMemoriesContext(userMessage, COFFEE_PROMPT);
-
-    conversation.securityProperties.commit();
-    Assert.ok(
-      conversation.securityProperties.privateData,
-      "privateData should be true after commit when memories were found"
-    );
-  }
-);
-
-add_task(
-  async function test_injectMemoriesContext_doesNotSetPrivateData_when_noMemories() {
-    await gMemoriesRetrieval.clearMemories();
-
-    const conversation = new ChatConversation({});
-    const userMessage = conversation.addUserMessage("hi");
-    await conversation.injectMemoriesContext(userMessage, "hello");
-
-    conversation.securityProperties.commit();
-    Assert.ok(
-      !conversation.securityProperties.privateData,
-      "privateData should remain false when no memories were found"
-    );
-  }
-);

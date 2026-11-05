@@ -101,16 +101,6 @@ add_task(async function test_security_chat() {
     conversation,
     "Conversation should exist on the active AI window before submit."
   );
-  Assert.equal(
-    conversation.securityProperties.privateData,
-    false,
-    "No private data has been seen at the start of a conversation."
-  );
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "No untrusted untrustedInput should be false at the start of a new conversation"
-  );
 
   await typeInSmartbar(
     sidebarBrowser,
@@ -156,17 +146,6 @@ add_task(async function test_security_chat() {
     text,
     chatResponseText,
     "The message assistant text is present."
-  );
-
-  Assert.equal(
-    conversation.securityProperties.privateData,
-    true,
-    "The conversation gets marked as private as the tab info is added to it."
-  );
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "Nothing untrusted is added to the conversation."
   );
 
   await removeNewsArticle();
@@ -279,17 +258,6 @@ add_task(async function test_security_chat_context_mention_is_not_untrusted() {
     "The mention carries the page title as its label; it is spotlighted by sanitizeUntrustedContent() only when rendered into the prompt."
   );
 
-  Assert.equal(
-    conversation.securityProperties.privateData,
-    true,
-    "The conversation is private because the current tab info is added to it."
-  );
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "A user-chosen context mention does not mark the conversation as untrusted, even when its title is a prompt-injection attempt."
-  );
-
   BrowserTestUtils.removeTab(contextTab);
   await removeNewsArticle();
   await cleanup();
@@ -315,11 +283,6 @@ add_task(async function test_security_chat_no_private_data_without_tab_info() {
   Assert.ok(
     conversation,
     "Conversation should exist on the active AI window before submit."
-  );
-  Assert.equal(
-    conversation.securityProperties.privateData,
-    false,
-    "No private data has been seen at the start of a conversation."
   );
 
   // Remove the implicit current-tab chip so no current-tab info is attached.
@@ -388,17 +351,6 @@ add_task(async function test_security_chat_no_private_data_without_tab_info() {
     text,
     chatResponseText,
     "The message assistant text is present."
-  );
-
-  Assert.equal(
-    conversation.securityProperties.privateData,
-    false,
-    "The conversation is not private: no current-tab info was attached after removing page context."
-  );
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "Nothing untrusted is added to the conversation."
   );
 
   await cleanup();

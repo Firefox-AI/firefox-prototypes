@@ -101,7 +101,7 @@ function getSearchBrowsingHistoryFake(fakeResults) {
   return async (toolParams, conversation) => {
     conversation.addSeenUrls(fakeResults.map(({ url }) => url));
     await conversation.addHistoryResults(fakeResults);
-    conversation.securityProperties.setPrivateData();
+
     return {
       searchTerm: "some search term",
       count: fakeResults.length,

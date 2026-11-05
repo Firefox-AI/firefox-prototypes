@@ -113,27 +113,8 @@ add_task(async function test_searchBrowsingHistory_wrapper_number_args() {
   );
 });
 
-add_task(async function test_searchBrowsingHistory_sets_security_flags() {
+add_task(async function test_searchBrowsingHistory_returns_results() {
   const conversation = makeConversation();
-  await searchBrowsingHistory({}, conversation);
-  conversation.securityProperties.commit();
-  Assert.equal(
-    conversation.securityProperties.privateData,
-    true,
-    "private_data flag set"
-  );
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrusted_input not set"
-  );
-});
-
-add_task(async function test_searchBrowsingHistory_allowed_when_flags_set() {
-  const conversation = makeConversation({
-    privateData: true,
-    untrustedInput: true,
-  });
   const output = await searchBrowsingHistory({}, conversation);
 
   Assert.ok("results" in output, "returns results, not a refusal");

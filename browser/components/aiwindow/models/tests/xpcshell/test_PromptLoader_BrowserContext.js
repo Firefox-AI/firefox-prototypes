@@ -57,7 +57,6 @@ function buildWith(records, mapping) {
       ...mapping,
     }),
     contextMentions: [],
-    securityProperties: new SecurityProperties(),
   });
 }
 
@@ -110,7 +109,6 @@ add_task(async function test_mentioned_smart_page_includes_its_slug() {
       { type: "tab", url: "about:smartpage?page=my-page", label: "My page" },
       { type: "tab", url: "https://example.com/?page=other", label: "Other" },
     ],
-    securityProperties: new SecurityProperties(),
   });
 
   Assert.ok(

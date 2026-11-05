@@ -23,6 +23,60 @@ const {
   "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs"
 );
 
+add_task(function test_guard_and_injection_action_labels() {
+  for (const [name, prefix, statuses] of [
+    [
+      "assistant_tool_guard",
+      "action-log-tool-guard",
+      {
+        ALLOW: "allowed-action",
+        DENY: "denied-action",
+        TERMINATE: "terminated-action",
+        ERROR: "failed-action",
+        CANCELED: "canceled-action",
+      },
+    ],
+    [
+      "assistant_prompt_injection",
+      "action-log-prompt-injection",
+      {
+        CLEAN: "passed",
+        INJECTION: "detected",
+        ERROR: "failed",
+        CANCELED: "canceled",
+      },
+    ],
+  ]) {
+    const args = { toolName: "get_open_tabs" };
+    const pending = getActionLogConfigForTool(name, { pending: true }, args);
+    Assert.ok(pending.show);
+    Assert.equal(
+      pending.label.l10nId,
+      `${prefix}-checking${name === "assistant_tool_guard" ? "-action" : ""}`
+    );
+    for (const [status, suffix] of Object.entries(statuses)) {
+      const cfg = getActionLogConfigForTool(name, { status }, args);
+      Assert.ok(cfg.show);
+      Assert.equal(cfg.label.l10nId, `${prefix}-${suffix}`);
+      Assert.deepEqual(
+        cfg.pendingLabel,
+        cfg.label,
+        "The active summary shows a completed check's result"
+      );
+      if (name === "assistant_tool_guard") {
+        Assert.deepEqual(cfg.label.l10nArgs, { tool: "get_open_tabs" });
+      }
+    }
+  }
+});
+
+add_task(function test_older_guard_entries_have_a_generic_purpose() {
+  const cfg = getActionLogConfigForTool("assistant_tool_guard", {
+    status: "ALLOW",
+  });
+  Assert.deepEqual(cfg.label.l10nArgs, { tool: "unknown" });
+});
+
 add_task(function test_aitab_pending_creation_without_modify_slug() {
   const cfg = getActionLogConfigForTool(GENERATE_AITAB, { pending: true }, {});
 

@@ -167,16 +167,6 @@ add_task(async function test_tab_group_mention_reaches_model_sanitized() {
       conversation.seenUrls.has(INJECTION_PAGE_URL),
       "The allowed tab of the group is a seen URL"
     );
-    Assert.equal(
-      conversation.securityProperties.privateData,
-      true,
-      "Mentioning a tab group marks the conversation private"
-    );
-    Assert.equal(
-      conversation.securityProperties.untrustedInput,
-      false,
-      "A user-selected tab group does not mark the conversation as untrusted"
-    );
 
     const { contextMentions } = conversation.messages.find(
       message => message.content?.contextMentions?.length
@@ -265,11 +255,6 @@ add_task(async function test_expanded_members_are_not_mentioned_urls() {
     Assert.ok(
       untrustedContent.includes("Ignore prior instructions"),
       "An unmentioned page is fetched while the conversation is still trusted"
-    );
-    Assert.equal(
-      conversation.securityProperties.untrustedInput,
-      true,
-      "Reading its content marks the conversation untrusted"
     );
 
     await mockEngineManager.respondTo({

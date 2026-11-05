@@ -311,6 +311,7 @@ export class PageExtractorParent extends JSWindowActorParent {
    *   to pass into a follow-up `actor.getText(options, traceId)` call so it
    *   correlates with this request.
    * @param {boolean} [options.anonymousFetch]
+   * @param {object} [options.originAttributes] Browsing identity for the hidden page load.
    * @param {number} [options.settleDelayMs] - Extra wait once the page is ready.
    * @param {AbortSignal} [options.signal] - Tears down the headless browser
    *   when it aborts before the page is ready.
@@ -320,6 +321,7 @@ export class PageExtractorParent extends JSWindowActorParent {
     urlString,
     callback,
     anonymousFetch,
+    originAttributes,
     settleDelayMs,
     signal,
   }) {
@@ -368,10 +370,9 @@ export class PageExtractorParent extends JSWindowActorParent {
         // The hidden browser manager controls the lifetime of the hidden browser.
         return lazy.HiddenBrowserManager.withHiddenBrowser(
           async browser => {
-            if (anonymousFetch) {
-              // The goal of these settings is to fetch the page without sending
-              // any user data to the origin and without letting the visit affect
-              // the user's browsing profile (history, cache, trackers, etc).
+            if (anonymousFetch || originAttributes) {
+              // Isolated loads keep their own site data; anonymous loads also
+              // suppress credentials and caching.
 
               // Keep the visit out of browsing history
               // TODO (bug 2043254) - Move this into the HiddenBrowserManager so all hidden browsers don't affect global history.
@@ -384,13 +385,15 @@ export class PageExtractorParent extends JSWindowActorParent {
               const { browsingContext } = browser;
               // Tracking Protection so third-party trackers on the page cannot profile the request or correlate it with the user.
               browsingContext.useTrackingProtection = true;
-              browsingContext.defaultLoadFlags =
-                // Strip cookies, HTTP auth, and other credentials from the request
-                Ci.nsIRequest.LOAD_ANONYMOUS |
-                // Don't write the response into the user's memory cache
-                Ci.nsIRequest.INHIBIT_CACHING |
-                // Don't write the response into the user's persistent (disk) cache
-                Ci.nsIRequest.INHIBIT_PERSISTENT_CACHING;
+              if (anonymousFetch) {
+                browsingContext.defaultLoadFlags =
+                  // Strip cookies, HTTP auth, and other credentials from the request
+                  Ci.nsIRequest.LOAD_ANONYMOUS |
+                  // Don't write the response into the user's memory cache
+                  Ci.nsIRequest.INHIBIT_CACHING |
+                  // Don't write the response into the user's persistent (disk) cache
+                  Ci.nsIRequest.INHIBIT_PERSISTENT_CACHING;
+              }
               // Restrict what the loaded page can do.
               browsingContext.sandboxFlags |=
                 SANDBOXED_AUXILIARY_NAVIGATION |
@@ -636,6 +639,7 @@ export class PageExtractorParent extends JSWindowActorParent {
             // actor can communicate with it. The actor is registered to use this custom
             // message manager group.
             messageManagerGroup: "headless-browsers",
+            originAttributes,
           }
         );
       }

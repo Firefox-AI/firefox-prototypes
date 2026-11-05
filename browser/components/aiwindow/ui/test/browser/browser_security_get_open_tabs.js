@@ -120,17 +120,6 @@ async function startFreshTurn({
     "Conversation should exist on the active AI window before submit."
   );
 
-  Assert.equal(
-    conversation.securityProperties.privateData,
-    false,
-    "privateData starts false on a fresh conversation."
-  );
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrustedInput starts false on a fresh conversation."
-  );
-
   await typeInSmartbar(sidebarBrowser, userMessage);
   await submitSmartbar(sidebarBrowser);
 
@@ -254,16 +243,6 @@ add_task(async function test_get_open_tabs_returns_sanitized_data() {
 
   // privateData advances once tab info is surfaced; untrustedInput stays false
   // because truncation + spotlighting relax it.
-  Assert.equal(
-    conversation.securityProperties.privateData,
-    true,
-    "privateData becomes true once tab info enters the conversation."
-  );
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrustedInput stays false because titles are truncated and spotlighted."
-  );
 
   BrowserTestUtils.removeTab(aboutTab);
   await server.cleanup();
@@ -297,16 +276,6 @@ add_task(async function test_get_open_tabs_empty_when_no_http_tabs() {
     toolMessage.content.body,
     [],
     "Returns an empty array when no http tabs are open."
-  );
-  Assert.equal(
-    conversation.securityProperties.privateData,
-    true,
-    "privateData is raised even when no matching tabs are returned."
-  );
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrustedInput stays false when no tabs are returned."
   );
 
   await mockEngineManager.rejectAllRequests();
@@ -362,17 +331,6 @@ add_task(async function test_get_open_tabs_caps_and_sorts() {
     tabs.map(t => t.url),
     expectedUrls,
     "Returned tabs are sorted most-recent-first."
-  );
-
-  Assert.equal(
-    conversation.securityProperties.privateData,
-    true,
-    "privateData was raised on the conversation by the tool."
-  );
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrustedInput stays false; tab titles are truncated and spotlighted."
   );
 
   await mockEngineManager.rejectAllRequests();
@@ -541,16 +499,6 @@ add_task(async function test_get_open_tabs_aggregates_across_ai_windows() {
     tabA.windowId,
     tabB.windowId,
     "Tabs in different windows are distinguishable by window ID."
-  );
-  Assert.equal(
-    conversation.securityProperties.privateData,
-    true,
-    "privateData is raised once tabs from the AI windows enter the conversation."
-  );
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrustedInput stays false; tab titles are truncated and spotlighted."
   );
 
   BrowserTestUtils.removeTab(noiseTab.tab);

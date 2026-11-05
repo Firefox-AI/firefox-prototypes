@@ -237,7 +237,6 @@ add_task(async function test_search_the_web_end_to_end() {
     answerTurn.respond(JSON.stringify(expectedAnswer));
 
     const result = await runPromise;
-    conversation.securityProperties.commit();
 
     Assert.deepEqual(
       result,
@@ -269,14 +268,7 @@ add_task(async function test_search_the_web_end_to_end() {
       [pageUrl],
       "The search result is eligible for anonymous page extraction"
     );
-    Assert.ok(
-      conversation.securityProperties.privateData,
-      "Running a web search marks the conversation as private"
-    );
-    Assert.ok(
-      conversation.securityProperties.untrustedInput,
-      "Search results are treated as untrusted input"
-    );
+
     mockEngineManager.assertAllRequestsHandled();
     mockSearchManager.assertAllRequestsHandled();
   } finally {
@@ -1004,14 +996,6 @@ add_task(async function test_fast_search_through_chat() {
         );
 
         // No commit() here: the follow-up turn committed the staged flags.
-        Assert.ok(
-          conversation.securityProperties.privateData,
-          "The follow-up turn commits the private-data flag the tool staged"
-        );
-        Assert.ok(
-          conversation.securityProperties.untrustedInput,
-          "The follow-up turn commits the untrusted-input flag the tool staged"
-        );
 
         Assert.deepEqual(
           conversation.getCitationsSnapshot(),

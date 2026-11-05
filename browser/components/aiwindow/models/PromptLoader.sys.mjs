@@ -365,7 +365,6 @@ function renderMentionedUrls(mentionsWithUrl) {
  * @param {object} [opts]
  * @param {Function} [opts.getRealTimeMapping]
  * @param {object[]} [opts.contextMentions]
- * @param {object} opts.securityProperties
  * @returns {Promise<string|null>}
  */
 export async function buildBrowserContextPrompt(
@@ -373,7 +372,6 @@ export async function buildBrowserContextPrompt(
   {
     getRealTimeMapping = constructRealTimeInfoInjectionMessage,
     contextMentions,
-    securityProperties,
   } = {}
 ) {
   const browserContextMapping = await getRealTimeMapping(contextMentions);
@@ -401,7 +399,6 @@ export async function buildBrowserContextPrompt(
   const fragments = [];
 
   if (browserContextMapping.hasTabInfo) {
-    securityProperties.setPrivateData();
     const record = findFragment(paramsRecord ? TAB_MODULE : LEGACY_TAB_MODULE);
     if (record?.prompts) {
       fragments.push(record.prompts);
@@ -418,7 +415,6 @@ export async function buildBrowserContextPrompt(
     // Tab group mentions do not have a URL
     const mentionsWithUrl = contextMentions.filter(mention => mention.url);
     if (mentionsWithUrl.length) {
-      securityProperties.setPrivateData();
       browserContextMapping.contextUrls = renderMentionedUrls(mentionsWithUrl);
       const record = findFragment("mentions");
       if (record?.prompts) {

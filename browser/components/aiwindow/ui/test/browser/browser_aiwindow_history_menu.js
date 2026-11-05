@@ -197,8 +197,7 @@ add_task(async function test_fullpage_more_settings() {
 });
 
 /**
- * Selecting a recent chat whose tab is not open reopens it in a new tab
- * (chats are tab-specific).
+ * Selecting a recent chat restores it in the current fullpage view.
  */
 add_task(async function test_fullpage_open_recent_chat() {
   const sb = this.sinon.createSandbox();
@@ -207,10 +206,11 @@ add_task(async function test_fullpage_open_recent_chat() {
   try {
     sb.stub(this.openAIEngine, "build");
     await cleanUpConversations();
-    await seedConversations(1);
+    const [conversationId] = await seedConversations(1);
 
     aiWin = await openAIWindow();
-    const openTrustedLinkIn = sb.stub(URILoadingHelper, "openTrustedLinkIn");
+    const selectedTab = aiWin.gBrowser.selectedTab;
+    const tabs = [...aiWin.gBrowser.tabs];
     const aiWindow = await getFullpageAiWindow(aiWin);
     const menuRoot = await getHistoryMenuRoot(aiWindow);
 
@@ -227,14 +227,15 @@ add_task(async function test_fullpage_open_recent_chat() {
     menuRoot.querySelector(".history-menu-chat").click();
 
     await TestUtils.waitForCondition(
-      () => openTrustedLinkIn.called,
-      "A tab should be opened for the selected recent chat"
+      () => aiWindow.conversationId === conversationId,
+      "The current view restores the selected recent chat"
     );
     Assert.equal(
-      openTrustedLinkIn.firstCall.args[2],
-      "tab",
-      "The chat should reopen in a new tab"
+      aiWin.gBrowser.selectedTab,
+      selectedTab,
+      "The selected tab stays unchanged"
     );
+    Assert.deepEqual([...aiWin.gBrowser.tabs], tabs);
   } finally {
     if (aiWin) {
       await BrowserTestUtils.closeWindow(aiWin);
@@ -245,10 +246,9 @@ add_task(async function test_fullpage_open_recent_chat() {
 });
 
 /**
- * A chat started in the sidebar on a website reopens on that website with the
- * chat in the sidebar, not in fullpage.
+ * A chat started on a website restores in the current view without reopening it.
  */
-add_task(async function test_reopen_sidebar_chat_on_its_page() {
+add_task(async function test_restore_sidebar_chat_in_current_view() {
   const restoreSignIn = skipSignIn();
   const mockEngineManager = new MockEngineManager();
   const pageUrl = "https://example.com/";
@@ -279,6 +279,7 @@ add_task(async function test_reopen_sidebar_chat_on_its_page() {
     await BrowserTestUtils.openNewForegroundTab(aiWin.gBrowser, AIWINDOW_URL);
     BrowserTestUtils.removeTab(pageTab);
     const aiWindow = await getFullpageAiWindow(aiWin);
+    await aiWindow.onCreateNewChatClick();
     const menuRoot = await getHistoryMenuRoot(aiWindow);
 
     await openMenu(
@@ -291,32 +292,28 @@ add_task(async function test_reopen_sidebar_chat_on_its_page() {
       "Recent chat item should be rendered"
     );
 
-    const newTabPromise = BrowserTestUtils.waitForNewTab(
-      aiWin.gBrowser,
-      pageUrl,
-      true
-    );
+    const selectedTab = aiWin.gBrowser.selectedTab;
+    const tabs = [...aiWin.gBrowser.tabs];
     menuRoot.querySelector(".history-menu-chat").click();
-    const reopenedTab = await newTabPromise;
+    await TestUtils.waitForCondition(
+      () => aiWindow.conversationId === convId,
+      "The saved chat returns in the existing view"
+    );
 
     Assert.equal(
-      reopenedTab.linkedBrowser.currentURI.spec,
-      pageUrl,
-      "The chat should reopen on the page it was about"
+      selectedTab.linkedBrowser.currentURI.spec,
+      AIWINDOW_URL,
+      "History keeps the current page"
     );
-    await waitForSidebarOpen(aiWin);
-    const reopenedSidebar = aiWin.document.getElementById("ai-window-browser");
-    Assert.equal(
-      reopenedSidebar.getAttribute("data-conversation-id"),
-      convId,
-      "The reopened chat should be shown in the sidebar"
-    );
+    Assert.strictEqual(aiWin.gBrowser.selectedTab, selectedTab);
+    Assert.deepEqual([...aiWin.gBrowser.tabs], tabs);
+    Assert.ok(!AIWindowUI.isSidebarOpen(aiWin));
     await TestUtils.waitForCondition(async () => {
-      const messages = await getSidebarChatMessages(reopenedSidebar);
+      const messages = await getSidebarChatMessages(selectedTab.linkedBrowser);
       return messages.some(
         m => m.role == "user" && m.message == "What is this page about?"
       );
-    }, "The reopened chat's prompt should be rendered in the sidebar");
+    }, "The saved prompt renders in the existing fullpage chat");
   } finally {
     if (aiWin) {
       await BrowserTestUtils.closeWindow(aiWin);

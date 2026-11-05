@@ -748,16 +748,7 @@ add_task(async function test_generateResumeActivityConversationStarters() {
         !("tool_choice" in request),
         "The request should not set tool_choice"
       );
-      Assert.equal(
-        generationConversation.securityProperties.privateData,
-        true,
-        "privateData should be set: the prompt carries memories and browsing history"
-      );
-      Assert.equal(
-        generationConversation.securityProperties.untrustedInput,
-        true,
-        "untrustedInput should be set: the prompt carries webpage titles"
-      );
+
       Assert.deepEqual(
         [...generationConversation.seenUrls],
         [],
@@ -1376,17 +1367,6 @@ add_task(async function test_constructConversationToResumeJourney() {
         userMessage.content.relevantMemories[0].memory_summary,
         "Test memory",
         "The user message should include the relevant memory summary"
-      );
-
-      Assert.equal(
-        conversation.securityProperties.privateData,
-        true,
-        "privateData should be set"
-      );
-      Assert.equal(
-        conversation.securityProperties.untrustedInput,
-        true,
-        "untrustedInput should be set"
       );
 
       const originatingId = "originating-conversation-id";

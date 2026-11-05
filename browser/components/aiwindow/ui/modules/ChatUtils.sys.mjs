@@ -58,12 +58,11 @@ export function parseConversationRow(row) {
     description: row.getResultByName("description"),
     pageUrl: URL.parse(row.getResultByName("page_url")),
     pageMeta: parseJSONOrNull(row.getResultByName("page_meta")),
+    assistantContext: parseJSONOrNull(row.getResultByName("assistant_context")),
     createdDate: row.getResultByName("created_date"),
     updatedDate: row.getResultByName("updated_date"),
     status: row.getResultByName("status"),
-    securityProperties: parseJSONOrNull(
-      row.getResultByName("security_properties")
-    ),
+
     seenUrls: Array.isArray(seenUrlsArray) ? seenUrlsArray : [],
     serpUrlsForAnonymousFetch: Array.isArray(serpUrlsForAnonymousFetchArray)
       ? serpUrlsForAnonymousFetchArray

@@ -271,6 +271,14 @@ skip-if = [
 
 ["browser_aiwindowui.js"]
 
+["browser_assistant_context.js"]
+
+["browser_assistant_guard_action_log.js"]
+
+["browser_assistant_page_access.js"]
+
+["browser_assistant_shared_conversation.js"]
+
 ["browser_chat_assistant_citations.js"]
 
 ["browser_chat_conversation_memories_context.js"]

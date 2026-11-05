@@ -9,6 +9,8 @@
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
+  AssistantGuards:
+    "moz-src:///browser/components/aiwindow/models/AssistantGuards.sys.mjs",
   AITabStore:
     "moz-src:///browser/components/aiwindow/ui/modules/AITabStore.sys.mjs",
   ConversationStore:
@@ -85,18 +87,6 @@ function generatedSurface(title = GENERATED_TITLE) {
     ],
     dataModel: {},
   };
-}
-
-/**
- * Raise both flags, the one combination that blocks a fetch.
- *
- * @param {ChatConversation} conversation
- */
-function markPrivateAndUntrusted(conversation) {
-  conversation.securityProperties.setPrivateData();
-  conversation.securityProperties.setUntrustedInput();
-  // Staged flags are invisible until committed.
-  conversation.securityProperties.commit();
 }
 
 /**
@@ -208,25 +198,10 @@ add_setup(async function () {
 // ---------------------------------------------------------------------------
 // Access control
 //
-// create_aitab reads its pages through the chat conversation's own
-// get_page_content, so that conversation's privateData and untrustedInput
-// flags decide what it can read. Once both are set, fetching a URL the user
-// never opened would mean a request to a server the model picked, and private
-// data could go out with it, so it is refused. A page already open in a tab
-// needs no request, so it stays readable.
-//
-// The model is treated as hostile here: it picks the URLs. The full
-// flags x url-kind matrix is in test_Tools_GetPageContent.js.
-// ---------------------------------------------------------------------------
+// Page reads inside generation use the same tool guard as direct page reads.
 
 add_task(async function test_allows_url_the_user_supplied() {
-  await withAITab(async ({ conversation, run }) => {
-    Assert.equal(
-      conversation.securityProperties.untrustedInput,
-      false,
-      "Nothing untrusted has been read yet."
-    );
-
+  await withAITab(async ({ conversation: _conversation, run }) => {
     const { sourceText, toolResult } = await run([SOURCE_URL]);
 
     Assert.ok(
@@ -243,7 +218,9 @@ add_task(async function test_allows_url_the_user_supplied() {
 /** seenUrls records what the user was shown; it does not grant read access. */
 add_task(async function test_blocks_url_the_model_chose() {
   await withAITab(async ({ conversation, mockEngine, runExpectingRefusal }) => {
-    markPrivateAndUntrusted(conversation);
+    lazy.AssistantGuards.checkToolCall.callsFake(async (_chat, name) =>
+      name === "get_page_content" ? "DENY" : "ALLOW"
+    );
     // Stands in for a link an earlier get_page_content turn discovered.
     conversation.addSeenUrls([ATTACKER_URL]);
     Assert.ok(
@@ -271,7 +248,7 @@ add_task(async function test_blocks_url_the_model_chose() {
   });
 });
 
-add_task(async function test_allows_open_tab_when_flagged() {
+add_task(async function test_allows_explicit_tab_context() {
   // get_page_content only reads tabs in AI windows, which AIWindow detects
   // from this attribute. A real AIWindow would interfere with openAIEngine.
   window.document.documentElement.setAttribute("ai-window", "true");
@@ -283,7 +260,7 @@ add_task(async function test_allows_open_tab_when_flagged() {
 
   try {
     await withAITab(async ({ conversation, run }) => {
-      markPrivateAndUntrusted(conversation);
+      conversation.addUserMessage("Summarize this tab", new URL(SOURCE_URL));
 
       const { sourceText, toolResult } = await run([SOURCE_URL]);
 

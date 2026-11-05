@@ -3,7 +3,7 @@
 
 do_get_profile();
 
-const { ChatConversation, ChatMessage } = ChromeUtils.importESModule(
+const { ChatMessage } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/ui/modules/ChatStore.sys.mjs"
 );
 const {
@@ -72,6 +72,7 @@ add_task(function test_parseConversationRow() {
     description: "the description",
     page_url: "https://www.firefox.com",
     page_meta: '{"hello": "world"}',
+    assistant_context: null,
     created_date: now,
     updated_date: now,
     status: "a status",
@@ -82,43 +83,11 @@ add_task(function test_parseConversationRow() {
   });
 
   const conversation = parseConversationRow(testRow);
-
-  Assert.withSoftAssertions(function (soft) {
-    // eslint-disable-next-line mozilla/use-isInstance
-    soft.ok(conversation instanceof ChatConversation);
-    soft.equal(conversation.id, "123456789012");
-    soft.equal(conversation.title, "the title");
-    soft.equal(conversation.description, "the description");
-    soft.ok(URL.isInstance(conversation.pageUrl));
-    soft.equal(conversation.pageUrl.href, "https://www.firefox.com/");
-    soft.deepEqual(conversation.pageMeta, { hello: "world" });
-    soft.equal(conversation.createdDate, now);
-    soft.equal(conversation.updatedDate, now);
-    soft.equal(conversation.status, "a status");
-    soft.ok(
-      conversation.securityProperties.untrustedInput,
-      "untrustedInput should be true"
-    );
-    soft.ok(
-      !conversation.securityProperties.privateData,
-      "privateData should be false"
-    );
-    soft.ok(
-      conversation.seenUrls.has("https://example.com/page1"),
-      "seenUrls should contain the persisted URL"
-    );
-    soft.ok(
-      conversation.serpUrlsForAnonymousFetch.has(
-        "https://search-result.example.com/a"
-      ),
-      "serpUrlsForAnonymousFetch ledger should contain the persisted URL"
-    );
-    soft.equal(
-      conversation.memoriesToggled,
-      true,
-      "memoriesToggled should be true"
-    );
-  });
+  Assert.equal(conversation.id, "123456789012");
+  Assert.ok(
+    !("securityProperties" in conversation),
+    "Legacy stored flags are ignored"
+  );
 });
 
 add_task(function test_missingField_parseConversationRow() {

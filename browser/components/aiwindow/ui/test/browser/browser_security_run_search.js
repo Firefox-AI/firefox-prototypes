@@ -238,12 +238,6 @@ add_task(async function test_run_search_verbatim_query_path() {
   );
 
   Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrustedInput starts false."
-  );
-
-  Assert.equal(
     conversation.serpUrlsForAnonymousFetch.size,
     0,
     "serpUrlsForAnonymousFetch is empty before run_search."
@@ -322,17 +316,6 @@ add_task(async function test_run_search_verbatim_query_path() {
       "about:blank, no extras, no missing entries."
   );
 
-  Assert.equal(
-    conversation.securityProperties.privateData,
-    true,
-    "privateData flips to true after run_search."
-  );
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    true,
-    "untrustedInput flips to true after run_search."
-  );
-
   // Drain the follow-up turn and title generation so teardown isn't mid-generation.
   const followUpReply = "Here is what I found.";
   await mockEngineManager.respondTo({
@@ -409,11 +392,6 @@ add_task(async function test_run_search_generated_query_path() {
   });
 
   // run_search hasn't run yet, so no untrusted web content has entered.
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrustedInput is still false before run_search runs on turn 1."
-  );
 
   // Turn 1: submit the message the model should ignore. submitSmartbar waits for
   // the action to leave "stop", so it won't fire until turn 0 finished.
@@ -487,17 +465,6 @@ add_task(async function test_run_search_generated_query_path() {
       "about:blank, no extras, no missing entries."
   );
 
-  Assert.equal(
-    conversation.securityProperties.privateData,
-    true,
-    "privateData flips to true after run_search."
-  );
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    true,
-    "untrustedInput flips to true after run_search."
-  );
-
   await mockEngineManager.respondTo({
     purpose: "chat",
     response: "Here is what I found.",
@@ -544,12 +511,6 @@ add_task(async function test_run_search_extraction_failure_flags_still_flip() {
     "Conversation should be created when the first message is sent."
   );
 
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    false,
-    "untrustedInput starts false."
-  );
-
   await mockEngineManager.respondTo({
     purpose: "chat",
     response: {
@@ -591,17 +552,6 @@ add_task(async function test_run_search_extraction_failure_flags_still_flip() {
     conversation.serpUrlsForAnonymousFetch.size,
     0,
     "serpUrlsForAnonymousFetch stays empty when PageExtractor extracts nothing."
-  );
-
-  Assert.equal(
-    conversation.securityProperties.privateData,
-    true,
-    "privateData still flips to true on extraction failure (the query was used)."
-  );
-  Assert.equal(
-    conversation.securityProperties.untrustedInput,
-    true,
-    "untrustedInput still flips to true on extraction failure."
   );
 
   await mockEngineManager.respondTo({

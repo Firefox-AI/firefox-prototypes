@@ -6,7 +6,6 @@
 
 import { Message } from "moz-src:///browser/components/aiwindow/models/Message.sys.mjs";
 import { compactMessages } from "moz-src:///browser/components/aiwindow/models/PromptOptimizer.sys.mjs";
-import { SecurityProperties } from "moz-src:///browser/components/aiwindow/models/SecurityProperties.sys.mjs";
 import {
   consumeStreamChunk,
   createParserState,
@@ -60,8 +59,6 @@ export class Conversation {
   feature;
   engine;
   parameters;
-  /** @type {SecurityProperties} */
-  securityProperties;
 
   /**
    * Language models can generate arbitrary URLs. If a conversation has been exposed
@@ -108,7 +105,6 @@ export class Conversation {
    * @param {string} [params.feature]
    * @param {object} [params.engine]
    * @param {InferenceParams} [params.parameters]
-   * @param {SecurityProperties|object|null} [params.securityProperties]
    */
   constructor({
     id = crypto.randomUUID(),
@@ -120,7 +116,6 @@ export class Conversation {
     feature = null,
     engine = null,
     parameters,
-    securityProperties,
   } = {}) {
     this.id = id;
     this.createdDate = createdDate;
@@ -133,14 +128,6 @@ export class Conversation {
     this.feature = feature;
     this.engine = engine;
     this.parameters = parameters ?? {};
-
-    if (securityProperties instanceof SecurityProperties) {
-      this.securityProperties = securityProperties;
-    } else if (securityProperties != null) {
-      this.securityProperties = SecurityProperties.fromJSON(securityProperties);
-    } else {
-      this.securityProperties = new SecurityProperties();
-    }
   }
 
   set messages(value) {
@@ -426,18 +413,11 @@ export class Conversation {
   /**
    * Execute one LLM call against this conversation's messages + parameters.
    *
-   * This and `runWithGenerator()` are the only ways a turn reaches the engine,
-   * so they are where staged security flags are committed. Committing here
-   * rather than at each call site covers turns driven from anywhere, including
-   * a tool that re-enters the chat loop, and keeps flags staged for the whole
-   * of a tool-call batch, which runs no LLM call of its own.
-   *
    * @param {object} opts - { token, signal?, ... }
    * @param {InferenceParams} [opts.inferenceParams]
    * @returns {Promise<object>}
    */
   async run(opts = {}) {
-    this.securityProperties.commit();
     return this.engine.run({
       args: this.getMessagesInChatCompletionsFormat(),
       ...opts,
@@ -446,15 +426,13 @@ export class Conversation {
   }
 
   /**
-   * Streaming variant — returns an AsyncGenerator. Commits security flags for
-   * the same reason `run()` does, eagerly, before the generator is returned.
+   * Streaming variant — returns an AsyncGenerator.
    *
    * @param {object} opts - { token, signal?, chatId?, tools?, tool_choice?, streamOptions?, args? }
    * @param {InferenceParams} [opts.inferenceParams]
    * @returns {AsyncGenerator}
    */
   runWithGenerator(opts = {}) {
-    this.securityProperties.commit();
     return this.engine.runWithGenerator({
       ...opts,
       // Lazy so the projection is skipped when the caller supplies its own

@@ -3,33 +3,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /* Any shared setup for these tests lives here. */
-const { SecurityProperties } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/aiwindow/models/SecurityProperties.sys.mjs"
-);
 
 /**
- * Creates a minimal conversation-like object for use in tool tests.
- *
- * @param {object} [options]
- * @param {boolean} [options.privateData] - Pre-set the privateData security flag.
- * @param {boolean} [options.untrustedInput] - Pre-set the untrustedInput security flag.
- * @returns {{ securityProperties: SecurityProperties }}
+ * @returns {object} A minimal conversation for tool tests.
  */
-function makeConversation({
-  privateData = false,
-  untrustedInput = false,
-} = {}) {
-  const securityProperties = new SecurityProperties();
-  if (privateData) {
-    securityProperties.setPrivateData();
-  }
-  if (untrustedInput) {
-    securityProperties.setUntrustedInput();
-  }
-  securityProperties.commit();
+function makeConversation() {
   const pendingBrowserActionTelemetry = new Map();
   return {
-    securityProperties,
     stashPendingBrowserActionTelemetry(toolCallId, telemetryInfo) {
       pendingBrowserActionTelemetry.set(toolCallId, telemetryInfo);
     },

@@ -1,6 +1,9 @@
 const { ChatStore, ChatConversation } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/ui/modules/ChatStore.sys.mjs"
 );
+const { AssistantSession } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/aiwindow/models/AssistantSession.sys.mjs"
+);
 
 async function addTestConversations(pageUrl) {
   for (let i = 1; i <= 5; i++) {
@@ -62,18 +65,26 @@ async function closeHistoryMenu(historyMenu) {
 }
 
 async function triggerMenuItem(menu, menuItem) {
-  const newTabPromise = BrowserTestUtils.waitForNewTab(gAiWindow.gBrowser);
+  const selectedTab = gAiWindow.gBrowser.selectedTab;
+  const tabs = [...gAiWindow.gBrowser.tabs];
+  const url = selectedTab.linkedBrowser.currentURI.spec;
+  const id = menuItem.getAttribute("data-conv-id");
 
   if (AppConstants.platform === "macosx") {
     menuItem.dispatchEvent(new gAiWindow.Event("command", { bubbles: true }));
-    return newTabPromise;
+  } else {
+    const menuHidden = BrowserTestUtils.waitForEvent(menu, "popuphidden");
+    menu.activateItem(menuItem);
+    await menuHidden;
   }
-
-  const menuHidden = BrowserTestUtils.waitForEvent(menu, "popuphidden");
-  menu.activateItem(menuItem);
-  await menuHidden;
-
-  return newTabPromise;
+  await TestUtils.waitForCondition(
+    () => AssistantSession.conversation.id === id,
+    "The menu restores the selected conversation"
+  );
+  Assert.deepEqual([...gAiWindow.gBrowser.tabs], tabs);
+  Assert.strictEqual(gAiWindow.gBrowser.selectedTab, selectedTab);
+  Assert.equal(selectedTab.linkedBrowser.currentURI.spec, url);
+  return selectedTab;
 }
 
 let gAiWindow;
@@ -161,27 +172,30 @@ describe("recent chats", () => {
       const expectedConversationId =
         recentChatItem.getAttribute("data-conv-id");
 
-      let newTab = await triggerMenuItem(historyMenu, recentChatItem);
+      const currentTab = await triggerMenuItem(historyMenu, recentChatItem);
       await BrowserTestUtils.waitForMutationCondition(
-        newTab.linkedBrowser,
+        currentTab.linkedBrowser,
         { attributes: true },
-        () => newTab.linkedBrowser.hasAttribute("data-conversation-id")
+        () =>
+          currentTab.linkedBrowser.getAttribute("data-conversation-id") ===
+          expectedConversationId
       );
 
       Assert.equal(
-        newTab.linkedBrowser.getAttribute("data-conversation-id"),
+        currentTab.linkedBrowser.getAttribute("data-conversation-id"),
         expectedConversationId,
         "The tab should have the conversation loaded"
       );
-
-      await BrowserTestUtils.removeTab(newTab);
-      newTab = null;
     });
   });
 
   describe("recent chats menu item click on chat that navigated to a url", () => {
     beforeEach(async () => {
       await addTestConversations(new URL("https://www.example.com"));
+      await promiseNavigateAndLoad(
+        gAiWindow.gBrowser.selectedBrowser,
+        "https://example.org/"
+      );
       historyMenu = await openHistoryMenu();
     });
 
@@ -201,12 +215,15 @@ describe("recent chats", () => {
       const expectedConversationId =
         recentChatItem.getAttribute("data-conv-id");
 
-      let newTab = await triggerMenuItem(historyMenu, recentChatItem);
+      await triggerMenuItem(historyMenu, recentChatItem);
 
       const sidebarBrowser =
         gAiWindow.document.getElementById("ai-window-browser");
-      await TestUtils.waitForCondition(() =>
-        AIWindowUI.isSidebarOpen(gAiWindow)
+      await TestUtils.waitForCondition(
+        () =>
+          AIWindowUI.isSidebarOpen(gAiWindow) &&
+          sidebarBrowser.getAttribute("data-conversation-id") ===
+            expectedConversationId
       );
 
       Assert.equal(
@@ -214,9 +231,6 @@ describe("recent chats", () => {
         expectedConversationId,
         "Sidebar should open the selected conversation ID"
       );
-
-      await BrowserTestUtils.removeTab(newTab);
-      newTab = null;
     });
   });
 
@@ -232,7 +246,7 @@ describe("recent chats", () => {
       historyMenu = await openHistoryMenu();
     });
 
-    it("opens the last page a prompt was submitted on", async () => {
+    it("restores the chat without opening its previous pages", async () => {
       await BrowserTestUtils.waitForMutationCondition(
         historyMenu,
         { childList: true },
@@ -240,15 +254,13 @@ describe("recent chats", () => {
       );
 
       const recentChatItem = historyMenu.querySelector(".recent-chat-item");
-      const newTab = await triggerMenuItem(historyMenu, recentChatItem);
+      const currentTab = await triggerMenuItem(historyMenu, recentChatItem);
 
       Assert.equal(
-        newTab.linkedBrowser.currentURI.spec,
-        "https://example.com/",
-        "The tab should open the last page a prompt was submitted on"
+        currentTab.linkedBrowser.currentURI.spec,
+        AIWINDOW_URL,
+        "The current page stays unchanged"
       );
-
-      await BrowserTestUtils.removeTab(newTab);
     });
   });
 });

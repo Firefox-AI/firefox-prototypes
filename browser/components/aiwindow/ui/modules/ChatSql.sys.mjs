@@ -36,7 +36,8 @@ CREATE TABLE conversation (
   security_properties_jsonb BLOB,
   seen_urls_jsonb BLOB,
   memories_toggled BOOLEAN,
-  serp_urls_for_anonymous_fetch_jsonb BLOB
+  serp_urls_for_anonymous_fetch_jsonb BLOB,
+  assistant_context_jsonb BLOB
 ) WITHOUT ROWID;
 `;
 
@@ -138,12 +139,12 @@ INSERT INTO conversation (
   conv_id, title, description, page_url, page_meta_jsonb,
   created_date, updated_date, status, active_branch_tip_message_id,
   security_properties_jsonb, seen_urls_jsonb, memories_toggled,
-  serp_urls_for_anonymous_fetch_jsonb
+  serp_urls_for_anonymous_fetch_jsonb, assistant_context_jsonb
 ) VALUES (
   :conv_id, :title, :description, :page_url, jsonb(:page_meta),
   :created_date, :updated_date, :status, :active_branch_tip_message_id,
   jsonb(:security_properties), jsonb(:seen_urls), :memories_toggled,
-  jsonb(:serp_urls_for_anonymous_fetch)
+  jsonb(:serp_urls_for_anonymous_fetch), jsonb(:assistant_context)
 )
 ON CONFLICT(conv_id) DO UPDATE
   SET title = :title,
@@ -153,7 +154,8 @@ ON CONFLICT(conv_id) DO UPDATE
       security_properties_jsonb = jsonb(:security_properties),
       seen_urls_jsonb = jsonb(:seen_urls),
       memories_toggled = :memories_toggled,
-      serp_urls_for_anonymous_fetch_jsonb = jsonb(:serp_urls_for_anonymous_fetch);
+      serp_urls_for_anonymous_fetch_jsonb = jsonb(:serp_urls_for_anonymous_fetch),
+      assistant_context_jsonb = jsonb(:assistant_context);
 `;
 
 export const MESSAGE_INSERT = `
@@ -231,7 +233,8 @@ SELECT conv_id, title, description, page_url,
   status, active_branch_tip_message_id,
   json(security_properties_jsonb) AS security_properties,
   json(seen_urls_jsonb) AS seen_urls, memories_toggled,
-  json(serp_urls_for_anonymous_fetch_jsonb) AS serp_urls_for_anonymous_fetch
+  json(serp_urls_for_anonymous_fetch_jsonb) AS serp_urls_for_anonymous_fetch,
+  json(assistant_context_jsonb) AS assistant_context
 FROM conversation WHERE conv_id = :conv_id;
 `;
 
@@ -241,7 +244,8 @@ SELECT conv_id, title, description, page_url,
   status, active_branch_tip_message_id,
   json(security_properties_jsonb) AS security_properties,
   json(seen_urls_jsonb) AS seen_urls, memories_toggled,
-  json(serp_urls_for_anonymous_fetch_jsonb) AS serp_urls_for_anonymous_fetch
+  json(serp_urls_for_anonymous_fetch_jsonb) AS serp_urls_for_anonymous_fetch,
+  json(assistant_context_jsonb) AS assistant_context
 FROM conversation
 WHERE updated_date >= :start_date AND updated_date <= :end_date
 ORDER BY updated_date DESC;
@@ -253,7 +257,8 @@ SELECT c.conv_id, c.title, c.description, c.page_url,
   c.status, c.active_branch_tip_message_id,
   json(c.security_properties_jsonb) AS security_properties,
   json(c.seen_urls_jsonb) AS seen_urls, c.memories_toggled,
-  json(c.serp_urls_for_anonymous_fetch_jsonb) AS serp_urls_for_anonymous_fetch
+  json(c.serp_urls_for_anonymous_fetch_jsonb) AS serp_urls_for_anonymous_fetch,
+  json(c.assistant_context_jsonb) AS assistant_context
 FROM conversation c
 WHERE EXISTS (
   SELECT 1
@@ -378,7 +383,8 @@ SELECT c.conv_id, c.title, c.description, c.page_url,
   c.status, c.active_branch_tip_message_id,
   json(c.security_properties_jsonb) AS security_properties,
   json(c.seen_urls_jsonb) AS seen_urls, c.memories_toggled,
-  json(c.serp_urls_for_anonymous_fetch_jsonb) AS serp_urls_for_anonymous_fetch
+  json(c.serp_urls_for_anonymous_fetch_jsonb) AS serp_urls_for_anonymous_fetch,
+  json(c.assistant_context_jsonb) AS assistant_context
 FROM conversation c
 JOIN message m ON m.conv_id = c.conv_id
 WHERE json_type(m.content_jsonb, :path) IS NOT NULL;
@@ -390,7 +396,8 @@ SELECT c.conv_id, c.title, c.description, c.page_url,
   c.status, c.active_branch_tip_message_id,
   json(c.security_properties_jsonb) AS security_properties,
   json(c.seen_urls_jsonb) AS seen_urls, c.memories_toggled,
-  json(c.serp_urls_for_anonymous_fetch_jsonb) AS serp_urls_for_anonymous_fetch
+  json(c.serp_urls_for_anonymous_fetch_jsonb) AS serp_urls_for_anonymous_fetch,
+  json(c.assistant_context_jsonb) AS assistant_context
 FROM conversation c
 JOIN message m ON m.conv_id = c.conv_id
 WHERE m.role = :role
@@ -412,6 +419,7 @@ SELECT
   json(c.seen_urls_jsonb) AS seen_urls,
   c.memories_toggled,
   json(c.serp_urls_for_anonymous_fetch_jsonb) AS serp_urls_for_anonymous_fetch,
+  json(c.assistant_context_jsonb) AS assistant_context,
   json_extract(m.content_jsonb, :path) AS matching_snippet
 FROM conversation AS c
 LEFT JOIN message AS m

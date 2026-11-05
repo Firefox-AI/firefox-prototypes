@@ -650,133 +650,6 @@ add_task(
   }
 );
 
-add_task(
-  async function test_Chat_fetchWithHistory_get_page_content_sets_flags_and_only_works_once() {
-    const sb = sinon.createSandbox();
-    try {
-      let callCount = 0;
-      const fakeEngine = {
-        runWithGenerator(_options) {
-          callCount++;
-          async function* gen() {
-            if (callCount === 1) {
-              yield {
-                toolCalls: [
-                  {
-                    id: "call_gpc_001",
-                    function: {
-                      name: "get_page_content",
-                      arguments: JSON.stringify({ url: "https://example.com" }),
-                    },
-                  },
-                ],
-              };
-            } else if (callCount === 2) {
-              yield {
-                toolCalls: [
-                  {
-                    id: "call_gpc_002",
-                    function: {
-                      name: "get_page_content",
-                      arguments: JSON.stringify({ url: "https://example.com" }),
-                    },
-                  },
-                ],
-              };
-            } else {
-              yield { text: "Final answer." };
-            }
-          }
-          return gen();
-        },
-        getConfig() {
-          return {};
-        },
-      };
-
-      const getPageContentStub = sb
-        .stub(GetPageContent, "getPageContent")
-        .callsFake(async (_params, conversation) => {
-          const secProps = conversation.securityProperties;
-          if (secProps.untrustedInput && secProps.privateData) {
-            return [
-              {
-                url: _params?.url,
-                ok: false,
-                content: `get_page_content is not available for ${_params?.url} when the conversation involves both untrusted input and private data.`,
-              },
-            ];
-          }
-          secProps.setUntrustedInput();
-          secProps.setPrivateData();
-          return [{ url: _params?.url, ok: true, content: "page content" }];
-        });
-      sb.stub(AuthProvider, "getToken").resolves("mock_token");
-
-      const conversation = new ChatConversation({
-        title: "flags test",
-        description: "desc",
-        pageUrl: new URL("https://www.firefox.com"),
-        pageMeta: {},
-      });
-      conversation.addUserMessage(
-        "Get page content twice",
-        "https://www.firefox.com",
-        0
-      );
-      conversation.addAssistantMessage("text", "");
-
-      setupConversationForChat(conversation, {
-        model: TEST_MODEL,
-        engine: fakeEngine,
-      });
-      await Chat.fetchWithHistory({
-        conversation,
-      });
-
-      Assert.strictEqual(
-        conversation.securityProperties.untrustedInput,
-        true,
-        "untrusted_input should be true after get_page_content"
-      );
-      Assert.strictEqual(
-        conversation.securityProperties.privateData,
-        true,
-        "private_data should be true after get_page_content"
-      );
-      Assert.ok(
-        getPageContentStub.calledTwice,
-        "get_page_content should be called twice"
-      );
-
-      const toolResultMessages = conversation.messages.filter(
-        message => message.role === MESSAGE_ROLE.TOOL
-      );
-      Assert.equal(
-        toolResultMessages.length,
-        2,
-        "Should have two tool result messages"
-      );
-      Assert.ok(
-        String(toolResultMessages[0].content?.body).includes("page content"),
-        "First call should return actual content"
-      );
-      Assert.ok(
-        String(toolResultMessages[1].content?.body).includes("not available"),
-        "Second call should return refusal"
-      );
-      Assert.ok(
-        getLastAssistantResponse(conversation).content.body.includes(
-          "Final answer."
-        ),
-        "Should yield text from the final engine call"
-      );
-    } finally {
-      sb.restore();
-    }
-  }
-);
-
 add_task(async function test_Chat_fetchWithHistory_uses_modelId_from_pref() {
   const sb = sinon.createSandbox();
   try {
@@ -1498,3 +1371,18 @@ add_task(
     );
   }
 );
+
+add_setup(function allow_tools_for_chat_orchestration_tests() {
+  const { AssistantGuards } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/aiwindow/models/AssistantGuards.sys.mjs"
+  );
+  const { SearchService } = ChromeUtils.importESModule(
+    "moz-src:///toolkit/components/search/SearchService.sys.mjs"
+  );
+  const search = sinon
+    .stub(SearchService, "getDefault")
+    .resolves({ name: "test" });
+  registerCleanupFunction(() => search.restore());
+  const guard = sinon.stub(AssistantGuards, "checkToolCall").resolves("ALLOW");
+  registerCleanupFunction(() => guard.restore());
+});

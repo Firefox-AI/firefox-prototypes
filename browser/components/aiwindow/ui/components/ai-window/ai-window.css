@@ -31,6 +31,7 @@
     "browser"
     "."
     "heading"
+    "page-access"
     "smartbar"
     "prompts"
     "topsites"
@@ -40,7 +41,7 @@
     "footer";
   /* Preserve space above the heading as the resume section grows, and a
    * minimum gap above the footer so it doesn't crowd short content. */
-  grid-template-rows: 0 minmax(var(--space-xlarge), 1fr) auto auto auto auto auto auto minmax(var(--size-item-xlarge), 1fr) auto;
+  grid-template-rows: 0 minmax(var(--space-xlarge), 1fr) auto auto auto auto auto auto auto minmax(var(--size-item-xlarge), 1fr) auto;
   align-content: stretch;
   box-shadow: var(--smartwindow-main-box-shadow);
 }
@@ -48,10 +49,11 @@
 :host([mode="sidebar"]) {
   grid-template-areas:
     "browser"
+    "page-access"
     "prompts"
     "smartbar"
     "disclaimer";
-  grid-template-rows: 1fr auto auto auto;
+  grid-template-rows: 1fr auto auto auto auto;
   --smartbar-width: calc(100% - var(--space-large));
 }
 
@@ -63,18 +65,20 @@
 :host(.chat-active) {
   grid-template-areas:
     "browser"
+    "page-access"
     "smartbar"
     "disclaimer";
-  grid-template-rows: 1fr auto auto;
+  grid-template-rows: 1fr auto auto auto;
 }
 
 :host([mode="fullpage"].chat-active) {
   grid-template-areas:
     "browser"
+    "page-access"
     "prompts"
     "smartbar"
     "disclaimer";
-  grid-template-rows: 1fr auto auto auto;
+  grid-template-rows: 1fr auto auto auto auto;
 
   & .fullpage-header:not([hidden]) {
     display: flex;
@@ -84,9 +88,58 @@
 :host([mode="sidebar"].chat-active) {
   grid-template-areas:
     "browser"
+    "page-access"
     "smartbar"
     "disclaimer";
-  grid-template-rows: 1fr auto auto;
+  grid-template-rows: 1fr auto auto auto;
+}
+
+.page-access-panel {
+  grid-area: page-access;
+  inline-size: var(--smartbar-width);
+  max-inline-size: var(--smartwindow-content-max-width);
+  max-block-size: 35vh;
+  overflow: auto;
+  box-sizing: border-box;
+  padding: var(--space-small);
+  color: var(--text-color);
+  font-size: var(--font-size-small);
+}
+
+.page-access-status,
+.page-access-actions,
+.page-access-sites li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-small);
+  justify-content: space-between;
+}
+
+.page-access-origin,
+.page-access-principal {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.page-access-description {
+  color: var(--text-color-deemphasized);
+}
+
+.page-access-request {
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-medium);
+  background-color: var(--background-color-box);
+  padding: var(--space-medium);
+  margin-block-end: var(--space-small);
+}
+
+.page-access-actions {
+  justify-content: end;
+  margin-block-start: var(--space-small);
+}
+
+.page-access-sites ul {
+  padding-inline-start: var(--space-medium);
 }
 
 #browser-container {

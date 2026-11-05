@@ -54,6 +54,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowMenu.sys.mjs",
   AuthProvider:
     "moz-src:///browser/components/aiwindow/models/AuthProvider.sys.mjs",
+  AssistantContext:
+    "moz-src:///browser/components/aiwindow/ui/modules/AssistantContext.sys.mjs",
   AutoTabGroupingSuggestions:
     "moz-src:///browser/components/aiwindow/ui/modules/AutoTabGroupingSuggestions.sys.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
@@ -170,6 +172,7 @@ export const AIWindow = {
    */
 
   init(win) {
+    lazy.AssistantContext.init(win);
     if (!this._windowStates.has(win)) {
       this._windowStates.set(win, {});
       this._updateHamburgerMenuPosition(win);
@@ -955,7 +958,7 @@ export const AIWindow = {
   },
 
   get newTabURL() {
-    return AIWINDOW_URL;
+    return "about:newtab";
   },
 
   get firstrunURL() {
@@ -970,7 +973,7 @@ export const AIWindow = {
    * @returns {string}
    */
   get initialStartupURL() {
-    return lazy.hasFirstrunCompleted ? AIWINDOW_URL : FIRSTRUN_URL;
+    return lazy.hasFirstrunCompleted ? this.newTabURL : FIRSTRUN_URL;
   },
 
   /**
@@ -1092,9 +1095,6 @@ export const AIWindow = {
             aitabSource: source,
           });
 
-        // AIWINDOW_URL is the Smart Window's new tab page, so this may be the
-        // preloaded new tab browser, whose ai-window connected before it had a
-        // tab and will not connect again.
         if (browser.contentDocument?.querySelector("ai-window")?.conversation) {
           submit();
           return;
@@ -1319,11 +1319,11 @@ export const AIWindow = {
     } else if (trigger === "startup") {
       // Startup navigation to about:newtab may still be pending when
       // _reconcileNewTabPages runs. Redirect any affected tabs to the
-      // AI window URL to ensure they open as Smart Windows.
-      const aiWindowURI = Services.io.newURI(AIWINDOW_URL);
+      // Smart Window new tab page.
+      const newTabURI = Services.io.newURI(this.newTabURL);
       for (const tab of win.gBrowser.tabs) {
         if (tab.linkedBrowser?.currentURI?.spec === "about:blank") {
-          tab.linkedBrowser.loadURI(aiWindowURI, { triggeringPrincipal });
+          tab.linkedBrowser.loadURI(newTabURI, { triggeringPrincipal });
         }
       }
     }

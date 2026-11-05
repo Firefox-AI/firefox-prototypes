@@ -589,3 +589,51 @@ aiwindow-resume-section-empty-no-suggestions-description = When there’s someth
 aiwindow-resume-section-empty-all-dismissed-heading = All caught up
 aiwindow-resume-section-empty-all-dismissed-description = That’s all the suggestions for now. Check back later for more.
 aiwindow-resume-section-hide = Hide for now
+
+smartwindow-assistant-error-guard-header = Assistant task stopped
+smartwindow-assistant-error-guard-body = The assistant could not verify that the requested action was needed. Try clarifying what you want it to do.
+aiwindow-page-session-shared = Page session shared
+aiwindow-page-session-private = Page session not shared
+aiwindow-page-session-share = Share site
+aiwindow-page-session-revoke = Stop sharing
+aiwindow-page-session-deny = Don’t share
+aiwindow-page-session-description = The assistant can fetch pages using its own separate session. Share this site or send an @mention to let it read your live, signed-in tabs.
+# $origin is the requested site's origin, including its scheme and port.
+aiwindow-page-session-request = Share your page session for { $origin }?
+aiwindow-page-session-request-description = The assistant is requesting access to this site’s open tabs using your signed-in session. Access applies only to this storage principal for this browser session. Stop sharing or clear the assistant to revoke it. Previously read messages remain in the conversation.
+# $count is the number of storage principals currently shared with the assistant.
+aiwindow-page-session-sites = Shared sites ({ $count })
+
+# $count is the number of sites visited as top-level pages using the assistant's browsing identity.
+aiwindow-assistant-context-open = View assistant context ({ $count })
+aiwindow-assistant-context-group = Assistant context
+# $tool is the identifier of the tool being checked.
+action-log-tool-purpose =
+    { $tool ->
+        [get_page_content] reading page content
+        [get_open_tabs] finding open tabs
+        [search_browsing_history] searching browsing history
+        [run_search] searching the web
+        [search_the_web] searching the web
+        [get_user_memories] reading saved memories
+        [add_memory] saving a memory
+        [get_navigation_info] finding browser settings
+        [manage_tabs] managing tabs
+        [get_skill] loading a skill
+        [generate_page] creating or updating a page
+       *[unknown] this action
+    }
+action-log-tool-guard-checking-action = Tool guard model is checking whether { action-log-tool-purpose } is needed
+action-log-tool-guard-allowed-action = Tool guard model allowed { action-log-tool-purpose }
+action-log-tool-guard-denied-action = Tool guard model declined { action-log-tool-purpose }
+action-log-tool-guard-terminated-action = Tool guard model stopped { action-log-tool-purpose }
+action-log-tool-guard-failed-action = Tool guard model check failed for { action-log-tool-purpose }; action blocked
+action-log-tool-guard-canceled-action = Tool guard model check canceled for { action-log-tool-purpose }
+action-log-prompt-injection-checking = Prompt-injection model is checking page content
+action-log-prompt-injection-passed = Prompt-injection model check passed; page content allowed
+action-log-prompt-injection-detected = Prompt-injection model check failed: injection detected; page content blocked
+action-log-prompt-injection-failed = Prompt-injection model check failed; page content blocked
+action-log-prompt-injection-canceled = Prompt-injection model check canceled
+aiwindow-page-session-tab-shared =
+    .tooltiptext = This page session is shared with the assistant until you stop sharing or clear the chat
+    .aria-label = Page session shared with the assistant
