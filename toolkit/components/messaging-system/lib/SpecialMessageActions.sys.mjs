@@ -36,6 +36,9 @@ ChromeUtils.defineESModuleGetters(lazy, {
   AIWindowUI:
     // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowUI.sys.mjs",
+  AuthProvider:
+    // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
+    "moz-src:///browser/components/aiwindow/models/AuthProvider.sys.mjs",
   CustomIconManager:
     // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
     "moz-src:///browser/components/shell/CustomIconManager.sys.mjs",
@@ -76,6 +79,9 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SharingUtils: "moz-src:///browser/components/sharing/SharingUtils.sys.mjs",
   // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
   Spotlight: "resource:///modules/asrouter/Spotlight.sys.mjs",
+  ToUSpotlight:
+    // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
+    "moz-src:///browser/components/aiwindow/ui/modules/ToUSpotlight.sys.mjs",
   // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
   TaskbarTabs: "moz-src:///browser/components/taskbartabs/TaskbarTabs.sys.mjs",
   UIState: "resource://services-sync/UIState.sys.mjs",
@@ -1145,6 +1151,53 @@ export const SpecialMessageActions = {
         break;
       case "SUBMIT_SMARTWINDOW_PROMPT": {
         const { prompt, source = "fxms" } = action.data;
+        const needsOnboarding =
+          !lazy.AuthProvider.hasToUConsent ||
+          !Services.prefs.getBoolPref(
+            "browser.smartwindow.firstrun.hasCompleted",
+            false
+          );
+        if (needsOnboarding) {
+          // Checkbox prefs are applied by the spotlight before it resolves.
+          // Record consent and first run here so the switch does not show
+          // the Terms dialog again or the first-run page.
+          const accepted = await lazy.ToUSpotlight.show(browser);
+          if (!accepted) {
+            break;
+          }
+          lazy.AuthProvider.recordToUConsent();
+          Services.prefs.setBoolPref(
+            "browser.smartwindow.firstrun.hasCompleted",
+            true
+          );
+        }
+
+        // Stay in this window. Turn the feature on when it is still off,
+        // then flip the current window to Smart Window.
+        if (!lazy.AIWindow.isAIWindowActive(window)) {
+          if (lazy.AIWindow.isBlocked) {
+            break;
+          }
+          if (!lazy.AIWindow.isAllowed) {
+            Services.prefs.setBoolPref("browser.smartwindow.enabled", true);
+          }
+          const authorized = await lazy.AuthProvider.maybeSignIn(browser);
+          if (!authorized) {
+            break;
+          }
+          lazy.AIWindow.toggleAIWindow(window, true, source);
+          if (!lazy.AIWindowUI.isSidebarOpen(window)) {
+            await lazy.AIWindowUI.openSidebar(window);
+          } else {
+            const aiBrowser = window.document.getElementById(
+              lazy.AIWindowUI.BROWSER_ID
+            );
+            if (aiBrowser) {
+              await lazy.AIWindowUI.getAiWindowElement(window, aiBrowser);
+            }
+          }
+        }
+
         await lazy.AIWindowUI.submitToSidebar(window, prompt, {
           submitType: source,
           aitabSource: source,

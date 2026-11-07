@@ -264,6 +264,13 @@ Sends a prompt to the Smart Window sidebar chat, as if the user had typed it
 there. If the sidebar is closed, it is opened on the selected tab's
 conversation first.
 
+When the user has not consented to the Terms of Use, or has not finished
+first run, the Terms spotlight (with the memory checkboxes) is shown first.
+Accepting records consent, marks first run complete, and continues. Go back
+sends nothing. This does not require `browser.smartwindow.enabled`. If this
+window is still Classic, the pref is turned on and this same window is
+switched to Smart Window. A new window is not opened.
+
 * args:
 ```ts
 {

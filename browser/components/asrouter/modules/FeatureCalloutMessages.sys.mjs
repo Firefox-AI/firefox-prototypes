@@ -36,6 +36,104 @@ const matchCurrentScreenTargeting = (prefName, screenIdRegEx = ".*") => {
   return `(${screenValMatches})`;
 };
 
+// Classic-window AI Tab callouts. Targeting omits isAIWindow on purpose:
+// checkMessageTargeting then restricts the message to Classic windows.
+// The switcher is hidden while Smart Window is off, so the app menu is the
+// fallback anchor. The sidebar smartbar and Ask button are hidden in Classic.
+const AITAB_CALLOUT_IDS = [
+  "SMARTWINDOW_AITAB_SPLITVIEW",
+  "SMARTWINDOW_AITAB_RECIPES",
+  "SMARTWINDOW_AITAB_HOWTO",
+  "SMARTWINDOW_AITAB_TRAVEL",
+  "SMARTWINDOW_AITAB_HOMES",
+  "SMARTWINDOW_AITAB_REVIEWS",
+];
+
+const AITAB_CALLOUT_IMPRESSION_CAP = `(${AITAB_CALLOUT_IDS.map(
+  id => `((messageImpressions.${id} || []) | length)`
+).join(" + ")}) < 3`;
+
+const AITAB_CALLOUT_TARGETING = `'browser.smartwindow.aitab.enabled'|preferenceValue && !activeNotifications && !hasActiveEnterprisePolicies && ${AITAB_CALLOUT_IMPRESSION_CAP}`;
+
+const AITAB_CALLOUT_ANCHORS = [
+  {
+    selector: "#ai-window-toggle > .toolbarbutton-icon",
+    panel_position: {
+      anchor_attachment: "bottomcenter",
+      callout_attachment: "topright",
+    },
+  },
+  {
+    selector: "#PanelUI-menu-button",
+    panel_position: {
+      anchor_attachment: "bottomcenter",
+      callout_attachment: "topright",
+    },
+  },
+];
+
+function aiTabCallout({
+  id,
+  title,
+  subtitle,
+  prompt,
+  trigger,
+  requireSelectedBrowser = true,
+}) {
+  return {
+    id,
+    template: "feature_callout",
+    groups: ["cfr", "smart-window-message"],
+    content: {
+      id,
+      template: "multistage",
+      backdrop: "transparent",
+      transitions: false,
+      disableHistoryUpdates: true,
+      screens: [
+        {
+          id: `${id}_SCREEN`,
+          force_hide_steps_indicator: true,
+          anchors: AITAB_CALLOUT_ANCHORS,
+          content: {
+            position: "callout",
+            title: { raw: title },
+            subtitle: { raw: subtitle },
+            primary_button: {
+              label: { raw: "Try Now" },
+              action: {
+                type: "SUBMIT_SMARTWINDOW_PROMPT",
+                data: { prompt },
+                dismiss: true,
+              },
+            },
+            secondary_button: {
+              label: { raw: "Later" },
+              action: { dismiss: true },
+            },
+            dismiss_button: {
+              action: {
+                type: "BLOCK_MESSAGE",
+                data: { id },
+                dismiss: true,
+              },
+            },
+          },
+        },
+      ],
+    },
+    trigger,
+    targeting: requireSelectedBrowser
+      ? `${AITAB_CALLOUT_TARGETING} && browserIsSelected`
+      : AITAB_CALLOUT_TARGETING,
+    frequency: {
+      lifetime: 3,
+      custom: [{ period: 604800000, cap: 1 }],
+    },
+    skip_in_tests: "it's not tested in automation",
+  };
+}
+
 /**
  * add24HourImpressionJEXLTargeting -
  * Creates a "hasn't been viewed in > 24 hours"
@@ -1183,6 +1281,122 @@ const MESSAGES = () => {
         lifetime: 1,
       },
     },
+    aiTabCallout({
+      id: "SMARTWINDOW_AITAB_SPLITVIEW",
+      title: "Compare pages side by side",
+      subtitle:
+        "Firefox can turn the pages you're looking into one page with a side-by-side table you can come back to. Use @ and find the pages you'd like to include.",
+      prompt:
+        "Compare the pages in my split view side by side in a table and put it in a page",
+      trigger: { id: "splitViewUsed" },
+      requireSelectedBrowser: false,
+    }),
+    aiTabCallout({
+      id: "SMARTWINDOW_AITAB_RECIPES",
+      title: "Turn recipes into one shopping list",
+      subtitle:
+        "Firefox can pull the ingredients from your recipe tabs into one page for easy access.",
+      prompt:
+        "Collect ingredients from recipes in my open tabs and put them in a page",
+      trigger: {
+        id: "openURL",
+        patterns: [
+          "*://www.allrecipes.com/recipe/*",
+          "*://www.foodnetwork.com/recipes/*",
+          "*://cooking.nytimes.com/recipes/*",
+          "*://www.seriouseats.com/*-recipe*",
+          "*://www.simplyrecipes.com/*-recipe*",
+          "*://www.bonappetit.com/recipe/*",
+          "*://www.epicurious.com/recipes/food/views/*",
+          "*://www.budgetbytes.com/*",
+          "*://www.ricardocuisine.com/en/recipes/*",
+          "*://chatelaine.com/recipe/*",
+          "*://*/*recipe*",
+        ],
+      },
+    }),
+    aiTabCallout({
+      id: "SMARTWINDOW_AITAB_HOWTO",
+      title: "Turn guides into a step-by-step plan",
+      subtitle:
+        "Firefox can combine the guides you have open into one page with every step that you can come back and reference to.",
+      prompt:
+        "Combine the steps from the guides in my open tabs into one step-by-step plan and put it in a page",
+      trigger: {
+        id: "openURL",
+        patterns: [
+          "*://www.wikihow.com/*",
+          "*://www.instructables.com/*",
+          "*://www.ifixit.com/Guide/*",
+          "*://*/*how-to*",
+        ],
+      },
+    }),
+    aiTabCallout({
+      id: "SMARTWINDOW_AITAB_TRAVEL",
+      title: "Plan your trip in one place",
+      subtitle:
+        "Firefox can bring the hotels, flights, and activities you've found into a trip plan you can keep coming back. Use @ and find more pages you'd like to include.",
+      prompt:
+        "Bring the hotels, flights and activities from my open tabs together into a trip plan and put it in a page",
+      trigger: {
+        id: "openURL",
+        patterns: [
+          "*://www.tripadvisor.com/Hotel_Review-*",
+          "*://www.tripadvisor.com/Attraction_Review-*",
+          "*://www.tripadvisor.ca/Hotel_Review-*",
+          "*://www.tripadvisor.ca/Attraction_Review-*",
+          "*://www.booking.com/hotel/*",
+          "*://www.airbnb.com/rooms/*",
+          "*://www.airbnb.ca/rooms/*",
+          "*://www.expedia.com/*.Hotel-Information*",
+          "*://www.expedia.ca/*.Hotel-Information*",
+          "*://www.google.com/travel/*",
+          "*://www.viator.com/tours/*",
+          "*://www.getyourguide.com/*-l*/*-t*",
+        ],
+      },
+    }),
+    aiTabCallout({
+      id: "SMARTWINDOW_AITAB_HOMES",
+      title: "Compare homes in one place",
+      subtitle:
+        "Firefox can line up the listings you're viewing in one place you can come back to review later on. Use @ and find more pages you'd like to include.",
+      prompt:
+        "Compare the home listings in my open tabs side by side and put them in a page",
+      trigger: {
+        id: "openURL",
+        patterns: [
+          "*://www.zillow.com/homedetails/*",
+          "*://www.redfin.com/*/home/*",
+          "*://www.realtor.com/realestateandhomes-detail/*",
+          "*://www.realtor.ca/real-estate/*",
+          "*://www.zolo.ca/*-real-estate/*",
+          "*://www.apartments.com/*/*",
+          "*://rentals.ca/*/*",
+          "*://www.rentals.ca/*/*",
+        ],
+      },
+    }),
+    aiTabCallout({
+      id: "SMARTWINDOW_AITAB_REVIEWS",
+      title: "Keep your top picks in one place",
+      subtitle:
+        "Firefox can turn the reviews you're reading into one page to help you compare your options. Use @ and find more pages you'd like to include.",
+      prompt:
+        "Compare the products reviewed in my open tabs and put my top picks in a page",
+      trigger: {
+        id: "openURL",
+        patterns: [
+          "*://www.rtings.com/*/reviews/*",
+          "*://www.nytimes.com/wirecutter/reviews/*",
+          "*://www.tomsguide.com/best-picks/*",
+          "*://www.tomsguide.com/*-review*",
+          "*://www.pcmag.com/reviews/*",
+          "*://www.consumerreports.org/*-a*",
+        ],
+      },
+    }),
   ];
   messages = add24HourImpressionJEXLTargeting(
     ["FIREFOX_VIEW_TAB_PICKUP_REMINDER"],

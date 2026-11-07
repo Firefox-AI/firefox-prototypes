@@ -260,7 +260,7 @@
               "properties": {
                 "prompt": {
                   "type": "string",
-                  "description": "Request sent to the Smart Window sidebar chat."
+                  "description": "Request sent to the Smart Window sidebar chat. When Terms of Use consent or first run is incomplete, the Terms spotlight is shown first and the prompt is sent only if the user accepts."
                 },
                 "source": {
                   "type": "string",
@@ -273,7 +273,7 @@
           },
           "required": ["type", "data"],
           "additionalProperties": false,
-          "description": "Sends a prompt to the Smart Window sidebar chat, opening the sidebar if needed"
+          "description": "Shows the Smart Window Terms spotlight when consent or first run is incomplete, switches the current window to Smart Window if needed, and sends a prompt to the sidebar chat"
         },
         {
           "type": "object",

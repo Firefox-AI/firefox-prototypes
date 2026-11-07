@@ -187,7 +187,11 @@ export class InputModelSelect extends MozLitElement {
       return html``;
     }
 
-    const buttonLabel = this.#modelBrandName(selectedModel);
+    // Spike: choice 1 stays the selected model, but the closed picker reads Auto.
+    const buttonLabel =
+      selectedModel.index === "1"
+        ? "Auto"
+        : this.#modelBrandName(selectedModel);
 
     const panelListTemplate = html`<panel-list
       id=${this._menuId}
