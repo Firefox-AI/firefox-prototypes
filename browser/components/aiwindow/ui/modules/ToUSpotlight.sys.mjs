@@ -9,6 +9,138 @@ ChromeUtils.defineESModuleGetters(lazy, {
 
 const ACCEPTED_TOPIC = "smartwindow-tou-accepted";
 
+const MEMORIES_FROM_CONVERSATION_PREF =
+  "browser.smartwindow.memories.generateFromConversation";
+const MEMORIES_FROM_HISTORY_PREF =
+  "browser.smartwindow.memories.generateFromHistory";
+
+/**
+ * Memory choices from the first-run memories screen. Model choice and the
+ * "always open in Smart Window" checkbox are intentionally absent: model
+ * selection is going away, and Smart Window does not become the default.
+ */
+const MEMORY_TILES = [
+  {
+    type: "confirmation-checklist",
+    data: {
+      inert: true,
+      items: [
+        {
+          icon: {
+            background:
+              "center / contain no-repeat url('chrome://browser/content/aiwindow/assets/new-chat.svg')",
+            height: "20px",
+            width: "20px",
+          },
+          text: {
+            string_id: "aiwindow-firstrun-memories-conversation-title",
+            fontWeight: "600",
+          },
+          subtext: {
+            string_id: "aiwindow-firstrun-memories-conversation-body",
+          },
+        },
+        {
+          icon: {
+            background:
+              "center / contain no-repeat url('chrome://global/skin/icons/settings.svg')",
+            height: "20px",
+            width: "20px",
+          },
+          text: {
+            string_id: "aiwindow-firstrun-memories-relevance-title",
+            fontWeight: "600",
+          },
+          subtext: {
+            string_id: "aiwindow-firstrun-memories-relevance-body",
+          },
+        },
+        {
+          icon: {
+            background:
+              "center / contain no-repeat url('chrome://global/skin/icons/security.svg')",
+            height: "20px",
+            width: "20px",
+          },
+          text: {
+            string_id: "aiwindow-firstrun-memories-privacy-title",
+            fontWeight: "600",
+          },
+          subtext: {
+            string_id: "aiwindow-firstrun-memories-privacy-body",
+          },
+        },
+      ],
+    },
+  },
+  {
+    type: "multiselect",
+    label: {
+      string_id: "aiwindow-firstrun-memories-choose-label",
+    },
+    footer: {
+      unCheckAllLabel: {
+        string_id: "aiwindow-firstrun-memories-no-create",
+      },
+      checkedLabel: {
+        string_id: "aiwindow-firstrun-memories-update-settings",
+      },
+    },
+    data: [
+      {
+        id: "memories-chats",
+        defaultValue: true,
+        label: {
+          string_id: "aiwindow-firstrun-memories-checkbox-chats",
+        },
+        action: {
+          type: "SET_PREF",
+          data: {
+            pref: {
+              name: MEMORIES_FROM_CONVERSATION_PREF,
+              value: true,
+            },
+          },
+        },
+        uncheckedAction: {
+          type: "SET_PREF",
+          data: {
+            pref: {
+              name: MEMORIES_FROM_CONVERSATION_PREF,
+              value: false,
+            },
+          },
+        },
+      },
+      {
+        id: "memories-browsing",
+        defaultValue: true,
+        label: {
+          string_id: "aiwindow-firstrun-memories-checkbox-browsing",
+        },
+        action: {
+          type: "SET_PREF",
+          data: {
+            pref: {
+              name: MEMORIES_FROM_HISTORY_PREF,
+              value: true,
+            },
+          },
+        },
+        uncheckedAction: {
+          type: "SET_PREF",
+          data: {
+            pref: {
+              name: MEMORIES_FROM_HISTORY_PREF,
+              value: false,
+            },
+          },
+        },
+      },
+    ],
+  },
+];
+
 const TOU_GUEST_MESSAGE = {
   id: "AI_WINDOW_TOU_GUEST_MODAL",
   template: "spotlight",
@@ -23,7 +155,7 @@ const TOU_GUEST_MESSAGE = {
         id: "AI_WINDOW_TOU_GUEST_MODAL",
         content: {
           screen_style: {
-            width: "585px",
+            width: "720px",
           },
           logo: {
             height: "40px",
@@ -32,6 +164,12 @@ const TOU_GUEST_MESSAGE = {
           title: {
             fontSize: "24px",
             string_id: "smartwindow-guest-tou-title",
+          },
+          subtitle: {
+            string_id: "aiwindow-firstrun-memories-subtitle",
+          },
+          tiles_container: {
+            position: "after_supporting_content",
           },
           above_button_content: [
             {
@@ -46,6 +184,7 @@ const TOU_GUEST_MESSAGE = {
               font_styles: "legal",
             },
           ],
+          tiles: MEMORY_TILES,
           terms_of_use: {
             action: {
               type: "OPEN_URL",
@@ -72,8 +211,17 @@ const TOU_GUEST_MESSAGE = {
             style: "primary",
             flow: "row",
             action: {
-              type: "ACCEPT_SMARTWINDOW_TOU",
+              type: "MULTI_ACTION",
+              collectSelect: true,
               navigate: true,
+              data: {
+                orderedExecution: true,
+                actions: [
+                  {
+                    type: "ACCEPT_SMARTWINDOW_TOU",
+                  },
+                ],
+              },
             },
           },
           primary_button: {

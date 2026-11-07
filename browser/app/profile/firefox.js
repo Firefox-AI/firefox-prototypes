@@ -2450,7 +2450,7 @@ pref("browser.smartwindow.actionsToolbar.prompt", "Suggest up to {n} things a us
 pref("browser.smartwindow.actionsToolbar.refreshDelayMs", 400);
 // Default endpoint for preset models
 pref("browser.smartwindow.endpoint", "https://mlpa-prod-prod-mozilla.freetls.fastly.net/v1");
-pref("browser.smartwindow.auth.impl", "fxa");
+pref("browser.smartwindow.auth.impl", "");
 pref("browser.smartwindow.auth.guest.mode", "fetch");
 pref("browser.smartwindow.memories.generateFromHistory", true);
 pref("browser.smartwindow.memories.generateFromConversation", true);
@@ -2460,6 +2460,7 @@ pref("browser.smartwindow.memoriesLogLevel", "Warn");
 pref("browser.smartwindow.resumeActivity.enabled", true);
 // TODO Bug 2067871: remove once journey store is available.
 pref("browser.smartwindow.resumeCards.enabled", true);
+pref("browser.smartwindow.firstrun.modelChoice", "1");
 pref("browser.smartwindow.firstrun.autoAdvanceMS", 3000);
 pref("browser.smartwindow.firstrun.hasCompleted", false);
 pref("browser.smartwindow.firstrun.singlePageWithAutoModel", false);
