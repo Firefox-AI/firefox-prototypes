@@ -9,6 +9,10 @@
   overflow: hidden;
   padding-inline: var(--space-small);
 
+  > .smart-actions-more {
+    flex-shrink: 0;
+  }
+
   > .smart-actions-loading {
     color: var(--text-color-deemphasized);
     line-height: var(--button-min-height-small);

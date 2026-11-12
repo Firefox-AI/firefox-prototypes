@@ -650,3 +650,6 @@ ai-clarifying-question-close =
 smart-actions-toolbar =
     .aria-label = Smart actions
 smart-actions-loading = Looking at this page…
+smart-actions-more =
+    .title = Suggest more for this page
+    .aria-label = Suggest more for this page
