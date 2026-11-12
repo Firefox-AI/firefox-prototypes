@@ -85,7 +85,10 @@ export class StructuredMetadataReader {
    */
   constructor(structuredMetadata) {
     this.#metadata = structuredMetadata;
-    for (const text of structuredMetadata.jsonLd) {
+    for (const text of [
+      ...structuredMetadata.jsonLd,
+      ...(structuredMetadata.microdata ?? []),
+    ]) {
       let block;
       try {
         block = JSON.parse(text);

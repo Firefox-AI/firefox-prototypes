@@ -294,6 +294,7 @@ export class PageExtractorChild extends JSWindowActorChild {
         language: null,
         metaTags: [],
         jsonLd: [],
+        microdata: [],
       };
     }
     return lazy.extractStructuredMetadata(document);

@@ -98,9 +98,13 @@ kept apart from the extracted text:
   written. Blocks that are not valid JSON are skipped. Terms are not expanded
   and remote contexts are not fetched.
 
+- `microdata`: the page's top-level microdata items as compact JSON shaped like
+  JSON-LD, with `itemtype` as `@type` and each `itemprop` as a property.
+  `itemref` is not followed.
+
 Repeats and conflicts are kept: an HTML description and an Open Graph
 description stay separate, as do two blocks that describe the same `@id`.
-Microdata and RDFa are not read.
+RDFa is not read.
 
 Extraction is bounded in the content process before returning data to the
 parent. `truncated` is true when a limit dropped or shortened something, so

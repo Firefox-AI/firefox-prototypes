@@ -109,6 +109,9 @@ export type StructuredMetadata = {
   // The page's JSON-LD blocks in document order, as compact JSON. Blocks that
   // are not valid JSON objects or arrays are skipped.
   jsonLd: string[];
+  // The page's top-level microdata items in document order, as compact JSON
+  // shaped like JSON-LD: itemtype becomes @type and each itemprop a property.
+  microdata: string[];
 };
 
 /**

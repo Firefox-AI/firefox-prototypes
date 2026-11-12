@@ -15,6 +15,7 @@ const EMPTY_METADATA = {
   language: null,
   metaTags: [],
   jsonLd: [],
+  microdata: [],
 };
 
 add_task(async function test_structured_metadata_reader_mode() {
@@ -69,6 +70,7 @@ add_task(async function test_structured_metadata_headless() {
       language: null,
       metaTags: [{ name: "description", value: "Headless description" }],
       jsonLd: ['{"@type":"Recipe"}'],
+      microdata: [],
     });
   } finally {
     await page.cleanup();
@@ -640,5 +642,58 @@ add_task(async function test_reader_reads_a_product_price_as_documented() {
     );
   } finally {
     await withMetaOnly.cleanup();
+  }
+});
+
+add_task(async function test_microdata_items() {
+  const { html } = await MLTestUtils.serveHTMLInTab({ browser: gBrowser });
+  const { getPageExtractor, cleanup } = await html`
+    <div itemscope itemtype="https://schema.org/Product">
+      <meta itemprop="name" content="14 Inch Bike" />
+      <a itemprop="url" href="/products/bike">Bike</a>
+      <div itemprop="offers" itemscope itemtype="https://schema.org/Offer">
+        <meta itemprop="priceCurrency" content="USD" />
+        <span itemprop="price">269.00</span>
+      </div>
+      <div
+        itemprop="aggregateRating"
+        itemscope
+        itemtype="https://schema.org/AggregateRating"
+      >
+        <meta itemprop="ratingValue" content="4.8" />
+        <meta itemprop="reviewCount" content="5205" />
+      </div>
+    </div>
+    <div itemscope><span itemprop="ignored">No type</span></div>
+  `;
+  try {
+    const metadata = await getPageExtractor().getStructuredMetadata();
+    Assert.deepEqual(
+      metadata.microdata.map(text => JSON.parse(text)),
+      [
+        {
+          "@type": "https://schema.org/Product",
+          name: "14 Inch Bike",
+          url: new URL("/products/bike", metadata.url).href,
+          offers: {
+            "@type": "https://schema.org/Offer",
+            priceCurrency: "USD",
+            price: "269.00",
+          },
+          aggregateRating: {
+            "@type": "https://schema.org/AggregateRating",
+            ratingValue: "4.8",
+            reviewCount: "5205",
+          },
+        },
+      ],
+      "Typed top-level items keep nested items as properties."
+    );
+    const reader = new StructuredMetadataReader(metadata);
+    const [product] = reader.findItems("Product");
+    Assert.equal(product?.offers?.price, "269.00", "The reader finds it.");
+    Assert.equal(reader.title, "14 Inch Bike");
+  } finally {
+    await cleanup();
   }
 });

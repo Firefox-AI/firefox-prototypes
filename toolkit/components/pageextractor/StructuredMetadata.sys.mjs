@@ -36,6 +36,119 @@ const SOCIAL_META_PREFIXES = [
 const MAX_META_TAGS = 50;
 const MAX_META_LENGTH = 1000;
 const MAX_JSON_LD_LENGTH = 100_000;
+const MAX_MICRODATA_ITEMS = 20;
+const MAX_MICRODATA_VALUES = 300;
+const MAX_MICRODATA_DEPTH = 5;
+const MAX_MICRODATA_LENGTH = 100_000;
+
+const URL_ELEMENTS = new Set(["a", "area", "link"]);
+const SRC_ELEMENTS = new Set([
+  "audio",
+  "embed",
+  "iframe",
+  "img",
+  "source",
+  "track",
+  "video",
+]);
+
+/**
+ * @param {Element} element - An element with an itemprop and no itemscope.
+ * @returns {string} Its microdata value, per the HTML spec's element rules.
+ */
+function microdataValue(element) {
+  const tag = element.localName;
+  if (tag == "meta") {
+    return element.getAttribute("content") ?? "";
+  }
+  if (URL_ELEMENTS.has(tag)) {
+    return element.href ?? "";
+  }
+  if (SRC_ELEMENTS.has(tag)) {
+    return element.src ?? "";
+  }
+  if (tag == "object") {
+    return element.data ?? "";
+  }
+  if (tag == "data" || tag == "meter") {
+    return element.getAttribute("value") ?? "";
+  }
+  if (tag == "time" && element.hasAttribute("datetime")) {
+    return element.getAttribute("datetime");
+  }
+  return element.textContent ?? "";
+}
+
+/**
+ * Reads the page's top-level microdata items as JSON-LD shaped objects, with
+ * itemtype as @type and each itemprop as a property. itemref is not followed.
+ *
+ * @param {Document} document
+ * @param {(text: string) => string} clip - Shortens a value to the limit.
+ * @param {() => void} onTruncate - Called when a limit leaves something out.
+ * @returns {string[]} Each item as compact JSON.
+ */
+function extractMicrodata(document, clip, onTruncate) {
+  let remainingValues = MAX_MICRODATA_VALUES;
+  const readItem = (scope, depth) => {
+    /** @type {Record<string, any>} */
+    const item = {};
+    const types = scope.getAttribute("itemtype")?.trim().split(/\s+/) ?? [];
+    if (types[0]) {
+      item["@type"] = types.length == 1 ? types[0] : types;
+    }
+    for (const element of scope.querySelectorAll("[itemprop]")) {
+      if (element.parentElement?.closest("[itemscope]") != scope) {
+        continue;
+      }
+      if (remainingValues <= 0) {
+        onTruncate();
+        break;
+      }
+      let value;
+      if (element.hasAttribute("itemscope")) {
+        if (depth >= MAX_MICRODATA_DEPTH) {
+          onTruncate();
+          continue;
+        }
+        value = readItem(element, depth + 1);
+      } else {
+        value = clip(microdataValue(element).trim());
+        if (!value) {
+          continue;
+        }
+      }
+      remainingValues--;
+      for (const name of element.getAttribute("itemprop").trim().split(/\s+/)) {
+        item[name] = name in item ? [item[name]].flat().concat([value]) : value;
+      }
+    }
+    return item;
+  };
+
+  const items = [];
+  let remainingLength = MAX_MICRODATA_LENGTH;
+  for (const scope of document.querySelectorAll(
+    "[itemscope]:not([itemprop])"
+  )) {
+    if (items.length >= MAX_MICRODATA_ITEMS || remainingValues <= 0) {
+      onTruncate();
+      break;
+    }
+    const item = readItem(scope, 0);
+    if (!item["@type"]) {
+      continue;
+    }
+    const text = JSON.stringify(item);
+    if (text.length > remainingLength) {
+      onTruncate();
+      continue;
+    }
+    items.push(text);
+    remainingLength -= text.length;
+  }
+  return items;
+}
 
 /**
  * @param {Document} document
@@ -54,8 +167,8 @@ export function* jsonLdScriptTexts(document) {
 }
 
 /**
- * Collects the SEO and social tags and the JSON-LD a page declares about
- * itself, keeping repeats and conflicts so callers can decide which ones
+ * Collects the SEO and social tags, the JSON-LD and the microdata a page
+ * declares about itself, keeping repeats and conflicts so callers can decide which ones
  * matter. StructuredMetadataReader interprets the result.
  *
  * @param {Document} document
@@ -135,6 +248,10 @@ export function extractStructuredMetadata(document) {
     } catch {}
   }
 
+  const microdata = extractMicrodata(document, clip, () => {
+    truncated = true;
+  });
+
   return {
     truncated,
     url: document.documentURI,
@@ -143,5 +260,6 @@ export function extractStructuredMetadata(document) {
     language,
     metaTags,
     jsonLd,
+    microdata,
   };
 }
