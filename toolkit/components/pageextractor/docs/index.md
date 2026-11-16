@@ -178,6 +178,12 @@ const price =
   reader.metaValues("product:price:amount")[0];
 ```
 
+Smart Window appends the raw metadata to `get_page_content` results when
+`browser.smartwindow.pageMetadata.enabled` is true (false by default). It
+keeps whole entries within a character budget, JSON-LD blocks first, and adds
+a line saying some metadata was left out when it dropped any or the extractor
+reported `truncated`.
+
 Values come from the page: they are untrusted, may be long, and are often
 missing, wrong, or contradicted by the page's own content. Use them as hints,
 and keep your feature working without them.
