@@ -196,6 +196,8 @@ skip-if = [
 
 ["browser_smartwindow_option_select.js"]
 
+["browser_smartwindow_page_metadata.js"]
+
 ["browser_smartwindow_panel_list.js"]
 
 ["browser_smartwindow_recentchats.js"]
