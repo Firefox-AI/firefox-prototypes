@@ -1113,6 +1113,11 @@ export class GetPageContent {
   static MAX_TRANSCRIPT_CHARACTERS = 65536;
 
   /**
+   * Keeps the page's metadata a small addition to its MAX_CHARACTERS of text.
+   */
+  static MAX_METADATA_CHARACTERS = 4000;
+
+  /**
    * getPageContent's results as plain text. A failed read contributes the
    * sentence explaining it, so callers that must tell the two apart want
    * getPageContent itself.
@@ -1433,6 +1438,11 @@ export class GetPageContent {
     signal,
     traceId
   ) {
+    const pendingMetadata = GetPageContent.#getPageMetadataContext(
+      pageExtractor,
+      signal,
+      traceId
+    );
     const extraction = await raceAbort(
       pageExtractor.getText(
         {
@@ -1470,7 +1480,77 @@ export class GetPageContent {
       };
     }
 
-    return { ok: true, content: `Content from ${label}:\n\n${text}` };
+    const metadata = await pendingMetadata;
+    signal?.throwIfAborted();
+    let content = `Content from ${label}:\n\n${text}`;
+    if (metadata) {
+      content += `\n\n${metadata}`;
+    }
+    return { ok: true, content };
+  }
+
+  /**
+   * Reads what the page declares about itself, when enabled. It never
+   * rejects: a failure leaves the page content to stand on its own, and the
+   * caller checks for an abort.
+   *
+   * @param {PageExtractorParent} pageExtractor
+   * @param {AbortSignal} [signal]
+   * @param {TraceId} [traceId]
+   * @returns {Promise<string | null>}
+   */
+  static async #getPageMetadataContext(pageExtractor, signal, traceId) {
+    if (
+      !Services.prefs.getBoolPref(
+        "browser.smartwindow.pageMetadata.enabled",
+        false
+      )
+    ) {
+      return null;
+    }
+    try {
+      const { metaTags, jsonLd, truncated } = await raceAbort(
+        pageExtractor.getStructuredMetadata(traceId),
+        signal
+      );
+      const entries = [
+        ...jsonLd,
+        ...metaTags.map(({ name, value }) => `${name}: ${value}`),
+      ];
+      if (!entries.length) {
+        return null;
+      }
+      const header =
+        "Metadata the page declares about itself, which may be incomplete " +
+        "or wrong:";
+      const notice = "Some of the page's metadata was left out.";
+      const lines = [];
+      let length = header.length + 1 + notice.length;
+      let leftOut = truncated;
+      for (const entry of entries) {
+        if (
+          length + 1 + entry.length >
+          GetPageContent.MAX_METADATA_CHARACTERS
+        ) {
+          leftOut = true;
+          continue;
+        }
+        lines.push(entry);
+        length += 1 + entry.length;
+      }
+      if (!lines.length) {
+        return null;
+      }
+      if (leftOut) {
+        lines.push(notice);
+      }
+      return `${header}\n${lines.join("\n")}`;
+    } catch (error) {
+      if (!signal?.aborted) {
+        lazy.console.warn("Could not read the page metadata", error);
+      }
+      return null;
+    }
   }
 }
 
