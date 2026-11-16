@@ -361,6 +361,77 @@ add_task(async function test_page_extractor_metadata_markers() {
 });
 
 /**
+ * A getStructuredMetadata call records a "PageExtractor" marker in both the
+ * parent and content process, correlated by a shared trace, and a
+ * page_extractor.phase Glean event twin for each. Mirrors
+ * test_page_extractor_metadata_markers.
+ */
+add_task(async function test_page_extractor_structured_metadata_markers() {
+  Services.fog.testResetFOG();
+  const { html } = await MLTestUtils.serveHTMLInTab({ browser: gBrowser });
+  const { getPageExtractor, cleanup } = await html`
+    <meta name="description" content="Structured metadata marker test" />
+    <article>
+      <h1>Structured metadata marker test</h1>
+      <p>This content is read for its declared metadata.</p>
+    </article>
+  `;
+
+  await ProfilerTestUtils.startProfilerForMarkerTests();
+  let profile;
+  try {
+    await getPageExtractor().getStructuredMetadata();
+    profile = await ProfilerTestUtils.stopNowAndGetProfile();
+    await Services.fog.testFlushAllChildren();
+  } finally {
+    if (Services.profiler.IsActive()) {
+      await Services.profiler.StopProfiler();
+    }
+    await cleanup();
+  }
+
+  const markers = ProfilerTestUtils.getPayloadsOfTypeFromAllThreads(
+    profile,
+    "PageExtractor"
+  );
+  const parentMarker = markers.find(
+    marker =>
+      marker.process === "parent" && marker.phase === "get-structured-metadata"
+  );
+  ok(parentMarker, "The parent get-structured-metadata marker was recorded.");
+  is(parentMarker.status, "success", "The parent marker reports success.");
+
+  const contentMarker = markers.find(
+    marker =>
+      marker.traceId === parentMarker.traceId &&
+      marker.process === "content" &&
+      marker.phase === "get-structured-metadata"
+  );
+  ok(
+    contentMarker,
+    "The content get-structured-metadata marker shares the parent's trace."
+  );
+  is(contentMarker.status, "success", "The content marker reports success.");
+
+  const parentEvent = findPhaseEvent(
+    "get-structured-metadata",
+    "parent",
+    parentMarker.flowId
+  );
+  is(parentEvent.extra.status, "success", "The parent event reports success.");
+  const contentEvent = findPhaseEvent(
+    "get-structured-metadata",
+    "content",
+    parentMarker.flowId
+  );
+  is(
+    contentEvent.extra.status,
+    "success",
+    "The content event reports success."
+  );
+});
+
+/**
  * A headless load that never commits its navigation (e.g. a stalled server)
  * records both its headless-navigate and headless-extractor
  * page_extractor.phase events with status "error" and the timeout's error

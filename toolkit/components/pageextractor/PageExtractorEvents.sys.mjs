@@ -218,6 +218,10 @@ export class PageExtractorEvent {
       label: "Wait for page to finish loading",
     },
     getPageMetadata: { name: "get-page-metadata", label: "Read page details" },
+    getStructuredMetadata: {
+      name: "get-structured-metadata",
+      label: "Read page metadata",
+    },
     getText: { name: "get-text", label: "Extract page text" },
     pdfExtract: { name: "pdf-extract", label: "Read PDF text" },
     readerParse: {

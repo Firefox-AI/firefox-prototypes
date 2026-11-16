@@ -5,7 +5,7 @@
 // @ts-check
 
 /**
- * @import { GetTextOptions, CanvasSnapshot, ExtractionResult, PageMetadata, ReaderModeDocument } from './PageExtractor.d.ts'
+ * @import { GetTextOptions, CanvasSnapshot, ExtractionResult, PageMetadata, ReaderModeDocument, StructuredMetadata } from './PageExtractor.d.ts'
  * @import { PageExtractorParent } from './PageExtractorParent.sys.mjs'
  * @import { PageExtractorPhase, TraceId } from './PageExtractorEvents.sys.mjs'
  */
@@ -30,6 +30,10 @@ const lazy = XPCOMUtils.declareLazy({
   ReaderMode: "moz-src:///toolkit/components/reader/ReaderMode.sys.mjs",
   extractTextFromDOM:
     "moz-src:///toolkit/components/pageextractor/DOMExtractor.sys.mjs",
+  extractStructuredMetadata:
+    "moz-src:///toolkit/components/pageextractor/StructuredMetadata.sys.mjs",
+  jsonLdScriptTexts:
+    "moz-src:///toolkit/components/pageextractor/StructuredMetadata.sys.mjs",
   shouldExtractYouTube:
     "moz-src:///toolkit/components/pageextractor/YouTubeExtraction.sys.mjs",
   getYouTubeContent:
@@ -89,6 +93,15 @@ export class PageExtractorChild extends JSWindowActorChild {
         );
       case "PageExtractorParent:GetPageMetadata":
         return this.#getPageMetadata(data?.traceId);
+      case "PageExtractorParent:GetStructuredMetadata": {
+        const traceId = data?.traceId;
+        if (!this.#isPageReady) {
+          await this.waitForPageReady(traceId);
+        }
+        return this.#trace(lazy.Phase.getStructuredMetadata, { traceId }, () =>
+          this.getStructuredMetadata()
+        );
+      }
     }
     return Promise.reject(new Error("Unknown message: " + name));
   }
@@ -265,6 +278,28 @@ export class PageExtractorChild extends JSWindowActorChild {
   }
 
   /**
+   * @see PageExtractorParent#getStructuredMetadata for docs
+   *
+   * @returns {StructuredMetadata}
+   */
+  getStructuredMetadata() {
+    const document = this.browsingContext?.window?.document;
+    // about:reader has replaced the page, and with it the page's metadata.
+    if (!document || this.isAboutReader()) {
+      return {
+        truncated: false,
+        url: "",
+        title: "",
+        canonicalUrl: null,
+        language: null,
+        metaTags: [],
+        jsonLd: [],
+      };
+    }
+    return lazy.extractStructuredMetadata(document);
+  }
+
+  /**
    * This will establish a word count of the text argument based on the provided language.
    *
    * @param {string} language
@@ -326,9 +361,6 @@ export class PageExtractorChild extends JSWindowActorChild {
    * @returns {{ types: string[], isGated: boolean }}
    */
   #extractStructuredData(document) {
-    const scripts = document.querySelectorAll(
-      'script[type="application/ld+json" i]'
-    );
     const types = new Set();
     let isGated = false;
 
@@ -339,12 +371,7 @@ export class PageExtractorChild extends JSWindowActorChild {
       return value == null ? [] : [value];
     };
 
-    for (const script of scripts) {
-      const text = script.textContent?.trim();
-      if (!text) {
-        continue;
-      }
-
+    for (const text of lazy.jsonLdScriptTexts(document)) {
       let parsed;
       try {
         parsed = JSON.parse(text);
