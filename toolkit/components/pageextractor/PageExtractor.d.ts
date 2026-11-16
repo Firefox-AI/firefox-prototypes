@@ -85,6 +85,32 @@ export type PageMetadata = {
   isGated: boolean;
 };
 
+export type MetaTag = {
+  // The lowercased name or property, e.g. "description" or "og:description".
+  name: string;
+  value: string;
+};
+
+export type StructuredMetadata = {
+  // True when a value was shortened, or a tag or JSON-LD block left out, by
+  // the extraction limits.
+  truncated: boolean;
+  // The document's URL, which relative URLs in the metadata resolve against.
+  url: string;
+  // The document's <title>.
+  title: string;
+  // The resolved href of <link rel="canonical">, or null when there is none.
+  canonicalUrl: string | null;
+  // The lang attribute of the root element, or null when it has none.
+  language: string | null;
+  // SEO and social tags in document order, with repeated and conflicting
+  // values all kept.
+  metaTags: MetaTag[];
+  // The page's JSON-LD blocks in document order, as compact JSON. Blocks that
+  // are not valid JSON objects or arrays are skipped.
+  jsonLd: string[];
+};
+
 /**
  * Reader mode doesn't provide the types for the result. This a stub for making
  * the results easier to interpret.

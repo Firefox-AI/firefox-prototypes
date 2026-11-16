@@ -30,6 +30,8 @@ support-files = [
 
 ["browser_page_metadata.js"]
 
+["browser_page_structured_metadata.js"]
+
 ["browser_viewport_extractor.js"]
 
 ["browser_youtube_extraction.js"]
