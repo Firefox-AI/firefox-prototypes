@@ -56,7 +56,7 @@ export function* jsonLdScriptTexts(document) {
 /**
  * Collects the SEO and social tags and the JSON-LD a page declares about
  * itself, keeping repeats and conflicts so callers can decide which ones
- * matter.
+ * matter. StructuredMetadataReader interprets the result.
  *
  * @param {Document} document
  * @returns {StructuredMetadata}

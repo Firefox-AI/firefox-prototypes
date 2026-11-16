@@ -112,6 +112,72 @@ The limits bound the work as well as the payload. Reading stops at 50 matching
 than what remains is skipped before it is parsed, but a smaller block after it
 is still considered. Once the budget is spent, no further block is examined.
 
+### Build a feature on it
+
+`StructuredMetadataReader.sys.mjs` interprets the result so each feature does
+not have to:
+
+```js
+const reader = new StructuredMetadataReader(
+  await pageExtractor.getStructuredMetadata()
+);
+reader.title; // The main item's headline or name, then og:title, twitter:title, <title>.
+reader.description;
+reader.image; // An absolute http(s) URL.
+reader.author;
+reader.publishedTime;
+reader.modifiedTime;
+reader.siteName;
+reader.canonicalUrl;
+reader.language;
+
+for (const event of reader.findItems("Event", "MusicEvent", "SportsEvent")) {
+  const place = reader.resolve(event.location);
+}
+```
+
+- The common fields prefer the page's main schema.org item, then Open Graph,
+  then Twitter Cards, then HTML. Each field is `null` when no source declares
+  it.
+- `primaryItem` is a heuristic: the first item in document order that is
+  neither site-level (`WebSite`, `Organization`, `BreadcrumbList` and the like,
+  which SEO plugins add to nearly every page) nor a web page. A page with
+  several products or articles may give the wrong one. A feature that knows
+  which item it wants assigns it (`reader.primaryItem = item`), and the common
+  fields then follow that item.
+- `findItems` matches types written as terms (`Recipe`), compact IRIs
+  (`schema:Recipe`) or IRIs, and searches nested items too, such as the events
+  of an `ItemList`. Schema.org subtypes are not inferred, so list the ones your
+  feature handles.
+- `resolve` follows a `{ "@id" }` reference to the item it names elsewhere on
+  the page.
+- `metaValues(name)` returns every value of a tag, for the ones the common
+  fields do not cover.
+
+#### Supported JSON-LD subset
+
+Types match by term, compact IRI or IRI, with the schema.org prefix stripped.
+`@id` references resolve by exact string match only. Custom `@context` aliases,
+equivalence between relative and absolute `@id` values, and schema.org type
+inheritance are not supported. The subset grows only for a concrete consumer,
+with a fixture page in the tests, and not for site-specific exceptions.
+
+#### Example: read a product price
+
+```js
+const reader = new StructuredMetadataReader(
+  await pageExtractor.getStructuredMetadata()
+);
+const [product] = reader.findItems("Product");
+// offers may be one offer, a list of them, or a reference to one.
+const offers = [reader.resolve(product?.offers)].flat().map(offer =>
+  reader.resolve(offer)
+);
+const price =
+  offers.find(offer => offer?.price != null)?.price ??
+  reader.metaValues("product:price:amount")[0];
+```
+
 Values come from the page: they are untrusted, may be long, and are often
 missing, wrong, or contradicted by the page's own content. Use them as hints,
 and keep your feature working without them.
