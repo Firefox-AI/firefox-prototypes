@@ -6,7 +6,7 @@
 
 /**
  * @import { HiddenFrame } from "resource://gre/modules/HiddenFrame.sys.mjs"
- * @import { GetTextOptions, ExtractionResult, PageMetadata } from './PageExtractor.d.ts'
+ * @import { GetTextOptions, ExtractionResult, PageMetadata, StructuredMetadata } from './PageExtractor.d.ts'
  * @import { PageExtractorChild } from './PageExtractorChild.sys.mjs'
  * @import { PageExtractorPhase, TraceId } from './PageExtractorEvents.sys.mjs'
  */
@@ -152,6 +152,25 @@ export class PageExtractorParent extends JSWindowActorParent {
   async getPageMetadata() {
     return this.#trace(lazy.Phase.getPageMetadata, {}, event =>
       this.sendQuery("PageExtractorParent:GetPageMetadata", {
+        traceId: event.traceId,
+      })
+    );
+  }
+
+  /**
+   * Get the metadata the page declares about itself: its SEO and social tags,
+   * and its schema.org structured data. Waits for the page to be ready, like
+   * getText.
+   *
+   * @see PageExtractorChild#getStructuredMetadata
+   *
+   * @param {TraceId} [traceId] - Correlates this call with an enclosing
+   *   headless-extractor request's profiler markers.
+   * @returns {Promise<StructuredMetadata>} Rejects when extraction fails.
+   */
+  async getStructuredMetadata(traceId) {
+    return this.#trace(lazy.Phase.getStructuredMetadata, { traceId }, event =>
+      this.sendQuery("PageExtractorParent:GetStructuredMetadata", {
         traceId: event.traceId,
       })
     );

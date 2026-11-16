@@ -84,6 +84,38 @@ The type definitions in the component list the options and result fields.
 Options can request Reader Mode cleanup, viewport-only extraction, simple text,
 early stopping, or canvas capture.
 
+## Read the page's own metadata
+
+`getStructuredMetadata` returns the metadata a page declares about itself,
+kept apart from the extracted text:
+
+- `url`, `title`, `canonicalUrl` and `language`: the document's URL, its
+  `<title>`, the resolved `<link rel="canonical">`, and the `lang` of its root
+  element.
+- `metaTags`: description, keywords, author and robots `<meta>` tags, Open Graph
+  tags, and Twitter Card tags, in document order.
+- `jsonLd`: the page's JSON-LD blocks as compact JSON strings, otherwise as
+  written. Blocks that are not valid JSON are skipped. Terms are not expanded
+  and remote contexts are not fetched.
+
+Repeats and conflicts are kept: an HTML description and an Open Graph
+description stay separate, as do two blocks that describe the same `@id`.
+Microdata and RDFa are not read.
+
+Extraction is bounded in the content process before returning data to the
+parent. `truncated` is true when a limit dropped or shortened something, so
+absence from a truncated result does not establish that the page omitted a
+declaration. If extraction fails, `getStructuredMetadata` rejects.
+
+The limits bound the work as well as the payload. Reading stops at 50 matching
+`<meta>` tags. JSON-LD has a total budget of 100,000 characters: a block longer
+than what remains is skipped before it is parsed, but a smaller block after it
+is still considered. Once the budget is spent, no further block is examined.
+
+Values come from the page: they are untrusted, may be long, and are often
+missing, wrong, or contradicted by the page's own content. Use them as hints,
+and keep your feature working without them.
+
 (pageextractor-hidden)=
 
 ## Extract in a hidden browser
