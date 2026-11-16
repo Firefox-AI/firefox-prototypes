@@ -16,6 +16,7 @@ MOZ_SRC_FILES += [
     "GoogleDocsExtraction.sys.mjs",
     "PageExtractorEvents.sys.mjs",
     "StructuredMetadata.sys.mjs",
+    "StructuredMetadataReader.sys.mjs",
     "YouTubeExtraction.sys.mjs",
 ]
 
