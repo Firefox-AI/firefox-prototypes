@@ -1160,7 +1160,7 @@ export const SpecialMessageActions = {
         lazy.AIWindowUI.showMonitorCreateForm(window);
         break;
       case "SUBMIT_SMARTWINDOW_PROMPT": {
-        const { prompt, source = "fxms" } = action.data;
+        const { prompt, source = "fxms", onboarding } = action.data;
         const needsOnboarding =
           !lazy.AuthProvider.hasToUConsent ||
           !Services.prefs.getBoolPref(
@@ -1171,7 +1171,10 @@ export const SpecialMessageActions = {
           // Checkbox prefs are applied by the spotlight before it resolves.
           // Record consent and first run here so the switch does not show
           // the Terms dialog again or the first-run page.
-          const accepted = await lazy.ToUSpotlight.show(browser);
+          const accepted =
+            onboarding === "page"
+              ? await lazy.ToUSpotlight.showFirstrunPage(browser)
+              : await lazy.ToUSpotlight.show(browser);
           if (!accepted) {
             break;
           }

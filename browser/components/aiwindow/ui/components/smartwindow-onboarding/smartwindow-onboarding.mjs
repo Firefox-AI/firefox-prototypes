@@ -75,6 +75,10 @@ function getModelOptions(models) {
     });
 }
 
+const TERMS_OF_USE_URL =
+  "https://www.mozilla.org/about/legal/terms/smart-window/";
+const PRIVACY_NOTICE_URL = "https://www.mozilla.org/privacy/smart-window/";
+
 const MEMORIES_OPTIONS = [
   {
     value: "both",
@@ -205,6 +209,14 @@ export class SmartwindowOnboarding extends MozLitElement {
       memoriesChoice: this.memoriesChoice,
       isDefaultWindow: this.isDefaultWindow,
     });
+  }
+
+  #onTermsClick(event) {
+    const link = event.target.closest("a");
+    if (link) {
+      event.preventDefault();
+      this.#emit("link", { url: link.href });
+    }
   }
 
   render() {
@@ -365,6 +377,14 @@ export class SmartwindowOnboarding extends MozLitElement {
             ></moz-toggle>
           </div>
         </div>
+        <p
+          class="terms"
+          data-l10n-id="smartwindow-onboarding-terms"
+          @click=${this.#onTermsClick}
+        >
+          <a data-l10n-name="terms-of-use" href=${TERMS_OF_USE_URL}></a>
+          <a data-l10n-name="privacy-notice" href=${PRIVACY_NOTICE_URL}></a>
+        </p>
         <moz-button
           class="save-button"
           id="save"

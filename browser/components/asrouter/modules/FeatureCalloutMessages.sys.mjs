@@ -100,10 +100,19 @@ function aiTabCallout({
             title: { raw: title },
             subtitle: { raw: subtitle },
             primary_button: {
-              label: { raw: "Try Now" },
+              label: { raw: "spotlight flow" },
               action: {
                 type: "SUBMIT_SMARTWINDOW_PROMPT",
                 data: { prompt },
+                dismiss: true,
+              },
+            },
+            additional_button: {
+              label: { raw: "in tab flow" },
+              style: "primary",
+              action: {
+                type: "SUBMIT_SMARTWINDOW_PROMPT",
+                data: { prompt, onboarding: "page" },
                 dismiss: true,
               },
             },

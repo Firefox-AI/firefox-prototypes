@@ -9,6 +9,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   AboutWelcomeParent: "resource:///actors/AboutWelcomeParent.sys.mjs",
   AIWindow:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
+  AuthProvider:
+    "moz-src:///browser/components/aiwindow/models/AuthProvider.sys.mjs",
   getModelIconSrc: "chrome://browser/content/aiwindow/modules/ModelIcons.mjs",
   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
   Region: "resource://gre/modules/Region.sys.mjs",
@@ -33,14 +35,10 @@ const NON_REMOVABLE_SCREEN_IDS = new Set([
   "AI_WINDOW_CHOOSE_MODEL",
   "AI_WINDOW_MEMORIES",
 ]);
-const {
-  AUTO_MODEL_CHOICE_ID,
-  getAllModelsData,
-  getModelDisplayOrder,
-  isAutoModelEnabled,
-} = ChromeUtils.importESModule(
-  "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs"
-);
+const { AUTO_MODEL_CHOICE_ID, getAllModelsData, getModelDisplayOrder } =
+  ChromeUtils.importESModule(
+    "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs"
+  );
 
 const autoAdvanceMS = Services.prefs.getIntPref(AUTO_ADVANCE_PREF);
 const PROMOTED_BRAND_NAME = "Mistral";
@@ -633,19 +631,28 @@ function getMemoriesChoice() {
   return fromHistory ? "browsing" : "none";
 }
 
+// Spike: saving accepts the Terms, and Auto is faked with choice 1. When opened
+// with #continue, the opener closes this tab and resumes its action.
 function saveSinglePageOnboarding({ detail }) {
   const { prefs, source } = MEMORIES_CHOICES[detail.memoriesChoice];
   const [fromConversation, fromHistory] = prefs;
-  Services.prefs.setStringPref(MODEL_PREF, detail.modelChoiceId);
+  const modelChoiceId =
+    detail.modelChoiceId === AUTO_MODEL_CHOICE_ID ? "1" : detail.modelChoiceId;
+  Services.prefs.setStringPref(MODEL_PREF, modelChoiceId);
   Services.prefs.setBoolPref(MEMORIES_FROM_CONVERSATION_PREF, fromConversation);
   Services.prefs.setBoolPref(MEMORIES_FROM_HISTORY_PREF, fromHistory);
   Services.prefs.setBoolPref(IS_DEFAULT_WINDOW_PREF, detail.isDefaultWindow);
+  lazy.AuthProvider.recordToUConsent();
   Services.prefs.setBoolPref(FIRST_RUN_COMPLETE_PREF, true);
   Glean.smartWindow.onboardingComplete.record({
-    model: detail.modelChoiceId,
+    model: modelChoiceId,
     memory_source: source,
     setdefault_source: setDefaultSource(detail.isDefaultWindow),
   });
+  Services.obs.notifyObservers(window, "smartwindow-firstrun-saved");
+  if (window.location.hash === "#continue") {
+    return;
+  }
   topChromeWindow.openLinkIn(
     Services.urlFormatter.formatURL(
       Services.prefs.getStringPref(
@@ -666,37 +673,38 @@ function saveSinglePageOnboarding({ detail }) {
 
 async function renderFirstRun() {
   const root = document.getElementById("onboarding-root");
-  if (isAutoModelEnabled()) {
-    let loaded = false;
-    try {
-      await import("chrome://browser/content/aiwindow/components/smartwindow-onboarding.mjs");
-      loaded = true;
-    } catch (ex) {
-      console.error("Single-page onboarding failed to load", ex);
-    }
-    if (loaded) {
-      const modelData = await getAllModelsData();
-      const onboarding = document.createElement("smartwindow-onboarding");
-      onboarding.autoAdvanceMS = autoAdvanceMS;
-      onboarding.recommendedModelChoiceId =
-        getPromotedChoiceId(modelData) ?? AUTO_MODEL_CHOICE_ID;
-      onboarding.modelChoiceId = onboarding.recommendedModelChoiceId;
-      onboarding.memoriesChoice = getMemoriesChoice();
-      onboarding.addEventListener(
-        "smartwindow-onboarding:save",
-        saveSinglePageOnboarding
-      );
-      onboarding.addEventListener(
-        "smartwindow-onboarding:impression",
-        recordSinglePageImpression
-      );
-      onboarding.addEventListener(
-        "smartwindow-onboarding:change",
-        recordSinglePageChange
-      );
-      root.appendChild(onboarding);
-      return;
-    }
+  let loaded = false;
+  try {
+    await import("chrome://browser/content/aiwindow/components/smartwindow-onboarding.mjs");
+    loaded = true;
+  } catch (ex) {
+    console.error("Single-page onboarding failed to load", ex);
+  }
+  if (loaded) {
+    const modelData = await getAllModelsData();
+    const onboarding = document.createElement("smartwindow-onboarding");
+    onboarding.autoAdvanceMS = autoAdvanceMS;
+    onboarding.recommendedModelChoiceId =
+      getPromotedChoiceId(modelData) ?? AUTO_MODEL_CHOICE_ID;
+    onboarding.modelChoiceId = onboarding.recommendedModelChoiceId;
+    onboarding.memoriesChoice = getMemoriesChoice();
+    onboarding.addEventListener(
+      "smartwindow-onboarding:save",
+      saveSinglePageOnboarding
+    );
+    onboarding.addEventListener("smartwindow-onboarding:link", ({ detail }) =>
+      topChromeWindow.openWebLinkIn(detail.url, "tab")
+    );
+    onboarding.addEventListener(
+      "smartwindow-onboarding:impression",
+      recordSinglePageImpression
+    );
+    onboarding.addEventListener(
+      "smartwindow-onboarding:change",
+      recordSinglePageChange
+    );
+    root.appendChild(onboarding);
+    return;
   }
 
   const multiStageRoot = document.createElement("div");

@@ -280,6 +280,8 @@ switched to Smart Window. A new window is not opened.
   // Recorded as submit_type on chat telemetry and how_initiated on AI Tab
   // telemetry. Defaults to "fxms".
   source?: string;
+  // "page" shows the first-run page in a tab instead of the Terms spotlight.
+  onboarding?: "page";
 }
 ```
 

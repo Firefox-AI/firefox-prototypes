@@ -147,6 +147,13 @@ p {
   font-weight: var(--font-weight-semibold);
 }
 
+.terms {
+  margin-block: 0 var(--space-large);
+  color: var(--text-color-deemphasized);
+  font-size: var(--font-size-small);
+  text-align: center;
+}
+
 .save-button {
   --button-border-radius: var(--border-radius-circle);
   --button-min-height: var(--size-item-large);
@@ -224,6 +231,7 @@ p {
 
   .setup-header,
   .choices,
+  .terms,
   .save-button {
     animation: screenEnter 0.6s ease backwards;
   }
@@ -232,6 +240,7 @@ p {
     animation-delay: 0.2s;
   }
 
+  .terms,
   .save-button {
     animation-delay: 0.4s;
   }

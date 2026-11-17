@@ -265,6 +265,11 @@
                 "source": {
                   "type": "string",
                   "description": "Identifies the surface that sent the prompt, recorded as submit_type on chat telemetry and how_initiated on AI Tab telemetry. Defaults to \"fxms\"."
+                },
+                "onboarding": {
+                  "type": "string",
+                  "enum": ["page"],
+                  "description": "Show the first-run page in a tab instead of the Terms spotlight when onboarding is incomplete."
                 }
               },
               "required": ["prompt"],

@@ -650,3 +650,8 @@ ai-clarifying-question-close =
 smart-actions-toolbar =
     .aria-label = Smart actions
 smart-actions-loading = Looking at this page…
+
+## Single-screen first run
+
+# Shown just above the save button. The links open the Smart Window Terms of Use and Privacy Notice.
+smartwindow-onboarding-terms = By continuing, you agree to the <a data-l10n-name="terms-of-use">Terms of Use</a> and our <a data-l10n-name="privacy-notice">Privacy Notice</a>.

@@ -8,6 +8,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
 });
 
 const ACCEPTED_TOPIC = "smartwindow-tou-accepted";
+const FIRSTRUN_SAVED_TOPIC = "smartwindow-firstrun-saved";
+const FIRSTRUN_URL = "chrome://browser/content/aiwindow/firstrun.html";
 
 const MEMORIES_FROM_CONVERSATION_PREF =
   "browser.smartwindow.memories.generateFromConversation";
@@ -335,6 +337,38 @@ export const ToUSpotlight = {
       Services.obs.removeObserver(observer, ACCEPTED_TOPIC);
     }
     return accepted;
+  },
+
+  /**
+   * Opens the first-run page in a tab next to the current one and waits for
+   * the user to save it or close it. The tab is closed either way.
+   *
+   * @param {Browser} browser
+   * @returns {Promise<boolean>} Whether the user saved
+   */
+  async showFirstrunPage(browser) {
+    const { gBrowser } = browser.documentGlobal;
+    const tab = gBrowser.addTrustedTab(`${FIRSTRUN_URL}#continue`, {
+      ownerTab: gBrowser.selectedTab,
+      relatedToCurrent: true,
+    });
+    gBrowser.selectedTab = tab;
+
+    let observer;
+    const saved = await new Promise(resolve => {
+      observer = subject => {
+        if (subject.browsingContext === tab.linkedBrowser.browsingContext) {
+          resolve(true);
+        }
+      };
+      Services.obs.addObserver(observer, FIRSTRUN_SAVED_TOPIC);
+      tab.addEventListener("TabClose", () => resolve(false), { once: true });
+    });
+    Services.obs.removeObserver(observer, FIRSTRUN_SAVED_TOPIC);
+    if (saved) {
+      gBrowser.removeTab(tab);
+    }
+    return saved;
   },
 
   /**
