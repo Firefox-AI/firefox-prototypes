@@ -139,10 +139,11 @@ for (const event of reader.findItems("Event", "MusicEvent", "SportsEvent")) {
 - The common fields prefer the page's main schema.org item, then Open Graph,
   then Twitter Cards, then HTML. Each field is `null` when no source declares
   it.
-- `primaryItem` is a heuristic: the first item in document order that is
-  neither site-level (`WebSite`, `Organization`, `BreadcrumbList` and the like,
-  which SEO plugins add to nearly every page) nor a web page. A page with
-  several products or articles may give the wrong one. A feature that knows
+- `primaryItem` is a heuristic: the first top-level item or `mainEntity` that
+  is neither site-level (`WebSite`, `Organization`, `BreadcrumbList` and the
+  like, which SEO plugins add to nearly every page) nor a web page or article,
+  so a `Recipe` wins over the `Article` around it. A page with several
+  products or articles may give the wrong one. A feature that knows
   which item it wants assigns it (`reader.primaryItem = item`), and the common
   fields then follow that item.
 - `findItems` matches types written as terms (`Recipe`), compact IRIs

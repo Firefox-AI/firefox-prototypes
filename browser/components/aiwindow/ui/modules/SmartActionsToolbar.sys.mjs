@@ -49,6 +49,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   renderPrompt: "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
   sanitizeUntrustedContent:
     "moz-src:///browser/components/aiwindow/models/ChatUtils.sys.mjs",
+  StructuredMetadataReader:
+    "moz-src:///toolkit/components/pageextractor/StructuredMetadataReader.sys.mjs",
 });
 
 XPCOMUtils.defineLazyPreferenceGetter(
@@ -171,12 +173,82 @@ function searchAction(win, label) {
 }
 
 /**
+ * @param {?Record<string, any>} item - A schema.org item.
+ * @returns {string} Its types, comma separated.
+ */
+function typeNames(item) {
+  return [item?.["@type"]]
+    .flat()
+    .filter(type => typeof type == "string")
+    .join(", ");
+}
+
+/**
+ * Keys left out of the main item's details: what the other metadata lines
+ * already say, and media, reviews and steps that take room without changing
+ * what to suggest.
+ */
+const OMITTED_DETAILS = new Set([
+  "@context",
+  "@id",
+  "author",
+  "datePublished",
+  "description",
+  "image",
+  "isPartOf",
+  "mainEntityOfPage",
+  "potentialAction",
+  "publisher",
+  "recipeInstructions",
+  "review",
+  "thumbnailUrl",
+  "url",
+  "video",
+]);
+
+/**
+ * @param {ChromeWindow} win
+ * @param {StructuredMetadataReader} reader
+ * @returns {string[]} The first #id of each item type whose url points into
+ *   this page, with what the item says, like "#step-1 (HowToStep: Brown the
+ *   beef)". Recipe steps and FAQ questions often mark where they start this
+ *   way.
+ */
+function metadataSections(win, reader) {
+  const page = win.gBrowser.currentURI;
+  const pages = [page.specIgnoringRef, reader.canonicalUrl?.split("#")[0]];
+  const types = new Set();
+  const sections = [];
+  for (const item of reader.items) {
+    const href = [item.url].flat()[0];
+    const url = typeof href == "string" && URL.parse(href, page.spec);
+    const type = typeNames(item);
+    if (
+      !url?.hash ||
+      !pages.includes(url.href.split("#")[0]) ||
+      types.has(type)
+    ) {
+      continue;
+    }
+    types.add(type);
+    const about = [item.name ?? item.text].flat()[0];
+    sections.push(
+      typeof about == "string" && about.trim()
+        ? `${url.hash} (${type}: ${about.trim().slice(0, 80)})`
+        : `${url.hash} (${type})`
+    );
+  }
+  return sections;
+}
+
+/**
  * Readers for the placeholders a prompt can use, run in this order. Only the
  * ones the prompt uses are read. {page_text|10000} keeps that many characters,
- * {page_anchors|10} that many #ids the page links to on itself and
- * {open_tabs|5} that many tabs. A {#key}...{/key} section is dropped when that
- * value is empty. Page text goes first since it waits for the page to load, so
- * the title read after it is the loaded one.
+ * {page_anchors|10} that many #ids the page links to on itself,
+ * {page_metadata|2000} that many characters of what the page declares about
+ * itself and {open_tabs|5} that many tabs. A {#key}...{/key} section is dropped
+ * when that value is empty. Page text goes first since it waits for the page to
+ * load, so the title read after it is the loaded one.
  *
  * @type {Record<
  *   string,
@@ -200,6 +272,36 @@ const PROMPT_VALUES = {
       }
     }
     return [...anchors].slice(0, limit).join("\n");
+  },
+  page_metadata: async (win, limit) => {
+    const metadata =
+      await win.gBrowser.selectedBrowser.browsingContext.currentWindowGlobal
+        ?.getActor("PageExtractor")
+        .getStructuredMetadata();
+    if (!metadata) {
+      return "";
+    }
+    const reader = new lazy.StructuredMetadataReader(metadata);
+    const item = reader.primaryItem;
+    return [
+      ["Type", typeNames(item)],
+      ["Description", reader.description],
+      ["Author", reader.author],
+      ["Published", reader.publishedTime],
+      ["Site", reader.siteName],
+      ...metadataSections(win, reader).map(section => ["Section", section]),
+      [
+        "Details",
+        item &&
+          JSON.stringify(item, (key, value) =>
+            OMITTED_DETAILS.has(key) ? undefined : value
+          ),
+      ],
+    ]
+      .filter(([, value]) => value)
+      .map(([name, value]) => `${name}: ${value.replace(/\s+/g, " ")}`)
+      .join("\n")
+      .slice(0, limit);
   },
   title: win => lazy.sanitizeUntrustedContent(win.gBrowser.selectedTab.label),
   url: win => win.gBrowser.currentURI.specIgnoringRef,

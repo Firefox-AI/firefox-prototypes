@@ -3,9 +3,28 @@
 <head>
   <meta charset="utf-8">
   <title>Chili recipe</title>
+  <meta name="description" content="A smoky chili
+    for a crowd.">
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Recipe",
+      "name": "Chili",
+      "recipeYield": "8 servings",
+      "recipeInstructions": [
+        { "@type": "HowToStep", "text": "Simmer the beans.", "url": "#steps" },
+        { "@type": "HowToStep", "text": "Top with cheddar.", "url": "#serving" }
+      ],
+      "video": {
+        "@type": "VideoObject",
+        "name": "Chili video",
+        "url": "https://example.org/chili#t=10"
+      }
+    }
+  </script>
 </head>
 <body>
-  <p>Simmer the beans with smoked paprika for an hour.</p>
+  <p id="steps">Simmer the beans with smoked paprika for an hour.</p>
   <p><a href="#serving">How to serve</a></p>
   <div style="height: 5000px"></div>
   <h2 id="serving">Serving suggestions</h2>

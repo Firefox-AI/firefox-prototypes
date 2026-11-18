@@ -438,6 +438,77 @@ add_task(async function test_reader_picks_the_main_item_over_site_furniture() {
   }
 });
 
+add_task(async function test_reader_skips_generic_and_nested_items() {
+  const { html } = await MLTestUtils.serveHTMLInTab({ browser: gBrowser });
+  const recipePage = await html`
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Article",
+            "@id": "#article",
+            "headline": "Easy Lasagna",
+            "potentialAction": [{ "@type": "CommentAction", "name": "Comment" }]
+          },
+          {
+            "@type": "WebPage",
+            "@id": "#webpage",
+            "potentialAction": [{ "@type": "ReadAction" }]
+          },
+          {
+            "@type": "WebSite",
+            "potentialAction": {
+              "@type": "SearchAction",
+              "target": { "@type": "EntryPoint" },
+              "query-input": { "@type": "PropertyValueSpecification" }
+            }
+          },
+          {
+            "@type": "Recipe",
+            "name": "Lasagna",
+            "isPartOf": { "@id": "#article" },
+            "recipeInstructions": [{ "@type": "HowToStep", "text": "Bake." }]
+          }
+        ]
+      }
+    </script>
+  `;
+  try {
+    const reader = new StructuredMetadataReader(
+      await recipePage.getPageExtractor().getStructuredMetadata()
+    );
+    Assert.equal(
+      reader.primaryItem?.["@type"],
+      "Recipe",
+      "A specific item is preferred over the article that wraps it."
+    );
+  } finally {
+    await recipePage.cleanup();
+  }
+
+  const productPage = await html`
+    <script type="application/ld+json">
+      {
+        "@type": "ItemPage",
+        "mainEntity": { "@type": "Product", "name": "Kettle" }
+      }
+    </script>
+  `;
+  try {
+    const reader = new StructuredMetadataReader(
+      await productPage.getPageExtractor().getStructuredMetadata()
+    );
+    Assert.equal(
+      reader.primaryItem?.name,
+      "Kettle",
+      "A page's main entity can be the primary item."
+    );
+  } finally {
+    await productPage.cleanup();
+  }
+});
+
 add_task(async function test_reader_falls_back_to_tags_and_document() {
   const { html } = await MLTestUtils.serveHTMLInTab({ browser: gBrowser });
   const { getPageExtractor, cleanup } = await html`

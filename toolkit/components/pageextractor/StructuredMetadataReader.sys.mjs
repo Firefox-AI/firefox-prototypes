@@ -45,11 +45,11 @@ function schemaOrgName(type) {
 }
 
 /**
- * @param {Record<string, any>} item
+ * @param {any} item
  * @returns {string[]}
  */
 function typesOf(item) {
-  return [item["@type"]]
+  return [item?.["@type"]]
     .flat()
     .filter(type => typeof type == "string")
     .map(schemaOrgName);
@@ -57,10 +57,11 @@ function typesOf(item) {
 
 /**
  * @param {string} type
- * @returns {boolean}
+ * @returns {boolean} Whether the type is a web page or an article, which say
+ *   less about what the page is than a more specific item next to them.
  */
-function isWebPageType(type) {
-  return type.endsWith("Page");
+function isGenericType(type) {
+  return /Page$|^(Article|BlogPosting|NewsArticle)$/.test(type);
 }
 
 /**
@@ -75,6 +76,12 @@ export class StructuredMetadataReader {
   #metadata;
   /** @type {Array<Record<string, any>>} */
   #items = [];
+  /**
+   * The blocks, their array entries and their @graph members.
+   *
+   * @type {Array<unknown>}
+   */
+  #topLevelItems = [];
   /** @type {Map<string, Record<string, any>>} */
   #itemsById = new Map();
   /** @type {Record<string, any> | null} */
@@ -93,6 +100,9 @@ export class StructuredMetadataReader {
         continue;
       }
       this.#collect(block);
+      this.#topLevelItems.push(
+        ...[block].flat().flatMap(entry => [entry?.["@graph"] ?? entry].flat())
+      );
     }
   }
 
@@ -159,10 +169,11 @@ export class StructuredMetadataReader {
   }
 
   /**
-   * The item the page is about. This is a heuristic: the first item in
-   * document order that is neither site-level (like WebSite or
-   * BreadcrumbList) nor a web page, or failing that the first web page. A
-   * page with several products or articles may yield the wrong one, so a
+   * The item the page is about. This is a heuristic over the top-level items
+   * and their mainEntity: the first that is neither site-level (like WebSite
+   * or BreadcrumbList) nor a web page or article, or failing that the first
+   * web page or article. A page with several products or articles may yield
+   * the wrong one, so a
    * consumer that knows which item it wants should assign it, and title,
    * description, image, author and dates then follow that item.
    *
@@ -172,11 +183,14 @@ export class StructuredMetadataReader {
     if (this.#primaryItem) {
       return this.#primaryItem;
     }
-    const candidates = this.#items.filter(item =>
-      typesOf(item).some(type => !SITE_LEVEL_TYPES.has(type))
-    );
+    const candidates = this.#topLevelItems
+      .flatMap(item => [
+        item,
+        ...[item?.mainEntity ?? []].flat().map(entry => this.resolve(entry)),
+      ])
+      .filter(item => typesOf(item).some(type => !SITE_LEVEL_TYPES.has(type)));
     return (
-      candidates.find(item => !typesOf(item).every(isWebPageType)) ??
+      candidates.find(item => !typesOf(item).every(isGenericType)) ??
       candidates[0] ??
       null
     );
