@@ -211,17 +211,53 @@ describe("Smart actions toolbar prompt", () => {
     );
   });
 
-  it("reads the page text for the default prompt", async () => {
+  it("fills a prompt with limited page metadata", async () => {
+    const { content } = await capturePrompt(
+      "{#page_metadata}Metadata:\n{page_metadata}{/page_metadata}"
+    );
+    Assert.equal(
+      content,
+      "Metadata:\nType: Recipe\nDescription: A smoky chili for a crowd.\n" +
+        "Section: #steps (HowToStep: Simmer the beans.)\n" +
+        'Details: {"@type":"Recipe","name":"Chili","recipeYield":"8 servings"}',
+      "The prompt has the main item without its steps and media, the tags " +
+        "and the first same-page section of each type, each on one line"
+    );
+
+    const { content: limited } = await capturePrompt("{page_metadata|12}");
+    Assert.equal(limited, "Type: Recipe", "The metadata is within the limit");
+  });
+
+  it("reads the page text, links and metadata for the default prompt", async () => {
     const { content } = await capturePrompt(null);
     Assert.stringContains(
       content,
       "Simmer the beans with smoked paprika for an hour.",
       "The default prompt includes the page text"
     );
+    Assert.stringContains(
+      content,
+      "Section links on this page:\n#serving",
+      "The default prompt includes the links to the page's sections"
+    );
+    Assert.stringContains(
+      content,
+      "Section: #steps (HowToStep: Simmer the beans.)",
+      "The default prompt offers the metadata's sections for jumps"
+    );
+    Assert.stringContains(
+      content,
+      '"recipeYield":"8 servings"',
+      "The default prompt includes the page metadata"
+    );
   });
 
   it("only reads what a prompt uses", async () => {
     const getText = sandbox.spy(PageExtractorParent.prototype, "getText");
+    const getStructuredMetadata = sandbox.spy(
+      PageExtractorParent.prototype,
+      "getStructuredMetadata"
+    );
     const { content } = await capturePrompt(
       "Suggest {n} for {url} on {date}{#open_tabs} and {open_tabs}{/open_tabs}"
     );
@@ -231,5 +267,9 @@ describe("Smart actions toolbar prompt", () => {
       "Drops the empty open tabs section"
     );
     Assert.ok(getText.notCalled, "Doesn't read the page text");
+    Assert.ok(
+      getStructuredMetadata.notCalled,
+      "Doesn't read the page metadata"
+    );
   });
 });
