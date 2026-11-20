@@ -8,6 +8,7 @@ const { ChatConversation } = ChromeUtils.importESModule(
 );
 
 const CHUNKING_PREF = "browser.smartwindow.pageContent.chunking.enabled";
+const LANDMARKS_PREF = "browser.smartwindow.pageContent.landmarks.enabled";
 
 /**
  * A page longer than one read, with a fact in the middle of its last section.
@@ -185,5 +186,74 @@ add_task(async function test_description_follows_the_budgets() {
     parameters.properties.alternate_queries.description,
     "up to 2 other ways"
   );
+  await SpecialPowers.popPrefEnv();
+});
+
+add_task(async function test_landmarks_without_chunking() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      [CHUNKING_PREF, false],
+      [LANDMARKS_PREF, true],
+    ],
+  });
+  const paragraph = "The recipe needs flour, sugar and butter. ".repeat(20);
+  const { url_list, GetPageContent, cleanup } = await setupGetPageContentTests(`
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"><title>Cookies</title></head>
+    <body>
+      <nav><a href="/a">Home</a> <a href="/b">Site navigation menu</a></nav>
+      <main>
+        <article><h1>Cookies</h1><p>${paragraph}</p></article>
+        <section class="comments">
+          <h2>Reviews</h2>
+          <p>A reviewer swapped the butter for coconut oil.</p>
+        </section>
+      </main>
+    </body>
+    </html>`);
+
+  const [read] = await GetPageContent.getPageContent(
+    { url_list },
+    newConversation("What did reviewers change?")
+  );
+  Assert.stringContains(
+    read.content,
+    "coconut oil",
+    "Reviews in the main landmark are kept."
+  );
+  Assert.ok(
+    !read.content.includes("Site navigation menu"),
+    "Navigation is skipped."
+  );
+
+  await cleanup();
+  await SpecialPowers.popPrefEnv();
+});
+
+add_task(async function test_landmarks_without_chunking_cuts_long_pages() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      [CHUNKING_PREF, false],
+      [LANDMARKS_PREF, true],
+      ["browser.smartwindow.pageContent.maxCharacters", 3000],
+    ],
+  });
+  const { url_list, GetPageContent, cleanup } =
+    await setupGetPageContentTests(longPage());
+
+  const [read] = await GetPageContent.getPageContent(
+    { url_list },
+    newConversation("When did the walrus ledger open?")
+  );
+  info(`Read ${read.content.length} characters`);
+  Assert.stringContains(read.content, "about history", "The start is read.");
+  Assert.ok(
+    !read.content.includes("walrus"),
+    "Without chunking, the read stops at the limit."
+  );
+  Assert.less(read.content.length, 4000, "The limit is the pref's.");
+
+  await cleanup();
   await SpecialPowers.popPrefEnv();
 });

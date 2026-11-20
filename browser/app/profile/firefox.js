@@ -2457,10 +2457,17 @@ pref("browser.smartwindow.endpoint", "https://mlpa-prod-prod-mozilla.freetls.fas
 pref("browser.smartwindow.auth.impl", "fxa");
 pref("browser.smartwindow.auth.guest.mode", "fetch");
 // Proof of concept: fit long pages into get_page_content's budget by query
-// relevance.
+// relevance. Uses landmarks extraction.
 pref("browser.smartwindow.pageContent.chunking.enabled", false);
 // With chunking: how much of a page is extracted before it is chunked.
 pref("browser.smartwindow.pageContent.maxExtractedCharacters", 300000);
+// Proof of concept: extract get_page_content's page text with Page Extractor's
+// landmarks strategy instead of reader mode, without chunking (to compare the
+// two in evals).
+pref("browser.smartwindow.pageContent.landmarks.enabled", false);
+// How much of a page get_page_content returns without chunking (the cut), so
+// evals can also compare a bigger cut.
+pref("browser.smartwindow.pageContent.maxCharacters", 10000);
 // With chunking: characters the first read of a page returns, and how many
 // more reads of the same page a turn may make.
 pref("browser.smartwindow.pageContent.firstBudget", 10000);

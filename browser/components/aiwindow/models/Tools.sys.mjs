@@ -128,6 +128,10 @@ export const PAGE_CONTENT_CHUNKING_PREF =
   "browser.smartwindow.pageContent.chunking.enabled";
 const PAGE_CONTENT_MAX_EXTRACTED_PREF =
   "browser.smartwindow.pageContent.maxExtractedCharacters";
+const PAGE_CONTENT_LANDMARKS_PREF =
+  "browser.smartwindow.pageContent.landmarks.enabled";
+const PAGE_CONTENT_MAX_CHARACTERS_PREF =
+  "browser.smartwindow.pageContent.maxCharacters";
 const PAGE_CONTENT_FOLLOW_UPS_PREF =
   "browser.smartwindow.pageContent.followUps.max";
 const PAGE_CONTENT_FIRST_BUDGET_PREF =
@@ -1238,7 +1242,13 @@ function raceAbort(promise, signal) {
  * Class for handling page content extraction with configurable modes and limits.
  */
 export class GetPageContent {
-  static MAX_CHARACTERS = 10000;
+  /**
+   * @returns {number} How much of a page a read returns without chunking, and
+   *   the default first read with it.
+   */
+  static get MAX_CHARACTERS() {
+    return Services.prefs.getIntPref(PAGE_CONTENT_MAX_CHARACTERS_PREF, 10000);
+  }
   /**
    * @returns {number} How much of a page is extracted for chunking.
    */
@@ -1756,6 +1766,9 @@ export class GetPageContent {
       PAGE_CONTENT_CHUNKING_PREF,
       false
     );
+    const landmarks =
+      chunking ||
+      Services.prefs.getBoolPref(PAGE_CONTENT_LANDMARKS_PREF, false);
     const extraction = await raceAbort(
       pageExtractor.getText(
         {
@@ -1766,7 +1779,7 @@ export class GetPageContent {
           cleanWhitespace: true,
           removeBoilerplate: true,
           sourceUrl,
-          boilerplateStrategy: chunking ? "landmarks" : "reader",
+          boilerplateStrategy: landmarks ? "landmarks" : "reader",
           includeBlocks: chunking,
         },
         traceId
