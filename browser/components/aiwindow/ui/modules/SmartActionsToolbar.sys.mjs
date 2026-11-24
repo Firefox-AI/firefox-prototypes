@@ -50,6 +50,11 @@ const lazy = XPCOMUtils.declareLazy({
   StructuredMetadataReader:
     "moz-src:///toolkit/components/pageextractor/StructuredMetadataReader.sys.mjs",
   actionCount: { pref: "browser.smartwindow.actionsToolbar.actionCount" },
+  console: () =>
+    console.createInstance({
+      logModule: "SmartActionsToolbar",
+      maxLogLevelPref: "browser.smartwindow.actionsToolbar.logLevel",
+    }),
   enabled: {
     pref: "browser.smartwindow.actionsToolbar.enabled",
     onUpdate: () => SmartActionsToolbar.updateAll(),
@@ -266,7 +271,7 @@ const PROMPT_VALUES = {
     }
     const reader = new lazy.StructuredMetadataReader(metadata);
     const item = reader.primaryItem;
-    return [
+    const text = [
       ["Type", typeNames(item)],
       ["Description", reader.description],
       ["Author", reader.author],
@@ -285,6 +290,34 @@ const PROMPT_VALUES = {
       .map(([name, value]) => `${name}: ${value.replace(/\s+/g, " ")}`)
       .join("\n")
       .slice(0, limit);
+    lazy.console.debug("Page metadata", {
+      url: metadata.url,
+      truncated: metadata.truncated,
+      metaTags: metadata.metaTags,
+      jsonLd: metadata.jsonLd.map(block => {
+        try {
+          return JSON.parse(block);
+        } catch {
+          return block;
+        }
+      }),
+      items: reader.items,
+      primaryItem: item,
+      fields: {
+        title: reader.title,
+        description: reader.description,
+        image: reader.image,
+        author: reader.author,
+        publishedTime: reader.publishedTime,
+        modifiedTime: reader.modifiedTime,
+        siteName: reader.siteName,
+        canonicalUrl: reader.canonicalUrl,
+        language: reader.language,
+      },
+      sections: metadataSections(win, reader),
+      prompt: text,
+    });
+    return text;
   },
   title: win => lazy.sanitizeUntrustedContent(win.gBrowser.selectedTab.label),
   url: win => win.gBrowser.currentURI.specIgnoringRef,
